@@ -1,0 +1,11 @@
+---
+- name: validate nginx config
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: reload nginx
+
+- name: reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  listen: reload nginx

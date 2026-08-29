@@ -1,0 +1,50 @@
+---
+- name: Install certbot and nginx plugin
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Check if certificate already exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
+  register: cert_check
+
+- name: Obtain Let's Encrypt certificate
+  command: >
+    certbot certonly --nginx --non-interactive --agree-tos
+    -m {{ letsencrypt_email }}
+    -d {{ app_domain }} -d {{ app_domain_www }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
+  when: not cert_check.stat.exists
+
+- name: Check certificate again after issuance
+  stat:
+    path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
+  register: cert_check_after
+
+- name: Re-render nginx vhost now that certificate exists
+  template:
+    src: "{{ playbook_dir }}/templates/app.conf.j2"
+    dest: /etc/nginx/sites-available/annygo.conf
+    mode: '0644'
+  vars:
+    letsencrypt_cert_exists: "{{ cert_check_after.stat.exists }}"
+  when: cert_check_after.stat.exists
+  notify: reload nginx
+
+- name: Ensure certbot renewal timer is enabled
+  systemd:
+    name: certbot.timer
+    enabled: true
+    state: started
+
+- name: Add nginx reload hook for certificate renewal
+  copy:
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+    content: |
+      #!/bin/sh
+      systemctl reload nginx
+    mode: '0755'

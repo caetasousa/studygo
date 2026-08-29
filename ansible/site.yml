@@ -1,0 +1,20 @@
+---
+- name: Provision annyGo VPS
+  hosts: vps
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - docker
+    - nginx
+    - certbot
+
+  post_tasks:
+    - name: Verify nginx/TLS is responding
+      uri:
+        url: "https://{{ app_domain }}/health"
+        status_code: 200
+      retries: 3
+      delay: 5
+      tags: [verify]

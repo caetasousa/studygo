@@ -1,0 +1,27 @@
+---
+- name: Lock down root SSH access
+  hosts: vps
+  gather_facts: false
+  vars:
+    ansible_user: root
+
+  tasks:
+    - name: Disable root SSH login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: restart sshd
+
+    - name: Disable SSH password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: restart sshd
+
+  handlers:
+    - name: restart sshd
+      systemd:
+        name: ssh
+        state: restarted

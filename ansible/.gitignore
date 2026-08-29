@@ -1,0 +1,5 @@
+.env
+*.retry
+.vault_pass
+inventory/hosts.ini
+inventory/group_vars/vps/secrets.yml

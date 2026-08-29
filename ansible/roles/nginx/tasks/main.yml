@@ -1,0 +1,38 @@
+---
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Check for existing Let's Encrypt certificate
+  stat:
+    path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
+  register: nginx_cert_check
+
+- name: Deploy annyGo vhost
+  template:
+    src: "{{ playbook_dir }}/templates/app.conf.j2"
+    dest: /etc/nginx/sites-available/annygo.conf
+    mode: '0644'
+  vars:
+    letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
+  notify: reload nginx
+
+- name: Enable annyGo vhost
+  file:
+    src: /etc/nginx/sites-available/annygo.conf
+    dest: /etc/nginx/sites-enabled/annygo.conf
+    state: link
+  notify: reload nginx
+
+- name: Ensure nginx is enabled and running
+  systemd:
+    name: nginx
+    enabled: true
+    state: started

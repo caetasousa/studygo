@@ -1,0 +1,90 @@
+---
+- name: Deploy annyGo (backend + worker + frontend)
+  hosts: vps
+  become: true
+  gather_facts: false
+
+  vars:
+    backend_image: "annygo-backend:latest"
+    frontend_image: "annygo-frontend:latest"
+    remote_app_dir: /opt/annygo
+    backend_tarball: /tmp/annygo-backend.tar
+    frontend_tarball: /tmp/annygo-frontend.tar
+
+  tasks:
+    - name: Build images locally
+      command: "docker build -t {{ item.image }} {{ item.context }}"
+      args:
+        chdir: "{{ playbook_dir }}/.."
+      loop:
+        - { image: "{{ backend_image }}", context: "backend" }
+        - { image: "{{ frontend_image }}", context: "frontend" }
+      delegate_to: localhost
+      become: false
+
+    - name: Save images to tarballs locally
+      command: "docker save -o {{ item.tar }} {{ item.image }}"
+      loop:
+        - { image: "{{ backend_image }}", tar: "{{ backend_tarball }}" }
+        - { image: "{{ frontend_image }}", tar: "{{ frontend_tarball }}" }
+      delegate_to: localhost
+      become: false
+
+    - name: Copy image tarballs to the VPS
+      copy:
+        src: "{{ item }}"
+        dest: "{{ item }}"
+        mode: '0644'
+      loop:
+        - "{{ backend_tarball }}"
+        - "{{ frontend_tarball }}"
+
+    - name: Load images on the VPS
+      command: "docker load -i {{ item }}"
+      loop:
+        - "{{ backend_tarball }}"
+        - "{{ frontend_tarball }}"
+
+    - name: Remove tarballs from the VPS
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ backend_tarball }}"
+        - "{{ frontend_tarball }}"
+
+    - name: Remove local tarballs
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ backend_tarball }}"
+        - "{{ frontend_tarball }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Ensure remote app directory exists
+      file:
+        path: "{{ remote_app_dir }}"
+        state: directory
+        mode: '0750'
+
+    - name: Deploy production docker-compose file
+      template:
+        src: "{{ playbook_dir }}/templates/docker-compose.prod.yml.j2"
+        dest: "{{ remote_app_dir }}/docker-compose.yml"
+        mode: '0640'
+
+    - name: Start/refresh the stack
+      command: docker compose up -d
+      args:
+        chdir: "{{ remote_app_dir }}"
+
+    - name: Verify the app responds through nginx
+      uri:
+        url: "https://{{ app_domain }}/health"
+        status_code: 200
+      retries: 5
+      delay: 4
+      delegate_to: localhost
+      become: false

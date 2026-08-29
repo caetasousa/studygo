@@ -1,0 +1,43 @@
+---
+- name: Bootstrap VPS - create sudo user for automation
+  hosts: vps
+  gather_facts: true
+  vars:
+    ansible_user: root
+
+  tasks:
+    - name: Create annyGo user
+      user:
+        name: annyGo
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Add annyGo to sudo group
+      user:
+        name: annyGo
+        groups: sudo
+        append: true
+
+    - name: Allow annyGo passwordless sudo
+      copy:
+        dest: /etc/sudoers.d/annygo
+        content: "annyGo ALL=(ALL) NOPASSWD:ALL\n"
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Create .ssh directory for annyGo
+      file:
+        path: /home/annyGo/.ssh
+        state: directory
+        owner: annyGo
+        group: annyGo
+        mode: '0700'
+
+    - name: Install deploy public key for annyGo
+      copy:
+        src: "{{ lookup('env', 'HOME') }}/.ssh/annygo_deploy.pub"
+        dest: /home/annyGo/.ssh/authorized_keys
+        owner: annyGo
+        group: annyGo
+        mode: '0600'

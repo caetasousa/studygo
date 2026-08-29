@@ -1,0 +1,51 @@
+services:
+  frontend:
+    image: "{{ frontend_image }}"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:{{ frontend_port }}:5173"
+
+  backend:
+    image: "{{ backend_image }}"
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8080"
+      DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
+      JWT_SECRET: "{{ jwt_secret }}"
+      CORS_ORIGIN: "https://{{ app_domain }}"
+      GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
+      GEMINI_MODEL: "{{ gemini_model | default('gemini-2.5-flash') }}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    image: "{{ backend_image }}"
+    entrypoint: ["/worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
+      JWT_SECRET: "{{ jwt_secret }}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

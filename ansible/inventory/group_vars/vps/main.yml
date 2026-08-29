@@ -1,0 +1,7 @@
+---
+app_domain: caetasousa.tech
+app_domain_www: www.caetasousa.tech
+backend_port: 8080
+frontend_port: 5173
+postgres_user: annygo
+postgres_db: annygo
