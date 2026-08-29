@@ -34,9 +34,12 @@ func WithShutdownTimeout(d time.Duration) Option {
 func New(addr string, opts ...Option) *Server {
 	s := &Server{
 		httpServer: &http.Server{
-			Addr:         addr,
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 10 * time.Second,
+			Addr:        addr,
+			ReadTimeout: 15 * time.Second,
+			// Long enough for a normal request; the edital-import handler, which
+			// waits on an external LLM call, extends its own deadline via
+			// http.ResponseController.
+			WriteTimeout: 30 * time.Second,
 		},
 		shutdownTimeout: 10 * time.Second,
 	}

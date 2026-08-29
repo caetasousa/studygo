@@ -16,7 +16,7 @@ services:
       JWT_SECRET: "{{ jwt_secret }}"
       CORS_ORIGIN: "https://{{ app_domain }}"
       GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
-      GEMINI_MODEL: "{{ gemini_model | default('gemini-2.5-flash') }}"
+      GEMINI_MODEL: "{{ gemini_model | default('gemini-3.6-flash') }}"
     depends_on:
       postgres:
         condition: service_healthy

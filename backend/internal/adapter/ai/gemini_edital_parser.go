@@ -45,7 +45,7 @@ type GeminiEditalParser struct {
 
 func NewGeminiEditalParser(apiKey, model string) *GeminiEditalParser {
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-3.6-flash"
 	}
 
 	return &GeminiEditalParser{

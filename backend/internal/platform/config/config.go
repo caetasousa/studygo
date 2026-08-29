@@ -42,7 +42,7 @@ func Load() (Config, error) {
 		JWTSecret:     os.Getenv("JWT_SECRET"),
 		RunMigrations: getEnvBool("RUN_MIGRATIONS", true),
 		GeminiAPIKey:  os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:   getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+		GeminiModel:   getEnv("GEMINI_MODEL", "gemini-3.6-flash"),
 		Argon2: Argon2Params{
 			Memory:      uint32(getEnvInt("ARGON2_MEMORY_KIB", 19*1024)),
 			Iterations:  uint32(getEnvInt("ARGON2_ITERATIONS", 2)),

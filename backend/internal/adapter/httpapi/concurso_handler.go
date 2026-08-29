@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"annygo/internal/port"
 	"annygo/internal/service"
@@ -56,6 +57,9 @@ func (h *ConcursoHandler) ImportarEdital(w http.ResponseWriter, r *http.Request)
 
 		return
 	}
+
+	// The LLM round-trip can take well over the server's default write timeout.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
 
 	entrada, err := lerEntradaEdital(r)
 	if err != nil {

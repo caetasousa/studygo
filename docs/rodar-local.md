@@ -46,7 +46,7 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | de quanto em quanto tempo o worker roda |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
-| `GEMINI_MODEL` | | `gemini-2.5-flash` | modelo usado na importação |
+| `GEMINI_MODEL` | | `gemini-3.6-flash` | modelo usado na importação |
 
 ## 2. Desenvolvimento com hot-reload
 
