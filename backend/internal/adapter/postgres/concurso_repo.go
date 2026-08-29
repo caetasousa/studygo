@@ -285,7 +285,7 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 
 func tipoFonte(t string) string {
 	switch t {
-	case "lei", "jurisprudencia", "material", "link":
+	case "lei", "jurisprudencia", "material", "questoes", "link":
 		return t
 	default:
 		return "link"

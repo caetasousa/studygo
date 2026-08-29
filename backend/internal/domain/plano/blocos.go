@@ -3,7 +3,6 @@ package plano
 import (
 	"math"
 	"strconv"
-	"strings"
 )
 
 // Bloco is one time slice of a day's routine: minutes, a label, and what to do.
@@ -54,10 +53,21 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 			})
 		}
 
+		// Sem nada vencendo, o tempo da revisão volta para o conteúdo em vez de
+		// mandar revisar o vazio.
+		if len(d.Revisoes) == 0 && len(out) > 0 {
+			extra := m5(h*0.16) / len(out)
+			for i := range out {
+				out[i].Minutos += extra
+			}
+
+			return out
+		}
+
 		out = append(out, Bloco{
 			Minutos: m5(h * 0.16),
-			Titulo:  "Revisão espaçada",
-			Detalhe: revisaoDetalhe(perfil),
+			Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
+			Detalhe: revisaoDetalhe(perfil, d.Revisoes),
 		})
 
 		return out
@@ -125,18 +135,16 @@ func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
 	}
 }
 
-// revisaoDetalhe names the user's own review intervals instead of a fixed
-// D-1 / D-7 / D-30.
-func revisaoDetalhe(perfil Perfil) string {
-	partes := make([]string, 0, len(perfil.Intervalos))
-	for _, d := range perfil.Intervalos {
-		partes = append(partes, "D-"+strconv.Itoa(d))
-	}
-
-	como := "retome"
+// revisaoDetalhe says what is actually due today. Retrieval beats re-reading, so
+// by default it asks for questions on each topic before any consulting.
+func revisaoDetalhe(perfil Perfil, vencendo []Revisao) string {
 	if perfil.RevisaoPorQuestoes {
-		como = "resolva questões dos temas de"
+		por := perfil.QuestoesPorRevisao
+
+		return "resolva " + strconv.Itoa(por) + " questões de cada tema ao lado sem consultar antes, " +
+			"e só depois confira o resumo no que errar (" +
+			strconv.Itoa(por*len(vencendo)) + " questões no total)"
 	}
 
-	return como + " " + strings.Join(partes, ", ") + " listados ao lado"
+	return "reconstrua de memória cada tema ao lado e confira o resumo depois"
 }

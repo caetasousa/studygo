@@ -13,6 +13,7 @@ import type {
 	Estatisticas,
 	EstruturaResposta,
 	PlanoResposta,
+	PreviewTEC,
 	RegistroInput
 } from '$lib/types';
 
@@ -155,6 +156,24 @@ export const api = {
 		request<PlanoResposta>(`${planoBase(slug)}/marcos/${id}`, {
 			method: 'PUT',
 			body: JSON.stringify({ cumprido })
+		}),
+
+	registrarRevisao: (slug: string, id: string, questoes: number, acertos: number) =>
+		request<PlanoResposta>(`${planoBase(slug)}/revisoes/${id}`, {
+			method: 'PATCH',
+			body: JSON.stringify({ questoes, acertos })
+		}),
+
+	previewTec: (slug: string, csv: string) =>
+		request<PreviewTEC>(`${planoBase(slug)}/tec/preview`, {
+			method: 'POST',
+			body: JSON.stringify({ csv })
+		}),
+
+	importarTec: (slug: string, csv: string, data: string) =>
+		request<PreviewTEC>(`${planoBase(slug)}/tec`, {
+			method: 'POST',
+			body: JSON.stringify({ csv, data })
 		}),
 
 	reordenar: (slug: string, dataA: string, dataB: string) =>

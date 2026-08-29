@@ -50,6 +50,13 @@ type RegistroInput struct {
 	Blocos    []RegistroBlocoInput `json:"blocos"`
 }
 
+// RevisaoInput is the result of one queued review.
+type RevisaoInput struct {
+	ID       uuid.UUID `json:"-"`
+	Questoes int       `json:"questoes"`
+	Acertos  int       `json:"acertos"`
+}
+
 // RegistroBlocoInput is one discipline's numbers inside a day. When any block is
 // sent the day-level totals are derived from them and the client's own totals
 // are ignored.
@@ -88,12 +95,22 @@ type ConcursoResposta struct {
 }
 
 type DisciplinaResposta struct {
-	Codigo string   `json:"codigo"`
-	Nome   string   `json:"nome"`
-	Bloco  string   `json:"bloco"`
-	Peso   int      `json:"peso"`
-	Cor    int      `json:"cor"` // palette index 0..12
-	Temas  []string `json:"temas"`
+	Codigo string          `json:"codigo"`
+	Nome   string          `json:"nome"`
+	Bloco  string          `json:"bloco"`
+	Peso   int             `json:"peso"`
+	Cor    int             `json:"cor"` // palette index 0..12
+	Temas  []string        `json:"temas"`
+	Fontes []FonteResposta `json:"fontes"`
+}
+
+// FonteResposta is a study source. Tipo "questoes" is the discipline's question
+// bank — the link the day's "abrir no TEC" button uses, with {tema} replaced by
+// the topic of the day.
+type FonteResposta struct {
+	Titulo string `json:"titulo"`
+	URL    string `json:"url"`
+	Tipo   string `json:"tipo"`
 }
 
 type ConteudoResposta struct {
@@ -136,7 +153,20 @@ type DiaResposta struct {
 	Meta       int               `json:"meta"`
 	Blocos     []BlocoResposta   `json:"blocos"`
 	Registro   *RegistroResposta `json:"registro"`
+	Revisoes   []RevisaoResposta `json:"revisoes"`
 	Reordenado bool              `json:"reordenado"`
+}
+
+// RevisaoResposta is one topic due for spaced review on a day.
+type RevisaoResposta struct {
+	ID         uuid.UUID `json:"id"`
+	Disciplina string    `json:"disciplina"`
+	Tema       string    `json:"tema"`
+	Etapa      int       `json:"etapa"`
+	Intervalo  int       `json:"intervalo"` // days this stage waits
+	VenceEm    string    `json:"venceEm"`
+	Atraso     int       `json:"atraso"` // days late, 0 when due today
+	Questoes   int       `json:"questoes"`
 }
 
 type ItemResposta struct {
@@ -247,16 +277,20 @@ type ResumoSemana struct {
 
 // CadernoResposta is GET /api/plano/caderno.
 type CadernoResposta struct {
-	Anotacoes   []AnotacaoResposta `json:"anotacoes"`
-	DiasComNota []DiaNota          `json:"diasComNota"`
-	DiasFracos  []DiaFraco         `json:"diasFracos"`
+	Anotacoes    []AnotacaoResposta `json:"anotacoes"`
+	DiasComNota  []DiaNota          `json:"diasComNota"`
+	DiasFracos   []DiaFraco         `json:"diasFracos"`
+	VencendoHoje []RevisaoResposta  `json:"vencendoHoje"`
 }
 
 type AnotacaoResposta struct {
 	ID         uuid.UUID `json:"id"`
 	Data       *string   `json:"data"`
 	Disciplina *string   `json:"disciplina"`
+	Tema       string    `json:"tema"`
 	Texto      string    `json:"texto"`
+	Origem     string    `json:"origem"`
+	URL        string    `json:"url"`
 	Resolvido  bool      `json:"resolvido"`
 	CriadoEm   time.Time `json:"criadoEm"`
 }
@@ -280,7 +314,9 @@ type DiaFraco struct {
 type AnotacaoInput struct {
 	Data       *string `json:"data"`
 	Disciplina *string `json:"disciplina"`
+	Tema       string  `json:"tema"`
 	Texto      string  `json:"texto"`
+	URL        string  `json:"url"`
 	Resolvido  bool    `json:"resolvido"`
 }
 
@@ -331,4 +367,11 @@ func parseISODate(s string) (time.Time, bool) {
 	}
 
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), true
+}
+
+// ImportacaoTECInput carries the spreadsheet the user confirmed, plus the day
+// the results belong to (today when empty).
+type ImportacaoTECInput struct {
+	CSV  string `json:"csv"`
+	Data string `json:"data"`
 }

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DiaLog from '$lib/components/DiaLog.svelte';
+	import RevisoesDoDia from '$lib/components/RevisoesDoDia.svelte';
+	import { linkQuestoes } from '$lib/tec';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fc, fl, hojeISO, diffDays, nf1, rotulo, tagStyle } from '$lib/format';
 	import type { Dia } from '$lib/types';
@@ -10,13 +12,6 @@
 	const idx = $derived(plano?.hojeIndex ?? null);
 	const diaAtual = $derived(idx !== null && plano ? plano.dias[idx] : null);
 	const ehHoje = $derived(diaAtual?.data === hojeISO());
-
-	const revEspacada = $derived.by(() => {
-		if (idx === null || !plano) return [];
-		return [1, 7, 30]
-			.map((k) => ({ k, d: plano.dias[idx - k] }))
-			.filter((x) => x.d) as { k: number; d: Dia }[];
-	});
 
 	const proximos = $derived(idx !== null && plano ? plano.dias.slice(idx + 1, idx + 7) : []);
 
@@ -74,6 +69,17 @@
 										: ''}
 								</div>
 								<h2 class="tema-grande">{it.tema}</h2>
+								{@const tec = linkQuestoes(
+									plano.concurso.disciplinas.find((d) => d.codigo === it.disciplina),
+									it.tema
+								)}
+								{#if tec}
+									<p class="tec-link">
+										<a class="btn" href={tec} target="_blank" rel="noopener noreferrer">
+											Abrir no TEC ↗
+										</a>
+									</p>
+								{/if}
 							{/each}
 						{/if}
 
@@ -98,29 +104,7 @@
 		</div>
 
 		<div class="side-cards">
-			<div class="card">
-				<div class="card-top">🔁 Revisão espaçada de hoje</div>
-				<div class="card-body">
-					{#if revEspacada.length === 0}
-						A partir do segundo dia, os minutos finais retomam o conteúdo de 1, 7 e 30 dias atrás.
-					{:else}
-						{#each revEspacada as x (x.k)}
-							<div>
-								<b>D-{x.k}</b> · dia {String(x.d.n).padStart(3, '0')} · {fc(x.d.data)}<br />
-								{#if x.d.itens.length}
-									{#each x.d.itens as it, i (i)}
-										<span style="color:var(--c{disc[it.disciplina]?.cor ?? 0}-tx)">{it.disciplina}</span>
-										{it.tema}{i < x.d.itens.length - 1 ? ' · ' : ''}
-									{/each}
-								{:else}
-									<span>{rotulo(x.d.tipo)}</span> {x.d.tema}
-								{/if}
-							</div>
-							<div style="height:10px"></div>
-						{/each}
-					{/if}
-				</div>
-			</div>
+			<RevisoesDoDia revisoes={diaAtual?.revisoes ?? []} />
 
 			<div class="card">
 				<div class="card-top">📆 Próximos dias</div>
@@ -176,3 +160,9 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.tec-link {
+		margin: -4px 0 14px;
+	}
+</style>

@@ -34,6 +34,12 @@ export interface FonteInput {
 	tipo: string;
 }
 
+export interface Fonte {
+	titulo: string;
+	url: string;
+	tipo: string;
+}
+
 export interface DisciplinaInput {
 	nome: string;
 	bloco: 'esp' | 'ger';
@@ -109,6 +115,7 @@ export interface Disciplina {
 	peso: number;
 	cor: number;
 	temas: string[];
+	fontes: Fonte[];
 }
 
 export interface ConteudoItem {
@@ -198,6 +205,17 @@ export interface Registro {
 	blocos: RegistroBloco[];
 }
 
+export interface RevisaoDia {
+	id: string;
+	disciplina: string;
+	tema: string;
+	etapa: number;
+	intervalo: number;
+	venceEm: string;
+	atraso: number;
+	questoes: number;
+}
+
 export interface Dia {
 	n: number;
 	data: string;
@@ -209,6 +227,7 @@ export interface Dia {
 	meta: number;
 	blocos: Bloco[];
 	registro: Registro | null;
+	revisoes: RevisaoDia[];
 	reordenado: boolean;
 }
 
@@ -327,11 +346,16 @@ export interface Estatisticas {
 	acertosTotal: number;
 }
 
+export type OrigemAnotacao = 'manual' | 'revisao' | 'tec' | 'simulado';
+
 export interface AnotacaoView {
 	id: string;
 	data: string | null;
 	disciplina: string | null;
+	tema: string;
 	texto: string;
+	origem: OrigemAnotacao;
+	url: string;
 	resolvido: boolean;
 	criadoEm: string;
 }
@@ -355,13 +379,34 @@ export interface Caderno {
 	anotacoes: AnotacaoView[];
 	diasComNota: DiaNota[];
 	diasFracos: DiaFraco[];
+	vencendoHoje: RevisaoDia[];
 }
 
 export interface AnotacaoInput {
 	data?: string | null;
 	disciplina?: string | null;
+	tema?: string;
 	texto: string;
+	url?: string;
 	resolvido: boolean;
+}
+
+export interface CasamentoTEC {
+	assunto: string;
+	questoes: number;
+	acertos: number;
+	erros: number;
+	pct: number;
+	disciplina: string;
+	nome: string;
+	tema: string;
+}
+
+export interface PreviewTEC {
+	casados: CasamentoTEC[];
+	semCorrespondencia: CasamentoTEC[];
+	questoes: number;
+	acertos: number;
 }
 
 export interface DossieFonte {

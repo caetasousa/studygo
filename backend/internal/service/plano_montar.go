@@ -39,6 +39,10 @@ func (s *PlanoService) montar(
 
 	balanceamento := montarBalanceamento(c, salvo.Config, res, stats)
 
+	// A fila é datada; cada dia do plano recebe o que vence nele. As atrasadas
+	// caem todas no primeiro dia não-passado, para não sumirem da tela.
+	vencendo := distribuirRevisoes(res.Dias, salvo.Revisoes, agora)
+
 	ctxBlocos := plano.BlocoCtx{
 		HorasDia: salvo.Config.HorasDia,
 		Nomes:    nomes,
@@ -69,6 +73,8 @@ func (s *PlanoService) montar(
 			})
 		}
 
+		d.Revisoes = vencendo[plano.DayOf(d.Data)]
+
 		for _, b := range plano.Blocos(d, ctxBlocos) {
 			dr.Blocos = append(dr.Blocos, BlocoResposta{
 				Minutos: b.Minutos,
@@ -80,6 +86,8 @@ func (s *PlanoService) montar(
 		if r, ok := salvo.Registros[plano.DayOf(d.Data)]; ok {
 			dr.Registro = registroToResposta(r)
 		}
+
+		dr.Revisoes = revisoesDoDia(vencendo[plano.DayOf(d.Data)], salvo.Config, agora)
 
 		if _, ok := salvo.Reordenacoes[plano.DayOf(d.Data)]; ok {
 			dr.Reordenado = true
@@ -113,6 +121,11 @@ func montarConcurso(c concurso.Concurso) ConcursoResposta {
 	discs := make([]DisciplinaResposta, 0, len(c.Disciplinas))
 
 	for i, d := range c.Disciplinas {
+		fontes := make([]FonteResposta, 0, len(d.Fontes))
+		for _, f := range d.Fontes {
+			fontes = append(fontes, FonteResposta{Titulo: f.Titulo, URL: f.URL, Tipo: f.Tipo})
+		}
+
 		discs = append(discs, DisciplinaResposta{
 			Codigo: d.Codigo,
 			Nome:   d.Nome,
@@ -120,6 +133,7 @@ func montarConcurso(c concurso.Concurso) ConcursoResposta {
 			Peso:   d.Peso,
 			Cor:    i % 13,
 			Temas:  d.Temas,
+			Fontes: fontes,
 		})
 	}
 
@@ -422,4 +436,81 @@ func abs(x int) int {
 	}
 
 	return x
+}
+
+// distribuirRevisoes buckets the open queue by the plan day it falls on.
+// Anything already overdue lands on the first day that is not in the past, so a
+// missed review resurfaces instead of disappearing behind the calendar.
+func distribuirRevisoes(
+	dias []plano.Dia,
+	fila []plano.Revisao,
+	agora time.Time,
+) map[time.Time][]plano.Revisao {
+	out := map[time.Time][]plano.Revisao{}
+
+	diasComTema := map[time.Time]bool{}
+	primeiroAberto := time.Time{}
+
+	for _, d := range dias {
+		if len(d.Itens) == 0 {
+			continue
+		}
+
+		dia := plano.DayOf(d.Data)
+		diasComTema[dia] = true
+
+		if primeiroAberto.IsZero() && !dia.Before(agora) {
+			primeiroAberto = dia
+		}
+	}
+
+	for _, r := range fila {
+		if r.FeitaEm != nil {
+			continue
+		}
+
+		alvo := plano.DayOf(r.VenceEm)
+
+		if alvo.Before(agora) || !diasComTema[alvo] {
+			if primeiroAberto.IsZero() {
+				continue
+			}
+
+			alvo = primeiroAberto
+		}
+
+		out[alvo] = append(out[alvo], r)
+	}
+
+	return out
+}
+
+func revisoesDoDia(rs []plano.Revisao, cfg plano.Config, agora time.Time) []RevisaoResposta {
+	perfil := cfg.Perfil.Normalizar()
+	out := make([]RevisaoResposta, 0, len(rs))
+
+	for _, r := range rs {
+		intervalo := 0
+		if r.Etapa < len(perfil.Intervalos) {
+			intervalo = perfil.Intervalos[r.Etapa]
+		}
+
+		atraso := plano.DiffDays(plano.DayOf(r.VenceEm), agora)
+		if atraso < 0 {
+			atraso = 0
+		}
+
+		out = append(out, RevisaoResposta{
+			ID:         r.ID,
+			Disciplina: r.Disciplina,
+			Tema:       r.Tema,
+			Etapa:      r.Etapa,
+			Intervalo:  intervalo,
+			VenceEm:    r.VenceEm.Format(isoDate),
+			Atraso:     atraso,
+			Questoes:   perfil.QuestoesPorRevisao,
+		})
+	}
+
+	return out
 }

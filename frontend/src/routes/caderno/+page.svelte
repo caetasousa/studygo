@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DossieModal from '$lib/components/DossieModal.svelte';
+	import ImportarTEC from '$lib/components/ImportarTEC.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fc } from '$lib/format';
 	import type { Caderno } from '$lib/types';
@@ -17,13 +18,16 @@
 
 	const disciplinas = $derived(planoStore.plano?.concurso.disciplinas ?? []);
 
-	$effect(() => {
-		if (planoStore.plano && !dados) {
-			planoStore
-				.caderno()
-				.then((d) => (dados = d))
-				.catch((e) => (erro = e instanceof Error ? e.message : 'Erro'));
+	async function carregar() {
+		try {
+			dados = await planoStore.caderno();
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'Erro';
 		}
+	}
+
+	$effect(() => {
+		if (planoStore.plano && !dados) void carregar();
 	});
 
 	async function adicionar(e: SubmitEvent) {
@@ -50,6 +54,8 @@
 			texto: a.texto,
 			disciplina: a.disciplina,
 			data: a.data,
+			tema: a.tema,
+			url: a.url,
 			resolvido: !a.resolvido
 		});
 	}
@@ -79,6 +85,19 @@
 
 {#if dados}
 	<div class="page">
+		{#if dados.vencendoHoje.length > 0}
+			<div class="callout">
+				<span class="em">🔁</span>
+				<div>
+					<b>{dados.vencendoHoje.length} temas vencendo hoje</b> na revisão espaçada. Lance o
+					resultado em <a href="/">Hoje</a> — o que ficar abaixo de
+					{planoStore.plano?.config.perfil.limiarFraco ?? 70}% entra aqui sozinho.
+				</div>
+			</div>
+		{/if}
+
+		<ImportarTEC onimportado={carregar} />
+
 		{#if disciplinas.length > 0}
 			<div class="card">
 				<div class="card-body">
@@ -150,7 +169,15 @@
 							onchange={() => alternar(a)}
 							aria-label="Resolvido"
 						/>
-						<span class="tx" style:opacity={a.resolvido ? 0.5 : 1}>{a.texto}</span>
+						<span class="tx" style:opacity={a.resolvido ? 0.5 : 1}>
+							{#if a.tema}<b class="tema">{a.tema}</b>{/if}{a.texto}
+							{#if a.origem !== 'manual'}
+								<span class="origem">{a.origem}</span>
+							{/if}
+							{#if a.url}
+								<a class="fonte" href={a.url} target="_blank" rel="noopener noreferrer">questões ↗</a>
+							{/if}
+						</span>
 						<span class="fa">{nomeDisc(a.disciplina)}</span>
 						<button
 							class="mv-btn"
@@ -205,3 +232,28 @@
 {:else if !erro}
 	<p class="page-sub">Carregando…</p>
 {/if}
+
+<style>
+	.tema {
+		font-weight: 600;
+		margin-right: 6px;
+	}
+	.origem {
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		background: var(--bg-soft);
+		border: 1px solid var(--border);
+		color: var(--text-faint);
+		padding: 1px 5px;
+		border-radius: 4px;
+		margin-left: 6px;
+		white-space: nowrap;
+	}
+	.fonte {
+		font-size: 11.5px;
+		margin-left: 6px;
+		white-space: nowrap;
+	}
+</style>

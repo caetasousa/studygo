@@ -44,29 +44,14 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	enviados := 0
 
 	for _, pce := range planos {
+		itens := lembreteItens(pce.Plano, hoje)
+		if len(itens) == 0 {
+			continue
+		}
+
 		c, err := s.concursos.ConcursoByID(ctx, pce.ConcursoID)
 		if err != nil {
 			return enviados, fmt.Errorf("loading concurso %s: %w", pce.ConcursoID, err)
-		}
-
-		res := plano.Gerar(pce.Plano.Config, &c)
-		plano.AplicarReordenacoes(res.Dias, pce.Plano.Reordenacoes)
-
-		hojeIdx := -1
-		for i, d := range res.Dias {
-			if plano.DayOf(d.Data).Equal(hoje) {
-				hojeIdx = i
-				break
-			}
-		}
-
-		if hojeIdx < 0 {
-			continue
-		}
-
-		itens := lembreteItens(res.Dias, hoje, pce.Plano.Config.Perfil.Normalizar().Intervalos)
-		if len(itens) == 0 {
-			continue
 		}
 
 		dica := ""
@@ -93,40 +78,17 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	return enviados, nil
 }
 
-// lembreteItens collects what is due for review today, one entry per interval.
-// The offsets are calendar days, not positions in the plan: for someone who
-// studies Monday to Friday, "seven days ago" is not seven plan days back.
-func lembreteItens(dias []plano.Dia, hoje time.Time, intervalos []int) []port.LembreteItem {
+// lembreteItens collects what the spaced-review queue owes today — overdue
+// entries included, since a missed review is exactly the one worth chasing.
+func lembreteItens(salvo plano.Salvo, hoje time.Time) []port.LembreteItem {
 	itens := []port.LembreteItem{}
 
-	porData := make(map[time.Time]plano.Dia, len(dias))
-	for _, d := range dias {
-		porData[plano.DayOf(d.Data)] = d
-	}
-
-	for _, k := range intervalos {
-		d, ok := porData[plano.AddDays(hoje, -k)]
-		if !ok {
-			continue
-		}
-
-		if len(d.Itens) == 0 {
-			itens = append(itens, port.LembreteItem{
-				Distancia:  k,
-				Disciplina: "—",
-				Tema:       d.Tema,
-			})
-
-			continue
-		}
-
-		for _, it := range d.Itens {
-			itens = append(itens, port.LembreteItem{
-				Distancia:  k,
-				Disciplina: it.Disciplina,
-				Tema:       it.Tema,
-			})
-		}
+	for _, r := range plano.VencidasAte(salvo.Revisoes, hoje) {
+		itens = append(itens, port.LembreteItem{
+			Distancia:  plano.DiffDays(r.OrigemData, hoje),
+			Disciplina: r.Disciplina,
+			Tema:       r.Tema,
+		})
 	}
 
 	return itens

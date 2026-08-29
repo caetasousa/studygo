@@ -48,6 +48,10 @@ type Dia struct {
 	Itens  []ItemDia `json:"itens"`
 	Tema   string    `json:"tema"` // headline for non-content days
 	Meta   int       `json:"meta"` // target number of questions
+
+	// Revisoes is filled in by the service from the persisted queue — the engine
+	// itself is pure and leaves it empty.
+	Revisoes []Revisao `json:"revisoes"`
 }
 
 // Config is the user's plan settings.

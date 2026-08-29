@@ -1,7 +1,15 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
-import type { AnotacaoInput, Caderno, ConfigInput, Estatisticas, PlanoResposta, RegistroInput } from '$lib/types';
+import type {
+	AnotacaoInput,
+	Caderno,
+	ConfigInput,
+	Estatisticas,
+	PlanoResposta,
+	PreviewTEC,
+	RegistroInput
+} from '$lib/types';
 
 const cacheKey = (slug: string) => `annygo.plano.${slug}.v1`;
 
@@ -103,6 +111,8 @@ class PlanoStore {
 		this.run((s) => api.registrarDia(s, data, input));
 	limparRegistros = () => this.run((s) => api.limparRegistros(s));
 	marcarMarco = (id: string, cumprido: boolean) => this.run((s) => api.marcarMarco(s, id, cumprido));
+	registrarRevisao = (id: string, questoes: number, acertos: number) =>
+		this.run((s) => api.registrarRevisao(s, id, questoes, acertos));
 	reordenar = (a: string, b: string) => this.run((s) => api.reordenar(s, a, b));
 	restaurarOrdem = () => this.run((s) => api.restaurarOrdem(s));
 
@@ -119,6 +129,12 @@ class PlanoStore {
 	removerAnotacao = (id: string): Promise<Caderno> => api.removerAnotacao(this.slug, id);
 	dossie = (disciplina: string) => api.dossie(this.slug, disciplina);
 	csvUrl = () => api.exportCsvUrl(this.slug);
+	previewTec = (csv: string): Promise<PreviewTEC> => api.previewTec(this.slug, csv);
+	importarTec = async (csv: string, data: string): Promise<PreviewTEC> => {
+		const res = await api.importarTec(this.slug, csv, data);
+		await this.carregar(true);
+		return res;
+	};
 }
 
 export const planoStore = new PlanoStore();

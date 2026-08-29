@@ -88,6 +88,13 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		return plano.Salvo{}, err
 	}
 
+	revisoes, err := r.ListRevisoes(ctx, s.ID)
+	if err != nil {
+		return plano.Salvo{}, err
+	}
+
+	s.Revisoes = revisoes
+
 	return s, nil
 }
 
@@ -418,7 +425,7 @@ func (r *PlanoRepo) DeleteRegistros(ctx context.Context, planoID uuid.UUID) erro
 		return fmt.Errorf("deleting marco_checks: %w", err)
 	}
 
-	return nil
+	return r.DeleteRevisoes(ctx, planoID)
 }
 
 func (r *PlanoRepo) SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error {
@@ -438,7 +445,8 @@ func (r *PlanoRepo) SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cu
 func (r *PlanoRepo) ListAnotacoes(ctx context.Context, planoID uuid.UUID) ([]plano.Anotacao, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, data, disciplina_id, texto, resolvido, criado_em, atualizado_em
+		`SELECT id, data, disciplina_id, tema, texto, origem, url, proxima_revisao,
+		        resolvido, criado_em, atualizado_em
 		 FROM anotacoes WHERE plano_id = $1 ORDER BY criado_em DESC`,
 		planoID,
 	)
@@ -452,7 +460,8 @@ func (r *PlanoRepo) ListAnotacoes(ctx context.Context, planoID uuid.UUID) ([]pla
 	for rows.Next() {
 		var a plano.Anotacao
 		if err := rows.Scan(
-			&a.ID, &a.Data, &a.DisciplinaID, &a.Texto, &a.Resolvido, &a.CriadoEm, &a.AtualizadoEm,
+			&a.ID, &a.Data, &a.DisciplinaID, &a.Tema, &a.Texto, &a.Origem, &a.URL,
+			&a.ProximaRevisao, &a.Resolvido, &a.CriadoEm, &a.AtualizadoEm,
 		); err != nil {
 			return nil, fmt.Errorf("scanning anotacao: %w", err)
 		}
@@ -470,10 +479,12 @@ func (r *PlanoRepo) CreateAnotacao(
 ) (plano.Anotacao, error) {
 	err := r.pool.QueryRow(
 		ctx,
-		`INSERT INTO anotacoes (plano_id, data, disciplina_id, texto, resolvido)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO anotacoes
+		   (plano_id, data, disciplina_id, tema, texto, origem, url, proxima_revisao, resolvido)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id, criado_em, atualizado_em`,
-		planoID, a.Data, a.DisciplinaID, a.Texto, a.Resolvido,
+		planoID, a.Data, a.DisciplinaID, a.Tema, a.Texto, string(origemDe(a.Origem)),
+		a.URL, a.ProximaRevisao, a.Resolvido,
 	).Scan(&a.ID, &a.CriadoEm, &a.AtualizadoEm)
 	if err != nil {
 		return plano.Anotacao{}, fmt.Errorf("inserting anotacao: %w", err)
@@ -489,10 +500,13 @@ func (r *PlanoRepo) UpdateAnotacao(
 ) (plano.Anotacao, error) {
 	err := r.pool.QueryRow(
 		ctx,
-		`UPDATE anotacoes SET texto = $3, resolvido = $4, data = $5, disciplina_id = $6, atualizado_em = now()
+		`UPDATE anotacoes SET
+		   texto = $3, resolvido = $4, data = $5, disciplina_id = $6,
+		   tema = $7, url = $8, proxima_revisao = $9, atualizado_em = now()
 		 WHERE id = $1 AND plano_id = $2
 		 RETURNING id, criado_em, atualizado_em`,
 		a.ID, planoID, a.Texto, a.Resolvido, a.Data, a.DisciplinaID,
+		a.Tema, a.URL, a.ProximaRevisao,
 	).Scan(&a.ID, &a.CriadoEm, &a.AtualizadoEm)
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -601,4 +615,148 @@ func toInt32Slice(xs []int) []int32 {
 	}
 
 	return out
+}
+
+// origemDe keeps an unknown origin out of the CHECK constraint.
+func origemDe(o plano.Origem) plano.Origem {
+	switch o {
+	case plano.OrigemRevisao, plano.OrigemTEC, plano.OrigemSimulado:
+		return o
+	default:
+		return plano.OrigemManual
+	}
+}
+
+func (r *PlanoRepo) ListRevisoes(ctx context.Context, planoID uuid.UUID) ([]plano.Revisao, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT id, disciplina, tema, origem_data, etapa, vence_em, feita_em, questoes, acertos
+		 FROM revisoes WHERE plano_id = $1 AND feita_em IS NULL ORDER BY vence_em, disciplina`,
+		planoID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying revisoes: %w", err)
+	}
+	defer rows.Close()
+
+	out := []plano.Revisao{}
+
+	for rows.Next() {
+		var rev plano.Revisao
+		if err := rows.Scan(
+			&rev.ID, &rev.Disciplina, &rev.Tema, &rev.OrigemData, &rev.Etapa,
+			&rev.VenceEm, &rev.FeitaEm, &rev.Questoes, &rev.Acertos,
+		); err != nil {
+			return nil, fmt.Errorf("scanning revisao: %w", err)
+		}
+
+		out = append(out, rev)
+	}
+
+	return out, rows.Err()
+}
+
+func (r *PlanoRepo) EnfileirarRevisoes(
+	ctx context.Context,
+	planoID uuid.UUID,
+	rs []plano.Revisao,
+) error {
+	for _, rev := range rs {
+		if _, err := r.pool.Exec(
+			ctx,
+			`INSERT INTO revisoes (plano_id, disciplina, tema, origem_data, etapa, vence_em)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 ON CONFLICT (plano_id, disciplina, tema, etapa) DO NOTHING`,
+			planoID, rev.Disciplina, rev.Tema, rev.OrigemData, rev.Etapa, rev.VenceEm,
+		); err != nil {
+			return fmt.Errorf("enqueueing revisao: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (r *PlanoRepo) RevisaoByID(
+	ctx context.Context,
+	planoID, revisaoID uuid.UUID,
+) (plano.Revisao, error) {
+	var rev plano.Revisao
+
+	err := r.pool.QueryRow(
+		ctx,
+		`SELECT id, disciplina, tema, origem_data, etapa, vence_em, feita_em, questoes, acertos
+		 FROM revisoes WHERE id = $1 AND plano_id = $2`,
+		revisaoID, planoID,
+	).Scan(
+		&rev.ID, &rev.Disciplina, &rev.Tema, &rev.OrigemData, &rev.Etapa,
+		&rev.VenceEm, &rev.FeitaEm, &rev.Questoes, &rev.Acertos,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return plano.Revisao{}, plano.ErrNotFound
+	}
+
+	if err != nil {
+		return plano.Revisao{}, fmt.Errorf("querying revisao: %w", err)
+	}
+
+	return rev, nil
+}
+
+// ConcluirRevisao closes one review and opens the next stage in one transaction,
+// so the queue can never lose a topic halfway through.
+func (r *PlanoRepo) ConcluirRevisao(
+	ctx context.Context,
+	planoID uuid.UUID,
+	feita plano.Revisao,
+	proxima *plano.Revisao,
+) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	ct, err := tx.Exec(
+		ctx,
+		`UPDATE revisoes SET feita_em = $3, questoes = $4, acertos = $5
+		 WHERE id = $1 AND plano_id = $2`,
+		feita.ID, planoID, feita.FeitaEm, feita.Questoes, feita.Acertos,
+	)
+	if err != nil {
+		return fmt.Errorf("closing revisao: %w", err)
+	}
+
+	if ct.RowsAffected() == 0 {
+		return plano.ErrNotFound
+	}
+
+	if proxima != nil {
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO revisoes (plano_id, disciplina, tema, origem_data, etapa, vence_em)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 ON CONFLICT (plano_id, disciplina, tema, etapa)
+			 DO UPDATE SET vence_em = EXCLUDED.vence_em, feita_em = NULL,
+			               questoes = NULL, acertos = NULL`,
+			planoID, proxima.Disciplina, proxima.Tema, proxima.OrigemData,
+			proxima.Etapa, proxima.VenceEm,
+		); err != nil {
+			return fmt.Errorf("enqueueing next revisao: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PlanoRepo) DeleteRevisoes(ctx context.Context, planoID uuid.UUID) error {
+	if _, err := r.pool.Exec(ctx, `DELETE FROM revisoes WHERE plano_id = $1`, planoID); err != nil {
+		return fmt.Errorf("deleting revisoes: %w", err)
+	}
+
+	return nil
 }

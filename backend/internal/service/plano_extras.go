@@ -131,7 +131,12 @@ func (s *PlanoService) Caderno(ctx context.Context, userID uuid.UUID, slug strin
 		return CadernoResposta{}, err
 	}
 
-	return montarCaderno(c, salvo, res.Dias, anots), nil
+	caderno := montarCaderno(c, salvo, res.Dias, anots)
+
+	hoje := plano.DayOf(s.clock.Now())
+	caderno.VencendoHoje = revisoesDoDia(plano.VencidasAte(salvo.Revisoes, hoje), salvo.Config, hoje)
+
+	return caderno, nil
 }
 
 // CriarAnotacao adds a notebook entry.
@@ -209,6 +214,8 @@ func anotacaoFromInput(c concurso.Concurso, base plano.Anotacao, in AnotacaoInpu
 
 	base.Texto = in.Texto
 	base.Resolvido = in.Resolvido
+	base.Tema = strings.TrimSpace(in.Tema)
+	base.URL = strings.TrimSpace(in.URL)
 	base.Data = nil
 	base.DisciplinaID = nil
 
@@ -252,7 +259,10 @@ func montarCaderno(
 	for _, a := range anots {
 		ar := AnotacaoResposta{
 			ID:        a.ID,
+			Tema:      a.Tema,
 			Texto:     a.Texto,
+			Origem:    string(a.Origem),
+			URL:       a.URL,
 			Resolvido: a.Resolvido,
 			CriadoEm:  a.CriadoEm,
 		}
@@ -312,9 +322,10 @@ func montarCaderno(
 	}
 
 	return CadernoResposta{
-		Anotacoes:   anotResp,
-		DiasComNota: comNota,
-		DiasFracos:  fracos,
+		Anotacoes:    anotResp,
+		DiasComNota:  comNota,
+		DiasFracos:   fracos,
+		VencendoHoje: []RevisaoResposta{},
 	}
 }
 
@@ -401,7 +412,17 @@ func (s *PlanoService) Dossie(
 			marca = "- [x]"
 		}
 
-		fmt.Fprintf(&b, "%s %s\n", marca, a.Texto)
+		prefixo := ""
+		if a.Tema != "" {
+			prefixo = "**" + a.Tema + "** — "
+		}
+
+		sufixo := ""
+		if a.Origem != "" && a.Origem != string(plano.OrigemManual) {
+			sufixo = " _(" + a.Origem + ")_"
+		}
+
+		fmt.Fprintf(&b, "%s %s%s%s\n", marca, prefixo, a.Texto, sufixo)
 		escreveuAlgo = true
 	}
 
@@ -500,7 +521,52 @@ func (s *PlanoService) ExportarCSV(ctx context.Context, userID uuid.UUID, slug s
 		})
 	}
 
+	anots, err := s.planos.ListAnotacoes(ctx, salvo.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	escreverCadernoCSV(&b, c, anots)
+
 	return []byte(b.String()), nil
+}
+
+// escreverCadernoCSV appends the error notebook as a second table, so an export
+// carries the reasoning and not only the numbers.
+func escreverCadernoCSV(b *strings.Builder, c concurso.Concurso, anots []plano.Anotacao) {
+	if len(anots) == 0 {
+		return
+	}
+
+	nomePorID := map[uuid.UUID]string{}
+	for _, d := range c.Disciplinas {
+		nomePorID[d.ID] = d.Nome
+	}
+
+	b.WriteByte('\n')
+	writeCSVRow(b, []string{"caderno_data", "caderno_disciplina", "caderno_tema", "caderno_origem", "caderno_texto", "caderno_resolvido", "caderno_link"})
+
+	for _, a := range anots {
+		data := ""
+		if a.Data != nil {
+			data = a.Data.Format("02/01/2006")
+		}
+
+		disciplina := ""
+		if a.DisciplinaID != nil {
+			disciplina = nomePorID[*a.DisciplinaID]
+		}
+
+		resolvido := "não"
+		if a.Resolvido {
+			resolvido = "sim"
+		}
+
+		writeCSVRow(b, []string{
+			data, disciplina, a.Tema, string(a.Origem),
+			strings.ReplaceAll(a.Texto, `"`, "'"), resolvido, a.URL,
+		})
+	}
 }
 
 func writeCSVRow(b *strings.Builder, cols []string) {

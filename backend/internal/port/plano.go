@@ -27,6 +27,21 @@ type PlanoRepository interface {
 
 	SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error
 
+	// ListRevisoes returns the plan's open review queue (feita_em IS NULL).
+	ListRevisoes(ctx context.Context, planoID uuid.UUID) ([]plano.Revisao, error)
+
+	// EnfileirarRevisoes adds reviews, ignoring any topic already queued at the
+	// same stage — re-completing a day must not duplicate its queue entries.
+	EnfileirarRevisoes(ctx context.Context, planoID uuid.UUID, rs []plano.Revisao) error
+
+	// ConcluirRevisao marks one review done with its result and enqueues the
+	// next stage, if there is one.
+	ConcluirRevisao(ctx context.Context, planoID uuid.UUID, feita plano.Revisao, proxima *plano.Revisao) error
+
+	RevisaoByID(ctx context.Context, planoID, revisaoID uuid.UUID) (plano.Revisao, error)
+
+	DeleteRevisoes(ctx context.Context, planoID uuid.UUID) error
+
 	ListAnotacoes(ctx context.Context, planoID uuid.UUID) ([]plano.Anotacao, error)
 	CreateAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
 	UpdateAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
