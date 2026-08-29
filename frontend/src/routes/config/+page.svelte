@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
+	import PerfilEstudo from '$lib/components/PerfilEstudo.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -147,6 +148,8 @@
 						/>
 					</div>
 				</div>
+
+				<PerfilEstudo />
 
 				<h2 class="sec">Reordenação manual</h2>
 				<p class="page-sub" style="margin-top:0">

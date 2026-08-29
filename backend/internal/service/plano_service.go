@@ -316,6 +316,7 @@ func defaultConfig(c concurso.Concurso, agora time.Time) plano.Config {
 		DiaRevisao:    5,
 		RetaFinalDias: c.RetaPadraoDias,
 		Questoes:      questoes,
+		Perfil:        plano.PerfilPadrao(),
 	}
 }
 
@@ -386,6 +387,8 @@ func aplicarConfigInput(
 		}
 	}
 
+	cfg.Perfil = aplicarPerfilInput(cfg.Perfil, c, in.Perfil)
+
 	tema := salvo.TemaUI
 	switch in.TemaUI {
 	case "light", "dark", "system":
@@ -393,6 +396,54 @@ func aplicarConfigInput(
 	}
 
 	return cfg, tema, nil
+}
+
+// aplicarPerfilInput patches the study profile. Every field is optional, so an
+// old client that never sends `perfil` keeps the profile it already had.
+func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput) plano.Perfil {
+	atual = atual.Normalizar()
+
+	if in == nil {
+		return atual
+	}
+
+	if in.Simulados != nil {
+		atual.Simulados = plano.Frequencia(*in.Simulados)
+	}
+
+	if in.Discursiva != nil {
+		atual.Discursiva = *in.Discursiva
+	}
+
+	if in.Intervalos != nil {
+		atual.Intervalos = *in.Intervalos
+	}
+
+	if in.PctQuestoes != nil {
+		atual.PctQuestoes = *in.PctQuestoes
+	}
+
+	if in.RevisaoPorQuestoes != nil {
+		atual.RevisaoPorQuestoes = *in.RevisaoPorQuestoes
+	}
+
+	if in.QuestoesPorRevisao != nil {
+		atual.QuestoesPorRevisao = *in.QuestoesPorRevisao
+	}
+
+	if in.LimiarFraco != nil {
+		atual.LimiarFraco = *in.LimiarFraco
+	}
+
+	for codigo, modo := range in.Modos {
+		if c.DisciplinaByCodigo(codigo) == nil {
+			continue
+		}
+
+		atual.Modos[codigo] = plano.Modo(modo)
+	}
+
+	return atual.Normalizar()
 }
 
 func normalizarDias(dias []int) []int {

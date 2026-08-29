@@ -29,13 +29,20 @@ func NewPlanoRepo(pool *pgxpool.Pool) *PlanoRepo {
 func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUID) (plano.Salvo, error) {
 	s := plano.NewSalvo()
 
-	var diasEstudo []int32
-	var horasDia float64
+	var (
+		diasEstudo []int32
+		intervalos []int32
+		horasDia   float64
+		pctQuest   float64
+		simulados  string
+	)
 
 	err := r.pool.QueryRow(
 		ctx,
 		`SELECT id, user_id, concurso_id, inicio, prova, horas_dia::float8,
-		        dias_estudo, dia_revisao, reta_final_dias, tema_ui, criado_em, atualizado_em
+		        dias_estudo, dia_revisao, reta_final_dias, tema_ui, criado_em, atualizado_em,
+		        simulados, discursiva, intervalos_revisao, pct_questoes::float8,
+		        revisao_por_questoes, questoes_por_revisao, limiar_fraco
 		 FROM planos WHERE user_id = $1 AND concurso_id = $2`,
 		userID,
 		concursoID,
@@ -43,6 +50,9 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		&s.ID, &s.UserID, &s.ConcursoID, &s.Config.Inicio, &s.Config.Prova, &horasDia,
 		&diasEstudo, &s.Config.DiaRevisao, &s.Config.RetaFinalDias, &s.TemaUI,
 		&s.CriadoEm, &s.AtualizadoEm,
+		&simulados, &s.Config.Perfil.Discursiva, &intervalos, &pctQuest,
+		&s.Config.Perfil.RevisaoPorQuestoes, &s.Config.Perfil.QuestoesPorRevisao,
+		&s.Config.Perfil.LimiarFraco,
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -57,7 +67,12 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 	s.Config.DiasEstudo = toIntSlice(diasEstudo)
 	s.Config.Questoes = map[string]int{}
 
-	if err := r.loadQuestoes(ctx, s.ID, &s); err != nil {
+	s.Config.Perfil.Simulados = plano.Frequencia(simulados)
+	s.Config.Perfil.Intervalos = toIntSlice(intervalos)
+	s.Config.Perfil.PctQuestoes = pctQuest
+	s.Config.Perfil.Modos = map[string]plano.Modo{}
+
+	if err := r.loadDisciplinas(ctx, s.ID, &s); err != nil {
 		return plano.Salvo{}, err
 	}
 
@@ -76,27 +91,30 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 	return s, nil
 }
 
-func (r *PlanoRepo) loadQuestoes(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
+func (r *PlanoRepo) loadDisciplinas(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT d.codigo, pq.questoes
-		 FROM plano_questoes pq JOIN disciplinas d ON d.id = pq.disciplina_id
-		 WHERE pq.plano_id = $1`,
+		`SELECT disciplina, questoes, modo FROM plano_disciplinas WHERE plano_id = $1`,
 		planoID,
 	)
 	if err != nil {
-		return fmt.Errorf("querying plano_questoes: %w", err)
+		return fmt.Errorf("querying plano_disciplinas: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var codigo string
-		var q int
-		if err := rows.Scan(&codigo, &q); err != nil {
-			return fmt.Errorf("scanning plano_questao: %w", err)
+		var (
+			codigo string
+			q      int
+			modo   string
+		)
+
+		if err := rows.Scan(&codigo, &q, &modo); err != nil {
+			return fmt.Errorf("scanning plano_disciplina: %w", err)
 		}
 
 		s.Config.Questoes[codigo] = q
+		s.Config.Perfil.Modos[codigo] = plano.Modo(modo)
 	}
 
 	return rows.Err()
@@ -235,36 +253,47 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 	}
 	defer tx.Rollback(ctx)
 
+	perfil := s.Config.Perfil.Normalizar()
+
 	err = tx.QueryRow(
 		ctx,
 		`INSERT INTO planos
-		   (user_id, concurso_id, inicio, prova, horas_dia, dias_estudo, dia_revisao, reta_final_dias, tema_ui)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		   (user_id, concurso_id, inicio, prova, horas_dia, dias_estudo, dia_revisao, reta_final_dias,
+		    tema_ui, simulados, discursiva, intervalos_revisao, pct_questoes,
+		    revisao_por_questoes, questoes_por_revisao, limiar_fraco)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		 ON CONFLICT (user_id, concurso_id) DO UPDATE SET
 		   inicio = EXCLUDED.inicio, prova = EXCLUDED.prova, horas_dia = EXCLUDED.horas_dia,
 		   dias_estudo = EXCLUDED.dias_estudo, dia_revisao = EXCLUDED.dia_revisao,
 		   reta_final_dias = EXCLUDED.reta_final_dias, tema_ui = EXCLUDED.tema_ui,
+		   simulados = EXCLUDED.simulados, discursiva = EXCLUDED.discursiva,
+		   intervalos_revisao = EXCLUDED.intervalos_revisao, pct_questoes = EXCLUDED.pct_questoes,
+		   revisao_por_questoes = EXCLUDED.revisao_por_questoes,
+		   questoes_por_revisao = EXCLUDED.questoes_por_revisao,
+		   limiar_fraco = EXCLUDED.limiar_fraco,
 		   atualizado_em = now()
 		 RETURNING id, criado_em, atualizado_em`,
 		s.UserID, s.ConcursoID, s.Config.Inicio, s.Config.Prova, s.Config.HorasDia,
 		toInt32Slice(s.Config.DiasEstudo), s.Config.DiaRevisao, s.Config.RetaFinalDias, s.TemaUI,
+		string(perfil.Simulados), perfil.Discursiva, toInt32Slice(perfil.Intervalos),
+		perfil.PctQuestoes, perfil.RevisaoPorQuestoes, perfil.QuestoesPorRevisao, perfil.LimiarFraco,
 	).Scan(&s.ID, &s.CriadoEm, &s.AtualizadoEm)
 	if err != nil {
 		return plano.Salvo{}, fmt.Errorf("upserting plano: %w", err)
 	}
 
-	if _, err := tx.Exec(ctx, `DELETE FROM plano_questoes WHERE plano_id = $1`, s.ID); err != nil {
-		return plano.Salvo{}, fmt.Errorf("clearing plano_questoes: %w", err)
+	if _, err := tx.Exec(ctx, `DELETE FROM plano_disciplinas WHERE plano_id = $1`, s.ID); err != nil {
+		return plano.Salvo{}, fmt.Errorf("clearing plano_disciplinas: %w", err)
 	}
 
 	for codigo, q := range s.Config.Questoes {
 		if _, err := tx.Exec(
 			ctx,
-			`INSERT INTO plano_questoes (plano_id, disciplina_id, questoes)
-			 SELECT $1, d.id, $3 FROM disciplinas d WHERE d.concurso_id = $2 AND d.codigo = $4`,
-			s.ID, s.ConcursoID, q, codigo,
+			`INSERT INTO plano_disciplinas (plano_id, disciplina, questoes, modo)
+			 VALUES ($1, $2, $3, $4)`,
+			s.ID, codigo, q, string(perfil.ModoDe(codigo)),
 		); err != nil {
-			return plano.Salvo{}, fmt.Errorf("inserting plano_questao %s: %w", codigo, err)
+			return plano.Salvo{}, fmt.Errorf("inserting plano_disciplina %s: %w", codigo, err)
 		}
 	}
 

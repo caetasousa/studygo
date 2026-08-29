@@ -3,13 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"annygo/internal/domain/plano"
 	"annygo/internal/port"
 )
-
-// distancias are the spaced-review offsets, matching the artifact's D-1/D-7/D-30.
-var distancias = []int{1, 7, 30}
 
 // NotificacaoService computes and dispatches each user's spaced-review reminder
 // for the current day. It is driven by cmd/worker.
@@ -66,7 +64,7 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 			continue
 		}
 
-		itens := lembreteItens(res.Dias, hojeIdx)
+		itens := lembreteItens(res.Dias, hoje, pce.Plano.Config.Perfil.Normalizar().Intervalos)
 		if len(itens) == 0 {
 			continue
 		}
@@ -95,16 +93,22 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	return enviados, nil
 }
 
-func lembreteItens(dias []plano.Dia, hojeIdx int) []port.LembreteItem {
+// lembreteItens collects what is due for review today, one entry per interval.
+// The offsets are calendar days, not positions in the plan: for someone who
+// studies Monday to Friday, "seven days ago" is not seven plan days back.
+func lembreteItens(dias []plano.Dia, hoje time.Time, intervalos []int) []port.LembreteItem {
 	itens := []port.LembreteItem{}
 
-	for _, k := range distancias {
-		j := hojeIdx - k
-		if j < 0 {
+	porData := make(map[time.Time]plano.Dia, len(dias))
+	for _, d := range dias {
+		porData[plano.DayOf(d.Data)] = d
+	}
+
+	for _, k := range intervalos {
+		d, ok := porData[plano.AddDays(hoje, -k)]
+		if !ok {
 			continue
 		}
-
-		d := dias[j]
 
 		if len(d.Itens) == 0 {
 			itens = append(itens, port.LembreteItem{

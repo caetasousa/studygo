@@ -127,6 +127,31 @@ export interface ConcursoInfo {
 	conteudo: ConteudoItem[];
 }
 
+export type Simulados = 'nunca' | 'quinzenal' | 'semanal';
+export type Modo = 'completo' | 'questoes' | 'teoria';
+
+export interface Perfil {
+	simulados: Simulados;
+	discursiva: boolean;
+	intervalos: number[];
+	pctQuestoes: number;
+	revisaoPorQuestoes: boolean;
+	questoesPorRevisao: number;
+	limiarFraco: number;
+	modos: Record<string, Modo>;
+}
+
+export interface PerfilInput {
+	simulados?: Simulados;
+	discursiva?: boolean;
+	intervalos?: number[];
+	pctQuestoes?: number;
+	revisaoPorQuestoes?: boolean;
+	questoesPorRevisao?: number;
+	limiarFraco?: number;
+	modos?: Record<string, Modo>;
+}
+
 export interface Config {
 	inicio: string;
 	prova: string;
@@ -136,6 +161,7 @@ export interface Config {
 	retaFinalDias: number;
 	temaUi: 'light' | 'dark' | 'system';
 	questoes: Record<string, number>;
+	perfil: Perfil;
 }
 
 export type Tipo = 'est' | 'revd' | 'sim' | 'disc' | 'vespera' | 'rev';
@@ -203,6 +229,9 @@ export interface LinhaBalanceamento {
 	bloco: 'esp' | 'ger';
 	cor: number;
 	questoes: number;
+	questoesEdital: number;
+	delta: number;
+	modo: Modo;
 	peso: number;
 	pontos: number;
 	pctIdeal: number;
@@ -252,6 +281,7 @@ export interface ConfigInput {
 	retaFinalDias?: number;
 	temaUi?: string;
 	questoes?: Record<string, number>;
+	perfil?: PerfilInput;
 }
 
 export interface RegistroBlocoInput {

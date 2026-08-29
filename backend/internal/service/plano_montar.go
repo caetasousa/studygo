@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"annygo/internal/domain/concurso"
@@ -35,10 +37,13 @@ func (s *PlanoService) montar(
 
 	stats := plano.CalcularStats(res.Dias, codes, salvo.Registros)
 
+	balanceamento := montarBalanceamento(c, salvo.Config, res, stats)
+
 	ctxBlocos := plano.BlocoCtx{
 		HorasDia: salvo.Config.HorasDia,
 		Nomes:    nomes,
 		Simulado: res.Simulado,
+		Perfil:   salvo.Config.Perfil,
 	}
 
 	dias := make([]DiaResposta, 0, len(res.Dias))
@@ -93,9 +98,9 @@ func (s *PlanoService) montar(
 		Config:        montarConfig(salvo),
 		Dias:          dias,
 		Marcos:        montarMarcos(c, salvo.Marcos),
-		Balanceamento: montarBalanceamento(c, salvo.Config, res, stats),
+		Balanceamento: balanceamento,
 		Props:         montarProps(salvo.Config, res.Dias, stats, agora),
-		Alertas:       montarAlertas(c, salvo.Marcos, agora),
+		Alertas:       append(alertaOrcamento(balanceamento), montarAlertas(c, salvo.Marcos, agora)...),
 		HojeIndex:     hojeIndex,
 		Reordenados:   datasOrdenadas(salvo.Reordenacoes),
 		GeradoEm:      s.clock.Now(),
@@ -145,6 +150,27 @@ func montarConfig(salvo plano.Salvo) ConfigResposta {
 		RetaFinalDias: salvo.Config.RetaFinalDias,
 		TemaUI:        salvo.TemaUI,
 		Questoes:      salvo.Config.Questoes,
+		Perfil:        montarPerfil(salvo.Config.Perfil),
+	}
+}
+
+func montarPerfil(p plano.Perfil) PerfilResposta {
+	p = p.Normalizar()
+
+	modos := make(map[string]string, len(p.Modos))
+	for codigo, m := range p.Modos {
+		modos[codigo] = string(m)
+	}
+
+	return PerfilResposta{
+		Simulados:          string(p.Simulados),
+		Discursiva:         p.Discursiva,
+		Intervalos:         p.Intervalos,
+		PctQuestoes:        p.PctQuestoes,
+		RevisaoPorQuestoes: p.RevisaoPorQuestoes,
+		QuestoesPorRevisao: p.QuestoesPorRevisao,
+		LimiarFraco:        p.LimiarFraco,
+		Modos:              modos,
 	}
 }
 
@@ -180,6 +206,7 @@ func montarBalanceamento(
 	stats plano.Stats,
 ) []LinhaBalanceamento {
 	hBloco := cfg.HorasDia / 2
+	perfil := cfg.Perfil.Normalizar()
 	out := make([]LinhaBalanceamento, 0, len(c.Disciplinas))
 
 	for i, d := range c.Disciplinas {
@@ -207,6 +234,9 @@ func montarBalanceamento(
 			Bloco:          string(d.Bloco),
 			Cor:            i % 13,
 			Questoes:       cfg.Questoes[d.Codigo],
+			QuestoesEdital: d.QuestoesPadrao,
+			Delta:          cfg.Questoes[d.Codigo] - d.QuestoesPadrao,
+			Modo:           string(perfil.ModoDe(d.Codigo)),
 			Peso:           d.Peso,
 			Pontos:         res.Pontos[d.Codigo],
 			PctIdeal:       round1(pctIdeal),
@@ -311,4 +341,85 @@ func round1(v float64) float64 {
 
 func fmtCurto(t time.Time) string {
 	return t.Format("02/01")
+}
+
+// alertaOrcamento warns when the user's question estimates no longer add up to
+// the edital's totals. The engine splits time strictly in proportion, so raising
+// one discipline silently takes time from every other one — this is what says so
+// out loud, and names where the excess (or the gap) is.
+func alertaOrcamento(linhas []LinhaBalanceamento) []AlertaResposta {
+	var (
+		total  int
+		edital int
+	)
+
+	for _, l := range linhas {
+		total += l.Questoes
+		edital += l.QuestoesEdital
+	}
+
+	if edital == 0 || total == edital {
+		return []AlertaResposta{}
+	}
+
+	sobra := total - edital
+
+	nivel := "warn"
+	if abs(sobra)*4 > edital {
+		nivel = "danger"
+	}
+
+	verbo, direcao := "tire", 1
+	if sobra < 0 {
+		verbo, direcao = "distribua mais", -1
+	}
+
+	titulo := fmt.Sprintf(
+		"Você distribuiu %d de %d questões — %s %d",
+		total, edital, verbo, abs(sobra),
+	)
+
+	return []AlertaResposta{{
+		Nivel:  nivel,
+		Titulo: titulo,
+		Texto:  textoOrcamento(linhas, direcao),
+	}}
+}
+
+// textoOrcamento names the two disciplines furthest from the edital in the
+// direction that caused the imbalance.
+func textoOrcamento(linhas []LinhaBalanceamento, direcao int) string {
+	fora := make([]LinhaBalanceamento, 0, len(linhas))
+	for _, l := range linhas {
+		if l.Delta*direcao > 0 {
+			fora = append(fora, l)
+		}
+	}
+
+	if len(fora) == 0 {
+		return "nenhuma disciplina está fora do edital — confira se o total de questões está certo"
+	}
+
+	sort.SliceStable(fora, func(i, j int) bool {
+		return abs(fora[i].Delta) > abs(fora[j].Delta)
+	})
+
+	if len(fora) > 2 {
+		fora = fora[:2]
+	}
+
+	partes := make([]string, 0, len(fora))
+	for _, l := range fora {
+		partes = append(partes, fmt.Sprintf("%s (%+d)", l.Nome, l.Delta))
+	}
+
+	return "provavelmente de " + strings.Join(partes, " e ")
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+
+	return x
 }

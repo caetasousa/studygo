@@ -50,10 +50,14 @@ func construir(
 		totalCal = 1
 	}
 
+	perfil := cfg.Perfil.Normalizar()
+
 	revCiclo := c.RevCiclo
 	if len(revCiclo) == 0 {
 		revCiclo = RevCicloPadrao
 	}
+
+	revCiclo = ajustarCiclo(revCiclo, perfil)
 
 	vesp := addDays(cfg.Prova, -1)
 	ancora := mondayOf(cfg.Inicio)
@@ -90,7 +94,7 @@ func construir(
 		return []Dia{}
 	}
 
-	fase := atribuiFases(cfg, estudo)
+	fase := atribuiFases(cfg, perfil, estudo)
 
 	diasEst := filterPapel(estudo, "est")
 	diasRevD := filterPapel(estudo, "revd")
@@ -163,7 +167,7 @@ func construir(
 
 // atribuiFases groups days by week, tags each week base/reta, and sets the
 // papel of every non-vespera day. Returns week -> phase.
-func atribuiFases(cfg Config, estudo []*diaTmp) map[int]Fase {
+func atribuiFases(cfg Config, perfil Perfil, estudo []*diaTmp) map[int]Fase {
 	inicioReta := addDays(cfg.Prova, -maxInt(7, cfg.RetaFinalDias))
 
 	semanas := map[int][]*diaTmp{}
@@ -180,6 +184,7 @@ func atribuiFases(cfg Config, estudo []*diaTmp) map[int]Fase {
 	sort.Ints(ordemSem)
 
 	fase := map[int]Fase{}
+	semanaReta := 0
 
 	for _, sm := range ordemSem {
 		grupo := semanas[sm]
@@ -206,7 +211,8 @@ func atribuiFases(cfg Config, estudo []*diaTmp) map[int]Fase {
 			continue
 		}
 
-		atribuiReta(conteudo)
+		semanaReta++
+		atribuiReta(conteudo, perfil, semanaReta)
 	}
 
 	return fase
@@ -230,27 +236,62 @@ func atribuiBase(cfg Config, conteudo []*diaTmp) {
 	}
 }
 
-func atribuiReta(conteudo []*diaTmp) {
-	last := len(conteudo) - 1
+// atribuiReta lays out one reta-final week. By default the last day is a full
+// mock exam and the day before it the essay — but both are personal calls, and a
+// week that has neither is simply all guided review.
+func atribuiReta(conteudo []*diaTmp, perfil Perfil, semanaReta int) {
+	temSim := querSimulado(perfil, semanaReta)
+	temDisc := perfil.Discursiva
 
-	for ix, d := range conteudo {
+	for _, d := range conteudo {
+		d.papel = "revd"
+	}
+
+	// Preenche de trás para frente: o simulado fecha a semana, a discursiva vem
+	// logo antes. Sem um deles, o outro sobe uma casa.
+	ix := len(conteudo) - 1
+
+	if temSim {
+		conteudo[ix].papel = "sim"
+		ix--
+	}
+
+	if temDisc && ix >= 0 {
+		conteudo[ix].papel = "disc"
+	}
+}
+
+// querSimulado answers whether this reta-final week gets a mock exam.
+func querSimulado(perfil Perfil, semanaReta int) bool {
+	switch perfil.Simulados {
+	case SimuladoNunca:
+		return false
+	case SimuladoQuinzenal:
+		return semanaReta%2 == 1
+	default:
+		return true
+	}
+}
+
+// ajustarCiclo rewrites the weekly-review cycle so it never asks for something
+// the user turned off — a mock exam or an essay become question batteries.
+func ajustarCiclo(ciclo []concurso.RevItem, perfil Perfil) []concurso.RevItem {
+	out := make([]concurso.RevItem, len(ciclo))
+	copy(out, ciclo)
+
+	for i := range out {
+		titulo := strings.ToLower(out[i].Titulo)
+
 		switch {
-		case ix == last:
-			d.papel = "sim"
-		case ix == last-1:
-			d.papel = "disc"
-		default:
-			d.papel = "revd"
+		case perfil.Simulados == SimuladoNunca && strings.Contains(titulo, "simulado"):
+			out[i].Titulo = "Bateria dirigida de questões nos temas da semana, com correção comentada"
+		case !perfil.Discursiva && strings.Contains(titulo, "discursiva"):
+			out[i].Titulo = "Bateria extra de questões nos temas mais fracos da semana"
+			out[i].Questoes = perfil.QuestoesPorRevisao * 3
 		}
 	}
 
-	switch len(conteudo) {
-	case 1:
-		conteudo[0].papel = "sim"
-	case 2:
-		conteudo[0].papel = "disc"
-		conteudo[1].papel = "sim"
-	}
+	return out
 }
 
 // renumera assigns 1-based day numbers and compacts week numbers so they run

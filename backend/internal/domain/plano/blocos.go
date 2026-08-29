@@ -3,6 +3,7 @@ package plano
 import (
 	"math"
 	"strconv"
+	"strings"
 )
 
 // Bloco is one time slice of a day's routine: minutes, a label, and what to do.
@@ -17,6 +18,7 @@ type BlocoCtx struct {
 	HorasDia float64           // the daily budget
 	Nomes    map[string]string // discipline codigo -> display name
 	Simulado Composicao        // question split of a full mock exam
+	Perfil   Perfil            // the user's study method
 }
 
 // Composicao is how many questions of each bloco a full exam has.
@@ -37,30 +39,25 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 
 		out := make([]Bloco, 0, len(d.Itens)+1)
 
+		perfil := ctx.Perfil.Normalizar()
+
 		for idx, it := range d.Itens {
 			rotulo := "1º bloco"
 			if idx == 1 {
 				rotulo = "2º bloco"
 			}
 
-			detalhe := "teoria com resumo de própria autoria e " +
-				strconv.Itoa(porBloco) + " questões do tema, corrigidas uma a uma"
-			if rev {
-				detalhe = "reconstrua o assunto de memória, sem consultar, e resolva " +
-					strconv.Itoa(porBloco) + " questões só dele"
-			}
-
 			out = append(out, Bloco{
 				Minutos: m5(h * 0.42),
 				Titulo:  rotulo + " — " + ctx.Nomes[it.Disciplina],
-				Detalhe: detalhe,
+				Detalhe: detalheDoBloco(perfil.ModoDe(it.Disciplina), rev, porBloco),
 			})
 		}
 
 		out = append(out, Bloco{
 			Minutos: m5(h * 0.16),
 			Titulo:  "Revisão espaçada",
-			Detalhe: "retome os temas de D-1, D-7 e D-30 listados ao lado",
+			Detalhe: revisaoDetalhe(perfil),
 		})
 
 		return out
@@ -102,4 +99,44 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 // m5 rounds to the nearest 5 minutes.
 func m5(x float64) int {
 	return int(math.Round(x/5)) * 5
+}
+
+// detalheDoBloco writes what to do in one study block. A discipline studied by
+// questions only never gets the "teoria com resumo" instruction, and one studied
+// by theory only never gets a question count.
+func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
+	q := strconv.Itoa(questoes)
+
+	if revisaoDirigida {
+		if modo == ModoTeoria {
+			return "reconstrua o assunto de memória, sem consultar, e confira o resumo depois"
+		}
+
+		return "reconstrua o assunto de memória, sem consultar, e resolva " + q + " questões só dele"
+	}
+
+	switch modo {
+	case ModoQuestoes:
+		return q + " questões do tema, corrigidas uma a uma; a teoria vem da correção"
+	case ModoTeoria:
+		return "teoria com resumo de própria autoria, sem bateria de questões"
+	default:
+		return "teoria com resumo de própria autoria e " + q + " questões do tema, corrigidas uma a uma"
+	}
+}
+
+// revisaoDetalhe names the user's own review intervals instead of a fixed
+// D-1 / D-7 / D-30.
+func revisaoDetalhe(perfil Perfil) string {
+	partes := make([]string, 0, len(perfil.Intervalos))
+	for _, d := range perfil.Intervalos {
+		partes = append(partes, "D-"+strconv.Itoa(d))
+	}
+
+	como := "retome"
+	if perfil.RevisaoPorQuestoes {
+		como = "resolva questões dos temas de"
+	}
+
+	return como + " " + strings.Join(partes, ", ") + " listados ao lado"
 }

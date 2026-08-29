@@ -24,6 +24,20 @@ type ConfigInput struct {
 	RetaFinalDias int            `json:"retaFinalDias"`
 	TemaUI        string         `json:"temaUi"`
 	Questoes      map[string]int `json:"questoes"`
+	Perfil        *PerfilInput   `json:"perfil"`
+}
+
+// PerfilInput patches the study profile. Every field is optional — a nil field
+// leaves that setting untouched.
+type PerfilInput struct {
+	Simulados          *string           `json:"simulados"`
+	Discursiva         *bool             `json:"discursiva"`
+	Intervalos         *[]int            `json:"intervalos"`
+	PctQuestoes        *float64          `json:"pctQuestoes"`
+	RevisaoPorQuestoes *bool             `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao *int              `json:"questoesPorRevisao"`
+	LimiarFraco        *int              `json:"limiarFraco"`
+	Modos              map[string]string `json:"modos"`
 }
 
 // RegistroInput is one day's log coming from the client.
@@ -96,6 +110,18 @@ type ConfigResposta struct {
 	RetaFinalDias int            `json:"retaFinalDias"`
 	TemaUI        string         `json:"temaUi"`
 	Questoes      map[string]int `json:"questoes"`
+	Perfil        PerfilResposta `json:"perfil"`
+}
+
+type PerfilResposta struct {
+	Simulados          string            `json:"simulados"`
+	Discursiva         bool              `json:"discursiva"`
+	Intervalos         []int             `json:"intervalos"`
+	PctQuestoes        float64           `json:"pctQuestoes"`
+	RevisaoPorQuestoes bool              `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao int               `json:"questoesPorRevisao"`
+	LimiarFraco        int               `json:"limiarFraco"`
+	Modos              map[string]string `json:"modos"`
 }
 
 // DiaResposta is one plan day plus the user's record and timed breakdown.
@@ -162,6 +188,9 @@ type LinhaBalanceamento struct {
 	Bloco          string  `json:"bloco"`
 	Cor            int     `json:"cor"`
 	Questoes       int     `json:"questoes"`
+	QuestoesEdital int     `json:"questoesEdital"`
+	Delta          int     `json:"delta"` // questoes - questoesEdital
+	Modo           string  `json:"modo"`
 	Peso           int     `json:"peso"`
 	Pontos         int     `json:"pontos"`
 	PctIdeal       float64 `json:"pctIdeal"`

@@ -59,6 +59,7 @@ type Config struct {
 	DiaRevisao    int
 	RetaFinalDias int
 	Questoes      map[string]int // discipline codigo -> estimated questions
+	Perfil        Perfil         // the user's study method
 }
 
 // Resultado is everything the engine produces: the days plus the intermediate

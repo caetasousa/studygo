@@ -131,7 +131,7 @@ func (s *PlanoService) Caderno(ctx context.Context, userID uuid.UUID, slug strin
 		return CadernoResposta{}, err
 	}
 
-	return montarCaderno(c, res.Dias, salvo.Registros, anots), nil
+	return montarCaderno(c, salvo, res.Dias, anots), nil
 }
 
 // CriarAnotacao adds a notebook entry.
@@ -236,10 +236,13 @@ func anotacaoFromInput(c concurso.Concurso, base plano.Anotacao, in AnotacaoInpu
 
 func montarCaderno(
 	c concurso.Concurso,
+	salvo plano.Salvo,
 	dias []plano.Dia,
-	registros map[time.Time]plano.Registro,
 	anots []plano.Anotacao,
 ) CadernoResposta {
+	registros := salvo.Registros
+	limiar := salvo.Config.Perfil.Normalizar().LimiarFraco
+
 	codigoPorID := map[uuid.UUID]string{}
 	for _, d := range c.Disciplinas {
 		codigoPorID[d.ID] = d.Codigo
@@ -296,7 +299,7 @@ func montarCaderno(
 
 		if q > 0 {
 			pct := int(math.Round(float64(a) / float64(q) * 100))
-			if pct < 70 {
+			if pct < limiar {
 				fracos = append(fracos, DiaFraco{
 					Data:     d.Data.Format(isoDate),
 					N:        d.N,
@@ -353,7 +356,7 @@ func (s *PlanoService) Dossie(
 		return DossieResposta{}, err
 	}
 
-	caderno := montarCaderno(c, res.Dias, salvo.Registros, anots)
+	caderno := montarCaderno(c, salvo, res.Dias, anots)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s — %s\n\n", d.Nome, c.Nome)

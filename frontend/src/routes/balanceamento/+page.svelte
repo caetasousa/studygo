@@ -29,6 +29,22 @@
 
 	const hBloco = $derived((plano?.config.horasDia ?? 0) / 2);
 
+	// Orçamento de questões: o motor divide o tempo em proporção estrita, então
+	// aumentar uma matéria tira tempo de todas as outras. Isto é o que avisa.
+	const orcamento = $derived.by(() => {
+		const linhas = plano?.balanceamento ?? [];
+		const distribuido = total(linhas, (l) => l.questoes);
+		const edital = total(linhas, (l) => l.questoesEdital);
+		const sobra = distribuido - edital;
+		return {
+			distribuido,
+			edital,
+			sobra,
+			pct: edital > 0 ? Math.min(100, (distribuido / edital) * 100) : 0,
+			nivel: sobra === 0 ? 'ok' : Math.abs(sobra) * 4 > edital ? 'danger' : 'warn'
+		};
+	});
+
 	const resumo = $derived.by(() => {
 		if (!plano) return [];
 		const grupos: { nome: string; tipo: string }[] = [
@@ -67,12 +83,32 @@
 			</div>
 		</div>
 
+		{#if orcamento.edital > 0}
+			<div class="orc {orcamento.nivel}">
+				<div class="orc-topo">
+					<b>
+						{orcamento.distribuido} de {orcamento.edital} questões distribuídas
+					</b>
+					<span>
+						{#if orcamento.sobra === 0}
+							bate com o edital
+						{:else if orcamento.sobra > 0}
+							{orcamento.sobra} a mais — tire de alguma matéria
+						{:else}
+							faltam {-orcamento.sobra} — distribua em alguma matéria
+						{/if}
+					</span>
+				</div>
+				<div class="orc-bar"><i style="width:{orcamento.pct}%"></i></div>
+			</div>
+		{/if}
+
 		{#snippet tabela(linhas: LinhaBalanceamento[])}
 			<div class="tbl-wrap">
 				<table class="tbl">
 					<thead>
 						<tr>
-							<th>Disciplina</th><th>Questões</th><th>Peso</th><th>Pontos</th><th>% ideal</th>
+							<th>Disciplina</th><th>Questões</th><th>vs edital</th><th>Peso</th><th>Pontos</th><th>% ideal</th>
 							<th>Bl. conteúdo</th><th>Bl. reta final</th><th>Previsto</th><th>Lançado</th>
 							<th>Desvio</th><th>Acerto</th>
 						</tr>
@@ -93,6 +129,9 @@
 										oninput={(e) => onQuestoes(l.codigo, e)}
 									/>
 								</td>
+								<td class="delta {l.delta > 0 ? 'pos' : l.delta < 0 ? 'neg' : ''}">
+									{l.delta === 0 ? '=' : (l.delta > 0 ? '+' : '') + l.delta}
+								</td>
 								<td>{l.peso}</td>
 								<td><b>{l.pontos}</b></td>
 								<td>{nf1.format(l.pctIdeal)}%</td>
@@ -111,6 +150,7 @@
 						<tr>
 							<td>Total</td>
 							<td>{total(linhas, (l) => l.questoes)}</td>
+							<td>{total(linhas, (l) => l.questoesEdital)} no edital</td>
 							<td>—</td>
 							<td>{total(linhas, (l) => l.pontos)}</td>
 							<td></td>
@@ -156,3 +196,70 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.orc {
+		border: 1px solid var(--border);
+		border-left: 3px solid var(--good);
+		border-radius: 8px;
+		background: var(--bg-card);
+		padding: 12px 14px;
+		margin-bottom: 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.orc.warn {
+		border-left-color: var(--warn);
+		background: var(--warn-soft);
+	}
+	.orc.danger {
+		border-left-color: var(--danger);
+		background: var(--danger-soft);
+	}
+	.orc-topo {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.orc-topo b {
+		font-size: 14px;
+	}
+	.orc-topo span {
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
+	.orc-bar {
+		height: 5px;
+		border-radius: 3px;
+		background: var(--bg-soft);
+		overflow: hidden;
+	}
+	.orc-bar i {
+		display: block;
+		height: 100%;
+		background: var(--good);
+	}
+	.orc.warn .orc-bar i {
+		background: var(--warn);
+	}
+	.orc.danger .orc-bar i {
+		background: var(--danger);
+	}
+
+	.delta {
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+	.delta.pos {
+		color: var(--warn);
+		font-weight: 600;
+	}
+	.delta.neg {
+		color: var(--accent);
+		font-weight: 600;
+	}
+</style>
