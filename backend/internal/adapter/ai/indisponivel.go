@@ -1,5 +1,3 @@
-// Package ai holds outbound adapters for AI providers. Today: a Gemini adapter
-// for reading editais, and a null adapter for when no key is configured.
 package ai
 
 import (
@@ -8,13 +6,29 @@ import (
 	"annygo/internal/port"
 )
 
-var _ port.EditalParser = Indisponivel{}
+var _ port.EditalAnalisador = Indisponivel{}
 
-// Indisponivel is the no-op EditalParser used when GEMINI_API_KEY is unset.
+// Indisponivel is the no-op EditalAnalisador used when GEMINI_API_KEY is unset.
 type Indisponivel struct{}
 
-func (Indisponivel) Parse(context.Context, port.EditalEntrada) (port.EditalExtraido, error) {
-	return port.EditalExtraido{}, port.ErrImportacaoIndisponivel
+func (Indisponivel) Disponivel() bool { return false }
+
+func (Indisponivel) Cargos(context.Context, port.EditalEntrada) (port.EditalCargos, error) {
+	return port.EditalCargos{}, port.ErrImportacaoIndisponivel
 }
 
-func (Indisponivel) Disponivel() bool { return false }
+func (Indisponivel) Estrutura(context.Context, port.EditalEntrada, string) (port.EditalEstrutura, error) {
+	return port.EditalEstrutura{}, port.ErrImportacaoIndisponivel
+}
+
+func (Indisponivel) Cronograma(context.Context, port.EditalEntrada) ([]port.EditalMarco, error) {
+	return nil, port.ErrImportacaoIndisponivel
+}
+
+func (Indisponivel) Conteudo(
+	context.Context,
+	port.EditalEntrada,
+	[]string,
+) ([]port.EditalConteudoDisciplina, error) {
+	return nil, port.ErrImportacaoIndisponivel
+}

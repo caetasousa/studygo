@@ -71,9 +71,35 @@ export interface ConcursoDetalhe {
 	dados: ConcursoInput;
 }
 
-export interface ImportarEditalResposta {
-	concurso: ConcursoInput;
+// ---- edital import wizard ----
+
+export interface CargoOpcao {
+	codigo: string;
+	nome: string;
+	escolaridade: string;
+	vagas: number;
+}
+
+export interface CargosResposta {
+	texto: string;
+	arquivoUri: string;
+	mime: string;
+	banca: string;
+	cargos: CargoOpcao[];
+}
+
+export interface EstruturaResposta {
+	nome: string;
+	prova: string;
+	provaDiscursiva: boolean;
+	gerais: DisciplinaInput[];
+	especificas: DisciplinaInput[];
+	marcos: MarcoInput[];
 	avisos: string[];
+}
+
+export interface ConteudoEditalResposta {
+	itens: { nome: string; temas: string[] }[];
 }
 
 export interface Disciplina {

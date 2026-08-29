@@ -68,11 +68,125 @@ type ConcursoDetalhe struct {
 	Data ConcursoInput `json:"dados"`
 }
 
-// ImportarEditalResposta is what POST /api/concursos/importar returns — the
-// prefilled form plus any caveats the user should double-check.
-type ImportarEditalResposta struct {
-	Concurso ConcursoInput `json:"concurso"`
-	Avisos   []string      `json:"avisos"`
+// ---- edital import wizard (POST /api/editais/*) ----
+
+// CargosResposta — step 1. The client keeps `texto` and passes it back on the
+// next steps.
+type CargosResposta struct {
+	Texto      string       `json:"texto"`
+	ArquivoURI string       `json:"arquivoUri"`
+	MIME       string       `json:"mime"`
+	Banca      string       `json:"banca"`
+	Cargos     []CargoOpcao `json:"cargos"`
+}
+
+type CargoOpcao struct {
+	Codigo       string `json:"codigo"`
+	Nome         string `json:"nome"`
+	Escolaridade string `json:"escolaridade"`
+	Vagas        int    `json:"vagas"`
+}
+
+// EstruturaResposta — step 2, the disciplines + schedule for the chosen cargo.
+type EstruturaResposta struct {
+	Nome            string            `json:"nome"`
+	Prova           string            `json:"prova"`
+	ProvaDiscursiva bool              `json:"provaDiscursiva"`
+	Gerais          []DisciplinaInput `json:"gerais"`
+	Especificas     []DisciplinaInput `json:"especificas"`
+	Marcos          []MarcoInput      `json:"marcos"`
+	Avisos          []string          `json:"avisos"`
+}
+
+// ConteudoEditalResposta — step 3, the syllabus topics per discipline.
+type ConteudoEditalResposta struct {
+	Itens []ConteudoEditalDisc `json:"itens"`
+}
+
+type ConteudoEditalDisc struct {
+	Nome  string   `json:"nome"`
+	Temas []string `json:"temas"`
+}
+
+func cargosParaResposta(c port.EditalCargos) CargosResposta {
+	out := CargosResposta{
+		Texto:      c.Texto,
+		ArquivoURI: c.ArquivoURI,
+		MIME:       c.MIME,
+		Banca:      strings.TrimSpace(c.Banca),
+		Cargos:     []CargoOpcao{},
+	}
+	for _, cg := range c.Cargos {
+		out.Cargos = append(out.Cargos, CargoOpcao{
+			Codigo:       cg.Codigo,
+			Nome:         cg.Nome,
+			Escolaridade: cg.Escolaridade,
+			Vagas:        cg.Vagas,
+		})
+	}
+
+	return out
+}
+
+func estruturaParaResposta(e port.EditalEstrutura) EstruturaResposta {
+	out := EstruturaResposta{
+		Nome:            strings.TrimSpace(e.Nome),
+		Prova:           strings.TrimSpace(e.Prova),
+		ProvaDiscursiva: e.ProvaDiscursiva,
+		Gerais:          discParaInput(e.Gerais, "ger"),
+		Especificas:     discParaInput(e.Especificas, "esp"),
+		Marcos:          []MarcoInput{},
+		Avisos:          []string{},
+	}
+
+	if out.Prova == "" {
+		out.Avisos = append(out.Avisos, "o edital não trazia data de prova definida — preencha antes de salvar")
+	}
+	if len(out.Gerais) == 0 && len(out.Especificas) == 0 {
+		out.Avisos = append(out.Avisos, "não consegui identificar as disciplinas — ajuste manualmente")
+	}
+
+	distGer := distribuirBloco(out.Gerais, "ger", e.TotalGerais)
+	distEsp := distribuirBloco(out.Especificas, "esp", e.TotalEspecificas)
+
+	if distGer || distEsp {
+		out.Avisos = append(out.Avisos,
+			"o edital só informou o total de questões por bloco — distribuí igualmente entre as disciplinas; ajuste se souber a divisão")
+	}
+
+	for _, m := range e.Marcos {
+		if strings.TrimSpace(m.Data) == "" {
+			continue
+		}
+
+		out.Marcos = append(out.Marcos, MarcoInput{
+			Data:      strings.TrimSpace(m.Data),
+			DataFim:   strings.TrimSpace(m.DataFim),
+			Titulo:    strings.TrimSpace(m.Titulo),
+			ExigeAcao: m.ExigeAcao,
+		})
+	}
+
+	return out
+}
+
+func discParaInput(ds []port.EditalDisciplina, bloco string) []DisciplinaInput {
+	out := make([]DisciplinaInput, 0, len(ds))
+	for _, d := range ds {
+		if strings.TrimSpace(d.Nome) == "" {
+			continue
+		}
+
+		out = append(out, DisciplinaInput{
+			Nome:     strings.TrimSpace(d.Nome),
+			Bloco:    bloco,
+			Questoes: maxZero(d.Questoes),
+			Temas:    []string{},
+			Fontes:   []FonteInput{},
+		})
+	}
+
+	return out
 }
 
 func resumoDe(c concurso.Concurso) ConcursoResumo {
@@ -225,64 +339,40 @@ func concursoFromInput(in ConcursoInput) (concurso.Concurso, []string) {
 	return c, avisos
 }
 
-// editalParaInput maps the AI extraction to the create-form shape.
-func editalParaInput(e port.EditalExtraido) (ConcursoInput, []string) {
-	avisos := []string{}
-
-	nome := strings.TrimSpace(e.Nome)
-	if nome == "" {
-		nome = strings.TrimSpace(strings.TrimSpace(e.Orgao + " " + e.Cargo))
+// distribuirBloco spreads `total` questions across every discipline of `bloco`
+// that currently has 0, largest-remainder style. It only acts when the whole
+// block is unset. Returns whether it changed anything.
+func distribuirBloco(discs []DisciplinaInput, bloco string, total int) bool {
+	if total <= 0 {
+		return false
 	}
 
-	in := ConcursoInput{
-		Nome:        nome,
-		Banca:       strings.TrimSpace(e.Banca),
-		Cargo:       strings.TrimSpace(e.Cargo),
-		Prova:       strings.TrimSpace(e.Prova),
-		Disciplinas: []DisciplinaInput{},
-		Marcos:      []MarcoInput{},
-		Conteudo:    []ConteudoInput{},
-	}
-
-	if in.Prova == "" {
-		avisos = append(avisos, "o edital não trazia data de prova definida — preencha antes de salvar")
-	}
-
-	if len(e.Disciplinas) == 0 {
-		avisos = append(avisos, "não consegui identificar as disciplinas — cadastre manualmente")
-	}
-
-	for _, d := range e.Disciplinas {
-		bloco := strings.ToLower(strings.TrimSpace(d.Bloco))
-		if bloco != "esp" && bloco != "ger" {
-			bloco = "esp"
+	idx := []int{}
+	for i, d := range discs {
+		if d.Bloco != bloco {
+			continue
 		}
-
-		di := DisciplinaInput{
-			Nome:     strings.TrimSpace(d.Nome),
-			Bloco:    bloco,
-			Questoes: maxZero(d.Questoes),
-			Temas:    limparLinhas(d.Temas),
-			Fontes:   []FonteInput{},
+		if d.Questoes > 0 {
+			return false // the edital did break this block down — leave it
 		}
-
-		if di.Questoes == 0 {
-			avisos = append(avisos, `"`+di.Nome+`": o edital não separou o nº de questões — estime`)
-		}
-
-		in.Disciplinas = append(in.Disciplinas, di)
+		idx = append(idx, i)
 	}
 
-	for _, m := range e.Marcos {
-		in.Marcos = append(in.Marcos, MarcoInput{
-			Data:      strings.TrimSpace(m.Data),
-			DataFim:   strings.TrimSpace(m.DataFim),
-			Titulo:    strings.TrimSpace(m.Titulo),
-			ExigeAcao: m.ExigeAcao,
-		})
+	if len(idx) == 0 {
+		return false
 	}
 
-	return in, avisos
+	base := total / len(idx)
+	resto := total % len(idx)
+
+	for n, i := range idx {
+		discs[i].Questoes = base
+		if n < resto {
+			discs[i].Questoes++
+		}
+	}
+
+	return true
 }
 
 func limparLinhas(xs []string) []string {
@@ -305,18 +395,29 @@ func firstEmoji(s string) string {
 	return string(r[0])
 }
 
+// deacentua maps the accented Latin letters common in Portuguese to their ASCII
+// base so slugs stay readable ("técnico" -> "tecnico").
+var deacentua = strings.NewReplacer(
+	"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
+	"é", "e", "ê", "e", "ë", "e",
+	"í", "i", "ï", "i",
+	"ó", "o", "ô", "o", "õ", "o", "ö", "o",
+	"ú", "u", "ü", "u",
+	"ç", "c", "ñ", "n",
+)
+
 // slugify builds a URL-safe slug from a name plus a short random suffix so it is
 // unique even across concursos with the same name.
 func slugify(nome string) string {
 	var b strings.Builder
 	prevDash := false
 
-	for _, r := range strings.ToLower(nome) {
+	for _, r := range deacentua.Replace(strings.ToLower(nome)) {
 		switch {
 		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
 			b.WriteRune(r)
 			prevDash = false
-		case r == ' ' || r == '-' || r == '_' || r == '/' || r == '.':
+		default:
 			if !prevDash && b.Len() > 0 {
 				b.WriteByte('-')
 				prevDash = true
@@ -330,7 +431,7 @@ func slugify(nome string) string {
 	}
 
 	if len(base) > 40 {
-		base = base[:40]
+		base = strings.Trim(base[:40], "-")
 	}
 
 	return base + "-" + randHex(2)

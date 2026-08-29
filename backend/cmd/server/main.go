@@ -61,9 +61,9 @@ func run(logger *slog.Logger) error {
 	concursoRepo := postgres.NewConcursoRepo(pool)
 	planoRepo := postgres.NewPlanoRepo(pool)
 
-	var editalParser port.EditalParser = ai.Indisponivel{}
+	var editalParser port.EditalAnalisador = ai.Indisponivel{}
 	if cfg.GeminiAPIKey != "" {
-		editalParser = ai.NewGeminiEditalParser(cfg.GeminiAPIKey, cfg.GeminiModel)
+		editalParser = ai.NewGeminiAnalisador(cfg.GeminiAPIKey, cfg.GeminiModel)
 		logger.Info("edital import enabled", slog.String("model", cfg.GeminiModel))
 	}
 

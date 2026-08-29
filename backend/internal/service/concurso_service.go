@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"annygo/internal/domain/concurso"
+	"annygo/internal/platform/pdftext"
 	"annygo/internal/port"
 
 	"github.com/google/uuid"
@@ -12,10 +13,10 @@ import (
 // ConcursoService manages the concursos a user registers.
 type ConcursoService struct {
 	repo   port.ConcursoRepository
-	edital port.EditalParser
+	edital port.EditalAnalisador
 }
 
-func NewConcursoService(repo port.ConcursoRepository, edital port.EditalParser) *ConcursoService {
+func NewConcursoService(repo port.ConcursoRepository, edital port.EditalAnalisador) *ConcursoService {
 	return &ConcursoService{repo: repo, edital: edital}
 }
 
@@ -24,20 +25,94 @@ func (s *ConcursoService) ImportacaoDisponivel() bool {
 	return s.edital != nil && s.edital.Disponivel()
 }
 
-// ImportarEdital reads a raw edital and returns the prefilled create form plus
-// any caveats. Nothing is persisted.
-func (s *ConcursoService) ImportarEdital(
-	ctx context.Context,
-	in port.EditalEntrada,
-) (ImportarEditalResposta, error) {
-	extraido, err := s.edital.Parse(ctx, in)
-	if err != nil {
-		return ImportarEditalResposta{}, err
+// prepararEntrada extracts a text layer from the PDF when there is one — that
+// keeps the later steps cheap and lets the client stop re-uploading the file.
+// Scanned PDFs have no text layer, so the raw bytes travel to the model instead.
+func prepararEntrada(in port.EditalEntrada) port.EditalEntrada {
+	if len(in.PDF) == 0 || in.Texto != "" {
+		return in
 	}
 
-	input, avisos := editalParaInput(extraido)
+	if txt, err := pdftext.Extrair(in.PDF); err == nil {
+		in.Texto = txt
+		in.PDF = nil
+	}
 
-	return ImportarEditalResposta{Concurso: input, Avisos: avisos}, nil
+	return in
+}
+
+// AnalisarEdital is wizard step 1: lists the cargos, returning the extracted
+// text when the PDF had one (the client then reuses it instead of re-uploading).
+func (s *ConcursoService) AnalisarEdital(ctx context.Context, in port.EditalEntrada) (CargosResposta, error) {
+	res, err := s.edital.Cargos(ctx, prepararEntrada(in))
+	if err != nil {
+		return CargosResposta{}, err
+	}
+
+	return cargosParaResposta(res), nil
+}
+
+// EstruturaDoCargo is wizard step 2: the disciplines, exam date and schedule for
+// the chosen cargo, with block totals already spread across the disciplines. The
+// disciplines and the (edital-wide) schedule are fetched concurrently.
+func (s *ConcursoService) EstruturaDoCargo(
+	ctx context.Context,
+	in port.EditalEntrada,
+	cargo string,
+) (EstruturaResposta, error) {
+	in = prepararEntrada(in)
+
+	var (
+		est    port.EditalEstrutura
+		marcos []port.EditalMarco
+		errEst error
+		errCr  error
+	)
+
+	done := make(chan struct{}, 2)
+
+	go func() {
+		est, errEst = s.edital.Estrutura(ctx, in, cargo)
+		done <- struct{}{}
+	}()
+	go func() {
+		marcos, errCr = s.edital.Cronograma(ctx, in)
+		done <- struct{}{}
+	}()
+
+	<-done
+	<-done
+
+	if errEst != nil {
+		return EstruturaResposta{}, errEst
+	}
+
+	// The schedule is a nice-to-have; a failure there just drops the marcos.
+	if errCr == nil {
+		est.Marcos = marcos
+	}
+
+	return estruturaParaResposta(est), nil
+}
+
+// ConteudoDoEdital is wizard step 3: the syllabus topics for the given
+// disciplines.
+func (s *ConcursoService) ConteudoDoEdital(
+	ctx context.Context,
+	in port.EditalEntrada,
+	disciplinas []string,
+) (ConteudoEditalResposta, error) {
+	itens, err := s.edital.Conteudo(ctx, prepararEntrada(in), disciplinas)
+	if err != nil {
+		return ConteudoEditalResposta{}, err
+	}
+
+	out := ConteudoEditalResposta{Itens: make([]ConteudoEditalDisc, 0, len(itens))}
+	for _, it := range itens {
+		out.Itens = append(out.Itens, ConteudoEditalDisc{Nome: it.Nome, Temas: it.Temas})
+	}
+
+	return out, nil
 }
 
 // Listar returns the user's concursos as picker rows.

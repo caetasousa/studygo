@@ -37,7 +37,9 @@ func NewRouter(h Handlers, tokens port.TokenIssuer, logger *slog.Logger) http.Ha
 
 	guard("GET /api/concursos", h.Concurso.List)
 	guard("POST /api/concursos", h.Concurso.Criar)
-	guard("POST /api/concursos/importar", h.Concurso.ImportarEdital)
+	guard("POST /api/editais/analisar", h.Concurso.AnalisarEdital)
+	guard("POST /api/editais/estrutura", h.Concurso.EstruturaEdital)
+	guard("POST /api/editais/conteudo", h.Concurso.ConteudoEdital)
 	guard("GET /api/concursos/{slug}", h.Concurso.Get)
 	guard("PUT /api/concursos/{slug}", h.Concurso.Atualizar)
 	guard("DELETE /api/concursos/{slug}", h.Concurso.Remover)
