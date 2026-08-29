@@ -18,9 +18,14 @@ type Handlers struct {
 // NewRouter builds the API mux. Protected routes are individually wrapped with
 // Authenticate; cross-cutting middleware (recover, logging, CORS) is applied by
 // the caller.
-func NewRouter(h Handlers, tokens port.TokenIssuer, logger *slog.Logger) http.Handler {
+func NewRouter(
+	h Handlers,
+	tokens port.TokenIssuer,
+	presence UserPresence,
+	logger *slog.Logger,
+) http.Handler {
 	mux := http.NewServeMux()
-	requireAuth := Authenticate(tokens, logger)
+	requireAuth := Authenticate(tokens, presence, logger)
 
 	guard := func(pattern string, fn http.HandlerFunc) {
 		mux.Handle(pattern, requireAuth(fn))

@@ -39,7 +39,14 @@ class ConcursoStore {
 	}
 
 	async carregar() {
-		const res = await api.listarConcursos();
+		let res;
+		try {
+			res = await api.listarConcursos();
+		} catch {
+			// 401 (stale session) etc. — auth store already cleared; the layout
+			// redirects to /login. Nothing to load.
+			return;
+		}
 		this.lista = res.concursos;
 		this.importacaoEdital = res.importacaoEdital;
 		this.carregado = true;

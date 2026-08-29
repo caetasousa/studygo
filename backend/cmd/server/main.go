@@ -67,14 +67,16 @@ func run(logger *slog.Logger) error {
 		logger.Info("edital import enabled", slog.String("model", cfg.GeminiModel))
 	}
 
+	authService := service.NewAuthService(userRepo, hasher, tokens, clock, cfg.RefreshTTL)
+
 	handlers := httpapi.Handlers{
 		Health:   httpapi.NewHealthHandler(service.NewHealthService(pool), logger),
-		Auth:     httpapi.NewAuthHandler(service.NewAuthService(userRepo, hasher, tokens, clock, cfg.RefreshTTL), logger),
+		Auth:     httpapi.NewAuthHandler(authService, logger),
 		Concurso: httpapi.NewConcursoHandler(service.NewConcursoService(concursoRepo, editalParser), logger),
 		Plano:    httpapi.NewPlanoHandler(service.NewPlanoService(planoRepo, concursoRepo, clock), logger),
 	}
 
-	router := httpapi.NewRouter(handlers, tokens, logger)
+	router := httpapi.NewRouter(handlers, tokens, authService, logger)
 
 	handler := middleware.Chain(
 		router,
