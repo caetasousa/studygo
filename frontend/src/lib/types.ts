@@ -153,12 +153,23 @@ export interface Bloco {
 	detalhe: string;
 }
 
+export interface RegistroBloco {
+	disciplina: string;
+	horas: number | null;
+	questoes: number | null;
+	acertos: number | null;
+	erros: number | null;
+	nota: string;
+}
+
 export interface Registro {
 	horas: number | null;
 	concluido: boolean;
 	questoes: number | null;
 	acertos: number | null;
+	erros: number | null;
 	nota: string;
+	blocos: RegistroBloco[];
 }
 
 export interface Dia {
@@ -243,12 +254,21 @@ export interface ConfigInput {
 	questoes?: Record<string, number>;
 }
 
+export interface RegistroBlocoInput {
+	disciplina: string;
+	horas: number | null;
+	questoes: number | null;
+	acertos: number | null;
+	nota: string;
+}
+
 export interface RegistroInput {
 	horas: number | null;
 	concluido: boolean;
 	questoes: number | null;
 	acertos: number | null;
 	nota: string;
+	blocos: RegistroBlocoInput[];
 }
 
 export interface PontoSerie {

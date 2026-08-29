@@ -173,7 +173,9 @@ func (r *ConcursoRepo) UpdateConcurso(ctx context.Context, c concurso.Concurso) 
 		return concurso.Concurso{}, concurso.ErrNotFound
 	}
 
-	for _, table := range []string{"disciplinas", "marcos", "conteudo_programatico"} {
+	// marcos são atualizados no lugar (inserirConteudoDoConcurso), para que os
+	// "cumprido" de marco_checks sobrevivam à edição do concurso.
+	for _, table := range []string{"disciplinas", "conteudo_programatico"} {
 		if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE concurso_id = $1`, c.ID); err != nil {
 			return concurso.Concurso{}, fmt.Errorf("clearing %s: %w", table, err)
 		}
@@ -239,16 +241,33 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		}
 	}
 
-	for i, m := range c.Marcos {
-		if _, err := tx.Exec(
+	for i := range c.Marcos {
+		m := &c.Marcos[i]
+		m.Ordem = i
+		m.Rotulo = i + 1
+
+		if err := tx.QueryRow(
 			ctx,
 			`INSERT INTO marcos
 			   (concurso_id, ordem, rotulo, data_inicio, data_fim, titulo, exige_acao, e_prova)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			c.ID, i, i+1, m.DataInicio, m.DataFim, m.Titulo, m.ExigeAcao, m.EProva,
-		); err != nil {
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			 ON CONFLICT (concurso_id, ordem) DO UPDATE SET
+			   rotulo = EXCLUDED.rotulo, data_inicio = EXCLUDED.data_inicio,
+			   data_fim = EXCLUDED.data_fim, titulo = EXCLUDED.titulo,
+			   exige_acao = EXCLUDED.exige_acao, e_prova = EXCLUDED.e_prova
+			 RETURNING id`,
+			c.ID, m.Ordem, m.Rotulo, m.DataInicio, m.DataFim, m.Titulo, m.ExigeAcao, m.EProva,
+		).Scan(&m.ID); err != nil {
 			return fmt.Errorf("inserting marco: %w", err)
 		}
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM marcos WHERE concurso_id = $1 AND ordem >= $2`,
+		c.ID, len(c.Marcos),
+	); err != nil {
+		return fmt.Errorf("trimming marcos: %w", err)
 	}
 
 	for i, item := range c.Conteudo {

@@ -35,6 +35,12 @@ func (s *PlanoService) montar(
 
 	stats := plano.CalcularStats(res.Dias, codes, salvo.Registros)
 
+	ctxBlocos := plano.BlocoCtx{
+		HorasDia: salvo.Config.HorasDia,
+		Nomes:    nomes,
+		Simulado: res.Simulado,
+	}
+
 	dias := make([]DiaResposta, 0, len(res.Dias))
 	var hojeIndex *int
 
@@ -58,7 +64,7 @@ func (s *PlanoService) montar(
 			})
 		}
 
-		for _, b := range plano.Blocos(d, salvo.Config.HorasDia, nomes) {
+		for _, b := range plano.Blocos(d, ctxBlocos) {
 			dr.Blocos = append(dr.Blocos, BlocoResposta{
 				Minutos: b.Minutos,
 				Titulo:  b.Titulo,

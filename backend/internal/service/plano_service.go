@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	"annygo/internal/domain/concurso"
@@ -109,6 +110,13 @@ func (s *PlanoService) RegistrarDia(
 		Questoes:  in.Questoes,
 		Acertos:   in.Acertos,
 		Nota:      in.Nota,
+		Blocos:    blocosDoInput(c, in.Blocos),
+	}
+
+	// Com lançamento por disciplina, os totais do dia são a soma dos blocos — o
+	// cliente não precisa mandá-los, e se mandar, os blocos ganham.
+	if len(reg.Blocos) > 0 {
+		reg.Horas, reg.Questoes, reg.Acertos = reg.Totais()
 	}
 
 	// Mirror the artifact: logging hours auto-marks the day done.
@@ -464,4 +472,45 @@ func containsInt(xs []int, x int) bool {
 	}
 
 	return false
+}
+
+// blocosDoInput keeps only the blocks whose discipline exists in the concurso
+// and that actually carry a value, one row per discipline.
+func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.RegistroBloco {
+	out := make([]plano.RegistroBloco, 0, len(in))
+	visto := map[string]bool{}
+
+	for _, b := range in {
+		codigo := strings.TrimSpace(b.Disciplina)
+		if codigo == "" || visto[codigo] || c.DisciplinaByCodigo(codigo) == nil {
+			continue
+		}
+
+		if b.Horas == nil && b.Questoes == nil && b.Acertos == nil && strings.TrimSpace(b.Nota) == "" {
+			continue
+		}
+
+		visto[codigo] = true
+
+		out = append(out, plano.RegistroBloco{
+			Disciplina: codigo,
+			Horas:      b.Horas,
+			Questoes:   b.Questoes,
+			Acertos:    naoMaiorQue(b.Acertos, b.Questoes),
+			Nota:       strings.TrimSpace(b.Nota),
+		})
+	}
+
+	return out
+}
+
+// naoMaiorQue clamps acertos to questoes, so erros never goes negative.
+func naoMaiorQue(acertos, questoes *int) *int {
+	if acertos == nil || questoes == nil || *acertos <= *questoes {
+		return acertos
+	}
+
+	v := *questoes
+
+	return &v
 }

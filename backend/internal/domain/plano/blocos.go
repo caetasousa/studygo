@@ -12,11 +12,24 @@ type Bloco struct {
 	Detalhe string `json:"detalhe"`
 }
 
+// BlocoCtx carries everything the breakdown needs beyond the day itself.
+type BlocoCtx struct {
+	HorasDia float64           // the daily budget
+	Nomes    map[string]string // discipline codigo -> display name
+	Simulado Composicao        // question split of a full mock exam
+}
+
+// Composicao is how many questions of each bloco a full exam has.
+type Composicao struct {
+	Gerais      int
+	Especificas int
+}
+
 // Blocos returns the timed breakdown for a day, mirroring the artifact's
 // blocos(): content days get two study blocks plus a spaced-review tail; the
-// special days get their own fixed splits. horasDia is the daily budget.
-func Blocos(d Dia, horasDia float64, nomes map[string]string) []Bloco {
-	h := horasDia * 60
+// special days get their own fixed splits.
+func Blocos(d Dia, ctx BlocoCtx) []Bloco {
+	h := ctx.HorasDia * 60
 
 	if len(d.Itens) > 0 {
 		rev := d.Tipo == TipoRevisaoDirigida
@@ -39,7 +52,7 @@ func Blocos(d Dia, horasDia float64, nomes map[string]string) []Bloco {
 
 			out = append(out, Bloco{
 				Minutos: m5(h * 0.42),
-				Titulo:  rotulo + " — " + nomes[it.Disciplina],
+				Titulo:  rotulo + " — " + ctx.Nomes[it.Disciplina],
 				Detalhe: detalhe,
 			})
 		}
@@ -56,7 +69,13 @@ func Blocos(d Dia, horasDia float64, nomes map[string]string) []Bloco {
 	switch d.Tipo {
 	case TipoSimulado:
 		return []Bloco{
-			{Minutos: m5(h * 0.70), Titulo: "Simulado cronometrado", Detalhe: "25 gerais + 45 específicos, sem pausa e sem consulta"},
+			{
+				Minutos: m5(h * 0.70),
+				Titulo:  "Simulado cronometrado",
+				Detalhe: strconv.Itoa(ctx.Simulado.Gerais) + " gerais + " +
+					strconv.Itoa(ctx.Simulado.Especificas) +
+					" específicos, sem pausa e sem consulta",
+			},
 			{Minutos: m5(h * 0.30), Titulo: "Correção comentada", Detalhe: "cada erro vira uma linha no caderno de erros"},
 		}
 	case TipoDiscursiva:

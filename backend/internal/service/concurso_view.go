@@ -313,6 +313,8 @@ func concursoFromInput(in ConcursoInput) (concurso.Concurso, []string) {
 
 		m := concurso.Marco{Titulo: strings.TrimSpace(mi.Titulo), ExigeAcao: mi.ExigeAcao}
 		m.DataInicio = data
+		// O marco da própria prova é o que cai na data dela — não é um campo do formulário.
+		m.EProva = !c.ProvaPadrao.IsZero() && data.Equal(c.ProvaPadrao)
 
 		if fim, ok := parseISODate(mi.DataFim); ok {
 			m.DataFim = &fim

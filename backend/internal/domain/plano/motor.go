@@ -111,7 +111,9 @@ func construir(
 	ordem := despareia(ordena(res.Slots, pontos, codes, soma))
 	ordemR := despareia(ordena(res.SlotsReta, pontos, codes, soma))
 
-	simTema, simMeta := simulado(cfg, c)
+	res.Simulado = simulado(cfg, c)
+	simTema := res.Simulado.Tema()
+	simMeta := res.Simulado.Gerais + res.Simulado.Especificas
 
 	dias := make([]Dia, 0, len(estudo))
 	oi, ori := 0, 0
@@ -270,27 +272,30 @@ func renumera(dias []Dia) {
 	}
 }
 
-func simulado(cfg Config, c *concurso.Concurso) (string, int) {
-	ger, esp := 0, 0
+func simulado(cfg Config, c *concurso.Concurso) Composicao {
+	var comp Composicao
 
 	for _, d := range c.Disciplinas {
 		q := cfg.Questoes[d.Codigo]
 
 		switch d.Bloco {
 		case concurso.BlocoGeral:
-			ger += q
+			comp.Gerais += q
 		default:
-			esp += q
+			comp.Especificas += q
 		}
 	}
 
-	tema := fmt.Sprintf(
-		"Simulado completo no formato oficial: %d gerais + %d específicos, cronometrado, com correção",
-		ger,
-		esp,
-	)
+	return comp
+}
 
-	return tema, ger + esp
+// Tema is the headline of a full mock-exam day.
+func (c Composicao) Tema() string {
+	return fmt.Sprintf(
+		"Simulado completo no formato oficial: %d gerais + %d específicos, cronometrado, com correção",
+		c.Gerais,
+		c.Especificas,
+	)
 }
 
 // puxaBloco consumes up to two discipline slots from ordem and pulls the next

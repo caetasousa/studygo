@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sintetizarConteudo } from '$lib/conteudo';
 	import type { ConcursoInput, DisciplinaInput } from '$lib/types';
 
 	let {
@@ -110,6 +111,17 @@
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
+		const disciplinas: DisciplinaInput[] = discs.map((d) => ({
+			nome: d.nome.trim(),
+			bloco: d.bloco,
+			questoes: Math.max(0, d.questoes || 0),
+			temas: d.temasTexto
+				.split('\n')
+				.map((t) => t.trim())
+				.filter(Boolean),
+			fontes: parseFontes(d.fontesTexto)
+		}));
+
 		const input: ConcursoInput = {
 			nome: nome.trim(),
 			banca: banca.trim(),
@@ -117,16 +129,7 @@
 			emoji: emoji.trim() || '📚',
 			prova,
 			retaFinalDias,
-			disciplinas: discs.map((d) => ({
-				nome: d.nome.trim(),
-				bloco: d.bloco,
-				questoes: Math.max(0, d.questoes || 0),
-				temas: d.temasTexto
-					.split('\n')
-					.map((t) => t.trim())
-					.filter(Boolean),
-				fontes: parseFontes(d.fontesTexto)
-			})),
+			disciplinas,
 			marcos: marcos
 				.filter((m) => m.data && m.titulo)
 				.map((m) => ({
@@ -135,7 +138,8 @@
 					titulo: m.titulo.trim(),
 					exigeAcao: m.exigeAcao
 				})),
-			conteudo: seed.conteudo ?? []
+			// A ementa é regerada dos temas, para não ficar defasada ao editar.
+			conteudo: sintetizarConteudo(disciplinas)
 		};
 		onsubmit(input);
 	}

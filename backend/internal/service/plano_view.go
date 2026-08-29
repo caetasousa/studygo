@@ -28,11 +28,23 @@ type ConfigInput struct {
 
 // RegistroInput is one day's log coming from the client.
 type RegistroInput struct {
-	Horas     *float64 `json:"horas"`
-	Concluido bool     `json:"concluido"`
-	Questoes  *int     `json:"questoes"`
-	Acertos   *int     `json:"acertos"`
-	Nota      string   `json:"nota"`
+	Horas     *float64             `json:"horas"`
+	Concluido bool                 `json:"concluido"`
+	Questoes  *int                 `json:"questoes"`
+	Acertos   *int                 `json:"acertos"`
+	Nota      string               `json:"nota"`
+	Blocos    []RegistroBlocoInput `json:"blocos"`
+}
+
+// RegistroBlocoInput is one discipline's numbers inside a day. When any block is
+// sent the day-level totals are derived from them and the client's own totals
+// are ignored.
+type RegistroBlocoInput struct {
+	Disciplina string   `json:"disciplina"`
+	Horas      *float64 `json:"horas"`
+	Questoes   *int     `json:"questoes"`
+	Acertos    *int     `json:"acertos"`
+	Nota       string   `json:"nota"`
 }
 
 // PlanoResposta is the fat payload for GET /api/plano.
@@ -114,11 +126,22 @@ type BlocoResposta struct {
 }
 
 type RegistroResposta struct {
-	Horas     *float64 `json:"horas"`
-	Concluido bool     `json:"concluido"`
-	Questoes  *int     `json:"questoes"`
-	Acertos   *int     `json:"acertos"`
-	Nota      string   `json:"nota"`
+	Horas     *float64                `json:"horas"`
+	Concluido bool                    `json:"concluido"`
+	Questoes  *int                    `json:"questoes"`
+	Acertos   *int                    `json:"acertos"`
+	Erros     *int                    `json:"erros"`
+	Nota      string                  `json:"nota"`
+	Blocos    []RegistroBlocoResposta `json:"blocos"`
+}
+
+type RegistroBlocoResposta struct {
+	Disciplina string   `json:"disciplina"`
+	Horas      *float64 `json:"horas"`
+	Questoes   *int     `json:"questoes"`
+	Acertos    *int     `json:"acertos"`
+	Erros      *int     `json:"erros"`
+	Nota       string   `json:"nota"`
 }
 
 type MarcoResposta struct {
@@ -233,13 +256,43 @@ type AnotacaoInput struct {
 }
 
 func registroToResposta(r plano.Registro) *RegistroResposta {
-	return &RegistroResposta{
+	out := &RegistroResposta{
 		Horas:     r.Horas,
 		Concluido: r.Concluido,
 		Questoes:  r.Questoes,
 		Acertos:   r.Acertos,
+		Erros:     errosDe(r.Questoes, r.Acertos),
 		Nota:      r.Nota,
+		Blocos:    make([]RegistroBlocoResposta, 0, len(r.Blocos)),
 	}
+
+	for _, b := range r.Blocos {
+		out.Blocos = append(out.Blocos, RegistroBlocoResposta{
+			Disciplina: b.Disciplina,
+			Horas:      b.Horas,
+			Questoes:   b.Questoes,
+			Acertos:    b.Acertos,
+			Erros:      errosDe(b.Questoes, b.Acertos),
+			Nota:       b.Nota,
+		})
+	}
+
+	return out
+}
+
+// errosDe derives the wrong-answer count. It is nil unless both numbers are
+// recorded, and never negative.
+func errosDe(questoes, acertos *int) *int {
+	if questoes == nil || acertos == nil {
+		return nil
+	}
+
+	e := *questoes - *acertos
+	if e < 0 {
+		e = 0
+	}
+
+	return &e
 }
 
 func parseISODate(s string) (time.Time, bool) {

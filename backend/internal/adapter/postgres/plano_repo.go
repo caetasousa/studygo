@@ -125,6 +125,47 @@ func (r *PlanoRepo) loadRegistros(ctx context.Context, planoID uuid.UUID, s *pla
 		s.Registros[reg.Data.UTC()] = reg
 	}
 
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return r.loadRegistrosBloco(ctx, planoID, s)
+}
+
+// loadRegistrosBloco attaches the per-discipline breakdown to the day records
+// already loaded. A bloco whose day has no registros_dia row is ignored — the
+// two are always written together.
+func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT data, disciplina, horas::float8, questoes, acertos, nota
+		 FROM registros_bloco WHERE plano_id = $1 ORDER BY data, disciplina`,
+		planoID,
+	)
+	if err != nil {
+		return fmt.Errorf("querying registros_bloco: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			data time.Time
+			b    plano.RegistroBloco
+		)
+
+		if err := rows.Scan(&data, &b.Disciplina, &b.Horas, &b.Questoes, &b.Acertos, &b.Nota); err != nil {
+			return fmt.Errorf("scanning registro_bloco: %w", err)
+		}
+
+		reg, ok := s.Registros[data.UTC()]
+		if !ok {
+			continue
+		}
+
+		reg.Blocos = append(reg.Blocos, b)
+		s.Registros[data.UTC()] = reg
+	}
+
 	return rows.Err()
 }
 
@@ -288,8 +329,16 @@ func replaceReordenacoesTx(
 	return nil
 }
 
+// UpsertRegistro replaces the whole record for one day — the day row and its
+// per-discipline blocks — in a single transaction.
 func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg plano.Registro) error {
-	_, err := r.pool.Exec(
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(
 		ctx,
 		`INSERT INTO registros_dia (plano_id, data, horas, concluido, questoes, acertos, nota)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -297,9 +346,31 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 		   horas = EXCLUDED.horas, concluido = EXCLUDED.concluido, questoes = EXCLUDED.questoes,
 		   acertos = EXCLUDED.acertos, nota = EXCLUDED.nota, atualizado_em = now()`,
 		planoID, reg.Data, reg.Horas, reg.Concluido, reg.Questoes, reg.Acertos, reg.Nota,
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("upserting registro_dia: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM registros_bloco WHERE plano_id = $1 AND data = $2`,
+		planoID, reg.Data,
+	); err != nil {
+		return fmt.Errorf("clearing registros_bloco: %w", err)
+	}
+
+	for _, b := range reg.Blocos {
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO registros_bloco (plano_id, data, disciplina, horas, questoes, acertos, nota)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota,
+		); err != nil {
+			return fmt.Errorf("inserting registro_bloco: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
@@ -308,6 +379,10 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 func (r *PlanoRepo) DeleteRegistros(ctx context.Context, planoID uuid.UUID) error {
 	if _, err := r.pool.Exec(ctx, `DELETE FROM registros_dia WHERE plano_id = $1`, planoID); err != nil {
 		return fmt.Errorf("deleting registros_dia: %w", err)
+	}
+
+	if _, err := r.pool.Exec(ctx, `DELETE FROM registros_bloco WHERE plano_id = $1`, planoID); err != nil {
+		return fmt.Errorf("deleting registros_bloco: %w", err)
 	}
 
 	if _, err := r.pool.Exec(ctx, `DELETE FROM marco_checks WHERE plano_id = $1`, planoID); err != nil {

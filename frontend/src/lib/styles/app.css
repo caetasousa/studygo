@@ -668,6 +668,8 @@ a:focus-visible {
 	display: flex;
 	gap: 3px;
 	justify-self: end;
+	grid-column: 6;
+	grid-row: 1;
 }
 .mv-btn {
 	width: 21px;
@@ -1288,7 +1290,7 @@ table.tbl tfoot td {
 	}
 	.row {
 		grid-template-columns: 1fr 78px 30px;
-		grid-template-areas: 'nd nd nd' 'it it it' 'mv mv mv' 'h q chk' 'note note note';
+		grid-template-areas: 'nd nd nd' 'it it it' 'mv mv mv' 'res res chk' 'painel painel painel' 'note note note';
 		gap: 8px;
 		padding: 12px;
 	}
@@ -1308,13 +1310,9 @@ table.tbl tfoot td {
 	}
 	.row-move {
 		grid-area: mv;
+		grid-column: auto;
+		grid-row: auto;
 		justify-self: start;
-	}
-	.cell-in.h {
-		grid-area: h;
-	}
-	.cell-in.q {
-		grid-area: q;
 	}
 	.checkbox.rowchk {
 		grid-area: chk;

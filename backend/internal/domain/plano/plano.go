@@ -69,6 +69,7 @@ type Resultado struct {
 	SlotsReta  map[string]int // reta-final blocks per discipline
 	Pontos     map[string]int // points per discipline (questoes * peso)
 	SomaPontos int
+	Simulado   Composicao // question split of a full mock exam
 }
 
 // Gerar builds the plan. It never returns nil slices/maps.

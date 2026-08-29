@@ -3,6 +3,7 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { api, ApiError, type FonteEdital } from '$lib/api';
 	import ConcursoForm from '$lib/components/ConcursoForm.svelte';
+	import { sintetizarConteudo } from '$lib/conteudo';
 	import type { CargoOpcao, ConcursoInput, DisciplinaInput } from '$lib/types';
 
 	type Etapa = 'edital' | 'cargo' | 'gerais' | 'especificas' | 'conteudo' | 'revisao' | 'manual';
@@ -120,14 +121,23 @@
 			provaDiscursiva = est.provaDiscursiva;
 			marcos = est.marcos;
 			avisos = est.avisos;
-			gerais = est.gerais.map((d) => ({ nome: d.nome, questoes: d.questoes, temasTexto: '' }));
-			especificas = est.especificas.map((d) => ({ nome: d.nome, questoes: d.questoes, temasTexto: '' }));
+			// A etapa "estrutura" já costuma trazer temas; o passo seguinte os refina.
+			gerais = est.gerais.map(paraLinha);
+			especificas = est.especificas.map(paraLinha);
 			etapa = 'gerais';
 		} catch (e) {
 			erro = trata(e);
 		} finally {
 			processando = false;
 		}
+	}
+
+	function paraLinha(d: DisciplinaInput): DiscRow {
+		return {
+			nome: d.nome,
+			questoes: d.questoes,
+			temasTexto: (d.temas ?? []).join('\n')
+		};
 	}
 
 	function addDisc(lista: DiscRow[]) {
@@ -180,6 +190,11 @@
 	}
 
 	function montarRevisao() {
+		const disciplinas = [
+			...toDisciplinaInput(gerais, 'ger'),
+			...toDisciplinaInput(especificas, 'esp')
+		];
+
 		inicialRevisao = {
 			nome: nomeSugerido,
 			banca,
@@ -187,9 +202,10 @@
 			emoji: '📚',
 			prova,
 			retaFinalDias: 28,
-			disciplinas: [...toDisciplinaInput(gerais, 'ger'), ...toDisciplinaInput(especificas, 'esp')],
+			disciplinas,
 			marcos,
-			conteudo: []
+			// ConcursoForm regenera o conteúdo a partir das disciplinas ao salvar.
+			conteudo: sintetizarConteudo(disciplinas)
 		};
 		etapa = 'revisao';
 	}
