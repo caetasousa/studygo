@@ -1,0 +1,1875 @@
+{
+  "somaPontos": 115,
+  "pontos": {
+    "ENG": 10,
+    "DEV": 14,
+    "IAS": 10,
+    "OPS": 8,
+    "BDD": 10,
+    "IAD": 10,
+    "SEG": 10,
+    "SOR": 8,
+    "GOV": 6,
+    "LTI": 4,
+    "POR": 10,
+    "MAT": 7,
+    "LEG": 8
+  },
+  "slots": {
+    "ENG": 11,
+    "DEV": 15,
+    "IAS": 11,
+    "OPS": 9,
+    "BDD": 11,
+    "IAD": 11,
+    "SEG": 11,
+    "SOR": 9,
+    "GOV": 6,
+    "LTI": 4,
+    "POR": 11,
+    "MAT": 8,
+    "LEG": 9
+  },
+  "slotsReta": {
+    "ENG": 2,
+    "DEV": 3,
+    "IAS": 2,
+    "OPS": 2,
+    "BDD": 2,
+    "IAD": 2,
+    "SEG": 2,
+    "SOR": 2,
+    "GOV": 1,
+    "LTI": 1,
+    "POR": 2,
+    "MAT": 1,
+    "LEG": 2
+  },
+  "dias": [
+    {
+      "n": 1,
+      "data": "2026-09-01",
+      "semana": 1,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Algoritmos e lógica de programação",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "Fundamentos e ciclo de vida de software; abordagens preditiva, iterativa, incremental e adaptativa/ágil",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 2,
+      "data": "2026-09-02",
+      "semana": 1,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAS",
+          "tema": "Fundamentos de IA aplicada ao desenvolvimento; modelos de linguagem de grande porte (LLMs)",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "Modelo entidade-relacionamento; normalização e desnormalização",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 3,
+      "data": "2026-09-03",
+      "semana": 1,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAD",
+          "tema": "Fundamentos da inteligência artificial",
+          "passada": 1
+        },
+        {
+          "disciplina": "SEG",
+          "tema": "Confidencialidade, integridade, disponibilidade, autenticidade e não repúdio",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 4,
+      "data": "2026-09-04",
+      "semana": 1,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Revisão ativa da semana + caderno de erros",
+      "meta": 30,
+      "itens": []
+    },
+    {
+      "n": 5,
+      "data": "2026-09-07",
+      "semana": 2,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "POR",
+          "tema": "Compreensão e interpretação de textos de gêneros variados",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "CI/CD; pipelines de desenvolvimento; automação de build e de testes",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 6,
+      "data": "2026-09-08",
+      "semana": 2,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Windows e Linux: administração básica",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "CF/88: Administração Pública",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 7,
+      "data": "2026-09-09",
+      "semana": 2,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Números inteiros e racionais: operações e expressões numéricas",
+          "passada": 1
+        },
+        {
+          "disciplina": "GOV",
+          "tema": "Governança de TI: estratégia e alinhamento com os objetivos institucionais",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 8,
+      "data": "2026-09-10",
+      "semana": 2,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Estruturas de dados: listas, pilhas, filas, árvores, grafos e hash",
+          "passada": 1
+        },
+        {
+          "disciplina": "LTI",
+          "tema": "LGPD no desenvolvimento: privacy by design e by default, minimização, anonimização e pseudonimização",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 9,
+      "data": "2026-09-11",
+      "semana": 2,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Bateria mista de questões no peso da prova: 25 gerais e 45 específicos",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 10,
+      "data": "2026-09-14",
+      "semana": 3,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Scrum: papéis, eventos e artefatos",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Programação baseada em intenção e desenvolvimento orientado a linguagem natural",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 11,
+      "data": "2026-09-15",
+      "semana": 3,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "SQL: DDL, DML, junções e agregações",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Aprendizado supervisionado, não supervisionado e por reforço",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 12,
+      "data": "2026-09-16",
+      "semana": 3,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Classificação da informação",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Ortografia e acentuação",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 13,
+      "data": "2026-09-17",
+      "semana": 3,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Programação orientada a objetos",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Infraestrutura como código e gerenciamento de configuração",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 14,
+      "data": "2026-09-18",
+      "semana": 3,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Estudo de caso: treino da prova discursiva, com autocorreção",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 15,
+      "data": "2026-09-21",
+      "semana": 4,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Gerenciamento de processos, memória e sistemas de arquivos",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "CF/88: fiscalização contábil, financeira, orçamentária, operacional e patrimonial",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 16,
+      "data": "2026-09-22",
+      "semana": 4,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Múltiplos e divisores; problemas",
+          "passada": 1
+        },
+        {
+          "disciplina": "GOV",
+          "tema": "Gestão de serviços: catálogo, incidentes, problemas, mudanças e configuração  ·  Gestão de portfólio, de ativos e continuidade de serviços",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 17,
+      "data": "2026-09-23",
+      "semana": 4,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Kanban, Lean Software Development e Extreme Programming (XP)",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Engenharia de contexto e engenharia de prompts aplicadas ao software",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 18,
+      "data": "2026-09-24",
+      "semana": 4,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Programação funcional",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "Álgebra relacional",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 19,
+      "data": "2026-09-25",
+      "semana": 4,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Simulado parcial cronometrado + correção comentada",
+      "meta": 45,
+      "itens": []
+    },
+    {
+      "n": 20,
+      "data": "2026-09-28",
+      "semana": 5,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAD",
+          "tema": "Redes neurais artificiais e noções de deep learning",
+          "passada": 1
+        },
+        {
+          "disciplina": "SEG",
+          "tema": "Gestão de riscos, de vulnerabilidades e de incidentes",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 21,
+      "data": "2026-09-29",
+      "semana": 5,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "POR",
+          "tema": "Emprego do sinal indicativo de crase  ·  Pontuação",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Observabilidade: métricas, logs e traces",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 22,
+      "data": "2026-09-30",
+      "semana": 5,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Shell do Linux e Windows PowerShell; automação por scripts",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "CF/88: controle interno e controle externo",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 23,
+      "data": "2026-10-01",
+      "semana": 5,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Java: conceitos básicos",
+          "passada": 1
+        },
+        {
+          "disciplina": "LTI",
+          "tema": "Marco Civil da Internet: neutralidade, proteção de dados e guarda de registros",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 24,
+      "data": "2026-10-02",
+      "semana": 5,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Revisão ativa da semana + caderno de erros",
+      "meta": 30,
+      "itens": []
+    },
+    {
+      "n": 25,
+      "data": "2026-10-05",
+      "semana": 6,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Requisitos funcionais e não funcionais; histórias de usuário, casos de uso e critérios de aceite",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Sistemas agentivos: assistentes de codificação em CLI e integrados a IDE",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 26,
+      "data": "2026-10-06",
+      "semana": 6,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Transações e propriedades ACID",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Processamento de linguagem natural",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 27,
+      "data": "2026-10-07",
+      "semana": 6,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Controle de acesso: autenticação, autorização e gestão de identidades (IAM)",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Morfossintaxe",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 28,
+      "data": "2026-10-08",
+      "semana": 6,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Frações e operações com frações  ·  Razões, proporções e divisão em partes proporcionais",
+          "passada": 1
+        },
+        {
+          "disciplina": "DEV",
+          "tema": "JavaScript e ambiente Node.js",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 29,
+      "data": "2026-10-09",
+      "semana": 6,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Bateria mista de questões no peso da prova: 25 gerais e 45 específicos",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 30,
+      "data": "2026-10-12",
+      "semana": 7,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "GOV",
+          "tema": "COBIT 2019",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Telemetria, instrumentação, correlação de eventos, alertas e indicadores",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 31,
+      "data": "2026-10-13",
+      "semana": 7,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Active Directory e LDAP",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Constituição do Estado de Goiás: disposições sobre o TCE-GO",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 32,
+      "data": "2026-10-14",
+      "semana": 7,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Arquitetura: camadas, SOA, microsserviços e orientada a eventos",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Ciclo agentivo: coleta de contexto, planejamento e execução em arquivos e shell",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 33,
+      "data": "2026-10-15",
+      "semana": 7,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Índices e otimização de consultas",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "IA generativa: conceitos e aplicações",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 34,
+      "data": "2026-10-16",
+      "semana": 7,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Estudo de caso: treino da prova discursiva, com autocorreção",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 35,
+      "data": "2026-10-19",
+      "semana": 8,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Conceito de Zero Trust",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Pronomes e colocação pronominal  ·  Flexão nominal e flexão verbal",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 36,
+      "data": "2026-10-20",
+      "semana": 8,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Front-end com React",
+          "passada": 1
+        },
+        {
+          "disciplina": "MAT",
+          "tema": "Regra de três simples",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 37,
+      "data": "2026-10-21",
+      "semana": 8,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Python para automação e back-end",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "SOLID, DRY, KISS, YAGNI; coesão e acoplamento",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 38,
+      "data": "2026-10-22",
+      "semana": 8,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAS",
+          "tema": "Verificação autônoma de resultados e autocorreção (self-healing)",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "Procedures, triggers e views  ·  PostgreSQL: administração e otimização",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 39,
+      "data": "2026-10-23",
+      "semana": 8,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Simulado parcial cronometrado + correção comentada",
+      "meta": 45,
+      "itens": []
+    },
+    {
+      "n": 40,
+      "data": "2026-10-26",
+      "semana": 9,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAD",
+          "tema": "Agentes inteligentes e modelos multimodais  ·  Engenharia de prompts e de contexto; RAG",
+          "passada": 1
+        },
+        {
+          "disciplina": "SEG",
+          "tema": "Criptografia simétrica e assimétrica  ·  Infraestrutura de chaves públicas; certificados e assinatura digital",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 41,
+      "data": "2026-10-27",
+      "semana": 9,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "POR",
+          "tema": "Concordância nominal e concordância verbal",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Git distribuído; GitHub e GitLab; pull requests e revisão de código",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 42,
+      "data": "2026-10-28",
+      "semana": 9,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Virtualização e containers  ·  Arquitetura TCP/IP; endereçamento IPv4 e IPv6",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Lei Orgânica do TCE-GO (Lei nº 16.168/2007) — competências e jurisdição  ·  Lei Orgânica do TCE-GO — processo, julgamento e sanções",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 43,
+      "data": "2026-10-29",
+      "semana": 9,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "GOV",
+          "tema": "ITIL v4  ·  ISO/IEC 38500:2024",
+          "passada": 1
+        },
+        {
+          "disciplina": "DEV",
+          "tema": "APIs RESTful; noções de GraphQL e WebSockets",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 44,
+      "data": "2026-10-30",
+      "semana": 9,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Revisão ativa da semana + caderno de erros",
+      "meta": 30,
+      "itens": []
+    },
+    {
+      "n": 45,
+      "data": "2026-11-02",
+      "semana": 10,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "LTI",
+          "tema": "Requisitos de segurança em contratações de TIC; certificação digital",
+          "passada": 1
+        },
+        {
+          "disciplina": "MAT",
+          "tema": "Porcentagem, acréscimos e descontos",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 46,
+      "data": "2026-11-03",
+      "semana": 10,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Modelagem com UML e BPMN",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Geração, revisão, documentação e depuração de código assistidas por IA; geração de testes",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 47,
+      "data": "2026-11-04",
+      "semana": 10,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Oracle Database: administração e otimização",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Aplicações de IA em sistemas de informação e automação de processos",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 48,
+      "data": "2026-11-05",
+      "semana": 10,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "OWASP Top 10:2025",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Regência nominal e regência verbal  ·  Vozes do verbo; correlação de tempos e modos verbais",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 49,
+      "data": "2026-11-06",
+      "semana": 10,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Bateria mista de questões no peso da prova: 25 gerais e 45 específicos",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 50,
+      "data": "2026-11-09",
+      "semana": 11,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Formatos JSON e XML; documentação com OpenAPI/Swagger",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Estratégias de branching: Git Flow e trunk-based development",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 51,
+      "data": "2026-11-10",
+      "semana": 11,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "DNS e DHCP",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Regimento Interno (Resolução nº 22/2008 e alterações)",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 52,
+      "data": "2026-11-11",
+      "semana": 11,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "GOV",
+          "tema": "Gestão de projetos: PMBOK 8ª edição e métodos ágeis em TI",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "Padrões de projeto criacionais, estruturais e comportamentais",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 53,
+      "data": "2026-11-12",
+      "semana": 11,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAS",
+          "tema": "Gestão de contexto e memória; RAG e bancos vetoriais",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "NoSQL: documentos, chave-valor, wide-column e grafos",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 54,
+      "data": "2026-11-13",
+      "semana": 11,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Estudo de caso: treino da prova discursiva, com autocorreção",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 55,
+      "data": "2026-11-16",
+      "semana": 12,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "OAuth 2.0 e OpenID Connect 1.0; tokens, claims e JWT",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Ciência de dados: coleta, preparação, limpeza, transformação e análise",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 56,
+      "data": "2026-11-17",
+      "semana": 12,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Codificação segura (DevSecOps); segurança em APIs, containers e nuvem",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Coordenação e subordinação; conectivos",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 57,
+      "data": "2026-11-18",
+      "semana": 12,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Estrutura lógica de relações entre pessoas, lugares, objetos e eventos  ·  Raciocínio verbal e raciocínio matemático",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Docker e Docker Compose",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 58,
+      "data": "2026-11-19",
+      "semana": 12,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "HTTP/2, HTTP/3 e HTTPS; SMTP, FTP e SSH",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Plano de Cargos, Carreiras e Remuneração (Lei nº 15.122/2005)",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 59,
+      "data": "2026-11-20",
+      "semana": 12,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Simulado parcial cronometrado + correção comentada",
+      "meta": 45,
+      "itens": []
+    },
+    {
+      "n": 60,
+      "data": "2026-11-23",
+      "semana": 13,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "HTML5, CSS3 e TypeScript",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "Qualidade: desempenho, escalabilidade, disponibilidade, confiabilidade e manutenibilidade",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 61,
+      "data": "2026-11-24",
+      "semana": 13,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAS",
+          "tema": "Model Context Protocol (MCP); skills e tool use",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "MongoDB e Redis",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 62,
+      "data": "2026-11-25",
+      "semana": 13,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "IAD",
+          "tema": "Estatística aplicada e avaliação de modelos",
+          "passada": 1
+        },
+        {
+          "disciplina": "SEG",
+          "tema": "Malware, ransomware, phishing e engenharia social",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 63,
+      "data": "2026-11-26",
+      "semana": 13,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "POR",
+          "tema": "Formação de palavras; sinonímia e antonímia  ·  Denotação, conotação e figuras de linguagem",
+          "passada": 1
+        },
+        {
+          "disciplina": "LTI",
+          "tema": "Lei Complementar estadual nº 205/2025  ·  Normativos do TCE-GO: RN nº 13/2016 (CETI), RA nº 14/2024, RA nº 17/2024, RA nº 14/2025 e PDTI 2025–2026",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 64,
+      "data": "2026-11-27",
+      "semana": 13,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Revisão ativa da semana + caderno de erros",
+      "meta": 30,
+      "itens": []
+    },
+    {
+      "n": 65,
+      "data": "2026-11-30",
+      "semana": 14,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Controle de versão com Git",
+          "passada": 1
+        },
+        {
+          "disciplina": "GOV",
+          "tema": "Lei nº 14.133/2021 aplicada às contratações de TIC  ·  Lei nº 14.129/2021 e ENGD 2024–2027 (Decreto nº 12.069/2024)",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 66,
+      "data": "2026-12-01",
+      "semana": 14,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Raciocínio sequencial; orientação espacial e temporal",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Orquestração de containers com Kubernetes",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 67,
+      "data": "2026-12-02",
+      "semana": 14,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "VPN, balanceamento de carga, proxies e firewalls; redes sem fio",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Regime Jurídico dos Servidores do Estado de Goiás (Lei nº 20.756/2020)",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 68,
+      "data": "2026-12-03",
+      "semana": 14,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Testes unitários, de integração, funcionais, de regressão, de carga e de estresse; automação de testes",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Qualidade do código gerado por IA; alucinações e validação",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 69,
+      "data": "2026-12-04",
+      "semana": 14,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Bateria mista de questões no peso da prova: 25 gerais e 45 específicos",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 70,
+      "data": "2026-12-07",
+      "semana": 15,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Bancos vetoriais e embeddings aplicados à IA",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Big Data, processamento distribuído; volume, velocidade e variedade",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 71,
+      "data": "2026-12-08",
+      "semana": 15,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Firewalls, antivírus e IDS/IPS; testes de invasão e análise de vulnerabilidades",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Discurso direto, indireto e indireto livre; intertextualidade; contexto histórico do texto",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 72,
+      "data": "2026-12-09",
+      "semana": 15,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Dependências, empacotamento e publicação de aplicações",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "Revisão de código, refatoração e dívida técnica",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 73,
+      "data": "2026-12-10",
+      "semana": 15,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Algoritmos e lógica de programação",
+          "passada": 2
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Segurança, privacidade, propriedade intelectual e ética no desenvolvimento assistido por IA",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 74,
+      "data": "2026-12-11",
+      "semana": 15,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Estudo de caso: treino da prova discursiva, com autocorreção",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 75,
+      "data": "2026-12-14",
+      "semana": 16,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Replicação, backup, recuperação e alta disponibilidade  ·  Segurança e governança de dados",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Ética em IA: IA responsável, explicabilidade e governança; LGPD aplicada à IA  ·  Estratégia Brasileira de Inteligência Artificial",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 76,
+      "data": "2026-12-15",
+      "semana": 16,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Backup, continuidade de negócios e recuperação de desastres  ·  Família ABNT NBR ISO/IEC 27000",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Redação Oficial  ·  Reescrita: frases corretas e incorretas, reorganização e equivalência de estruturas",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 77,
+      "data": "2026-12-16",
+      "semana": 16,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "OPS",
+          "tema": "Ambientes de desenvolvimento, homologação e produção  ·  GitHub Actions, GitLab CI/CD e Jenkins",
+          "passada": 1
+        },
+        {
+          "disciplina": "SOR",
+          "tema": "Nuvem: IaaS, PaaS, SaaS e serverless  ·  Escalabilidade, alta disponibilidade, integração local–nuvem e monitoramento",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 78,
+      "data": "2026-12-17",
+      "semana": 16,
+      "fase": "base",
+      "tipo": "est",
+      "tema": "",
+      "meta": 20,
+      "itens": [
+        {
+          "disciplina": "LEG",
+          "tema": "Código de Ética dos Servidores do TCE-GO  ·  Políticas institucionais do TCE-GO e Resolução Administrativa nº 15/2024",
+          "passada": 1
+        },
+        {
+          "disciplina": "MAT",
+          "tema": "Formação de conceitos e discriminação de elementos  ·  De hipóteses a conclusões válidas: argumentação lógica",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 79,
+      "data": "2026-12-18",
+      "semana": 16,
+      "fase": "base",
+      "tipo": "rev",
+      "tema": "Simulado parcial cronometrado + correção comentada",
+      "meta": 45,
+      "itens": []
+    },
+    {
+      "n": 80,
+      "data": "2026-12-21",
+      "semana": 17,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Revisão dirigida — Algoritmos e lógica de programação  ·  Estruturas de dados: listas, pilhas, filas, árvores, grafos e hash  ·  Programação orientada a objetos  ·  Programação funcional",
+          "passada": 1
+        },
+        {
+          "disciplina": "ENG",
+          "tema": "Revisão dirigida — Fundamentos e ciclo de vida de software; abordagens preditiva, iterativa, incremental e adaptativa/ágil  ·  Scrum: papéis, eventos e artefatos  ·  Kanban, Lean Software Development e Extreme Programming (XP)  ·  Requisitos funcionais e não funcionais; histórias de usuário, casos de uso e critérios de aceite  ·  Arquitetura: camadas, SOA, microsserviços e orientada a eventos",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 81,
+      "data": "2026-12-22",
+      "semana": 17,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "IAS",
+          "tema": "Revisão dirigida — Fundamentos de IA aplicada ao desenvolvimento; modelos de linguagem de grande porte (LLMs)  ·  Programação baseada em intenção e desenvolvimento orientado a linguagem natural  ·  Engenharia de contexto e engenharia de prompts aplicadas ao software  ·  Sistemas agentivos: assistentes de codificação em CLI e integrados a IDE  ·  Ciclo agentivo: coleta de contexto, planejamento e execução em arquivos e shell",
+          "passada": 1
+        },
+        {
+          "disciplina": "BDD",
+          "tema": "Revisão dirigida — Modelo entidade-relacionamento; normalização e desnormalização  ·  SQL: DDL, DML, junções e agregações  ·  Álgebra relacional  ·  Transações e propriedades ACID  ·  Índices e otimização de consultas  ·  Procedures, triggers e views",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 82,
+      "data": "2026-12-23",
+      "semana": 17,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "IAD",
+          "tema": "Revisão dirigida — Fundamentos da inteligência artificial  ·  Aprendizado supervisionado, não supervisionado e por reforço  ·  Redes neurais artificiais e noções de deep learning  ·  Processamento de linguagem natural  ·  IA generativa: conceitos e aplicações  ·  Agentes inteligentes e modelos multimodais",
+          "passada": 1
+        },
+        {
+          "disciplina": "SEG",
+          "tema": "Revisão dirigida — Confidencialidade, integridade, disponibilidade, autenticidade e não repúdio  ·  Classificação da informação  ·  Gestão de riscos, de vulnerabilidades e de incidentes  ·  Controle de acesso: autenticação, autorização e gestão de identidades (IAM)  ·  Conceito de Zero Trust  ·  Criptografia simétrica e assimétrica",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 83,
+      "data": "2026-12-24",
+      "semana": 17,
+      "fase": "reta",
+      "tipo": "disc",
+      "tema": "Estudo de caso: prova discursiva completa e autocorreção pelos critérios do edital",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 84,
+      "data": "2026-12-25",
+      "semana": 17,
+      "fase": "reta",
+      "tipo": "sim",
+      "tema": "Simulado completo no formato oficial: 25 gerais + 45 específicos, cronometrado, com correção",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 85,
+      "data": "2026-12-28",
+      "semana": 18,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "POR",
+          "tema": "Revisão dirigida — Compreensão e interpretação de textos de gêneros variados  ·  Ortografia e acentuação  ·  Emprego do sinal indicativo de crase  ·  Pontuação  ·  Morfossintaxe  ·  Pronomes e colocação pronominal  ·  Flexão nominal e flexão verbal  ·  Concordância nominal e concordância verbal",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Revisão dirigida — CI/CD; pipelines de desenvolvimento; automação de build e de testes  ·  Infraestrutura como código e gerenciamento de configuração  ·  Observabilidade: métricas, logs e traces  ·  Telemetria, instrumentação, correlação de eventos, alertas e indicadores  ·  Git distribuído; GitHub e GitLab; pull requests e revisão de código",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 86,
+      "data": "2026-12-29",
+      "semana": 18,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Revisão dirigida — Windows e Linux: administração básica  ·  Gerenciamento de processos, memória e sistemas de arquivos  ·  Shell do Linux e Windows PowerShell; automação por scripts  ·  Active Directory e LDAP  ·  Virtualização e containers",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Revisão dirigida — CF/88: Administração Pública  ·  CF/88: fiscalização contábil, financeira, orçamentária, operacional e patrimonial  ·  CF/88: controle interno e controle externo  ·  Constituição do Estado de Goiás: disposições sobre o TCE-GO  ·  Lei Orgânica do TCE-GO (Lei nº 16.168/2007) — competências e jurisdição",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 87,
+      "data": "2026-12-30",
+      "semana": 18,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "MAT",
+          "tema": "Revisão dirigida — Números inteiros e racionais: operações e expressões numéricas  ·  Múltiplos e divisores; problemas  ·  Frações e operações com frações  ·  Razões, proporções e divisão em partes proporcionais  ·  Regra de três simples  ·  Porcentagem, acréscimos e descontos  ·  Estrutura lógica de relações entre pessoas, lugares, objetos e eventos  ·  Raciocínio verbal e raciocínio matemático  ·  Raciocínio sequencial; orientação espacial e temporal  ·  Formação de conceitos e discriminação de elementos  ·  De hipóteses a conclusões válidas: argumentação lógica",
+          "passada": 1
+        },
+        {
+          "disciplina": "GOV",
+          "tema": "Revisão dirigida — Governança de TI: estratégia e alinhamento com os objetivos institucionais  ·  Gestão de serviços: catálogo, incidentes, problemas, mudanças e configuração  ·  Gestão de portfólio, de ativos e continuidade de serviços  ·  COBIT 2019  ·  ITIL v4  ·  ISO/IEC 38500:2024  ·  Gestão de projetos: PMBOK 8ª edição e métodos ágeis em TI  ·  Lei nº 14.133/2021 aplicada às contratações de TIC  ·  Lei nº 14.129/2021 e ENGD 2024–2027 (Decreto nº 12.069/2024)",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 88,
+      "data": "2026-12-31",
+      "semana": 18,
+      "fase": "reta",
+      "tipo": "disc",
+      "tema": "Estudo de caso: prova discursiva completa e autocorreção pelos critérios do edital",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 89,
+      "data": "2027-01-01",
+      "semana": 18,
+      "fase": "reta",
+      "tipo": "sim",
+      "tema": "Simulado completo no formato oficial: 25 gerais + 45 específicos, cronometrado, com correção",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 90,
+      "data": "2027-01-04",
+      "semana": 19,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Revisão dirigida — Java: conceitos básicos  ·  JavaScript e ambiente Node.js  ·  Front-end com React  ·  Python para automação e back-end  ·  APIs RESTful; noções de GraphQL e WebSockets",
+          "passada": 1
+        },
+        {
+          "disciplina": "LTI",
+          "tema": "Revisão dirigida — LGPD no desenvolvimento: privacy by design e by default, minimização, anonimização e pseudonimização  ·  Marco Civil da Internet: neutralidade, proteção de dados e guarda de registros  ·  Requisitos de segurança em contratações de TIC; certificação digital  ·  Lei Complementar estadual nº 205/2025  ·  Normativos do TCE-GO: RN nº 13/2016 (CETI), RA nº 14/2024, RA nº 17/2024, RA nº 14/2025 e PDTI 2025–2026",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 91,
+      "data": "2027-01-05",
+      "semana": 19,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "ENG",
+          "tema": "Revisão dirigida — SOLID, DRY, KISS, YAGNI; coesão e acoplamento  ·  Modelagem com UML e BPMN  ·  Padrões de projeto criacionais, estruturais e comportamentais  ·  Qualidade: desempenho, escalabilidade, disponibilidade, confiabilidade e manutenibilidade  ·  Testes unitários, de integração, funcionais, de regressão, de carga e de estresse; automação de testes  ·  Revisão de código, refatoração e dívida técnica",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAS",
+          "tema": "Revisão dirigida — Verificação autônoma de resultados e autocorreção (self-healing)  ·  Geração, revisão, documentação e depuração de código assistidas por IA; geração de testes  ·  Gestão de contexto e memória; RAG e bancos vetoriais  ·  Model Context Protocol (MCP); skills e tool use  ·  Qualidade do código gerado por IA; alucinações e validação  ·  Segurança, privacidade, propriedade intelectual e ética no desenvolvimento assistido por IA",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 92,
+      "data": "2027-01-06",
+      "semana": 19,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "BDD",
+          "tema": "Revisão dirigida — PostgreSQL: administração e otimização  ·  Oracle Database: administração e otimização  ·  NoSQL: documentos, chave-valor, wide-column e grafos  ·  MongoDB e Redis  ·  Bancos vetoriais e embeddings aplicados à IA  ·  Replicação, backup, recuperação e alta disponibilidade  ·  Segurança e governança de dados",
+          "passada": 1
+        },
+        {
+          "disciplina": "IAD",
+          "tema": "Revisão dirigida — Engenharia de prompts e de contexto; RAG  ·  Aplicações de IA em sistemas de informação e automação de processos  ·  Ciência de dados: coleta, preparação, limpeza, transformação e análise  ·  Estatística aplicada e avaliação de modelos  ·  Big Data, processamento distribuído; volume, velocidade e variedade  ·  Ética em IA: IA responsável, explicabilidade e governança; LGPD aplicada à IA  ·  Estratégia Brasileira de Inteligência Artificial",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 93,
+      "data": "2027-01-07",
+      "semana": 19,
+      "fase": "reta",
+      "tipo": "disc",
+      "tema": "Estudo de caso: prova discursiva completa e autocorreção pelos critérios do edital",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 94,
+      "data": "2027-01-08",
+      "semana": 19,
+      "fase": "reta",
+      "tipo": "sim",
+      "tema": "Simulado completo no formato oficial: 25 gerais + 45 específicos, cronometrado, com correção",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 95,
+      "data": "2027-01-11",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "SEG",
+          "tema": "Revisão dirigida — Infraestrutura de chaves públicas; certificados e assinatura digital  ·  OWASP Top 10:2025  ·  Codificação segura (DevSecOps); segurança em APIs, containers e nuvem  ·  Malware, ransomware, phishing e engenharia social  ·  Firewalls, antivírus e IDS/IPS; testes de invasão e análise de vulnerabilidades  ·  Backup, continuidade de negócios e recuperação de desastres  ·  Família ABNT NBR ISO/IEC 27000",
+          "passada": 1
+        },
+        {
+          "disciplina": "POR",
+          "tema": "Revisão dirigida — Regência nominal e regência verbal  ·  Vozes do verbo; correlação de tempos e modos verbais  ·  Coordenação e subordinação; conectivos  ·  Formação de palavras; sinonímia e antonímia  ·  Denotação, conotação e figuras de linguagem  ·  Discurso direto, indireto e indireto livre; intertextualidade; contexto histórico do texto  ·  Redação Oficial  ·  Reescrita: frases corretas e incorretas, reorganização e equivalência de estruturas",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 96,
+      "data": "2027-01-12",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "DEV",
+          "tema": "Revisão dirigida — Formatos JSON e XML; documentação com OpenAPI/Swagger  ·  OAuth 2.0 e OpenID Connect 1.0; tokens, claims e JWT  ·  HTML5, CSS3 e TypeScript  ·  Controle de versão com Git  ·  Dependências, empacotamento e publicação de aplicações",
+          "passada": 1
+        },
+        {
+          "disciplina": "OPS",
+          "tema": "Revisão dirigida — Estratégias de branching: Git Flow e trunk-based development  ·  Docker e Docker Compose  ·  Orquestração de containers com Kubernetes  ·  Ambientes de desenvolvimento, homologação e produção  ·  GitHub Actions, GitLab CI/CD e Jenkins",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 97,
+      "data": "2027-01-13",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "revd",
+      "tema": "",
+      "meta": 24,
+      "itens": [
+        {
+          "disciplina": "SOR",
+          "tema": "Revisão dirigida — Arquitetura TCP/IP; endereçamento IPv4 e IPv6  ·  DNS e DHCP  ·  HTTP/2, HTTP/3 e HTTPS; SMTP, FTP e SSH  ·  VPN, balanceamento de carga, proxies e firewalls; redes sem fio  ·  Nuvem: IaaS, PaaS, SaaS e serverless  ·  Escalabilidade, alta disponibilidade, integração local–nuvem e monitoramento",
+          "passada": 1
+        },
+        {
+          "disciplina": "LEG",
+          "tema": "Revisão dirigida — Lei Orgânica do TCE-GO — processo, julgamento e sanções  ·  Regimento Interno (Resolução nº 22/2008 e alterações)  ·  Plano de Cargos, Carreiras e Remuneração (Lei nº 15.122/2005)  ·  Regime Jurídico dos Servidores do Estado de Goiás (Lei nº 20.756/2020)  ·  Código de Ética dos Servidores do TCE-GO  ·  Políticas institucionais do TCE-GO e Resolução Administrativa nº 15/2024",
+          "passada": 1
+        }
+      ]
+    },
+    {
+      "n": 98,
+      "data": "2027-01-14",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "disc",
+      "tema": "Estudo de caso: prova discursiva completa e autocorreção pelos critérios do edital",
+      "meta": 0,
+      "itens": []
+    },
+    {
+      "n": 99,
+      "data": "2027-01-15",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "sim",
+      "tema": "Simulado completo no formato oficial: 25 gerais + 45 específicos, cronometrado, com correção",
+      "meta": 70,
+      "itens": []
+    },
+    {
+      "n": 100,
+      "data": "2027-01-16",
+      "semana": 20,
+      "fase": "reta",
+      "tipo": "vespera",
+      "tema": "Véspera: leitura leve dos resumos, conferência de documento e local de prova, e descanso",
+      "meta": 0,
+      "itens": []
+    }
+  ]
+}

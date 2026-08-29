@@ -1,0 +1,304 @@
+{
+  "disciplinas": [
+    {
+      "codigo": "ENG",
+      "nome": "Engenharia de Software",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 5,
+      "ordem": 0,
+      "temas": [
+        "Fundamentos e ciclo de vida de software; abordagens preditiva, iterativa, incremental e adaptativa/ágil",
+        "Scrum: papéis, eventos e artefatos",
+        "Kanban, Lean Software Development e Extreme Programming (XP)",
+        "Requisitos funcionais e não funcionais; histórias de usuário, casos de uso e critérios de aceite",
+        "Arquitetura: camadas, SOA, microsserviços e orientada a eventos",
+        "SOLID, DRY, KISS, YAGNI; coesão e acoplamento",
+        "Modelagem com UML e BPMN",
+        "Padrões de projeto criacionais, estruturais e comportamentais",
+        "Qualidade: desempenho, escalabilidade, disponibilidade, confiabilidade e manutenibilidade",
+        "Testes unitários, de integração, funcionais, de regressão, de carga e de estresse; automação de testes",
+        "Revisão de código, refatoração e dívida técnica"
+      ]
+    },
+    {
+      "codigo": "DEV",
+      "nome": "Desenvolvimento de Sistemas",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 7,
+      "ordem": 1,
+      "temas": [
+        "Algoritmos e lógica de programação",
+        "Estruturas de dados: listas, pilhas, filas, árvores, grafos e hash",
+        "Programação orientada a objetos",
+        "Programação funcional",
+        "Java: conceitos básicos",
+        "JavaScript e ambiente Node.js",
+        "Front-end com React",
+        "Python para automação e back-end",
+        "APIs RESTful; noções de GraphQL e WebSockets",
+        "Formatos JSON e XML; documentação com OpenAPI/Swagger",
+        "OAuth 2.0 e OpenID Connect 1.0; tokens, claims e JWT",
+        "HTML5, CSS3 e TypeScript",
+        "Controle de versão com Git",
+        "Dependências, empacotamento e publicação de aplicações"
+      ]
+    },
+    {
+      "codigo": "IAS",
+      "nome": "Eng. de Software com IA e Agentes",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 5,
+      "ordem": 2,
+      "temas": [
+        "Fundamentos de IA aplicada ao desenvolvimento; modelos de linguagem de grande porte (LLMs)",
+        "Programação baseada em intenção e desenvolvimento orientado a linguagem natural",
+        "Engenharia de contexto e engenharia de prompts aplicadas ao software",
+        "Sistemas agentivos: assistentes de codificação em CLI e integrados a IDE",
+        "Ciclo agentivo: coleta de contexto, planejamento e execução em arquivos e shell",
+        "Verificação autônoma de resultados e autocorreção (self-healing)",
+        "Geração, revisão, documentação e depuração de código assistidas por IA; geração de testes",
+        "Gestão de contexto e memória; RAG e bancos vetoriais",
+        "Model Context Protocol (MCP); skills e tool use",
+        "Qualidade do código gerado por IA; alucinações e validação",
+        "Segurança, privacidade, propriedade intelectual e ética no desenvolvimento assistido por IA"
+      ]
+    },
+    {
+      "codigo": "OPS",
+      "nome": "DevOps e Engenharia de Entrega",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 4,
+      "ordem": 3,
+      "temas": [
+        "CI/CD; pipelines de desenvolvimento; automação de build e de testes",
+        "Infraestrutura como código e gerenciamento de configuração",
+        "Observabilidade: métricas, logs e traces",
+        "Telemetria, instrumentação, correlação de eventos, alertas e indicadores",
+        "Git distribuído; GitHub e GitLab; pull requests e revisão de código",
+        "Estratégias de branching: Git Flow e trunk-based development",
+        "Docker e Docker Compose",
+        "Orquestração de containers com Kubernetes",
+        "Ambientes de desenvolvimento, homologação e produção",
+        "GitHub Actions, GitLab CI/CD e Jenkins"
+      ]
+    },
+    {
+      "codigo": "BDD",
+      "nome": "Banco de Dados",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 5,
+      "ordem": 4,
+      "temas": [
+        "Modelo entidade-relacionamento; normalização e desnormalização",
+        "SQL: DDL, DML, junções e agregações",
+        "Álgebra relacional",
+        "Transações e propriedades ACID",
+        "Índices e otimização de consultas",
+        "Procedures, triggers e views",
+        "PostgreSQL: administração e otimização",
+        "Oracle Database: administração e otimização",
+        "NoSQL: documentos, chave-valor, wide-column e grafos",
+        "MongoDB e Redis",
+        "Bancos vetoriais e embeddings aplicados à IA",
+        "Replicação, backup, recuperação e alta disponibilidade",
+        "Segurança e governança de dados"
+      ]
+    },
+    {
+      "codigo": "IAD",
+      "nome": "IA, Ciência de Dados e Automação",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 5,
+      "ordem": 5,
+      "temas": [
+        "Fundamentos da inteligência artificial",
+        "Aprendizado supervisionado, não supervisionado e por reforço",
+        "Redes neurais artificiais e noções de deep learning",
+        "Processamento de linguagem natural",
+        "IA generativa: conceitos e aplicações",
+        "Agentes inteligentes e modelos multimodais",
+        "Engenharia de prompts e de contexto; RAG",
+        "Aplicações de IA em sistemas de informação e automação de processos",
+        "Ciência de dados: coleta, preparação, limpeza, transformação e análise",
+        "Estatística aplicada e avaliação de modelos",
+        "Big Data, processamento distribuído; volume, velocidade e variedade",
+        "Ética em IA: IA responsável, explicabilidade e governança; LGPD aplicada à IA",
+        "Estratégia Brasileira de Inteligência Artificial"
+      ]
+    },
+    {
+      "codigo": "SEG",
+      "nome": "Segurança da Informação",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 5,
+      "ordem": 6,
+      "temas": [
+        "Confidencialidade, integridade, disponibilidade, autenticidade e não repúdio",
+        "Classificação da informação",
+        "Gestão de riscos, de vulnerabilidades e de incidentes",
+        "Controle de acesso: autenticação, autorização e gestão de identidades (IAM)",
+        "Conceito de Zero Trust",
+        "Criptografia simétrica e assimétrica",
+        "Infraestrutura de chaves públicas; certificados e assinatura digital",
+        "OWASP Top 10:2025",
+        "Codificação segura (DevSecOps); segurança em APIs, containers e nuvem",
+        "Malware, ransomware, phishing e engenharia social",
+        "Firewalls, antivírus e IDS/IPS; testes de invasão e análise de vulnerabilidades",
+        "Backup, continuidade de negócios e recuperação de desastres",
+        "Família ABNT NBR ISO/IEC 27000"
+      ]
+    },
+    {
+      "codigo": "SOR",
+      "nome": "Sist. Operacionais, Redes e Nuvem",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 4,
+      "ordem": 7,
+      "temas": [
+        "Windows e Linux: administração básica",
+        "Gerenciamento de processos, memória e sistemas de arquivos",
+        "Shell do Linux e Windows PowerShell; automação por scripts",
+        "Active Directory e LDAP",
+        "Virtualização e containers",
+        "Arquitetura TCP/IP; endereçamento IPv4 e IPv6",
+        "DNS e DHCP",
+        "HTTP/2, HTTP/3 e HTTPS; SMTP, FTP e SSH",
+        "VPN, balanceamento de carga, proxies e firewalls; redes sem fio",
+        "Nuvem: IaaS, PaaS, SaaS e serverless",
+        "Escalabilidade, alta disponibilidade, integração local–nuvem e monitoramento"
+      ]
+    },
+    {
+      "codigo": "GOV",
+      "nome": "Governança de TI",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 3,
+      "ordem": 8,
+      "temas": [
+        "Governança de TI: estratégia e alinhamento com os objetivos institucionais",
+        "Gestão de serviços: catálogo, incidentes, problemas, mudanças e configuração",
+        "Gestão de portfólio, de ativos e continuidade de serviços",
+        "COBIT 2019",
+        "ITIL v4",
+        "ISO/IEC 38500:2024",
+        "Gestão de projetos: PMBOK 8ª edição e métodos ágeis em TI",
+        "Lei nº 14.133/2021 aplicada às contratações de TIC",
+        "Lei nº 14.129/2021 e ENGD 2024–2027 (Decreto nº 12.069/2024)"
+      ]
+    },
+    {
+      "codigo": "LTI",
+      "nome": "Legislação Aplicada à TI",
+      "bloco": "esp",
+      "peso": 2,
+      "questoesPadrao": 2,
+      "ordem": 9,
+      "temas": [
+        "LGPD no desenvolvimento: privacy by design e by default, minimização, anonimização e pseudonimização",
+        "Marco Civil da Internet: neutralidade, proteção de dados e guarda de registros",
+        "Requisitos de segurança em contratações de TIC; certificação digital",
+        "Lei Complementar estadual nº 205/2025",
+        "Normativos do TCE-GO: RN nº 13/2016 (CETI), RA nº 14/2024, RA nº 17/2024, RA nº 14/2025 e PDTI 2025–2026"
+      ]
+    },
+    {
+      "codigo": "POR",
+      "nome": "Língua Portuguesa",
+      "bloco": "ger",
+      "peso": 1,
+      "questoesPadrao": 10,
+      "ordem": 10,
+      "temas": [
+        "Compreensão e interpretação de textos de gêneros variados",
+        "Ortografia e acentuação",
+        "Emprego do sinal indicativo de crase",
+        "Pontuação",
+        "Morfossintaxe",
+        "Pronomes e colocação pronominal",
+        "Flexão nominal e flexão verbal",
+        "Concordância nominal e concordância verbal",
+        "Regência nominal e regência verbal",
+        "Vozes do verbo; correlação de tempos e modos verbais",
+        "Coordenação e subordinação; conectivos",
+        "Formação de palavras; sinonímia e antonímia",
+        "Denotação, conotação e figuras de linguagem",
+        "Discurso direto, indireto e indireto livre; intertextualidade; contexto histórico do texto",
+        "Redação Oficial",
+        "Reescrita: frases corretas e incorretas, reorganização e equivalência de estruturas"
+      ]
+    },
+    {
+      "codigo": "MAT",
+      "nome": "Matemática e Raciocínio Lógico",
+      "bloco": "ger",
+      "peso": 1,
+      "questoesPadrao": 7,
+      "ordem": 11,
+      "temas": [
+        "Números inteiros e racionais: operações e expressões numéricas",
+        "Múltiplos e divisores; problemas",
+        "Frações e operações com frações",
+        "Razões, proporções e divisão em partes proporcionais",
+        "Regra de três simples",
+        "Porcentagem, acréscimos e descontos",
+        "Estrutura lógica de relações entre pessoas, lugares, objetos e eventos",
+        "Raciocínio verbal e raciocínio matemático",
+        "Raciocínio sequencial; orientação espacial e temporal",
+        "Formação de conceitos e discriminação de elementos",
+        "De hipóteses a conclusões válidas: argumentação lógica"
+      ]
+    },
+    {
+      "codigo": "LEG",
+      "nome": "Legislação Institucional",
+      "bloco": "ger",
+      "peso": 1,
+      "questoesPadrao": 8,
+      "ordem": 12,
+      "temas": [
+        "CF/88: Administração Pública",
+        "CF/88: fiscalização contábil, financeira, orçamentária, operacional e patrimonial",
+        "CF/88: controle interno e controle externo",
+        "Constituição do Estado de Goiás: disposições sobre o TCE-GO",
+        "Lei Orgânica do TCE-GO (Lei nº 16.168/2007) — competências e jurisdição",
+        "Lei Orgânica do TCE-GO — processo, julgamento e sanções",
+        "Regimento Interno (Resolução nº 22/2008 e alterações)",
+        "Plano de Cargos, Carreiras e Remuneração (Lei nº 15.122/2005)",
+        "Regime Jurídico dos Servidores do Estado de Goiás (Lei nº 20.756/2020)",
+        "Código de Ética dos Servidores do TCE-GO",
+        "Políticas institucionais do TCE-GO e Resolução Administrativa nº 15/2024"
+      ]
+    }
+  ],
+  "revCiclo": [
+    {
+      "ordem": 0,
+      "titulo": "Revisão ativa da semana + caderno de erros",
+      "questoes": 30
+    },
+    {
+      "ordem": 1,
+      "titulo": "Bateria mista de questões no peso da prova: 25 gerais e 45 específicos",
+      "questoes": 70
+    },
+    {
+      "ordem": 2,
+      "titulo": "Estudo de caso: treino da prova discursiva, com autocorreção",
+      "questoes": 0
+    },
+    {
+      "ordem": 3,
+      "titulo": "Simulado parcial cronometrado + correção comentada",
+      "questoes": 45
+    }
+  ]
+}
