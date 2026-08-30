@@ -22,7 +22,10 @@
 		datasDisponiveis,
 		onMover,
 		onArrastar,
-		onSoltar
+		onSoltar,
+		concluida = false,
+		onAlternarConcluida,
+		onRegistrar
 	}: {
 		item: ItemDia;
 		data: string;
@@ -34,6 +37,11 @@
 		onMover: (id: string, data: string, posicao: number) => void;
 		onArrastar?: (id: string) => void;
 		onSoltar?: (posicao: number) => void;
+		/** this discipline finished on this day */
+		concluida?: boolean;
+		onAlternarConcluida?: (marcado: boolean) => void;
+		/** opens the day's log focused on this discipline */
+		onRegistrar?: () => void;
 	} = $props();
 
 	let menuAberto = $state(false);
@@ -64,6 +72,7 @@
 <div
 	class="atv"
 	class:movida={item.movida}
+	class:feita={concluida}
 	draggable={movivel}
 	ondragstart={() => onArrastar?.(item.id)}
 	ondragover={(e) => e.preventDefault()}
@@ -90,8 +99,26 @@
 		{#if item.movida}<span class="meta movida-tag">movida por você</span>{/if}
 	</span>
 
-	{#if movivel}
-		<span class="acoes">
+	<span class="acoes">
+		{#if onRegistrar}
+			<IconButton
+				icon="registrar"
+				label="Registrar horas e questões de {nome}"
+				onclick={onRegistrar}
+			/>
+		{/if}
+		{#if onAlternarConcluida}
+			<label class="ok" title="Marcar {nome} como concluída">
+				<input
+					type="checkbox"
+					class="checkbox"
+					checked={concluida}
+					onchange={(e) => onAlternarConcluida(e.currentTarget.checked)}
+				/>
+				<span class="sr-only">Concluí {nome} — {tema}</span>
+			</label>
+		{/if}
+		{#if movivel}
 			<IconButton
 				icon="anterior"
 				label="Mover para cima"
@@ -109,8 +136,8 @@
 				label="Mais ações para {nome} — {tema}"
 				onclick={() => (menuAberto = !menuAberto)}
 			/>
-		</span>
-	{/if}
+		{/if}
+	</span>
 
 	{#if menuAberto}
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -230,8 +257,25 @@
 	}
 	.acoes {
 		display: flex;
+		align-items: center;
 		gap: 2px;
 		align-self: center;
+	}
+	/* The check gets the same hit area as the icon buttons beside it, so the row
+	   of controls reads as one strip rather than a checkbox tacked on. */
+	.ok {
+		display: grid;
+		place-items: center;
+		width: var(--icon-hit);
+		height: var(--icon-hit);
+		cursor: pointer;
+		flex: none;
+	}
+	/* A finished activity settles back without becoming unreadable. */
+	.atv.feita .tema {
+		color: var(--text-faint);
+		text-decoration: line-through;
+		text-decoration-color: var(--border-strong);
 	}
 	.menu {
 		position: absolute;

@@ -29,6 +29,9 @@ type RegistroBloco struct {
 	Questoes   *int
 	Acertos    *int
 	Nota       string
+	// Concluido marks this discipline done on its own, independently of the
+	// day's own flag: a day can be half finished.
+	Concluido bool
 }
 
 // BlocoDe returns the record for one discipline of the day, or nil.

@@ -59,9 +59,17 @@
 		return null;
 	}
 
+	/**
+	 * Moves one activity. When the target slot in another day is already taken,
+	 * the two subjects swap places instead of the target day growing — which is
+	 * what "move this to the 2nd" means when the 2nd is already full.
+	 */
 	async function mover(id: string, data: string, posicao: number) {
 		const antes = posicaoAtual(id);
-		const ok = await planoStore.moverAtividade(id, data, posicao);
+		const destino = plano?.dias.find((d) => d.data === data);
+		const ocupado = !!destino && posicao < destino.itens.length;
+		const trocar = ocupado && antes?.data !== data;
+		const ok = await planoStore.moverAtividade(id, data, posicao, trocar);
 		if (ok && antes) {
 			ultimoMovimento = { id, ...antes };
 			aviso = 'Atividade movida.';

@@ -290,6 +290,85 @@ func (s *PlanoService) MarcarMarco(
 	return s.montar(ctx, c, salvo)
 }
 
+// MoverAtividade moves a single scheduled activity to (data, posicao).
+//
+// This is the fine-grained counterpart to Reordenar, which can only swap two
+// whole days. The first move seeds the activity table from the engine's output,
+// so what the user sees is exactly what they were already looking at; from then
+// on the stored layout wins for the days it covers.
+//
+// Registros are never touched: moving what is *planned* must not rewrite the
+// record of what was actually studied.
+func (s *PlanoService) MoverAtividade(
+	ctx context.Context,
+	userID uuid.UUID,
+	slug string,
+	mov MoverAtividadeInput,
+) (PlanoResposta, error) {
+	c, salvo, err := s.carregar(ctx, userID, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	destino, ok := parseISODate(mov.Data)
+	if !ok {
+		return PlanoResposta{}, ErrValidacao{Msg: "data inválida"}
+	}
+
+	res := plano.Gerar(salvo.Config, &c)
+	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
+
+	atividades, err := s.planos.ListAtividades(ctx, salvo.ID)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	// First move on this plan: materialise what the engine generated, so ids
+	// exist to move around.
+	if len(atividades) == 0 {
+		atividades = plano.DerivarAtividades(res.Dias)
+		if err := s.planos.ReplaceAtividades(ctx, salvo.ID, atividades); err != nil {
+			return PlanoResposta{}, err
+		}
+
+		if atividades, err = s.planos.ListAtividades(ctx, salvo.ID); err != nil {
+			return PlanoResposta{}, err
+		}
+	}
+
+	concluido := func(d time.Time) bool {
+		r, ok := salvo.Registros[plano.DayOf(d)]
+
+		return ok && r.Concluido
+	}
+
+	mover := plano.MoverAtividade
+	if mov.Trocar {
+		mover = plano.TrocarAtividades
+	}
+
+	movidas, err := mover(
+		atividades, res.Dias, mov.ID, destino, mov.Posicao, concluido,
+	)
+
+	switch {
+	case errors.Is(err, plano.ErrAtividadeNaoEncontrada):
+		return PlanoResposta{}, ErrValidacao{Msg: "atividade não encontrada"}
+	case errors.Is(err, plano.ErrDestinoInvalido):
+		return PlanoResposta{}, ErrValidacao{Msg: "esse dia não recebe atividades"}
+	case errors.Is(err, plano.ErrDiaConcluido):
+		return PlanoResposta{}, ErrValidacao{Msg: "um dia já concluído não pode ser reorganizado"}
+	case err != nil:
+		return PlanoResposta{}, err
+	}
+
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, movidas); err != nil {
+		return PlanoResposta{}, err
+	}
+
+	return s.montar(ctx, c, salvo)
+}
+
 // Reordenar swaps the content of two days and persists both as overrides.
 func (s *PlanoService) Reordenar(
 	ctx context.Context,
@@ -730,7 +809,11 @@ func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.Registr
 			continue
 		}
 
-		if b.Horas == nil && b.Questoes == nil && b.Acertos == nil && strings.TrimSpace(b.Nota) == "" {
+		// Concluido counts as a value: ticking a discipline with no hours yet is
+		// a legitimate state, and dropping the row here would make the check
+		// silently fail to persist.
+		if b.Horas == nil && b.Questoes == nil && b.Acertos == nil &&
+			strings.TrimSpace(b.Nota) == "" && !b.Concluido {
 			continue
 		}
 
@@ -742,6 +825,7 @@ func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.Registr
 			Questoes:   b.Questoes,
 			Acertos:    naoMaiorQue(b.Acertos, b.Questoes),
 			Nota:       strings.TrimSpace(b.Nota),
+			Concluido:  b.Concluido,
 		})
 	}
 

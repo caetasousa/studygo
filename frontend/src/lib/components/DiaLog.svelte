@@ -4,7 +4,16 @@
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { debounce, parseNum, parseInteger } from '$lib/debounce';
 
-	let { dia, variant = 'row' }: { dia: Dia; variant?: 'row' | 'card' } = $props();
+	let {
+		dia,
+		variant = 'row',
+		aberto = $bindable(false)
+	}: {
+		dia: Dia;
+		variant?: 'row' | 'card';
+		/** Bindable so an activity's own "registrar" icon can open this panel. */
+		aberto?: boolean;
+	} = $props();
 
 	const disc = $derived(planoStore.discIndex);
 
@@ -38,9 +47,11 @@
 	}
 
 	let valores = $state<Record<string, Campos>>({});
+	// Completion per discipline, keyed by codigo. The day's own flag below stays
+	// for the special days and for the stats, and is derived from these.
+	let feitos = $state<Record<string, boolean>>({});
 	let concluido = $state(false);
 	let nota = $state('');
-	let aberto = $state(false);
 
 	// Re-sync from the server only when the component switches to a different
 	// day — never mid-edit, so a debounced save in flight can't clobber newer
@@ -53,12 +64,15 @@
 			const reg = dia.registro;
 			const novo: Record<string, Campos> = {};
 
+			const novosFeitos: Record<string, boolean> = {};
+
 			if (dia.itens.length === 0) {
 				novo[''] = {
 					horas: reg?.horas ?? null,
 					questoes: reg?.questoes ?? null,
 					acertos: reg?.acertos ?? null
 				};
+				novosFeitos[''] = reg?.concluido ?? false;
 			} else {
 				for (const it of dia.itens) {
 					const b = reg?.blocos?.find((x) => x.disciplina === it.disciplina);
@@ -67,10 +81,14 @@
 						questoes: b?.questoes ?? null,
 						acertos: b?.acertos ?? null
 					};
+					// An older record has no per-block flag; fall back to the day's,
+					// so a day ticked before this existed still reads as done.
+					novosFeitos[it.disciplina] = b?.concluido ?? reg?.concluido ?? false;
 				}
 			}
 
 			valores = novo;
+			feitos = novosFeitos;
 			concluido = reg?.concluido ?? false;
 			nota = reg?.nota ?? '';
 			aberto = false;
@@ -110,8 +128,16 @@
 
 		const blocos: RegistroBlocoInput[] = porDisciplina
 			? linhas
-					.map((l) => ({ disciplina: l.codigo, ...campo(l.codigo), nota: '' }))
-					.filter((b) => b.horas !== null || b.questoes !== null || b.acertos !== null)
+					.map((l) => ({
+						disciplina: l.codigo,
+						...campo(l.codigo),
+						nota: '',
+						concluido: feitos[l.codigo] ?? false
+					}))
+					.filter(
+						(b) =>
+							b.horas !== null || b.questoes !== null || b.acertos !== null || b.concluido
+					)
 			: [];
 
 		const dia0 = campo('');
@@ -130,20 +156,57 @@
 	function setCampo(codigo: string, chave: keyof Campos, bruto: string) {
 		const v = chave === 'horas' ? parseNum(bruto) : parseInteger(bruto);
 		valores[codigo] = { ...campo(codigo), [chave]: v };
-		if (chave === 'horas' && v && !concluido) concluido = true;
+		// Logging hours for a discipline implies you studied it.
+		if (chave === 'horas' && v && !feitos[codigo]) feitos[codigo] = true;
+		sincronizarDia();
 		salvar();
 	}
 
-	function onConcluido(e: Event) {
-		concluido = (e.target as HTMLInputElement).checked;
-		if (concluido && horasTotal === null) {
-			const padrao = planoStore.plano?.config.horasDia ?? null;
-			if (padrao !== null && linhas.length > 0) {
-				const fatia = Math.round((padrao / linhas.length) * 100) / 100;
-				for (const l of linhas) valores[l.codigo] = { ...campo(l.codigo), horas: fatia };
+	/** The day counts as done once every discipline in it does. */
+	function sincronizarDia() {
+		concluido = linhas.length > 0 && linhas.every((l) => feitos[l.codigo]);
+	}
+
+	// What ticking a discipline filled in on its own, so unticking can take back
+	// exactly that and leave anything typed by hand alone.
+	let autoPreenchido = $state<Record<string, boolean>>({});
+
+	/**
+	 * Toggles one discipline. Ticking it fills in the default hours when none
+	 * were given; unticking puts it back the way it was, rather than leaving
+	 * hours behind that the user never typed.
+	 */
+	function alternarDisciplina(codigo: string, marcado: boolean) {
+		feitos[codigo] = marcado;
+
+		if (marcado) {
+			if (campo(codigo).horas === null) {
+				const padrao = planoStore.plano?.config.horasDia ?? null;
+				if (padrao !== null && linhas.length > 0) {
+					const fatia = Math.round((padrao / linhas.length) * 100) / 100;
+					valores[codigo] = { ...campo(codigo), horas: fatia };
+					autoPreenchido[codigo] = true;
+				}
 			}
+		} else if (autoPreenchido[codigo]) {
+			valores[codigo] = { ...campo(codigo), horas: null };
+			autoPreenchido[codigo] = false;
 		}
+
+		sincronizarDia();
 		salvar();
+	}
+
+	// The whole-day checkbox (special days, and the card variant) drives every
+	// discipline at once, so the two views never disagree.
+	function onConcluido(e: Event) {
+		const marcado = (e.target as HTMLInputElement).checked;
+		for (const l of linhas) alternarDisciplina(l.codigo, marcado);
+		if (linhas.length === 0) {
+			concluido = marcado;
+			salvar();
+		}
+		concluido = marcado;
 	}
 
 	function onNota(e: Event) {
@@ -168,7 +231,16 @@
 		{#each linhas as l (l.codigo)}
 			{@const c = campo(l.codigo)}
 			{@const err = errosDe(c)}
-			<div class="bl">
+			<div class="bl" class:feito={feitos[l.codigo]}>
+				<label class="bl-ok" title="Marcar {l.nome} como concluída">
+					<input
+						type="checkbox"
+						class="checkbox"
+						checked={feitos[l.codigo] ?? false}
+						onchange={(e) => alternarDisciplina(l.codigo, e.currentTarget.checked)}
+					/>
+					<span class="sr-only">Concluí {l.nome}</span>
+				</label>
 				<span class="bl-nome">
 					{#if l.cor >= 0}
 						<span class="chip-dot" style="background:var(--c{l.cor}-tx)"></span>
@@ -228,6 +300,7 @@
 
 		{#if linhas.length > 1}
 			<div class="bl total">
+				<span aria-hidden="true"></span>
 				<span class="bl-nome">Total do dia</span>
 				<span class="bl-v">{horasTotal ?? '—'}<i>h</i></span>
 				{#if algumaComQuestoes}
@@ -283,6 +356,17 @@
 {/if}
 
 <style>
+	.bl-ok {
+		display: grid;
+		place-items: center;
+		flex: none;
+		cursor: pointer;
+	}
+	/* A finished discipline stays legible but visibly settled. */
+	.bl.feito .bl-nome {
+		color: var(--text-faint);
+	}
+
 	/* The note lives under the day's controls: hidden until the day carries one or
 	   the panel is open, so an empty schedule is not a wall of empty inputs.
 	   This used to be driven by the page's `.row` wrapper, which no longer exists —
@@ -314,7 +398,8 @@
 	}
 	.bl {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) 84px 84px 84px 74px;
+		/* check | discipline | horas | questões | acertos | erros */
+		grid-template-columns: 22px minmax(0, 1fr) 84px 84px 84px 74px;
 		align-items: end;
 		gap: 8px;
 	}

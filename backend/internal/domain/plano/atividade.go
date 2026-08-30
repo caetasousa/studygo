@@ -1,0 +1,361 @@
+package plano
+
+import (
+	"errors"
+	"sort"
+	"time"
+)
+
+// Errors a move can fail with. They are distinct so the API can turn each into
+// a message that says what to do next, rather than a generic refusal.
+var (
+	// ErrAtividadeNaoEncontrada: no activity with that id in the plan.
+	ErrAtividadeNaoEncontrada = errors.New("atividade não encontrada")
+	// ErrDestinoInvalido: the target date is not a day that can hold content
+	// (outside the plan, or a fixed day such as the simulado or the eve).
+	ErrDestinoInvalido = errors.New("dia de destino não aceita atividades")
+	// ErrDiaConcluido: the source or target day is already marked done, so
+	// moving would rewrite history.
+	ErrDiaConcluido = errors.New("dia já concluído")
+)
+
+// TipoAtividade is what a scheduled activity asks of the student. It is
+// deliberately separate from Tipo (which classifies a whole day): a single day
+// can hold a theory block and a question block at once.
+type TipoAtividade string
+
+const (
+	AtividadeConteudo   TipoAtividade = "conteudo"
+	AtividadeRevisao    TipoAtividade = "revisao"
+	AtividadeQuestoes   TipoAtividade = "questoes"
+	AtividadeSimulado   TipoAtividade = "simulado"
+	AtividadeDiscursiva TipoAtividade = "discursiva"
+)
+
+// Atividade is one movable unit of the schedule: a subject+topic to study, a
+// review, a block of questions. It is the planning side only — what the student
+// actually did lives in Registro, so moving an activity never rewrites history.
+type Atividade struct {
+	ID         string
+	Data       time.Time
+	Posicao    int
+	Disciplina string // discipline codigo; empty for whole-day activities
+	Tema       string
+	Passada    int
+	Tipo       TipoAtividade
+	DuracaoMin int // 0 = use the plan's default block length
+
+	// Where the engine had put it, so a regeneration can distinguish an activity
+	// the user moved from one it merely regenerated differently.
+	OrigemDia *time.Time
+	OrigemPos *int
+}
+
+// Movida reports whether the user has moved this activity away from where the
+// engine originally placed it.
+func (a Atividade) Movida() bool {
+	if a.OrigemDia == nil || a.OrigemPos == nil {
+		return false
+	}
+
+	return !sameDay(*a.OrigemDia, a.Data) || *a.OrigemPos != a.Posicao
+}
+
+// Duracao resolves the planned length, falling back to the plan's block size.
+func (a Atividade) Duracao(padraoMin int) int {
+	if a.DuracaoMin > 0 {
+		return a.DuracaoMin
+	}
+
+	return padraoMin
+}
+
+// DestinoValido reports whether a date can receive activities: it must be a day
+// the plan actually contains, and one that carries content rather than a fixed
+// fixture (simulado, discursiva, véspera).
+func DestinoValido(dias []Dia, dt time.Time) bool {
+	d := findDia(dias, dt)
+	if d == nil {
+		return false
+	}
+
+	// Only days that actually carry study items can receive one; the fixed
+	// fixtures (simulado, discursiva, véspera) are the plan's skeleton.
+	return d.Tipo == TipoEstudo || d.Tipo == TipoRevisaoDirigida || d.Tipo == TipoRevisaoSemanal
+}
+
+// TrocarAtividades swaps one activity with whatever occupies (destino, posicao),
+// instead of inserting alongside it. This is what "move Português from the 31st
+// to the 2nd" usually means when the 2nd is already full: the two subjects
+// exchange places and neither day changes size.
+//
+// When the target slot is empty (the day has fewer activities than posicao),
+// there is nothing to swap with and this degrades to a plain move.
+func TrocarAtividades(
+	atividades []Atividade,
+	dias []Dia,
+	id string,
+	destino time.Time,
+	posicao int,
+	concluido func(time.Time) bool,
+) ([]Atividade, error) {
+	idx := -1
+
+	for i := range atividades {
+		if atividades[i].ID == id {
+			idx = i
+
+			break
+		}
+	}
+
+	if idx < 0 {
+		return nil, ErrAtividadeNaoEncontrada
+	}
+
+	origem := day(atividades[idx].Data)
+	posOrigem := atividades[idx].Posicao
+	destino = day(destino)
+
+	if !DestinoValido(dias, destino) {
+		return nil, ErrDestinoInvalido
+	}
+
+	if concluido(origem) || concluido(destino) {
+		return nil, ErrDiaConcluido
+	}
+
+	// Same slot: nothing to do, and swapping with itself would be a no-op that
+	// still rewrote every position.
+	if sameDay(origem, destino) && posOrigem == posicao {
+		return append([]Atividade(nil), atividades...), nil
+	}
+
+	destinoLista := doDia(atividades, destino)
+
+	// No occupant at that slot — a swap has no counterpart, so this is a move.
+	if posicao < 0 || posicao >= len(destinoLista) {
+		return MoverAtividade(atividades, dias, id, destino, posicao, concluido)
+	}
+
+	alvoID := destinoLista[posicao].ID
+	if alvoID == id {
+		return append([]Atividade(nil), atividades...), nil
+	}
+
+	saida := append([]Atividade(nil), atividades...)
+
+	for i := range saida {
+		switch saida[i].ID {
+		case id:
+			saida[i].Data = destino
+			saida[i].Posicao = posicao
+		case alvoID:
+			saida[i].Data = origem
+			saida[i].Posicao = posOrigem
+		}
+	}
+
+	return saida, nil
+}
+
+// MoverAtividade moves one activity to (data, posicao) and returns the full new
+// ordering of every day it touched, so the caller can persist positions
+// densely and atomically.
+//
+// It never touches Registro: the plan changes, the history of what was studied
+// does not. concluido reports whether a date is already marked done.
+func MoverAtividade(
+	atividades []Atividade,
+	dias []Dia,
+	id string,
+	destino time.Time,
+	posicao int,
+	concluido func(time.Time) bool,
+) ([]Atividade, error) {
+	idx := -1
+
+	for i := range atividades {
+		if atividades[i].ID == id {
+			idx = i
+
+			break
+		}
+	}
+
+	if idx < 0 {
+		return nil, ErrAtividadeNaoEncontrada
+	}
+
+	origem := atividades[idx].Data
+	destino = day(destino)
+
+	if !DestinoValido(dias, destino) {
+		return nil, ErrDestinoInvalido
+	}
+
+	// A concluded day is history on both ends: moving into or out of one would
+	// silently contradict what the student recorded.
+	if concluido(day(origem)) || concluido(destino) {
+		return nil, ErrDiaConcluido
+	}
+
+	movida := atividades[idx]
+	restantes := make([]Atividade, 0, len(atividades))
+	restantes = append(restantes, atividades[:idx]...)
+	restantes = append(restantes, atividades[idx+1:]...)
+
+	destinoLista := doDia(restantes, destino)
+	if posicao < 0 {
+		posicao = 0
+	}
+
+	if posicao > len(destinoLista) {
+		posicao = len(destinoLista)
+	}
+
+	movida.Data = destino
+
+	// Rebuild the destination day explicitly, inserting at `posicao`. Bumping the
+	// moved item's position alone is not enough: the ones it displaces would keep
+	// their old numbers and a stable sort would leave it behind them.
+	saida := make([]Atividade, 0, len(atividades))
+	for _, a := range restantes {
+		if !sameDay(a.Data, destino) {
+			saida = append(saida, a)
+		}
+	}
+
+	novaOrdem := make([]Atividade, 0, len(destinoLista)+1)
+	novaOrdem = append(novaOrdem, destinoLista[:posicao]...)
+	novaOrdem = append(novaOrdem, movida)
+	novaOrdem = append(novaOrdem, destinoLista[posicao:]...)
+
+	for i := range novaOrdem {
+		novaOrdem[i].Posicao = i
+	}
+
+	saida = append(saida, novaOrdem...)
+
+	// The source day lost one item, so close the gap it left behind.
+	if !sameDay(origem, destino) {
+		renumerar(saida, map[time.Time]bool{day(origem): true})
+	}
+
+	return saida, nil
+}
+
+// doDia returns the activities of one day, ordered by position.
+func doDia(atividades []Atividade, dt time.Time) []Atividade {
+	out := []Atividade{}
+
+	for _, a := range atividades {
+		if sameDay(a.Data, dt) {
+			out = append(out, a)
+		}
+	}
+
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Posicao < out[j].Posicao })
+
+	return out
+}
+
+// renumerar rewrites positions 0..n-1 for each affected day, in place.
+func renumerar(atividades []Atividade, dias map[time.Time]bool) {
+	for dt := range dias {
+		ordenadas := doDia(atividades, dt)
+		for i, a := range ordenadas {
+			for j := range atividades {
+				if atividades[j].ID == a.ID {
+					atividades[j].Posicao = i
+
+					break
+				}
+			}
+		}
+	}
+}
+
+// AtividadesDoDia is the ordered view one day's card renders.
+func AtividadesDoDia(atividades []Atividade, dt time.Time) []Atividade {
+	return doDia(atividades, dt)
+}
+
+// MinutosPlanejados totals a day's planned minutes.
+func MinutosPlanejados(atividades []Atividade, dt time.Time, padraoMin int) int {
+	total := 0
+	for _, a := range doDia(atividades, dt) {
+		total += a.Duracao(padraoMin)
+	}
+
+	return total
+}
+
+// DerivarAtividades turns the engine's generated days into activities. Used to
+// seed the override table the first time the user moves something, so what they
+// see is exactly what they were already looking at.
+func DerivarAtividades(dias []Dia) []Atividade {
+	out := []Atividade{}
+
+	for _, d := range dias {
+		for i, it := range d.Itens {
+			dia, pos := d.Data, i
+			out = append(out, Atividade{
+				Data:       day(d.Data),
+				Posicao:    i,
+				Disciplina: it.Disciplina,
+				Tema:       it.Tema,
+				Passada:    it.Passada,
+				Tipo:       tipoDaAtividade(d.Tipo),
+				OrigemDia:  &dia,
+				OrigemPos:  &pos,
+			})
+		}
+	}
+
+	return out
+}
+
+func tipoDaAtividade(t Tipo) TipoAtividade {
+	switch t {
+	case TipoRevisaoSemanal, TipoRevisaoDirigida:
+		return AtividadeRevisao
+	case TipoSimulado:
+		return AtividadeSimulado
+	case TipoDiscursiva:
+		return AtividadeDiscursiva
+	default:
+		return AtividadeConteudo
+	}
+}
+
+// AplicarAtividades overwrites the generated days with the persisted activity
+// layout, for the days the user has arranged by hand. Days with no stored
+// activity keep whatever the engine produced.
+func AplicarAtividades(dias []Dia, atividades []Atividade) {
+	porDia := map[time.Time][]Atividade{}
+	for _, a := range atividades {
+		k := day(a.Data)
+		porDia[k] = append(porDia[k], a)
+	}
+
+	for i := range dias {
+		lista, ok := porDia[day(dias[i].Data)]
+		if !ok {
+			continue
+		}
+
+		sort.SliceStable(lista, func(x, y int) bool { return lista[x].Posicao < lista[y].Posicao })
+
+		itens := make([]ItemDia, 0, len(lista))
+		for _, a := range lista {
+			itens = append(itens, ItemDia{
+				Disciplina: a.Disciplina,
+				Tema:       a.Tema,
+				Passada:    a.Passada,
+			})
+		}
+
+		dias[i].Itens = itens
+	}
+}

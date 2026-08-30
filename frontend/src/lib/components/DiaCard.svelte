@@ -3,6 +3,7 @@
 	import TemaTexto from './TemaTexto.svelte';
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
+	import { planoStore } from '$lib/stores/plano.svelte';
 	import type { Dia } from '$lib/types';
 
 	const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -27,7 +28,8 @@
 		datasDisponiveis,
 		onMover,
 		onArrastarAtv,
-		onSoltarAtv
+		onSoltarAtv,
+		onTrocarComDestino
 	}: {
 		dia: Dia;
 		movivel: boolean;
@@ -35,6 +37,7 @@
 		onMover: (id: string, data: string, posicao: number) => void;
 		onArrastarAtv: (id: string) => void;
 		onSoltarAtv: (posicao: number) => void;
+		onTrocarComDestino?: (id: string, data: string, posicao: number) => void;
 	} = $props();
 
 	const hoje = $derived(dia.data === hojeISO());
@@ -45,6 +48,18 @@
 
 	const diaNum = $derived(Number(dia.data.slice(8, 10)));
 	const mes = $derived(MESES[Number(dia.data.slice(5, 7)) - 1]);
+
+	/** Whether one discipline of this day is already marked done. */
+	function feita(codigo: string): boolean {
+		const b = dia.registro?.blocos?.find((x) => x.disciplina === codigo);
+
+		// Older records carry no per-block flag: fall back to the day's own.
+		return b?.concluido ?? dia.registro?.concluido ?? false;
+	}
+
+	// Opening the log from an activity scrolls the panel into view; the panel
+	// itself is the day's, since hours are recorded per discipline inside it.
+	let logAberto = $state(false);
 
 	// The header band says what the day holds, so the count is worth stating.
 	const resumoItens = $derived(
@@ -79,7 +94,7 @@
 					<span class="selo">Revisão semanal</span>
 				{/if}
 				<span class="acoes">
-					<DiaLog {dia} variant="row" />
+					<DiaLog {dia} variant="row" bind:aberto={logAberto} />
 				</span>
 			</div>
 
@@ -104,6 +119,10 @@
 								{onMover}
 								onArrastar={onArrastarAtv}
 								onSoltar={onSoltarAtv}
+								concluida={feita(it.disciplina)}
+								onAlternarConcluida={(m) =>
+									void planoStore.concluirDisciplina(dia.data, it.disciplina, m)}
+								onRegistrar={() => (logAberto = true)}
 							/>
 						{/each}
 					</div>

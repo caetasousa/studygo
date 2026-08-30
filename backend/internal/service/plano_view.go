@@ -77,6 +77,7 @@ type RegistroBlocoInput struct {
 	Questoes   *int     `json:"questoes"`
 	Acertos    *int     `json:"acertos"`
 	Nota       string   `json:"nota"`
+	Concluido  bool     `json:"concluido"`
 }
 
 // PlanoResposta is the fat payload for GET /api/plano.
@@ -184,9 +185,14 @@ type RevisaoResposta struct {
 }
 
 type ItemResposta struct {
+	// ID addresses this activity for a move. Empty until the plan has been
+	// arranged by hand — the UI falls back to whole-day actions until then.
+	ID         string `json:"id"`
 	Disciplina string `json:"disciplina"`
 	Tema       string `json:"tema"`
 	Passada    int    `json:"passada"`
+	// Movida marks an activity the user placed here, rather than the engine.
+	Movida bool `json:"movida"`
 }
 
 type BlocoResposta struct {
@@ -212,6 +218,7 @@ type RegistroBlocoResposta struct {
 	Acertos    *int     `json:"acertos"`
 	Erros      *int     `json:"erros"`
 	Nota       string   `json:"nota"`
+	Concluido  bool     `json:"concluido"`
 }
 
 type MarcoResposta struct {
@@ -353,6 +360,7 @@ func registroToResposta(r plano.Registro) *RegistroResposta {
 			Acertos:    b.Acertos,
 			Erros:      errosDe(b.Questoes, b.Acertos),
 			Nota:       b.Nota,
+			Concluido:  b.Concluido,
 		})
 	}
 
@@ -388,4 +396,17 @@ func parseISODate(s string) (time.Time, bool) {
 type ImportacaoTECInput struct {
 	CSV  string `json:"csv"`
 	Data string `json:"data"`
+}
+
+// MoverAtividadeInput is a single activity move: which activity, and where it
+// lands. Deliberately minimal — the API sends only what changed, not the whole
+// schedule.
+type MoverAtividadeInput struct {
+	ID      string `json:"id"`
+	Data    string `json:"data"` // YYYY-MM-DD
+	Posicao int    `json:"posicao"`
+	// Trocar swaps with whatever occupies the target slot instead of inserting
+	// beside it, so neither day changes size. Falls back to a plain move when
+	// the slot is empty.
+	Trocar bool `json:"trocar"`
 }

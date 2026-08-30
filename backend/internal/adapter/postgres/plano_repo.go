@@ -175,7 +175,7 @@ func (r *PlanoRepo) loadRegistros(ctx context.Context, planoID uuid.UUID, s *pla
 func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT data, disciplina, horas::float8, questoes, acertos, nota
+		`SELECT data, disciplina, horas::float8, questoes, acertos, nota, concluido
 		 FROM registros_bloco WHERE plano_id = $1 ORDER BY data, disciplina`,
 		planoID,
 	)
@@ -190,7 +190,9 @@ func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s
 			b    plano.RegistroBloco
 		)
 
-		if err := rows.Scan(&data, &b.Disciplina, &b.Horas, &b.Questoes, &b.Acertos, &b.Nota); err != nil {
+		if err := rows.Scan(
+			&data, &b.Disciplina, &b.Horas, &b.Questoes, &b.Acertos, &b.Nota, &b.Concluido,
+		); err != nil {
 			return fmt.Errorf("scanning registro_bloco: %w", err)
 		}
 
@@ -427,9 +429,9 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 	for _, b := range reg.Blocos {
 		if _, err := tx.Exec(
 			ctx,
-			`INSERT INTO registros_bloco (plano_id, data, disciplina, horas, questoes, acertos, nota)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota,
+			`INSERT INTO registros_bloco (plano_id, data, disciplina, horas, questoes, acertos, nota, concluido)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota, b.Concluido,
 		); err != nil {
 			return fmt.Errorf("inserting registro_bloco: %w", err)
 		}
@@ -812,4 +814,108 @@ func (r *PlanoRepo) loadCiclo(ctx context.Context, planoID uuid.UUID, s *plano.S
 	}
 
 	return rows.Err()
+}
+
+// ListAtividades returns the plan's manually arranged activities. Ordering by
+// (data, posicao) here means the domain never has to re-sort what it reads.
+func (r *PlanoRepo) ListAtividades(
+	ctx context.Context,
+	planoID uuid.UUID,
+) ([]plano.Atividade, error) {
+	const q = `
+		SELECT id, data, posicao, disciplina, tema, passada, tipo, duracao_min,
+		       origem_dia, origem_pos
+		  FROM atividades
+		 WHERE plano_id = $1
+		 ORDER BY data, posicao`
+
+	rows, err := r.pool.Query(ctx, q, planoID)
+	if err != nil {
+		return nil, fmt.Errorf("query atividades: %w", err)
+	}
+	defer rows.Close()
+
+	out := []plano.Atividade{}
+
+	for rows.Next() {
+		var (
+			a         plano.Atividade
+			id        uuid.UUID
+			tipo      string
+			origemDia *time.Time
+			origemPos *int
+		)
+
+		if err := rows.Scan(
+			&id, &a.Data, &a.Posicao, &a.Disciplina, &a.Tema, &a.Passada, &tipo,
+			&a.DuracaoMin, &origemDia, &origemPos,
+		); err != nil {
+			return nil, fmt.Errorf("scan atividade: %w", err)
+		}
+
+		a.ID = id.String()
+		a.Tipo = plano.TipoAtividade(tipo)
+		a.OrigemDia = origemDia
+		a.OrigemPos = origemPos
+
+		out = append(out, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows atividades: %w", err)
+	}
+
+	return out, nil
+}
+
+// ReplaceAtividades rewrites the whole layout in one transaction. Delete-then-
+// insert (rather than per-row updates) is what keeps positions consistent: the
+// unique constraint is deferred to commit, so intermediate states never clash.
+func (r *PlanoRepo) ReplaceAtividades(
+	ctx context.Context,
+	planoID uuid.UUID,
+	as []plano.Atividade,
+) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	if _, err := tx.Exec(ctx, `DELETE FROM atividades WHERE plano_id = $1`, planoID); err != nil {
+		return fmt.Errorf("delete atividades: %w", err)
+	}
+
+	const ins = `
+		INSERT INTO atividades
+			(id, plano_id, data, posicao, disciplina, tema, passada, tipo,
+			 duracao_min, origem_dia, origem_pos)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+
+	for _, a := range as {
+		id, err := uuid.Parse(a.ID)
+		if err != nil {
+			// A freshly derived activity has no id yet; give it one.
+			id = uuid.New()
+		}
+
+		if _, err := tx.Exec(ctx, ins,
+			id, planoID, a.Data, a.Posicao, a.Disciplina, a.Tema, a.Passada,
+			string(a.Tipo), a.DuracaoMin, a.OrigemDia, a.OrigemPos,
+		); err != nil {
+			return fmt.Errorf("insert atividade: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE planos SET atividades_manuais = true WHERE id = $1`, planoID,
+	); err != nil {
+		return fmt.Errorf("marcar atividades manuais: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
 }

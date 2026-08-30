@@ -215,9 +215,14 @@ export type Tipo = 'est' | 'revd' | 'sim' | 'disc' | 'vespera' | 'rev';
 export type Fase = 'base' | 'reta';
 
 export interface ItemDia {
+	/** Addresses this activity for a move. Empty until the plan has been arranged
+	 *  by hand — the backend seeds ids on the first move. */
+	id: string;
 	disciplina: string;
 	tema: string;
 	passada: number;
+	/** True when the user placed this activity here, rather than the engine. */
+	movida: boolean;
 }
 
 export interface Bloco {
@@ -233,6 +238,8 @@ export interface RegistroBloco {
 	acertos: number | null;
 	erros: number | null;
 	nota: string;
+	/** This discipline finished, independently of the day's own flag. */
+	concluido: boolean;
 }
 
 export interface Registro {
@@ -365,6 +372,7 @@ export interface RegistroBlocoInput {
 	questoes: number | null;
 	acertos: number | null;
 	nota: string;
+	concluido: boolean;
 }
 
 export interface RegistroInput {

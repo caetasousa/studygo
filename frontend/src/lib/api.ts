@@ -194,6 +194,13 @@ export const api = {
 			body: JSON.stringify({ dataA, dataB })
 		}),
 
+	/** Moves one activity to (data, posicao). Sends only the change, not the plan. */
+	moverAtividade: (slug: string, id: string, data: string, posicao: number, trocar = false) =>
+		request<PlanoResposta>(`${planoBase(slug)}/atividades/mover`, {
+			method: 'POST',
+			body: JSON.stringify({ id, data, posicao, trocar })
+		}),
+
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 
