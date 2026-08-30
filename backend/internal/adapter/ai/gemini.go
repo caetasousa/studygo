@@ -37,7 +37,7 @@ type GeminiAnalisador struct {
 
 func NewGeminiAnalisador(apiKey, model string) *GeminiAnalisador {
 	if model == "" {
-		model = "gemini-flash-lite-latest"
+		model = "gemini-flash-latest"
 	}
 
 	return &GeminiAnalisador{
@@ -54,10 +54,18 @@ func NewGeminiAnalisador(apiKey, model string) *GeminiAnalisador {
 
 func (g *GeminiAnalisador) Disponivel() bool { return g.apiKey != "" }
 
+// preambulo is prepended to every step. It sets the role and the hard rules the
+// JSON mode alone does not enforce (no invented data, empty over guessed).
+const preambulo = `Você é um especialista em análise de editais de concurso público brasileiro e
+extração de dados estruturados. Responda APENAS com o JSON pedido, sem nenhum texto antes ou
+depois. Não invente dados: quando uma informação não estiver no documento, use "" para texto,
+0 para número e [] para lista. Baseie-se somente no edital anexado.
+
+`
+
 // ---- step 1: cargos ----
 
-const promptCargos = `Você recebe um edital de concurso público brasileiro.
-Liste em JSON a banca organizadora e TODOS os cargos/especialidades oferecidos.
+const promptCargos = preambulo + `Liste a banca organizadora e TODOS os cargos/especialidades oferecidos.
 Para cada cargo: "codigo" (código de opção, ex.: "B02"), "nome" (nome completo),
 "escolaridade" (exigência de escolaridade) e "vagas" (nº total de vagas; 0 se não informado).`
 
@@ -130,8 +138,8 @@ func (g *GeminiAnalisador) Cargos(ctx context.Context, in port.EditalEntrada) (p
 
 // ---- step 2: estrutura de um cargo ----
 
-const promptEstrutura = `Você recebe o texto de um edital de concurso público brasileiro e o
-nome de UM cargo. Extraia em JSON, referentes SOMENTE a esse cargo:
+const promptEstrutura = preambulo + `Você recebe também o nome de UM cargo. Extraia, referentes
+SOMENTE a esse cargo:
 - "nome": nome curto do concurso (órgão + cargo), ex.: "TCE-GO — Técnico de Controle Externo (TI)".
 - "prova": data de aplicação das provas objetivas, formato AAAA-MM-DD (ou "" se não houver).
 - "provaDiscursiva": true se há prova discursiva/redação/estudo de caso para o cargo.
@@ -140,7 +148,7 @@ nome de UM cargo. Extraia em JSON, referentes SOMENTE a esse cargo:
 - "gerais": disciplinas de Conhecimentos Gerais/Básicos do cargo — cada uma com "nome" e "questoes"
   (nº de questões DAQUELA disciplina; 0 quando o edital só dá o total do bloco).
 - "especificas": idem para Conhecimentos Específicos do cargo.
-Não invente dados. Não inclua o cronograma.`
+Não inclua o cronograma.`
 
 func (g *GeminiAnalisador) Estrutura(
 	ctx context.Context,
@@ -192,9 +200,9 @@ func (g *GeminiAnalisador) Estrutura(
 
 // ---- step 2b: cronograma (roda em paralelo com Estrutura) ----
 
-const promptCronograma = `Você recebe o texto de um edital de concurso público. Extraia em JSON
-o cronograma completo (Anexo de datas / cronograma de provas e publicações): inscrição, isenção,
-pagamento, divulgações, convocações, recursos, resultados, heteroidentificação, etc.
+const promptCronograma = preambulo + `Extraia o cronograma completo (Anexo de datas / cronograma
+de provas e publicações): inscrição, isenção, pagamento, divulgações, convocações, recursos,
+resultados, heteroidentificação, etc.
 "marcos": [{ "data" (AAAA-MM-DD), "dataFim" (só se for período), "titulo",
 "exigeAcao" (true quando a data exige ação do candidato: inscrever-se, pagar, recorrer) }].`
 
@@ -246,10 +254,10 @@ func (g *GeminiAnalisador) Cronograma(ctx context.Context, in port.EditalEntrada
 
 // ---- step 3: conteúdo programático ----
 
-const promptConteudo = `Você recebe um edital de concurso público e uma lista de disciplinas.
+const promptConteudo = preambulo + `Você recebe também uma lista de disciplinas.
 Para CADA disciplina da lista, extraia do Conteúdo Programático (anexo do edital) os temas
 correspondentes, um tema por item, mantendo a redação do edital de forma curta.
-Retorne em JSON: "disciplinas": [{ "nome": <exatamente como na lista>, "temas": [<strings>] }].
+Retorne "disciplinas": [{ "nome": <exatamente como na lista>, "temas": [<strings>] }].
 Se não achar o conteúdo de uma disciplina, devolva "temas": [].`
 
 func (g *GeminiAnalisador) Conteudo(
@@ -304,12 +312,16 @@ func (g *GeminiAnalisador) gerar(
 	ctx, cancel := context.WithTimeout(ctx, 200*time.Second)
 	defer cancel()
 
+	// No temperature/top_p/top_k: the Gemini 3 flash models deprecated them and a
+	// low temperature there degrades output (looping, truncation). The JSON mode
+	// + responseSchema already pin the shape. thinkingLevel "low" keeps a pure
+	// extraction fast — it does not need deep reasoning.
 	body := map[string]any{
 		"contents": []map[string]any{{"role": "user", "parts": parts}},
 		"generationConfig": map[string]any{
 			"responseMimeType": "application/json",
 			"responseSchema":   schema,
-			"temperature":      0.1,
+			"thinkingConfig":   map[string]any{"thinkingLevel": "low"},
 		},
 	}
 

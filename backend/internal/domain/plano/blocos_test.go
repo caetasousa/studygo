@@ -21,6 +21,15 @@ func itens(codigos ...string) []plano.ItemDia {
 	return out
 }
 
+// cfgBlocos is a normalized config with the given daily budget, for the Blocos
+// tests — which only care about the study method, not the calendar.
+func cfgBlocos(horas float64) plano.Config {
+	c := plano.ConfigPadrao()
+	c.HorasDia = horas
+
+	return c
+}
+
 func somaMinutos(bs []plano.Bloco) int {
 	t := 0
 	for _, b := range bs {
@@ -70,9 +79,8 @@ func TestBlocos_repartePorNumeroDeBlocos(t *testing.T) {
 			}
 
 			got := plano.Blocos(d, plano.BlocoCtx{
-				HorasDia: c.horas,
-				Nomes:    nomesTeste(),
-				Perfil:   plano.PerfilPadrao(),
+				Cfg:   cfgBlocos(c.horas),
+				Nomes: nomesTeste(),
 			})
 
 			if len(got) != c.querBlocos {
@@ -89,8 +97,8 @@ func TestBlocos_repartePorNumeroDeBlocos(t *testing.T) {
 func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 	t.Parallel()
 
-	perfil := plano.PerfilPadrao()
-	perfil.Reforcos = map[string]float64{"D02": 2}
+	cfg := cfgBlocos(3)
+	cfg.Reforcos = map[string]float64{"D02": 2}
 
 	d := plano.Dia{
 		Tipo:     plano.TipoEstudo,
@@ -99,7 +107,7 @@ func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 		Revisoes: []plano.Revisao{{Tema: "x"}},
 	}
 
-	got := plano.Blocos(d, plano.BlocoCtx{HorasDia: 3, Nomes: nomesTeste(), Perfil: perfil})
+	got := plano.Blocos(d, plano.BlocoCtx{Cfg: cfg, Nomes: nomesTeste()})
 
 	if len(got) != 3 {
 		t.Fatalf("gerou %d blocos, queria 3", len(got))
@@ -124,14 +132,14 @@ func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 func TestBlocos_modoPorDisciplina(t *testing.T) {
 	t.Parallel()
 
-	perfil := plano.PerfilPadrao()
-	perfil.Modos = map[string]plano.Modo{"D01": plano.ModoQuestoes, "D02": plano.ModoTeoria}
+	cfg := cfgBlocos(2)
+	cfg.Modos = map[string]plano.Modo{"D01": plano.ModoQuestoes, "D02": plano.ModoTeoria}
 
 	got := plano.Blocos(plano.Dia{
 		Tipo:  plano.TipoEstudo,
 		Meta:  20,
 		Itens: itens("D01", "D02"),
-	}, plano.BlocoCtx{HorasDia: 2, Nomes: nomesTeste(), Perfil: perfil})
+	}, plano.BlocoCtx{Cfg: cfg, Nomes: nomesTeste()})
 
 	if strings.Contains(got[0].Detalhe, "teoria com resumo") {
 		t.Errorf("bloco só-questões = %q, não devia pedir teoria", got[0].Detalhe)
@@ -139,6 +147,36 @@ func TestBlocos_modoPorDisciplina(t *testing.T) {
 
 	if !strings.Contains(got[1].Detalhe, "sem bateria de questões") {
 		t.Errorf("bloco só-teoria = %q, não devia pedir questões", got[1].Detalhe)
+	}
+}
+
+// TestBlocos_revisaoSemanalFocaQuestoes garante que o dia de revisão semanal
+// abre explicitamente com resolução de questões, no volume do ciclo.
+func TestBlocos_revisaoSemanalFocaQuestoes(t *testing.T) {
+	t.Parallel()
+
+	d := plano.Dia{
+		Tipo: plano.TipoRevisaoSemanal,
+		Tema: "Revisão ativa da semana",
+		Meta: 60,
+	}
+
+	got := plano.Blocos(d, plano.BlocoCtx{Cfg: cfgBlocos(3), Nomes: nomesTeste()})
+
+	if len(got) == 0 {
+		t.Fatal("dia de revisão semanal sem blocos")
+	}
+
+	if !strings.Contains(strings.ToLower(got[0].Titulo), "resolução de questões") {
+		t.Errorf("primeiro bloco = %q, queria resolução de questões em destaque", got[0].Titulo)
+	}
+
+	if !strings.Contains(got[0].Detalhe, "60 questões") {
+		t.Errorf("detalhe = %q, queria as 60 questões do ciclo", got[0].Detalhe)
+	}
+
+	if got[0].Minutos < got[1].Minutos {
+		t.Errorf("o bloco de questões (%d) devia ser o maior do dia", got[0].Minutos)
 	}
 }
 
@@ -161,19 +199,17 @@ func TestGerar_blocosPorDia(t *testing.T) {
 		t.Run("blocos por dia = "+string(rune('0'+n)), func(t *testing.T) {
 			t.Parallel()
 
-			perfil := plano.PerfilPadrao()
-			perfil.BlocosPorDia = n
+			cfg := plano.ConfigPadrao()
+			cfg.Inicio = dia(2026, 3, 2)
+			cfg.Prova = c.ProvaPadrao
+			cfg.HorasDia = 3
+			cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+			cfg.DiaRevisao = 5
+			cfg.RetaFinalDias = 28
+			cfg.Questoes = map[string]int{"D01": 10, "D02": 10, "D03": 10}
+			cfg.BlocosPorDia = n
 
-			res := plano.Gerar(plano.Config{
-				Inicio:        dia(2026, 3, 2),
-				Prova:         c.ProvaPadrao,
-				HorasDia:      3,
-				DiasEstudo:    []int{1, 2, 3, 4, 5},
-				DiaRevisao:    5,
-				RetaFinalDias: 28,
-				Questoes:      map[string]int{"D01": 10, "D02": 10, "D03": 10},
-				Perfil:        perfil,
-			}, &c)
+			res := plano.Gerar(cfg, &c)
 
 			for _, d := range res.Dias {
 				if d.Tipo != plano.TipoEstudo {
@@ -212,19 +248,17 @@ func TestGerar_disciplinaPesadaRepeteNoDia(t *testing.T) {
 		},
 	}
 
-	perfil := plano.PerfilPadrao()
-	perfil.BlocosPorDia = 3
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = dia(2026, 3, 2)
+	cfg.Prova = c.ProvaPadrao
+	cfg.HorasDia = 3
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = 28
+	cfg.Questoes = map[string]int{"D01": 5, "D02": 40} // D02 leva 16/17 dos pontos
+	cfg.BlocosPorDia = 3
 
-	res := plano.Gerar(plano.Config{
-		Inicio:        dia(2026, 3, 2),
-		Prova:         c.ProvaPadrao,
-		HorasDia:      3,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: 28,
-		Questoes:      map[string]int{"D01": 5, "D02": 40}, // D02 leva 16/17 dos pontos
-		Perfil:        perfil,
-	}, &c)
+	res := plano.Gerar(cfg, &c)
 
 	dias := 0
 	for _, d := range res.Dias {
@@ -261,25 +295,21 @@ func TestGerar_reforcoDaMaisBlocos(t *testing.T) {
 		},
 	}
 
-	cfg := plano.Config{
-		Inicio:        dia(2026, 3, 2),
-		Prova:         c.ProvaPadrao,
-		HorasDia:      2,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: 28,
-		Questoes:      map[string]int{"D01": 10, "D02": 10},
-		Perfil:        plano.PerfilPadrao(),
-	}
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = dia(2026, 3, 2)
+	cfg.Prova = c.ProvaPadrao
+	cfg.HorasDia = 2
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = 28
+	cfg.Questoes = map[string]int{"D01": 10, "D02": 10}
 
 	iguais := plano.Gerar(cfg, &c)
 	if iguais.Slots["D01"] != iguais.Slots["D02"] {
 		t.Fatalf("sem reforço os slots deviam empatar: %v", iguais.Slots)
 	}
 
-	perfil := plano.PerfilPadrao()
-	perfil.Reforcos = map[string]float64{"D02": 2}
-	cfg.Perfil = perfil
+	cfg.Reforcos = map[string]float64{"D02": 2}
 
 	comReforco := plano.Gerar(cfg, &c)
 
@@ -305,16 +335,14 @@ func TestGerar_simuladoNaoMexeNoCicloDeRevisao(t *testing.T) {
 		},
 	}
 
-	cfg := plano.Config{
-		Inicio:        dia(2026, 3, 2),
-		Prova:         c.ProvaPadrao,
-		HorasDia:      2,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: 28,
-		Questoes:      map[string]int{"D01": 10},
-		Perfil:        plano.PerfilPadrao(),
-	}
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = dia(2026, 3, 2)
+	cfg.Prova = c.ProvaPadrao
+	cfg.HorasDia = 2
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = 28
+	cfg.Questoes = map[string]int{"D01": 10}
 
 	temas := func(res plano.Resultado) map[string]bool {
 		out := map[string]bool{}
@@ -329,9 +357,7 @@ func TestGerar_simuladoNaoMexeNoCicloDeRevisao(t *testing.T) {
 
 	comSim := temas(plano.Gerar(cfg, &c))
 
-	perfil := plano.PerfilPadrao()
-	perfil.Simulados = plano.SimuladoNunca
-	cfg.Perfil = perfil
+	cfg.Simulados = plano.SimuladoNunca
 
 	semSim := plano.Gerar(cfg, &c)
 
@@ -363,22 +389,20 @@ func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
 		},
 	}
 
-	perfil := plano.PerfilPadrao()
-	perfil.CicloRevisao = []concurso.RevItem{
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = dia(2026, 3, 2)
+	cfg.Prova = c.ProvaPadrao
+	cfg.HorasDia = 2
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = 28
+	cfg.Questoes = map[string]int{"D01": 10}
+	cfg.CicloRevisao = []concurso.RevItem{
 		{Ordem: 0, Titulo: "Minha revisão semanal", Questoes: 42},
 		{Ordem: 1, Titulo: "", Questoes: 10}, // sem título: descartado
 	}
 
-	res := plano.Gerar(plano.Config{
-		Inicio:        dia(2026, 3, 2),
-		Prova:         c.ProvaPadrao,
-		HorasDia:      2,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: 28,
-		Questoes:      map[string]int{"D01": 10},
-		Perfil:        perfil,
-	}, &c)
+	res := plano.Gerar(cfg, &c)
 
 	achou := false
 

@@ -57,6 +57,8 @@ export function rotulo(tipo: string): string {
 			return 'DISCURSIVA';
 		case 'vespera':
 			return 'VÉSPERA';
+		case 'rev':
+			return 'REVISÃO — RESOLUÇÃO DE QUESTÕES';
 		default:
 			return 'REVISÃO';
 	}

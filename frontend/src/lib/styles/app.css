@@ -627,6 +627,19 @@ a:focus-visible {
 .row.esp-rev {
 	background: var(--accent-soft);
 }
+/* O dia de revisão semanal tem cor própria (âmbar), que segue o dia escolhido
+   em Configurações — não é uma cor fixa de dia da semana. */
+.row.rev-day {
+	background: var(--warn-soft);
+	box-shadow: inset 3px 0 0 var(--warn);
+}
+.row.rev-day.today {
+	box-shadow: inset 3px 0 0 var(--warn);
+}
+.row.rev-day .tag {
+	background: var(--warn-soft) !important;
+	color: var(--warn) !important;
+}
 .row.drag-over {
 	outline: 2px dashed var(--accent);
 	outline-offset: -2px;
@@ -951,9 +964,15 @@ table.tbl tfoot td {
 	border-color: var(--accent);
 	color: #fff;
 }
+/* O dia de revisão fica em âmbar, seja ou não um dia de estudo. */
+.day-sel button.rev {
+	border-color: var(--warn);
+	color: var(--warn);
+}
 .day-sel button.rev[aria-pressed='true'] {
 	background: var(--warn);
 	border-color: var(--warn);
+	color: #fff;
 }
 .btn {
 	font-family: var(--font-mono);

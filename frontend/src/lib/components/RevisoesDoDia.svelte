@@ -6,7 +6,7 @@
 	let { revisoes }: { revisoes: RevisaoDia[] } = $props();
 
 	const disc = $derived(planoStore.discIndex);
-	const perfil = $derived(planoStore.plano?.config.perfil);
+	const cfg = $derived(planoStore.plano?.config);
 	const disciplinas = $derived(planoStore.plano?.concurso.disciplinas ?? []);
 
 	// A revisão em aberto: qual está sendo lançada e com quais números.
@@ -45,10 +45,10 @@
 	}
 
 	function proximo(p: number | null, etapa: number): string {
-		if (p === null || !perfil) return '';
+		if (p === null || !cfg) return '';
 		const prox = p >= 80 ? etapa + 1 : p >= 60 ? etapa : Math.max(0, etapa - 1);
-		if (prox >= perfil.intervalos.length) return 'sai da fila — consolidado';
-		return `volta em ${perfil.intervalos[prox]} ${perfil.intervalos[prox] === 1 ? 'dia' : 'dias'}`;
+		if (prox >= cfg.intervalos.length) return 'sai da fila — consolidado';
+		return `volta em ${cfg.intervalos[prox]} ${cfg.intervalos[prox] === 1 ? 'dia' : 'dias'}`;
 	}
 
 	function link(r: RevisaoDia): string {
@@ -64,8 +64,8 @@
 	<div class="card-body">
 		{#if revisoes.length === 0}
 			Nada vencendo hoje. Conclua um dia e seus temas entram na fila — o primeiro retorno é em
-			{perfil?.intervalos[0] ?? 1}
-			{(perfil?.intervalos[0] ?? 1) === 1 ? 'dia' : 'dias'}.
+			{cfg?.intervalos[0] ?? 1}
+			{(cfg?.intervalos[0] ?? 1) === 1 ? 'dia' : 'dias'}.
 		{:else}
 			<p class="como">
 				Resolva as questões <b>sem consultar antes</b>. Só depois confira o resumo no que errar — é

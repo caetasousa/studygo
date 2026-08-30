@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -438,16 +439,31 @@ func defaultConfig(c concurso.Concurso, agora time.Time) plano.Config {
 		inicio = plano.AddDays(c.ProvaPadrao, -30)
 	}
 
-	return plano.Config{
-		Inicio:        inicio,
-		Prova:         plano.DayOf(c.ProvaPadrao),
-		HorasDia:      2,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: c.RetaPadraoDias,
-		Questoes:      questoes,
-		Perfil:        plano.PerfilPadrao(),
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = inicio
+	cfg.Prova = plano.DayOf(c.ProvaPadrao)
+	cfg.HorasDia = 2
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = c.RetaPadraoDias
+	cfg.Questoes = questoes
+	// MinutosBloco stays 0: HorasDia is the artifact's flat 2h until the user
+	// sets an explicit block length, at which point it starts driving the day.
+
+	return cfg.Normalizar()
+}
+
+// minutosDe is the block length implied by HorasDia / BlocosPorDia / PctRevisao —
+// the number the config screen shows and, once saved, the number that drives the
+// day.
+func minutosDe(cfg plano.Config) int {
+	if cfg.BlocosPorDia <= 0 {
+		return 0
 	}
+
+	m := cfg.HorasDia * 60 * (1 - cfg.PctRevisao) / float64(cfg.BlocosPorDia)
+
+	return int(math.Round(m/5)) * 5
 }
 
 func aplicarConfigInput(
@@ -479,6 +495,8 @@ func aplicarConfigInput(
 		return plano.Config{}, "", ErrValidacao{Msg: "o início precisa ser antes da prova"}
 	}
 
+	// HorasDia may still be sent directly by an old client; MinutosBloco (below)
+	// takes precedence — Normalizar recomputes HorasDia from it.
 	if in.HorasDia > 0 {
 		cfg.HorasDia = clampFloat(in.HorasDia, 0.5, 14)
 	}
@@ -487,8 +505,8 @@ func aplicarConfigInput(
 		cfg.DiasEstudo = normalizarDias(in.DiasEstudo)
 	}
 
-	if in.DiaRevisao >= 0 && in.DiaRevisao <= 6 {
-		cfg.DiaRevisao = in.DiaRevisao
+	if in.DiaRevisao != nil && *in.DiaRevisao >= 0 && *in.DiaRevisao <= 6 {
+		cfg.DiaRevisao = *in.DiaRevisao
 	}
 
 	if !containsInt(cfg.DiasEstudo, cfg.DiaRevisao) {
@@ -517,7 +535,7 @@ func aplicarConfigInput(
 		}
 	}
 
-	cfg.Perfil = aplicarPerfilInput(cfg.Perfil, c, in.Perfil)
+	aplicarMetodoInput(&cfg, c, in)
 
 	tema := salvo.TemaUI
 	switch in.TemaUI {
@@ -525,56 +543,61 @@ func aplicarConfigInput(
 		tema = in.TemaUI
 	}
 
-	return cfg, tema, nil
+	// Normalizar clamps every method field and recomputes HorasDia from
+	// MinutosBloco when it is set, so the stored horas_dia stays in step.
+	return cfg.Normalizar(), tema, nil
 }
 
-// aplicarPerfilInput patches the study profile. Every field is optional, so an
-// old client that never sends `perfil` keeps the profile it already had.
-func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput) plano.Perfil {
-	atual = atual.Normalizar()
-
-	if in == nil {
-		return atual
-	}
-
+// aplicarMetodoInput patches the study-method fields of cfg in place. Every
+// field is optional — a nil field leaves that setting as it was, so a patch that
+// only touches one control never resets the rest.
+func aplicarMetodoInput(cfg *plano.Config, c concurso.Concurso, in ConfigInput) {
 	if in.Simulados != nil {
-		atual.Simulados = plano.Frequencia(*in.Simulados)
+		cfg.Simulados = plano.Frequencia(*in.Simulados)
 	}
 
 	if in.Discursiva != nil {
-		atual.Discursiva = *in.Discursiva
+		cfg.Discursiva = *in.Discursiva
 	}
 
 	if in.Intervalos != nil {
-		atual.Intervalos = *in.Intervalos
+		cfg.Intervalos = *in.Intervalos
 	}
 
 	if in.PctQuestoes != nil {
-		atual.PctQuestoes = *in.PctQuestoes
+		cfg.PctQuestoes = *in.PctQuestoes
 	}
 
 	if in.RevisaoPorQuestoes != nil {
-		atual.RevisaoPorQuestoes = *in.RevisaoPorQuestoes
+		cfg.RevisaoPorQuestoes = *in.RevisaoPorQuestoes
 	}
 
 	if in.QuestoesPorRevisao != nil {
-		atual.QuestoesPorRevisao = *in.QuestoesPorRevisao
+		cfg.QuestoesPorRevisao = *in.QuestoesPorRevisao
 	}
 
 	if in.LimiarFraco != nil {
-		atual.LimiarFraco = *in.LimiarFraco
+		cfg.LimiarFraco = *in.LimiarFraco
 	}
 
 	if in.BlocosPorDia != nil {
-		atual.BlocosPorDia = *in.BlocosPorDia
+		cfg.BlocosPorDia = *in.BlocosPorDia
+	}
+
+	if in.MinutosBloco != nil {
+		cfg.MinutosBloco = *in.MinutosBloco
 	}
 
 	if in.PctRevisao != nil {
-		atual.PctRevisao = *in.PctRevisao
+		cfg.PctRevisao = *in.PctRevisao
 	}
 
 	if in.CicloRevisao != nil {
-		atual.CicloRevisao = cicloDoInput(*in.CicloRevisao)
+		cfg.CicloRevisao = cicloDoInput(*in.CicloRevisao)
+	}
+
+	if cfg.Modos == nil {
+		cfg.Modos = map[string]plano.Modo{}
 	}
 
 	for codigo, modo := range in.Modos {
@@ -582,7 +605,11 @@ func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput
 			continue
 		}
 
-		atual.Modos[codigo] = plano.Modo(modo)
+		cfg.Modos[codigo] = plano.Modo(modo)
+	}
+
+	if cfg.Reforcos == nil {
+		cfg.Reforcos = map[string]float64{}
 	}
 
 	for codigo, r := range in.Reforcos {
@@ -590,10 +617,8 @@ func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput
 			continue
 		}
 
-		atual.Reforcos[codigo] = r
+		cfg.Reforcos[codigo] = r
 	}
-
-	return atual.Normalizar()
 }
 
 // cicloDoInput turns the wire form of the weekly rotation into domain items.

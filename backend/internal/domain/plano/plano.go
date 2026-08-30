@@ -54,17 +54,7 @@ type Dia struct {
 	Revisoes []Revisao `json:"revisoes"`
 }
 
-// Config is the user's plan settings.
-type Config struct {
-	Inicio        time.Time
-	Prova         time.Time
-	HorasDia      float64
-	DiasEstudo    []int // weekdays 0=Sun..6=Sat
-	DiaRevisao    int
-	RetaFinalDias int
-	Questoes      map[string]int // discipline codigo -> estimated questions
-	Perfil        Perfil         // the user's study method
-}
+// Config is defined in config.go: the dates and rhythm plus the study method.
 
 // Resultado is everything the engine produces: the days plus the intermediate
 // weightings the balanceamento view needs.
@@ -79,6 +69,8 @@ type Resultado struct {
 
 // Gerar builds the plan. It never returns nil slices/maps.
 func Gerar(cfg Config, c *concurso.Concurso) Resultado {
+	cfg = cfg.Normalizar()
+
 	codes := make([]string, 0, len(c.Disciplinas))
 	temas := map[string][]string{}
 	pesos := map[string]int{}

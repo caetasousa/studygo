@@ -248,7 +248,7 @@ func montarCaderno(
 	anots []plano.Anotacao,
 ) CadernoResposta {
 	registros := salvo.Registros
-	limiar := salvo.Config.Perfil.Normalizar().LimiarFraco
+	limiar := salvo.Config.Normalizar().LimiarFraco
 
 	codigoPorID := map[uuid.UUID]string{}
 	for _, d := range c.Disciplinas {

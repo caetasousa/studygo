@@ -13,15 +13,17 @@ func dia(ano, mes, d int) time.Time {
 }
 
 // cfgRevisao is a plan running Mon-Fri with the exam far enough away that
-// scheduling never bumps into it, unless a test moves it.
-func cfgRevisao(perfil plano.Perfil) plano.Config {
-	return plano.Config{
-		Inicio:     dia(2026, 3, 2),
-		Prova:      dia(2026, 12, 13),
-		HorasDia:   2,
-		DiasEstudo: []int{1, 2, 3, 4, 5},
-		Perfil:     perfil,
-	}
+// scheduling never bumps into it, unless a test moves it. Study-method fields
+// come from ConfigPadrao; a caller that needs a different cycle overrides them
+// on the returned value.
+func cfgRevisao() plano.Config {
+	c := plano.ConfigPadrao()
+	c.Inicio = dia(2026, 3, 2)
+	c.Prova = dia(2026, 12, 13)
+	c.HorasDia = 2
+	c.DiasEstudo = []int{1, 2, 3, 4, 5}
+
+	return c
 }
 
 func TestEnfileirar(t *testing.T) {
@@ -44,14 +46,14 @@ func TestEnfileirar(t *testing.T) {
 	}{
 		{
 			nome:    "um por tema, 24h depois",
-			cfg:     cfgRevisao(plano.PerfilPadrao()),
+			cfg:     cfgRevisao(),
 			d:       diaEstudo,
 			quer:    2,
 			venceEm: dia(2026, 3, 6), // sexta
 		},
 		{
 			nome: "pula o fim de semana",
-			cfg:  cfgRevisao(plano.PerfilPadrao()),
+			cfg:  cfgRevisao(),
 			d: plano.Dia{
 				Data:  dia(2026, 3, 6), // sexta
 				Itens: []plano.ItemDia{{Disciplina: "D01", Tema: "Crase"}},
@@ -61,7 +63,7 @@ func TestEnfileirar(t *testing.T) {
 		},
 		{
 			nome: "dia sem temas não enfileira nada",
-			cfg:  cfgRevisao(plano.PerfilPadrao()),
+			cfg:  cfgRevisao(),
 			d:    plano.Dia{Data: dia(2026, 3, 5), Tipo: plano.TipoSimulado},
 			quer: 0,
 		},
@@ -94,7 +96,7 @@ func TestEnfileirar(t *testing.T) {
 func TestEnfileirar_naoPassaDaProva(t *testing.T) {
 	t.Parallel()
 
-	cfg := cfgRevisao(plano.PerfilPadrao())
+	cfg := cfgRevisao()
 	cfg.Prova = dia(2026, 3, 6)
 
 	got := plano.Enfileirar(cfg, plano.Dia{
@@ -158,7 +160,7 @@ func TestRevisao_Resultado(t *testing.T) {
 			r := base
 			r.Etapa = c.etapa
 
-			prox, fica := r.Resultado(cfgRevisao(plano.PerfilPadrao()), hoje, c.questoes, c.acertos)
+			prox, fica := r.Resultado(cfgRevisao(), hoje, c.questoes, c.acertos)
 
 			if fica != c.querFica {
 				t.Fatalf("continua na fila = %v, queria %v", fica, c.querFica)
@@ -187,12 +189,12 @@ func TestRevisao_Resultado(t *testing.T) {
 func TestRevisao_Resultado_intervalosCustomizados(t *testing.T) {
 	t.Parallel()
 
-	perfil := plano.PerfilPadrao()
-	perfil.Intervalos = []int{2, 10}
+	cfg := cfgRevisao()
+	cfg.Intervalos = []int{2, 10}
 
 	r := plano.Revisao{Disciplina: "D01", Tema: "Crase", Etapa: 0}
 
-	prox, fica := r.Resultado(cfgRevisao(perfil), dia(2026, 3, 4), 10, 10)
+	prox, fica := r.Resultado(cfg, dia(2026, 3, 4), 10, 10)
 	if !fica {
 		t.Fatal("deveria continuar na fila")
 	}
@@ -202,7 +204,7 @@ func TestRevisao_Resultado_intervalosCustomizados(t *testing.T) {
 			prox.VenceEm.Format(time.DateOnly), quer.Format(time.DateOnly))
 	}
 
-	if _, fica := prox.Resultado(cfgRevisao(perfil), dia(2026, 3, 16), 10, 10); fica {
+	if _, fica := prox.Resultado(cfg, dia(2026, 3, 16), 10, 10); fica {
 		t.Error("deveria consolidar ao sair da última etapa")
 	}
 }
@@ -266,7 +268,7 @@ func TestVencidasAte(t *testing.T) {
 	}
 }
 
-func TestGerar_perfilDesligaSimuladoEDiscursiva(t *testing.T) {
+func TestGerar_desligaSimuladoEDiscursiva(t *testing.T) {
 	t.Parallel()
 
 	c := concurso.Concurso{
@@ -296,20 +298,18 @@ func TestGerar_perfilDesligaSimuladoEDiscursiva(t *testing.T) {
 		t.Run(tc.nome, func(t *testing.T) {
 			t.Parallel()
 
-			perfil := plano.PerfilPadrao()
-			perfil.Simulados = tc.simulados
-			perfil.Discursiva = tc.disc
+			cfg := plano.ConfigPadrao()
+			cfg.Inicio = dia(2026, 3, 2)
+			cfg.Prova = c.ProvaPadrao
+			cfg.HorasDia = 2
+			cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+			cfg.DiaRevisao = 5
+			cfg.RetaFinalDias = 28
+			cfg.Questoes = map[string]int{"D01": 10, "D02": 20}
+			cfg.Simulados = tc.simulados
+			cfg.Discursiva = tc.disc
 
-			res := plano.Gerar(plano.Config{
-				Inicio:        dia(2026, 3, 2),
-				Prova:         c.ProvaPadrao,
-				HorasDia:      2,
-				DiasEstudo:    []int{1, 2, 3, 4, 5},
-				DiaRevisao:    5,
-				RetaFinalDias: 28,
-				Questoes:      map[string]int{"D01": 10, "D02": 20},
-				Perfil:        perfil,
-			}, &c)
+			res := plano.Gerar(cfg, &c)
 
 			sims, discs := 0, 0
 			for _, d := range res.Dias {

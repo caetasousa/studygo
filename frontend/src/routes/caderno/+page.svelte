@@ -91,7 +91,7 @@
 				<div>
 					<b>{dados.vencendoHoje.length} temas vencendo hoje</b> na revisão espaçada. Lance o
 					resultado em <a href="/">Hoje</a> — o que ficar abaixo de
-					{planoStore.plano?.config.perfil.limiarFraco ?? 70}% entra aqui sozinho.
+					{planoStore.plano?.config.limiarFraco ?? 70}% entra aqui sozinho.
 				</div>
 			</div>
 		{/if}

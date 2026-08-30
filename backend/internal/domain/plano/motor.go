@@ -51,15 +51,13 @@ func construir(
 		totalCal = 1
 	}
 
-	perfil := cfg.Perfil.Normalizar()
-
 	revCiclo := c.RevCiclo
 	if len(revCiclo) == 0 {
 		revCiclo = RevCicloPadrao
 	}
 
-	if len(perfil.CicloRevisao) > 0 {
-		revCiclo = perfil.CicloRevisao
+	if len(cfg.CicloRevisao) > 0 {
+		revCiclo = cfg.CicloRevisao
 	}
 
 	vesp := addDays(cfg.Prova, -1)
@@ -97,15 +95,15 @@ func construir(
 		return []Dia{}
 	}
 
-	fase := atribuiFases(cfg, perfil, estudo)
+	fase := atribuiFases(cfg, estudo)
 
 	diasEst := filterPapel(estudo, "est")
 	diasRevD := filterPapel(estudo, "revd")
 
 	// A distribuição usa o peso com reforço; res.Pontos segue sendo o peso puro
 	// da prova, que é o que a tela de balanceamento mostra.
-	dist, somaDist := pesosDistribuicao(codes, pontos, perfil)
-	n := perfil.BlocosPorDia
+	dist, somaDist := pesosDistribuicao(codes, pontos, cfg)
+	n := cfg.BlocosPorDia
 
 	res.Slots = distribui(len(diasEst)*n, codes, dist, somaDist)
 	res.SlotsReta = distribui(len(diasRevD)*n, codes, dist, somaDist)
@@ -175,7 +173,7 @@ func construir(
 
 // atribuiFases groups days by week, tags each week base/reta, and sets the
 // papel of every non-vespera day. Returns week -> phase.
-func atribuiFases(cfg Config, perfil Perfil, estudo []*diaTmp) map[int]Fase {
+func atribuiFases(cfg Config, estudo []*diaTmp) map[int]Fase {
 	inicioReta := addDays(cfg.Prova, -maxInt(7, cfg.RetaFinalDias))
 
 	semanas := map[int][]*diaTmp{}
@@ -220,7 +218,7 @@ func atribuiFases(cfg Config, perfil Perfil, estudo []*diaTmp) map[int]Fase {
 		}
 
 		semanaReta++
-		atribuiReta(conteudo, perfil, semanaReta)
+		atribuiReta(conteudo, cfg, semanaReta)
 	}
 
 	return fase
@@ -247,9 +245,9 @@ func atribuiBase(cfg Config, conteudo []*diaTmp) {
 // atribuiReta lays out one reta-final week. By default the last day is a full
 // mock exam and the day before it the essay — but both are personal calls, and a
 // week that has neither is simply all guided review.
-func atribuiReta(conteudo []*diaTmp, perfil Perfil, semanaReta int) {
-	temSim := querSimulado(perfil, semanaReta)
-	temDisc := perfil.Discursiva
+func atribuiReta(conteudo []*diaTmp, cfg Config, semanaReta int) {
+	temSim := querSimulado(cfg, semanaReta)
+	temDisc := cfg.Discursiva
 
 	for _, d := range conteudo {
 		d.papel = "revd"
@@ -270,8 +268,8 @@ func atribuiReta(conteudo []*diaTmp, perfil Perfil, semanaReta int) {
 }
 
 // querSimulado answers whether this reta-final week gets a mock exam.
-func querSimulado(perfil Perfil, semanaReta int) bool {
-	switch perfil.Simulados {
+func querSimulado(cfg Config, semanaReta int) bool {
+	switch cfg.Simulados {
 	case SimuladoNunca:
 		return false
 	case SimuladoQuinzenal:
@@ -535,12 +533,12 @@ func contemEntre(xs []string, inicio, fim int, alvo string) bool {
 // values are multiplied by 100 first so a fractional reforço still lands on
 // integers; distribui and ordena are both ratio-based, so the scale itself
 // changes nothing.
-func pesosDistribuicao(codes []string, pontos map[string]int, perfil Perfil) (map[string]int, int) {
+func pesosDistribuicao(codes []string, pontos map[string]int, cfg Config) (map[string]int, int) {
 	out := make(map[string]int, len(codes))
 	soma := 0
 
 	for _, k := range codes {
-		v := int(math.Round(float64(pontos[k]) * perfil.ReforcoDe(k) * 100))
+		v := int(math.Round(float64(pontos[k]) * cfg.ReforcoDe(k) * 100))
 		out[k] = v
 		soma += v
 	}

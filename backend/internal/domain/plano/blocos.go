@@ -14,10 +14,9 @@ type Bloco struct {
 
 // BlocoCtx carries everything the breakdown needs beyond the day itself.
 type BlocoCtx struct {
-	HorasDia float64           // the daily budget
+	Cfg      Config            // the user's plan settings (dates, rhythm, method)
 	Nomes    map[string]string // discipline codigo -> display name
 	Simulado Composicao        // question split of a full mock exam
-	Perfil   Perfil            // the user's study method
 }
 
 // Composicao is how many questions of each bloco a full exam has.
@@ -30,20 +29,20 @@ type Composicao struct {
 // blocos(): content days get two study blocks plus a spaced-review tail; the
 // special days get their own fixed splits.
 func Blocos(d Dia, ctx BlocoCtx) []Bloco {
-	h := ctx.HorasDia * 60
+	cfg := ctx.Cfg.Normalizar()
+	h := cfg.HorasDia * 60
 
 	if len(d.Itens) > 0 {
-		perfil := ctx.Perfil.Normalizar()
 		rev := d.Tipo == TipoRevisaoDirigida
 
 		// Sem nada vencendo, o tempo da revisão volta para o conteúdo em vez de
 		// mandar revisar o vazio.
-		pctRevisao := perfil.PctRevisao
+		pctRevisao := cfg.PctRevisao
 		if len(d.Revisoes) == 0 {
 			pctRevisao = 0
 		}
 
-		minutos := repartirMinutos(h*(1-pctRevisao), d.Itens, perfil)
+		minutos := repartirMinutos(h*(1-pctRevisao), d.Itens, cfg)
 		out := make([]Bloco, 0, len(d.Itens)+1)
 
 		for idx, it := range d.Itens {
@@ -57,7 +56,7 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 			out = append(out, Bloco{
 				Minutos: minutos[idx],
 				Titulo:  rotuloBloco(idx) + " — " + ctx.Nomes[it.Disciplina],
-				Detalhe: detalheDoBloco(perfil.ModoDe(it.Disciplina), rev, porBloco),
+				Detalhe: detalheDoBloco(cfg.ModoDe(it.Disciplina), rev, porBloco),
 			})
 		}
 
@@ -68,7 +67,7 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 		out = append(out, Bloco{
 			Minutos: m5(h * pctRevisao),
 			Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
-			Detalhe: revisaoDetalhe(perfil, d.Revisoes),
+			Detalhe: revisaoDetalhe(cfg, d.Revisoes),
 		})
 
 		return out
@@ -98,11 +97,28 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 			{Minutos: m5(h * 0.2), Titulo: "Logística", Detalhe: "documento com foto, comprovante, local, horário e trajeto"},
 			{Minutos: m5(h * 0.3), Titulo: "Descanso", Detalhe: "durma cedo; nesta altura, sono rende mais que revisão"},
 		}
-	default: // weekly review
+	default: // weekly review — foco em resolução de questões
+		meta := d.Meta
+		if meta <= 0 {
+			meta = 40
+		}
+
 		return []Bloco{
-			{Minutos: m5(h * 0.35), Titulo: "Revisão ativa", Detalhe: "releia os resumos das duas matérias de cada dia da semana"},
-			{Minutos: m5(h * 0.50), Titulo: "Bateria de questões", Detalhe: "no peso da prova: mais específicos que gerais"},
-			{Minutos: m5(h * 0.15), Titulo: "Caderno de erros", Detalhe: "anote o porquê de cada erro, não só a resposta"},
+			{
+				Minutos: m5(h * 0.55),
+				Titulo:  "Resolução de questões — bateria no peso da prova",
+				Detalhe: strconv.Itoa(meta) + " questões, mais específicas que gerais, cronometradas e corrigidas uma a uma",
+			},
+			{
+				Minutos: m5(h * 0.30),
+				Titulo:  "Revisão ativa dos erros",
+				Detalhe: "releia só o resumo dos temas que você errou na bateria",
+			},
+			{
+				Minutos: m5(h * 0.15),
+				Titulo:  "Caderno de erros",
+				Detalhe: "anote o porquê de cada erro, não só a resposta",
+			},
 		}
 	}
 }
@@ -138,9 +154,9 @@ func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
 
 // revisaoDetalhe says what is actually due today. Retrieval beats re-reading, so
 // by default it asks for questions on each topic before any consulting.
-func revisaoDetalhe(perfil Perfil, vencendo []Revisao) string {
-	if perfil.RevisaoPorQuestoes {
-		por := perfil.QuestoesPorRevisao
+func revisaoDetalhe(cfg Config, vencendo []Revisao) string {
+	if cfg.RevisaoPorQuestoes {
+		por := cfg.QuestoesPorRevisao
 
 		return "resolva " + strconv.Itoa(por) + " questões de cada tema ao lado sem consultar antes, " +
 			"e só depois confira o resumo no que errar (" +
@@ -164,12 +180,12 @@ func rotuloBloco(idx int) string {
 // repartirMinutos splits the content time across the day's blocks in proportion
 // to each discipline's reforço, rounding to 5 minutes and giving the leftover to
 // the heaviest block so the day still adds up.
-func repartirMinutos(total float64, itens []ItemDia, perfil Perfil) []int {
+func repartirMinutos(total float64, itens []ItemDia, cfg Config) []int {
 	pesos := make([]float64, len(itens))
 	soma := 0.0
 
 	for i, it := range itens {
-		pesos[i] = perfil.ReforcoDe(it.Disciplina)
+		pesos[i] = cfg.ReforcoDe(it.Disciplina)
 		soma += pesos[i]
 	}
 

@@ -106,7 +106,8 @@
 						class="row"
 						class:today={d.data === hojeISO()}
 						class:done={d.registro?.concluido}
-						class:esp-rev={d.itens.length === 0}
+						class:esp-rev={d.itens.length === 0 && d.tipo !== 'rev'}
+						class:rev-day={d.tipo === 'rev'}
 						class:has-note={!!d.registro?.nota}
 						class:drag-over={arrastando && arrastando !== d.data && movivel}
 						ondragover={(e) => movivel && e.preventDefault()}
@@ -130,10 +131,15 @@
 						>
 							{#if d.itens.length === 0}
 								<span class="item">
-									<span class="tag" style="background:var(--bg-hover);color:var(--accent)"
-										>{rotulo(d.tipo)}</span
+									<span
+										class="tag"
+										style={d.tipo === 'rev'
+											? 'background:var(--warn-soft);color:var(--warn)'
+											: 'background:var(--bg-hover);color:var(--accent)'}>{rotulo(d.tipo)}</span
 									>
-									<span class="tema-txt">{d.tema}</span>
+									<span class="tema-txt">
+										{d.tema}{#if d.tipo === 'rev' && d.meta > 0}<em>{d.meta} questões</em>{/if}
+									</span>
 								</span>
 							{:else}
 								{#each d.itens as it, i (i)}

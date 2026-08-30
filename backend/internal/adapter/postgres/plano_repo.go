@@ -45,7 +45,7 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		        dias_estudo, dia_revisao, reta_final_dias, tema_ui, criado_em, atualizado_em,
 		        simulados, discursiva, intervalos_revisao, pct_questoes::float8,
 		        revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		        blocos_por_dia, pct_revisao::float8
+		        blocos_por_dia, pct_revisao::float8, minutos_bloco
 		 FROM planos WHERE user_id = $1 AND concurso_id = $2`,
 		userID,
 		concursoID,
@@ -53,9 +53,9 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		&s.ID, &s.UserID, &s.ConcursoID, &s.Config.Inicio, &s.Config.Prova, &horasDia,
 		&diasEstudo, &s.Config.DiaRevisao, &s.Config.RetaFinalDias, &s.TemaUI,
 		&s.CriadoEm, &s.AtualizadoEm,
-		&simulados, &s.Config.Perfil.Discursiva, &intervalos, &pctQuest,
-		&s.Config.Perfil.RevisaoPorQuestoes, &s.Config.Perfil.QuestoesPorRevisao,
-		&s.Config.Perfil.LimiarFraco, &s.Config.Perfil.BlocosPorDia, &pctRevisao,
+		&simulados, &s.Config.Discursiva, &intervalos, &pctQuest,
+		&s.Config.RevisaoPorQuestoes, &s.Config.QuestoesPorRevisao,
+		&s.Config.LimiarFraco, &s.Config.BlocosPorDia, &pctRevisao, &s.Config.MinutosBloco,
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -70,12 +70,12 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 	s.Config.DiasEstudo = toIntSlice(diasEstudo)
 	s.Config.Questoes = map[string]int{}
 
-	s.Config.Perfil.Simulados = plano.Frequencia(simulados)
-	s.Config.Perfil.Intervalos = toIntSlice(intervalos)
-	s.Config.Perfil.PctQuestoes = pctQuest
-	s.Config.Perfil.PctRevisao = pctRevisao
-	s.Config.Perfil.Modos = map[string]plano.Modo{}
-	s.Config.Perfil.Reforcos = map[string]float64{}
+	s.Config.Simulados = plano.Frequencia(simulados)
+	s.Config.Intervalos = toIntSlice(intervalos)
+	s.Config.PctQuestoes = pctQuest
+	s.Config.PctRevisao = pctRevisao
+	s.Config.Modos = map[string]plano.Modo{}
+	s.Config.Reforcos = map[string]float64{}
 
 	if err := r.loadDisciplinas(ctx, s.ID, &s); err != nil {
 		return plano.Salvo{}, err
@@ -132,8 +132,8 @@ func (r *PlanoRepo) loadDisciplinas(ctx context.Context, planoID uuid.UUID, s *p
 		}
 
 		s.Config.Questoes[codigo] = q
-		s.Config.Perfil.Modos[codigo] = plano.Modo(modo)
-		s.Config.Perfil.Reforcos[codigo] = reforco
+		s.Config.Modos[codigo] = plano.Modo(modo)
+		s.Config.Reforcos[codigo] = reforco
 	}
 
 	return rows.Err()
@@ -272,7 +272,7 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 	}
 	defer tx.Rollback(ctx)
 
-	perfil := s.Config.Perfil.Normalizar()
+	cfg := s.Config.Normalizar()
 
 	err = tx.QueryRow(
 		ctx,
@@ -280,8 +280,8 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		   (user_id, concurso_id, inicio, prova, horas_dia, dias_estudo, dia_revisao, reta_final_dias,
 		    tema_ui, simulados, discursiva, intervalos_revisao, pct_questoes,
 		    revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		    blocos_por_dia, pct_revisao)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		    blocos_por_dia, pct_revisao, minutos_bloco)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		 ON CONFLICT (user_id, concurso_id) DO UPDATE SET
 		   inicio = EXCLUDED.inicio, prova = EXCLUDED.prova, horas_dia = EXCLUDED.horas_dia,
 		   dias_estudo = EXCLUDED.dias_estudo, dia_revisao = EXCLUDED.dia_revisao,
@@ -292,13 +292,14 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		   questoes_por_revisao = EXCLUDED.questoes_por_revisao,
 		   limiar_fraco = EXCLUDED.limiar_fraco,
 		   blocos_por_dia = EXCLUDED.blocos_por_dia, pct_revisao = EXCLUDED.pct_revisao,
+		   minutos_bloco = EXCLUDED.minutos_bloco,
 		   atualizado_em = now()
 		 RETURNING id, criado_em, atualizado_em`,
-		s.UserID, s.ConcursoID, s.Config.Inicio, s.Config.Prova, s.Config.HorasDia,
-		toInt32Slice(s.Config.DiasEstudo), s.Config.DiaRevisao, s.Config.RetaFinalDias, s.TemaUI,
-		string(perfil.Simulados), perfil.Discursiva, toInt32Slice(perfil.Intervalos),
-		perfil.PctQuestoes, perfil.RevisaoPorQuestoes, perfil.QuestoesPorRevisao, perfil.LimiarFraco,
-		perfil.BlocosPorDia, perfil.PctRevisao,
+		s.UserID, s.ConcursoID, cfg.Inicio, cfg.Prova, cfg.HorasDia,
+		toInt32Slice(cfg.DiasEstudo), cfg.DiaRevisao, cfg.RetaFinalDias, s.TemaUI,
+		string(cfg.Simulados), cfg.Discursiva, toInt32Slice(cfg.Intervalos),
+		cfg.PctQuestoes, cfg.RevisaoPorQuestoes, cfg.QuestoesPorRevisao, cfg.LimiarFraco,
+		cfg.BlocosPorDia, cfg.PctRevisao, cfg.MinutosBloco,
 	).Scan(&s.ID, &s.CriadoEm, &s.AtualizadoEm)
 	if err != nil {
 		return plano.Salvo{}, fmt.Errorf("upserting plano: %w", err)
@@ -313,7 +314,7 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 			ctx,
 			`INSERT INTO plano_disciplinas (plano_id, disciplina, questoes, modo, reforco)
 			 VALUES ($1, $2, $3, $4, $5)`,
-			s.ID, codigo, q, string(perfil.ModoDe(codigo)), perfil.ReforcoDe(codigo),
+			s.ID, codigo, q, string(cfg.ModoDe(codigo)), cfg.ReforcoDe(codigo),
 		); err != nil {
 			return plano.Salvo{}, fmt.Errorf("inserting plano_disciplina %s: %w", codigo, err)
 		}
@@ -323,7 +324,7 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		return plano.Salvo{}, fmt.Errorf("clearing plano_ciclo: %w", err)
 	}
 
-	for i, it := range perfil.CicloRevisao {
+	for i, it := range cfg.CicloRevisao {
 		if _, err := tx.Exec(
 			ctx,
 			`INSERT INTO plano_ciclo (plano_id, ordem, titulo, questoes) VALUES ($1, $2, $3, $4)`,
@@ -807,7 +808,7 @@ func (r *PlanoRepo) loadCiclo(ctx context.Context, planoID uuid.UUID, s *plano.S
 			return fmt.Errorf("scanning plano_ciclo: %w", err)
 		}
 
-		s.Config.Perfil.CicloRevisao = append(s.Config.Perfil.CicloRevisao, it)
+		s.Config.CicloRevisao = append(s.Config.CicloRevisao, it)
 	}
 
 	return rows.Err()

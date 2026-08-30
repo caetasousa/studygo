@@ -14,34 +14,35 @@ import (
 
 const isoDate = "2006-01-02"
 
-// ConfigInput is the editable plan configuration coming from the client.
+// ConfigInput is the editable plan configuration coming from the client. Every
+// study-method field is a pointer/optional: a nil (absent) field leaves that
+// setting untouched, so a patch that only touches one control doesn't reset the
+// rest — the bug the old flat `DiaRevisao int` had (a zero value = domingo, so
+// every partial save silently moved the review day).
 type ConfigInput struct {
 	Inicio        string         `json:"inicio"`
 	Prova         string         `json:"prova"`
 	HorasDia      float64        `json:"horasDia"`
 	DiasEstudo    []int          `json:"diasEstudo"`
-	DiaRevisao    int            `json:"diaRevisao"`
+	DiaRevisao    *int           `json:"diaRevisao"`
 	RetaFinalDias int            `json:"retaFinalDias"`
 	TemaUI        string         `json:"temaUi"`
 	Questoes      map[string]int `json:"questoes"`
-	Perfil        *PerfilInput   `json:"perfil"`
-}
 
-// PerfilInput patches the study profile. Every field is optional — a nil field
-// leaves that setting untouched.
-type PerfilInput struct {
-	Simulados          *string            `json:"simulados"`
-	Discursiva         *bool              `json:"discursiva"`
-	Intervalos         *[]int             `json:"intervalos"`
-	PctQuestoes        *float64           `json:"pctQuestoes"`
-	RevisaoPorQuestoes *bool              `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao *int               `json:"questoesPorRevisao"`
-	LimiarFraco        *int               `json:"limiarFraco"`
-	Modos              map[string]string  `json:"modos"`
+	// Study method — was the nested `perfil` object, now flat.
 	BlocosPorDia       *int               `json:"blocosPorDia"`
+	MinutosBloco       *int               `json:"minutosBloco"`
 	PctRevisao         *float64           `json:"pctRevisao"`
 	Reforcos           map[string]float64 `json:"reforcos"`
+	RevisaoPorQuestoes *bool              `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao *int               `json:"questoesPorRevisao"`
+	Intervalos         *[]int             `json:"intervalos"`
 	CicloRevisao       *[]CicloItemInput  `json:"cicloRevisao"`
+	Simulados          *string            `json:"simulados"`
+	Discursiva         *bool              `json:"discursiva"`
+	Modos              map[string]string  `json:"modos"`
+	PctQuestoes        *float64           `json:"pctQuestoes"`
+	LimiarFraco        *int               `json:"limiarFraco"`
 }
 
 // CicloItemInput is one week of the base-phase review rotation.
@@ -131,29 +132,27 @@ type ConteudoResposta struct {
 type ConfigResposta struct {
 	Inicio        string         `json:"inicio"`
 	Prova         string         `json:"prova"`
-	HorasDia      float64        `json:"horasDia"`
+	HorasDia      float64        `json:"horasDia"` // derivado de minutosBloco × blocosPorDia + cauda de revisão
 	DiasEstudo    []int          `json:"diasEstudo"`
 	DiaRevisao    int            `json:"diaRevisao"`
 	RetaFinalDias int            `json:"retaFinalDias"`
 	TemaUI        string         `json:"temaUi"`
 	Questoes      map[string]int `json:"questoes"`
-	Perfil        PerfilResposta `json:"perfil"`
-}
 
-type PerfilResposta struct {
-	Simulados          string             `json:"simulados"`
-	Discursiva         bool               `json:"discursiva"`
-	Intervalos         []int              `json:"intervalos"`
-	PctQuestoes        float64            `json:"pctQuestoes"`
-	RevisaoPorQuestoes bool               `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao int                `json:"questoesPorRevisao"`
-	LimiarFraco        int                `json:"limiarFraco"`
-	Modos              map[string]string  `json:"modos"`
+	// Study method — flat.
 	BlocosPorDia       int                `json:"blocosPorDia"`
+	MinutosBloco       int                `json:"minutosBloco"` // duração de um bloco normal; define o dia
 	PctRevisao         float64            `json:"pctRevisao"`
 	Reforcos           map[string]float64 `json:"reforcos"`
+	RevisaoPorQuestoes bool               `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao int                `json:"questoesPorRevisao"`
+	Intervalos         []int              `json:"intervalos"`
 	CicloRevisao       []CicloItemInput   `json:"cicloRevisao"`
-	MinutosPorBloco    int                `json:"minutosPorBloco"` // derivado, para a tela
+	Simulados          string             `json:"simulados"`
+	Discursiva         bool               `json:"discursiva"`
+	Modos              map[string]string  `json:"modos"`
+	PctQuestoes        float64            `json:"pctQuestoes"`
+	LimiarFraco        int                `json:"limiarFraco"`
 }
 
 // DiaResposta is one plan day plus the user's record and timed breakdown.

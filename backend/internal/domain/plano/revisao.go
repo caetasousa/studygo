@@ -16,7 +16,7 @@ type Revisao struct {
 	Disciplina string
 	Tema       string
 	OrigemData time.Time // the day the topic was studied
-	Etapa      int       // index into Perfil.Intervalos
+	Etapa      int       // index into Config.Intervalos
 	VenceEm    time.Time
 	FeitaEm    *time.Time
 	Questoes   *int
@@ -32,11 +32,11 @@ const (
 // Enfileirar returns the reviews a finished day creates — one per topic studied.
 // A day with no topics (simulado, véspera) creates none.
 func Enfileirar(cfg Config, d Dia) []Revisao {
-	perfil := cfg.Perfil.Normalizar()
+	cfg = cfg.Normalizar()
 	out := make([]Revisao, 0, len(d.Itens))
 
 	for _, it := range d.Itens {
-		vence, ok := agendar(cfg, DayOf(d.Data), perfil.Intervalos[0])
+		vence, ok := agendar(cfg, DayOf(d.Data), cfg.Intervalos[0])
 		if !ok {
 			continue
 		}
@@ -58,7 +58,7 @@ func Enfileirar(cfg Config, d Dia) []Revisao {
 // (it climbed past the last interval) or because the next date would fall after
 // the exam.
 func (r Revisao) Resultado(cfg Config, hoje time.Time, questoes, acertos int) (Revisao, bool) {
-	perfil := cfg.Perfil.Normalizar()
+	cfg = cfg.Normalizar()
 
 	proxima := Revisao{
 		Disciplina: r.Disciplina,
@@ -67,11 +67,11 @@ func (r Revisao) Resultado(cfg Config, hoje time.Time, questoes, acertos int) (R
 		Etapa:      proximaEtapa(r.Etapa, Aproveitamento(questoes, acertos)),
 	}
 
-	if proxima.Etapa >= len(perfil.Intervalos) {
+	if proxima.Etapa >= len(cfg.Intervalos) {
 		return Revisao{}, false
 	}
 
-	vence, ok := agendar(cfg, DayOf(hoje), perfil.Intervalos[proxima.Etapa])
+	vence, ok := agendar(cfg, DayOf(hoje), cfg.Intervalos[proxima.Etapa])
 	if !ok {
 		return Revisao{}, false
 	}

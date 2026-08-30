@@ -142,47 +142,31 @@ export interface CicloItem {
 	questoes: number;
 }
 
-export interface Perfil {
-	simulados: Simulados;
-	discursiva: boolean;
-	intervalos: number[];
-	pctQuestoes: number;
-	revisaoPorQuestoes: boolean;
-	questoesPorRevisao: number;
-	limiarFraco: number;
-	modos: Record<string, Modo>;
-	blocosPorDia: number;
-	pctRevisao: number;
-	reforcos: Record<string, number>;
-	cicloRevisao: CicloItem[];
-	minutosPorBloco: number;
-}
-
-export interface PerfilInput {
-	simulados?: Simulados;
-	discursiva?: boolean;
-	intervalos?: number[];
-	pctQuestoes?: number;
-	revisaoPorQuestoes?: boolean;
-	questoesPorRevisao?: number;
-	limiarFraco?: number;
-	modos?: Record<string, Modo>;
-	blocosPorDia?: number;
-	pctRevisao?: number;
-	reforcos?: Record<string, number>;
-	cicloRevisao?: CicloItem[];
-}
-
+// Config is the whole plan configuration — dates, rhythm and the study method,
+// flat (the old nested `perfil` object is gone).
 export interface Config {
 	inicio: string;
 	prova: string;
-	horasDia: number;
+	horasDia: number; // derivado de minutosBloco × blocosPorDia + cauda de revisão
 	diasEstudo: number[];
 	diaRevisao: number;
 	retaFinalDias: number;
 	temaUi: 'light' | 'dark' | 'system';
 	questoes: Record<string, number>;
-	perfil: Perfil;
+
+	blocosPorDia: number;
+	minutosBloco: number; // duração de um bloco normal; define o dia
+	pctRevisao: number;
+	reforcos: Record<string, number>;
+	revisaoPorQuestoes: boolean;
+	questoesPorRevisao: number;
+	intervalos: number[];
+	cicloRevisao: CicloItem[];
+	simulados: Simulados;
+	discursiva: boolean;
+	modos: Record<string, Modo>;
+	pctQuestoes: number;
+	limiarFraco: number;
 }
 
 export type Tipo = 'est' | 'revd' | 'sim' | 'disc' | 'vespera' | 'rev';
@@ -305,6 +289,9 @@ export interface PlanoResposta {
 	geradoEm: string;
 }
 
+// ConfigInput patches the plan config. Every study-method field is optional — an
+// absent field leaves that setting untouched, so a patch that touches one
+// control never resets the rest.
 export interface ConfigInput {
 	inicio?: string;
 	prova?: string;
@@ -314,7 +301,20 @@ export interface ConfigInput {
 	retaFinalDias?: number;
 	temaUi?: string;
 	questoes?: Record<string, number>;
-	perfil?: PerfilInput;
+
+	blocosPorDia?: number;
+	minutosBloco?: number;
+	pctRevisao?: number;
+	reforcos?: Record<string, number>;
+	revisaoPorQuestoes?: boolean;
+	questoesPorRevisao?: number;
+	intervalos?: number[];
+	cicloRevisao?: CicloItem[];
+	simulados?: Simulados;
+	discursiva?: boolean;
+	modos?: Record<string, Modo>;
+	pctQuestoes?: number;
+	limiarFraco?: number;
 }
 
 export interface RegistroBlocoInput {

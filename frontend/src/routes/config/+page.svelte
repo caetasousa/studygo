@@ -1,15 +1,17 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
-	import PerfilEstudo from '$lib/components/PerfilEstudo.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { DIAS_CURTOS, DIAS_SEMANA, ORDEM_DIAS } from '$lib/format';
+	import { DIAS_CURTOS, DIAS_SEMANA, ORDEM_DIAS, nf1 } from '$lib/format';
+	import type { ConfigInput, Modo, Simulados } from '$lib/types';
 
 	const plano = $derived(planoStore.plano);
 	const cfg = $derived(plano?.config);
+	const disciplinas = $derived(plano?.concurso.disciplinas ?? []);
+	const balanceamento = $derived(plano?.balanceamento ?? []);
 
-	function salvar(patch: Parameters<typeof planoStore.salvarConfig>[0]) {
+	function salvar(patch: ConfigInput) {
 		void planoStore.salvarConfig(patch);
 	}
 
@@ -24,6 +26,99 @@
 			novo = [...atual, wd];
 		}
 		salvar({ diasEstudo: novo });
+	}
+
+	// ---- ritmo de estudo (antes: componente "Perfil de estudo") ----
+
+	const BLOCOS = [1, 2, 3, 4, 5, 6];
+
+	const SIMULADOS: { v: Simulados; r: string }[] = [
+		{ v: 'nunca', r: 'nunca' },
+		{ v: 'quinzenal', r: 'a cada 2 semanas' },
+		{ v: 'semanal', r: 'toda semana' }
+	];
+
+	const MODOS: { v: Modo; r: string }[] = [
+		{ v: 'completo', r: 'teoria + questões' },
+		{ v: 'questoes', r: 'só questões' },
+		{ v: 'teoria', r: 'só teoria' }
+	];
+
+	const REFORCOS: { v: number; r: string }[] = [
+		{ v: 0.5, r: 'menos' },
+		{ v: 1, r: 'normal' },
+		{ v: 1.5, r: '+50%' },
+		{ v: 2, r: 'dobro' },
+		{ v: 3, r: 'triplo' }
+	];
+
+	// O motor usa este ciclo quando o plano não tem um próprio — mostrado como
+	// ponto de partida editável.
+	const CICLO_PADRAO = [
+		{ titulo: 'Revisão ativa da semana + caderno de erros', questoes: 30 },
+		{ titulo: 'Bateria mista de questões no peso da prova', questoes: 60 },
+		{ titulo: 'Treino da prova discursiva, com autocorreção', questoes: 0 },
+		{ titulo: 'Simulado parcial cronometrado + correção comentada', questoes: 45 }
+	];
+
+	// Intervalos de revisão editados como rascunho local, enviados ao sair do campo.
+	let intervalosTexto = $state('');
+	let editandoIntervalos = $state(false);
+	const intervalosView = $derived(
+		editandoIntervalos ? intervalosTexto : (cfg?.intervalos ?? []).join(', ')
+	);
+
+	function commitIntervalos() {
+		editandoIntervalos = false;
+		const nums = intervalosTexto
+			.split(/[,\s]+/)
+			.map((x) => parseInt(x, 10))
+			.filter((n) => Number.isFinite(n) && n > 0);
+		if (nums.length > 0) salvar({ intervalos: nums });
+	}
+
+	// Ciclo semanal como rascunho local — enviado ao sair do campo, para não
+	// regerar o plano a cada tecla.
+	let cicloDraft = $state<{ titulo: string; questoes: number }[] | null>(null);
+	const ciclo = $derived(
+		cicloDraft ??
+			(cfg?.cicloRevisao.length
+				? cfg.cicloRevisao.map((c) => ({ ...c }))
+				: CICLO_PADRAO.map((c) => ({ ...c })))
+	);
+
+	function editarCiclo(i: number, campo: 'titulo' | 'questoes', valor: string) {
+		const copia = ciclo.map((c) => ({ ...c }));
+		if (campo === 'titulo') copia[i].titulo = valor;
+		else copia[i].questoes = Math.max(0, parseInt(valor, 10) || 0);
+		cicloDraft = copia;
+	}
+
+	function commitCiclo() {
+		if (!cicloDraft) return;
+		const limpo = cicloDraft.filter((c) => c.titulo.trim());
+		cicloDraft = null;
+		salvar({ cicloRevisao: limpo });
+	}
+
+	function addSemana() {
+		cicloDraft = [...ciclo.map((c) => ({ ...c })), { titulo: '', questoes: 30 }];
+	}
+
+	function rmSemana(i: number) {
+		const copia = ciclo.map((c) => ({ ...c }));
+		copia.splice(i, 1);
+		cicloDraft = copia;
+		commitCiclo();
+	}
+
+	// Quantas vezes mais uma matéria aparece que uma básica (peso 1, reforço 1).
+	function frequenciaRelativa(codigo: string): number {
+		if (!cfg) return 1;
+		const l = balanceamento.find((x) => x.codigo === codigo);
+		const peso = l?.peso ?? 1;
+		const reforco = cfg.reforcos[codigo] ?? 1;
+		return peso * reforco;
 	}
 
 	let baixando = $state(false);
@@ -46,13 +141,19 @@
 	}
 
 	async function limpar() {
-		if (!confirm('Isso apaga todas as horas, questões, anotações de dias e marcações de prazo. Continuar?'))
+		if (
+			!confirm(
+				'Isso apaga todas as horas, questões, anotações de dias e marcações de prazo. Continuar?'
+			)
+		)
 			return;
 		await planoStore.limparRegistros();
 	}
 
 	async function restaurar() {
-		if (!confirm('Isso desfaz as trocas manuais de matérias e volta à ordem calculada pelo peso. Continuar?'))
+		if (
+			!confirm('Isso desfaz as trocas manuais de matérias e volta à ordem calculada pelo peso. Continuar?')
+		)
 			return;
 		await planoStore.restaurarOrdem();
 	}
@@ -69,7 +170,7 @@
 	<div class="page">
 		<div class="card">
 			<div class="card-body">
-				<h2 class="sec" style="margin-top:0">Datas e ritmo</h2>
+				<h2 class="sec" style="margin-top:0">Datas</h2>
 				<div class="form-grid">
 					<div class="field">
 						<label for="inicio">Início</label>
@@ -87,18 +188,6 @@
 							type="date"
 							value={cfg.prova}
 							onchange={(e) => salvar({ prova: (e.target as HTMLInputElement).value })}
-						/>
-					</div>
-					<div class="field">
-						<label for="horas">Horas por dia</label>
-						<input
-							id="horas"
-							type="number"
-							min="0.5"
-							max="14"
-							step="0.5"
-							value={cfg.horasDia}
-							onchange={(e) => salvar({ horasDia: parseFloat((e.target as HTMLInputElement).value) })}
 						/>
 					</div>
 					<div class="field">
@@ -123,7 +212,8 @@
 						<select
 							id="diarev"
 							value={cfg.diaRevisao}
-							onchange={(e) => salvar({ diaRevisao: parseInt((e.target as HTMLSelectElement).value, 10) })}
+							onchange={(e) =>
+								salvar({ diaRevisao: parseInt((e.target as HTMLSelectElement).value, 10) })}
 						>
 							<option value={1}>segunda</option>
 							<option value={2}>terça</option>
@@ -148,8 +238,228 @@
 						/>
 					</div>
 				</div>
+				<p class="page-sub" style="margin:8px 0 0">
+					O <b>dia da revisão</b> é um dia de estudo dedicado à <b>resolução de questões</b> no peso
+					da prova. Ele segue o dia que você escolher aqui — mude para domingo, sábado ou qualquer
+					outro e o cronograma acompanha, com cor própria.
+				</p>
 
-				<PerfilEstudo />
+				<h2 class="sec">Ritmo de estudo</h2>
+				<div class="form-grid">
+					<div class="field">
+						<label for="minbloco">Minutos por bloco</label>
+						<input
+							id="minbloco"
+							type="number"
+							min="15"
+							max="240"
+							step="5"
+							value={cfg.minutosBloco}
+							onchange={(e) =>
+								salvar({ minutosBloco: parseInt((e.target as HTMLInputElement).value, 10) })}
+						/>
+					</div>
+					<div class="field" style="flex:1 1 240px">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>Blocos por dia</label>
+						<div class="day-sel">
+							{#each BLOCOS as n (n)}
+								<button
+									type="button"
+									aria-pressed={cfg.blocosPorDia === n}
+									style="width:auto;padding:0 12px"
+									onclick={() => salvar({ blocosPorDia: n })}>{n}</button
+								>
+							{/each}
+						</div>
+					</div>
+					<div class="field">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>Dá um dia de</label>
+						<output class="readout">{nf1.format(cfg.horasDia)} h</output>
+					</div>
+					<div class="field">
+						<label for="pf-prev">
+							Tempo da revisão espaçada — {Math.round(cfg.pctRevisao * 100)}% do dia
+						</label>
+						<input
+							id="pf-prev"
+							type="range"
+							min="0"
+							max="40"
+							step="4"
+							value={Math.round(cfg.pctRevisao * 100)}
+							onchange={(e) =>
+								salvar({ pctRevisao: parseInt((e.target as HTMLInputElement).value, 10) / 100 })}
+						/>
+					</div>
+					<div class="field" style="flex:1 1 220px">
+						<label for="pf-int">Revisão espaçada — dias, separados por vírgula</label>
+						<input
+							id="pf-int"
+							type="text"
+							inputmode="numeric"
+							placeholder="1, 7, 30"
+							value={intervalosView}
+							oninput={(e) => {
+								editandoIntervalos = true;
+								intervalosTexto = e.currentTarget.value;
+							}}
+							onblur={commitIntervalos}
+							style="width:100%"
+						/>
+					</div>
+					<div class="field">
+						<label for="pf-qrev">Questões por revisão</label>
+						<input
+							id="pf-qrev"
+							type="number"
+							min="1"
+							max="200"
+							value={cfg.questoesPorRevisao}
+							onchange={(e) =>
+								salvar({ questoesPorRevisao: parseInt(e.currentTarget.value, 10) })}
+						/>
+					</div>
+					<div class="field">
+						<label for="pf-revq">Revisão por questões</label>
+						<input
+							id="pf-revq"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.revisaoPorQuestoes}
+							onchange={(e) => salvar({ revisaoPorQuestoes: e.currentTarget.checked })}
+						/>
+					</div>
+					<div class="field">
+						<label for="pf-pct">Questões no bloco — {Math.round(cfg.pctQuestoes * 100)}%</label>
+						<input
+							id="pf-pct"
+							type="range"
+							min="10"
+							max="90"
+							step="10"
+							value={Math.round(cfg.pctQuestoes * 100)}
+							onchange={(e) =>
+								salvar({ pctQuestoes: parseInt(e.currentTarget.value, 10) / 100 })}
+						/>
+					</div>
+					<div class="field">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>Simulados completos</label>
+						<div class="day-sel">
+							{#each SIMULADOS as s (s.v)}
+								<button
+									type="button"
+									aria-pressed={cfg.simulados === s.v}
+									style="width:auto;padding:0 10px"
+									onclick={() => salvar({ simulados: s.v })}>{s.r}</button
+								>
+							{/each}
+						</div>
+					</div>
+					<div class="field">
+						<label for="pf-disc">Prova discursiva</label>
+						<input
+							id="pf-disc"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.discursiva}
+							onchange={(e) => salvar({ discursiva: e.currentTarget.checked })}
+						/>
+					</div>
+					<div class="field">
+						<label for="pf-limiar">Aproveitamento fraco abaixo de</label>
+						<input
+							id="pf-limiar"
+							type="number"
+							min="1"
+							max="100"
+							value={cfg.limiarFraco}
+							onchange={(e) => salvar({ limiarFraco: parseInt(e.currentTarget.value, 10) })}
+						/>
+					</div>
+				</div>
+
+				<h3 class="modos-t">Peso e método por matéria</h3>
+				<p class="page-sub" style="margin:0 0 10px;font-size:12px">
+					Matérias de peso maior (as <b>específicas</b> valem 2, as básicas 1) já aparecem mais vezes
+					no cronograma. O <b>reforço</b> multiplica ainda mais uma matéria em que você está com
+					dificuldade — ela aparece mais e ganha um bloco mais longo.
+				</p>
+				<div class="modos">
+					{#each disciplinas as d (d.codigo)}
+						{@const rel = frequenciaRelativa(d.codigo)}
+						<div class="modo-linha">
+							<span class="modo-nome">
+								<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>{d.nome}
+								<em class="peso-tag">
+									peso {d.peso}{#if rel !== 1} · ~{nf1.format(rel)}× as básicas{/if}
+								</em>
+							</span>
+							<div class="day-sel">
+								{#each MODOS as m (m.v)}
+									<button
+										type="button"
+										aria-pressed={(cfg.modos[d.codigo] ?? 'completo') === m.v}
+										style="width:auto;padding:0 10px"
+										onclick={() => salvar({ modos: { [d.codigo]: m.v } })}>{m.r}</button
+									>
+								{/each}
+							</div>
+							<div class="day-sel reforco">
+								{#each REFORCOS as r (r.v)}
+									<button
+										type="button"
+										aria-pressed={(cfg.reforcos[d.codigo] ?? 1) === r.v}
+										style="width:auto;padding:0 9px"
+										title="Reforço {r.v}×"
+										onclick={() => salvar({ reforcos: { [d.codigo]: r.v } })}>{r.r}</button
+									>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<h3 class="modos-t">Ciclo de revisão semanal</h3>
+				<p class="page-sub" style="margin:0 0 10px;font-size:12px">
+					Um dia de cada semana da fase de conteúdo, em rodízio — sempre focado em resolver
+					questões. É independente dos simulados da reta final.
+				</p>
+				<div class="ciclo">
+					{#each ciclo as c, i (i)}
+						<div class="ciclo-linha">
+							<span class="ciclo-n">sem. {i + 1}</span>
+							<input
+								type="text"
+								value={c.titulo}
+								placeholder="o que fazer nesta semana"
+								oninput={(e) => editarCiclo(i, 'titulo', e.currentTarget.value)}
+								onblur={commitCiclo}
+							/>
+							<input
+								type="number"
+								min="0"
+								max="300"
+								class="ciclo-q"
+								value={c.questoes}
+								oninput={(e) => editarCiclo(i, 'questoes', e.currentTarget.value)}
+								onblur={commitCiclo}
+							/>
+							<button
+								type="button"
+								class="mv-btn"
+								aria-label="Remover semana"
+								disabled={ciclo.length <= 1}
+								onclick={() => rmSemana(i)}>✕</button
+							>
+						</div>
+					{/each}
+					<button type="button" class="btn" style="margin-top:8px" onclick={addSemana}
+						>+ semana</button
+					>
+				</div>
 
 				<h2 class="sec">Reordenação manual</h2>
 				<p class="page-sub" style="margin-top:0">
@@ -169,7 +479,9 @@
 
 				<h2 class="sec">Este concurso</h2>
 				<div class="form-grid">
-					<a class="btn" href="/concursos/{plano.concurso.slug}/editar">✏️ Editar disciplinas e datas</a>
+					<a class="btn" href="/concursos/{plano.concurso.slug}/editar"
+						>✏️ Editar disciplinas e datas</a
+					>
 					<a class="btn" href="/concursos">📁 Trocar de concurso</a>
 				</div>
 
@@ -179,10 +491,85 @@
 					<button class="btn danger" onclick={limpar}>Limpar registros</button>
 				</div>
 				<p class="page-sub" style="margin-top:14px">
-					Seus dados ficam salvos no servidor, ligados à sua conta ({auth.usuario?.email}). O CSV é uma
-					cópia de segurança que você pode abrir no Excel.
+					Seus dados ficam salvos no servidor, ligados à sua conta ({auth.usuario?.email}). O CSV é
+					uma cópia de segurança que você pode abrir no Excel.
 				</p>
 			</div>
 		</div>
 	</div>
 {/if}
+
+<style>
+	.readout {
+		font-family: var(--font-mono);
+		font-size: 14px;
+		font-weight: 600;
+		padding: 7px 0;
+		color: var(--text);
+	}
+	.modos-t {
+		font-size: 13px;
+		font-weight: 600;
+		margin: 20px 0 8px;
+	}
+	.modos {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.modo-linha {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.modo-nome {
+		flex: 1 1 200px;
+		min-width: 0;
+		font-size: 13.5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.peso-tag {
+		font-style: normal;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--text-faint);
+		margin-left: 6px;
+	}
+	.reforco button[aria-pressed='true'] {
+		background: var(--warn-soft);
+		color: var(--warn);
+	}
+	.ciclo {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.ciclo-linha {
+		display: grid;
+		grid-template-columns: 58px minmax(0, 1fr) 72px 30px;
+		align-items: center;
+		gap: 8px;
+	}
+	.ciclo-n {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--text-faint);
+	}
+	.ciclo-linha input {
+		width: 100%;
+	}
+	.ciclo-q {
+		text-align: right;
+	}
+	@media (max-width: 560px) {
+		.ciclo-linha {
+			grid-template-columns: minmax(0, 1fr) 68px 30px;
+		}
+		.ciclo-n {
+			grid-column: 1 / -1;
+		}
+	}
+</style>

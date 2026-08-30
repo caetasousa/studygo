@@ -24,6 +24,11 @@ func (s *PlanoService) montar(
 ) (PlanoResposta, error) {
 	agora := plano.DayOf(s.clock.Now())
 
+	// Normalize once here so every downstream reader — montarConfig, the block
+	// breakdown, balanceamento — sees the same HorasDia (recomputed from
+	// MinutosBloco) and clamped method fields.
+	salvo.Config = salvo.Config.Normalizar()
+
 	codes := make([]string, 0, len(c.Disciplinas))
 	nomes := map[string]string{}
 
@@ -44,10 +49,9 @@ func (s *PlanoService) montar(
 	vencendo := distribuirRevisoes(res.Dias, salvo.Revisoes, agora)
 
 	ctxBlocos := plano.BlocoCtx{
-		HorasDia: salvo.Config.HorasDia,
+		Cfg:      salvo.Config,
 		Nomes:    nomes,
 		Simulado: res.Simulado,
-		Perfil:   salvo.Config.Perfil,
 	}
 
 	dias := make([]DiaResposta, 0, len(res.Dias))
@@ -155,51 +159,54 @@ func montarConcurso(c concurso.Concurso) ConcursoResposta {
 }
 
 func montarConfig(salvo plano.Salvo) ConfigResposta {
-	return ConfigResposta{
-		Inicio:        salvo.Config.Inicio.Format(isoDate),
-		Prova:         salvo.Config.Prova.Format(isoDate),
-		HorasDia:      salvo.Config.HorasDia,
-		DiasEstudo:    salvo.Config.DiasEstudo,
-		DiaRevisao:    salvo.Config.DiaRevisao,
-		RetaFinalDias: salvo.Config.RetaFinalDias,
-		TemaUI:        salvo.TemaUI,
-		Questoes:      salvo.Config.Questoes,
-		Perfil:        montarPerfil(salvo.Config.Perfil, salvo.Config.HorasDia),
-	}
-}
+	cfg := salvo.Config.Normalizar()
 
-func montarPerfil(p plano.Perfil, horasDia float64) PerfilResposta {
-	p = p.Normalizar()
-
-	modos := make(map[string]string, len(p.Modos))
-	for codigo, m := range p.Modos {
+	modos := make(map[string]string, len(cfg.Modos))
+	for codigo, m := range cfg.Modos {
 		modos[codigo] = string(m)
 	}
 
-	reforcos := make(map[string]float64, len(p.Reforcos))
-	for codigo := range p.Reforcos {
-		reforcos[codigo] = p.ReforcoDe(codigo)
+	reforcos := make(map[string]float64, len(cfg.Reforcos))
+	for codigo := range cfg.Reforcos {
+		reforcos[codigo] = cfg.ReforcoDe(codigo)
 	}
 
-	ciclo := make([]CicloItemInput, 0, len(p.CicloRevisao))
-	for _, it := range p.CicloRevisao {
+	ciclo := make([]CicloItemInput, 0, len(cfg.CicloRevisao))
+	for _, it := range cfg.CicloRevisao {
 		ciclo = append(ciclo, CicloItemInput{Titulo: it.Titulo, Questoes: it.Questoes})
 	}
 
-	return PerfilResposta{
-		BlocosPorDia:       p.BlocosPorDia,
-		PctRevisao:         p.PctRevisao,
+	// MinutosBloco is what the config screen edits. When the plan has never had
+	// an explicit length (old rows), report the one implied by HorasDia so the
+	// screen shows a real number and the first save solidifies it.
+	minutos := cfg.MinutosBloco
+	if minutos == 0 {
+		minutos = minutosDe(cfg)
+	}
+
+	return ConfigResposta{
+		Inicio:        cfg.Inicio.Format(isoDate),
+		Prova:         cfg.Prova.Format(isoDate),
+		HorasDia:      cfg.HorasDia,
+		DiasEstudo:    cfg.DiasEstudo,
+		DiaRevisao:    cfg.DiaRevisao,
+		RetaFinalDias: cfg.RetaFinalDias,
+		TemaUI:        salvo.TemaUI,
+		Questoes:      cfg.Questoes,
+
+		BlocosPorDia:       cfg.BlocosPorDia,
+		MinutosBloco:       minutos,
+		PctRevisao:         cfg.PctRevisao,
 		Reforcos:           reforcos,
+		RevisaoPorQuestoes: cfg.RevisaoPorQuestoes,
+		QuestoesPorRevisao: cfg.QuestoesPorRevisao,
+		Intervalos:         cfg.Intervalos,
 		CicloRevisao:       ciclo,
-		MinutosPorBloco:    minutosPorBloco(horasDia, p),
-		Simulados:          string(p.Simulados),
-		Discursiva:         p.Discursiva,
-		Intervalos:         p.Intervalos,
-		PctQuestoes:        p.PctQuestoes,
-		RevisaoPorQuestoes: p.RevisaoPorQuestoes,
-		QuestoesPorRevisao: p.QuestoesPorRevisao,
-		LimiarFraco:        p.LimiarFraco,
+		Simulados:          string(cfg.Simulados),
+		Discursiva:         cfg.Discursiva,
 		Modos:              modos,
+		PctQuestoes:        cfg.PctQuestoes,
+		LimiarFraco:        cfg.LimiarFraco,
 	}
 }
 
@@ -234,8 +241,8 @@ func montarBalanceamento(
 	res plano.Resultado,
 	stats plano.Stats,
 ) []LinhaBalanceamento {
+	cfg = cfg.Normalizar()
 	hBloco := cfg.HorasDia / 2
-	perfil := cfg.Perfil.Normalizar()
 	out := make([]LinhaBalanceamento, 0, len(c.Disciplinas))
 
 	for i, d := range c.Disciplinas {
@@ -265,7 +272,7 @@ func montarBalanceamento(
 			Questoes:       cfg.Questoes[d.Codigo],
 			QuestoesEdital: d.QuestoesPadrao,
 			Delta:          cfg.Questoes[d.Codigo] - d.QuestoesPadrao,
-			Modo:           string(perfil.ModoDe(d.Codigo)),
+			Modo:           string(cfg.ModoDe(d.Codigo)),
 			Peso:           d.Peso,
 			Pontos:         res.Pontos[d.Codigo],
 			PctIdeal:       round1(pctIdeal),
@@ -501,13 +508,13 @@ func distribuirRevisoes(
 }
 
 func revisoesDoDia(rs []plano.Revisao, cfg plano.Config, agora time.Time) []RevisaoResposta {
-	perfil := cfg.Perfil.Normalizar()
+	cfg = cfg.Normalizar()
 	out := make([]RevisaoResposta, 0, len(rs))
 
 	for _, r := range rs {
 		intervalo := 0
-		if r.Etapa < len(perfil.Intervalos) {
-			intervalo = perfil.Intervalos[r.Etapa]
+		if r.Etapa < len(cfg.Intervalos) {
+			intervalo = cfg.Intervalos[r.Etapa]
 		}
 
 		atraso := plano.DiffDays(plano.DayOf(r.VenceEm), agora)
@@ -523,21 +530,9 @@ func revisoesDoDia(rs []plano.Revisao, cfg plano.Config, agora time.Time) []Revi
 			Intervalo:  intervalo,
 			VenceEm:    r.VenceEm.Format(isoDate),
 			Atraso:     atraso,
-			Questoes:   perfil.QuestoesPorRevisao,
+			Questoes:   cfg.QuestoesPorRevisao,
 		})
 	}
 
 	return out
-}
-
-// minutosPorBloco is what one normal (reforço 1) study block lasts, rounded to
-// five minutes — the number the profile screen shows next to blocos por dia.
-func minutosPorBloco(horasDia float64, p plano.Perfil) int {
-	if p.BlocosPorDia <= 0 {
-		return 0
-	}
-
-	m := horasDia * 60 * (1 - p.PctRevisao) / float64(p.BlocosPorDia)
-
-	return int(math.Round(m/5)) * 5
 }

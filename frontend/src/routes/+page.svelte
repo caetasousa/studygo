@@ -46,8 +46,16 @@
 			<div class="card">
 				{#if diaAtual}
 					{@const cor = diaAtual.itens.length ? disc[diaAtual.itens[0].disciplina]?.cor ?? 0 : null}
+					{@const ehRev = diaAtual.tipo === 'rev'}
 					<div class="card-top">
-						<span class="pill" style={cor !== null ? `background:var(--c${cor}-tx)` : ''}>
+						<span
+							class="pill"
+							style={ehRev
+								? 'background:var(--warn)'
+								: cor !== null
+									? `background:var(--c${cor}-tx)`
+									: ''}
+						>
 							{ehHoje ? 'Dia ' : 'Próximo · dia '}{String(diaAtual.n).padStart(3, '0')}
 						</span>
 						<span>
@@ -58,8 +66,13 @@
 					</div>
 					<div class="card-body">
 						{#if diaAtual.itens.length === 0}
-							<div class="disc-label" style="color:var(--accent)">{rotulo(diaAtual.tipo)}</div>
+							<div class="disc-label" style="color:{ehRev ? 'var(--warn)' : 'var(--accent)'}">
+								{rotulo(diaAtual.tipo)}
+							</div>
 							<h2 class="tema-grande">{diaAtual.tema}</h2>
+							{#if ehRev && diaAtual.meta > 0}
+								<p class="rev-meta">Meta do dia: <b>{diaAtual.meta} questões</b></p>
+							{/if}
 						{:else}
 							{#each diaAtual.itens as it, i (i)}
 								<div class="disc-label" style="color:var(--c{disc[it.disciplina]?.cor ?? 0}-tx)">
@@ -164,5 +177,13 @@
 <style>
 	.tec-link {
 		margin: -4px 0 14px;
+	}
+	.rev-meta {
+		margin: -6px 0 12px;
+		font-size: 13px;
+		color: var(--text-muted);
+	}
+	.rev-meta b {
+		color: var(--warn);
 	}
 </style>

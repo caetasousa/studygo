@@ -388,7 +388,7 @@ func (s *PlanoService) ImportarTEC(
 		return PreviewTEC{}, err
 	}
 
-	limiar := salvo.Config.Perfil.Normalizar().LimiarFraco
+	limiar := salvo.Config.Normalizar().LimiarFraco
 
 	for _, cas := range prev.Casados {
 		if cas.Pct >= limiar {
