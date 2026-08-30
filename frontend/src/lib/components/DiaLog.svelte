@@ -10,15 +10,26 @@
 
 	// One line per discipline on content days; a single "day" line on the special
 	// days (simulado, revisão, véspera), which have no disciplines to split by.
+	// Which fields a line shows depends on how that matéria is studied: a
+	// theory-only session has no questions to report, so asking for them is noise.
+	const modos = $derived(planoStore.plano?.config.modos ?? {});
+
+	// Question fields still appear on a day whose activity is questions by nature
+	// (revisão por questões, simulado), whatever the matéria's own mode says.
+	const diaDeQuestoes = $derived(dia.tipo === 'rev' || dia.tipo === 'sim');
+
 	const linhas = $derived(
 		dia.itens.length > 0
 			? dia.itens.map((it) => ({
 					codigo: it.disciplina,
 					nome: disc[it.disciplina]?.nome ?? it.disciplina,
-					cor: disc[it.disciplina]?.cor ?? 0
+					cor: disc[it.disciplina]?.cor ?? 0,
+					questoes: diaDeQuestoes || (modos[it.disciplina] ?? 'completo') !== 'teoria'
 				}))
-			: [{ codigo: '', nome: 'O dia', cor: -1 }]
+			: [{ codigo: '', nome: 'O dia', cor: -1, questoes: true }]
 	);
+
+	const algumaComQuestoes = $derived(linhas.some((l) => l.questoes));
 
 	interface Campos {
 		horas: number | null;
@@ -176,35 +187,42 @@
 						oninput={(e) => setCampo(l.codigo, 'horas', e.currentTarget.value)}
 					/>
 				</label>
-				<label class="bl-in">
-					<span>questões</span>
-					<input
-						type="number"
-						min="0"
-						step="1"
-						placeholder={linhas.length > 1 ? String(Math.round(dia.meta / linhas.length)) : String(dia.meta)}
-						value={c.questoes ?? ''}
-						oninput={(e) => setCampo(l.codigo, 'questoes', e.currentTarget.value)}
-					/>
-				</label>
-				<label class="bl-in">
-					<span>acertos</span>
-					<input
-						type="number"
-						min="0"
-						step="1"
-						placeholder="0"
-						value={c.acertos ?? ''}
-						oninput={(e) => setCampo(l.codigo, 'acertos', e.currentTarget.value)}
-					/>
-				</label>
-				<span class="bl-err" class:vazio={err === null}>
-					{#if err !== null}
-						<b>{err}</b> {err === 1 ? 'erro' : 'erros'}
-					{:else}
-						—
-					{/if}
-				</span>
+				{#if l.questoes}
+					<label class="bl-in">
+						<span>questões</span>
+						<input
+							type="number"
+							min="0"
+							step="1"
+							placeholder={linhas.length > 1
+								? String(Math.round(dia.meta / linhas.length))
+								: String(dia.meta)}
+							value={c.questoes ?? ''}
+							oninput={(e) => setCampo(l.codigo, 'questoes', e.currentTarget.value)}
+						/>
+					</label>
+					<label class="bl-in">
+						<span>acertos</span>
+						<input
+							type="number"
+							min="0"
+							step="1"
+							placeholder="0"
+							max={c.questoes ?? undefined}
+							value={c.acertos ?? ''}
+							oninput={(e) => setCampo(l.codigo, 'acertos', e.currentTarget.value)}
+						/>
+					</label>
+					<span class="bl-err" class:vazio={err === null}>
+						{#if err !== null}
+							<b>{err}</b> {err === 1 ? 'erro' : 'erros'}
+						{:else}
+							—
+						{/if}
+					</span>
+				{:else}
+					<span class="bl-so-teoria">só teoria</span>
+				{/if}
 			</div>
 		{/each}
 
@@ -212,11 +230,14 @@
 			<div class="bl total">
 				<span class="bl-nome">Total do dia</span>
 				<span class="bl-v">{horasTotal ?? '—'}<i>h</i></span>
-				<span class="bl-v">{questoesTotal ?? '—'}<i>q</i></span>
-				<span class="bl-v">{acertosTotal ?? '—'}<i>✓</i></span>
-				<span class="bl-err" class:vazio={errosTotal === null}>
-					{#if errosTotal !== null}<b>{errosTotal}</b> {errosTotal === 1 ? 'erro' : 'erros'}{:else}—{/if}
-				</span>
+				{#if algumaComQuestoes}
+					<span class="bl-v">{questoesTotal ?? '—'}<i>q</i></span>
+					<span class="bl-v">{acertosTotal ?? '—'}<i>✓</i></span>
+					<span class="bl-err" class:vazio={errosTotal === null}>
+						{#if errosTotal !== null}<b>{errosTotal}</b>
+							{errosTotal === 1 ? 'erro' : 'erros'}{:else}—{/if}
+					</span>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -236,9 +257,10 @@
 		class="resumo"
 		class:filled={resumo !== ''}
 		aria-expanded={aberto}
+		title={resumo ? 'Editar o que você estudou neste dia' : 'Registrar o que você estudou neste dia'}
 		onclick={() => (aberto = !aberto)}
 	>
-		{resumo || 'lançar'}
+		{resumo || 'registrar'}
 	</button>
 	<input
 		type="checkbox"
@@ -250,7 +272,7 @@
 	{#if aberto}
 		<div class="painel-row">{@render painel()}</div>
 	{/if}
-	<span class="note-row">
+	<span class="note-row" class:tem-nota={nota !== '' || aberto}>
 		<input
 			type="text"
 			placeholder="Anotação: dúvidas, questões erradas, o que revisar…"
@@ -261,6 +283,30 @@
 {/if}
 
 <style>
+	/* The note lives under the day's controls: hidden until the day carries one or
+	   the panel is open, so an empty schedule is not a wall of empty inputs.
+	   This used to be driven by the page's `.row` wrapper, which no longer exists —
+	   the reveal belongs to the component that owns the input. */
+	.note-row {
+		display: none;
+		flex-basis: 100%;
+		padding-top: 4px;
+	}
+	.note-row.tem-nota,
+	.note-row:focus-within {
+		display: block;
+	}
+	.note-row input {
+		width: 100%;
+		background: transparent;
+		border: 0;
+		border-bottom: 1px dotted var(--border-strong);
+		border-radius: 0;
+		font-family: var(--font-ui);
+		font-size: 12.5px;
+		color: var(--text-muted);
+		padding: 3px 2px;
+	}
 	.blocos {
 		display: flex;
 		flex-direction: column;
@@ -306,6 +352,13 @@
 		text-align: right;
 		padding-bottom: 6px;
 		white-space: nowrap;
+	}
+	.bl-so-teoria {
+		grid-column: span 3;
+		font-size: 11px;
+		color: var(--text-faint);
+		font-style: italic;
+		align-self: center;
 	}
 	.bl-err b {
 		font-family: var(--font-mono);
@@ -354,18 +407,19 @@
 		cursor: pointer;
 	}
 
+	/* "Registrar" is the main action of a day, so it looks like a button instead
+	   of faint monospaced text that reads as a label. */
 	.resumo {
-		grid-area: res;
-		grid-column: 3 / 5;
-		grid-row: 1;
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		text-align: right;
-		padding: 5px 7px;
+		font-family: inherit;
+		font-size: 12.5px;
+		font-weight: 500;
+		text-align: center;
+		padding: 6px 12px;
+		min-height: 32px;
 		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 5px;
-		color: var(--text-faint);
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		color: var(--text-muted);
 		cursor: pointer;
 		white-space: nowrap;
 		overflow: hidden;
@@ -381,23 +435,11 @@
 		color: var(--good);
 		font-weight: 600;
 	}
+	/* The day is a flex block now, so the log panel simply takes the full width
+	   under the activities instead of being placed into a grid area. */
 	.painel-row {
-		grid-area: painel;
-		grid-column: 1 / -1;
+		width: 100%;
 		padding: 8px 0 4px;
-	}
-
-	/* Abaixo de 900px a .row vira grid-template-areas (app.css) — as posições
-	   explícitas de coluna do desktop precisam sair do caminho. */
-	@media (max-width: 900px) {
-		.resumo {
-			grid-column: auto;
-			grid-row: auto;
-			text-align: left;
-		}
-		.painel-row {
-			grid-column: auto;
-		}
 	}
 
 	@media (max-width: 720px) {

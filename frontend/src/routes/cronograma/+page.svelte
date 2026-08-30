@@ -1,13 +1,12 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
-	import DiaLog from '$lib/components/DiaLog.svelte';
-	import TemaTexto from '$lib/components/TemaTexto.svelte';
+	import PanoramaPlano from '$lib/components/PanoramaPlano.svelte';
+	import DiaCard from '$lib/components/DiaCard.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import { fc, hojeISO, diffDays, nf1, rotulo, tagStyle, weekdayShort } from '$lib/format';
+	import { fc, nf1 } from '$lib/format';
 	import type { Dia } from '$lib/types';
 
 	const plano = $derived(planoStore.plano);
-	const disc = $derived(planoStore.discIndex);
 
 	interface Semana {
 		numero: number;
@@ -57,6 +56,51 @@
 
 	let arrastando = $state<string | null>(null);
 
+	// --- individual activity moves ---
+	let arrastandoAtv = $state<string | null>(null);
+	let ultimoMovimento = $state<{ id: string; data: string; posicao: number } | null>(null);
+	let aviso = $state<string | null>(null);
+
+	// Days that can receive an activity: the ones the engine filled with content.
+	const datasDisponiveis = $derived(
+		(plano?.dias ?? []).filter((d) => d.itens.length > 0).map((d) => d.data)
+	);
+
+	function posicaoAtual(id: string): { data: string; posicao: number } | null {
+		for (const d of plano?.dias ?? []) {
+			const i = d.itens.findIndex((x) => x.id === id);
+			if (i >= 0) return { data: d.data, posicao: i };
+		}
+		return null;
+	}
+
+	async function mover(id: string, data: string, posicao: number) {
+		const antes = posicaoAtual(id);
+		const ok = await planoStore.moverAtividade(id, data, posicao);
+		if (ok && antes) {
+			ultimoMovimento = { id, ...antes };
+			aviso = 'Atividade movida.';
+		} else if (!ok) {
+			// planoStore.erro already carries the reason; the plan itself is untouched.
+			aviso = null;
+		}
+	}
+
+	async function desfazer() {
+		if (!ultimoMovimento) return;
+		const { id, data, posicao } = ultimoMovimento;
+		ultimoMovimento = null;
+		aviso = null;
+		await planoStore.moverAtividade(id, data, posicao);
+	}
+
+	function soltarAtv(data: string, posicao: number) {
+		if (!arrastandoAtv) return;
+		const id = arrastandoAtv;
+		arrastandoAtv = null;
+		void mover(id, data, posicao);
+	}
+
 	function onDrop(destino: Dia) {
 		if (arrastando && arrastando !== destino.data && diaMovivel(destino)) {
 			void planoStore.reordenar(arrastando, destino.data);
@@ -72,115 +116,158 @@
 />
 
 {#if plano}
+	<PanoramaPlano {plano} />
+
 	<div class="page">
-		{#each semanas as s (s.numero)}
-			{#if s.mostrarFlag}
-				<div
-					class="phase-flag"
-					style="background:{s.fase === 'reta' ? 'var(--danger)' : 'var(--good)'}"
+		{#if aviso || planoStore.erro}
+			<div class="mov-aviso" role="status" aria-live="polite">
+				<span>{planoStore.erro ?? aviso}</span>
+				{#if ultimoMovimento && !planoStore.erro}
+					<button type="button" class="btn" onclick={desfazer}>Desfazer</button>
+				{/if}
+				<button
+					type="button"
+					class="btn"
+					onclick={() => {
+						aviso = null;
+						planoStore.erro = null;
+					}}>Dispensar</button
 				>
-					{s.fase === 'reta'
-						? 'Reta final — sem conteúdo novo: revisão dirigida, discursiva e simulados'
-						: 'Ciclo de conteúdo — primeira passada no edital, com revisão semanal'}
-				</div>
-			{/if}
+			</div>
+		{/if}
+
+		{#each semanas as s (s.numero)}
 			{@const saldo = saldoSemana(s)}
-			<div class="week">
-				<div class="week-head">
-					<h3>Semana {String(s.numero).padStart(2, '0')}</h3>
+			<section class="semana">
+				<!-- The week's own header. The phase used to need a separate full-width
+				     banner above the card; it is a chip on this line now. -->
+				<header class="sem-head">
+					<h2>Semana {String(s.numero).padStart(2, '0')}</h2>
 					<span class="per">
-						{fc(s.dias[0].data)} – {fc(s.dias.at(-1)!.data)} · faltam
-						{diffDays(s.dias[0].data, plano.config.prova)} dias
+						{fc(s.dias[0].data)} – {fc(s.dias.at(-1)!.data)}
 					</span>
-					<span class="week-bal">
+					{#if s.mostrarFlag}
+						<span class="fase" class:reta={s.fase === 'reta'}>
+							{s.fase === 'reta' ? 'Reta final' : 'Ciclo de conteúdo'}
+						</span>
+					{/if}
+					<span class="sem-bal">
 						<span class="mini-bar"
-							><i style="width:{saldo.alvo ? Math.min(100, (saldo.h / saldo.alvo) * 100) : 0}%"></i></span
+							><i style="width:{saldo.alvo ? Math.min(100, (saldo.h / saldo.alvo) * 100) : 0}%"
+							></i></span
 						>
 						<span>{nf1.format(saldo.h)} / {nf1.format(saldo.alvo)} h</span>
 					</span>
+				</header>
+
+				{#if s.mostrarFlag && s.fase === 'reta'}
+					<p class="fase-nota">
+						Sem conteúdo novo: revisão dirigida, discursiva e simulados até a prova.
+					</p>
+				{/if}
+
+				<div class="dias">
+					{#each s.dias as d (d.data)}
+						<DiaCard
+							dia={d}
+							movivel={diaMovivel(d)}
+							{datasDisponiveis}
+							temAnterior={!!vizinho(d, -1)}
+							temProximo={!!vizinho(d, 1)}
+							arrastandoDia={arrastando}
+							onMover={mover}
+							onTrocar={(dir) => trocar(d, dir)}
+							onArrastarDia={() => (arrastando = d.data)}
+							onLargarDia={() => (arrastando = null)}
+							onSoltarDia={() => onDrop(d)}
+							onArrastarAtv={(id) => (arrastandoAtv = id)}
+							onSoltarAtv={(pos) => soltarAtv(d.data, pos)}
+						/>
+					{/each}
 				</div>
-
-				{#each s.dias as d (d.data)}
-					{@const movivel = diaMovivel(d)}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div
-						class="row"
-						class:today={d.data === hojeISO()}
-						class:done={d.registro?.concluido}
-						class:esp-rev={d.itens.length === 0 && d.tipo !== 'rev'}
-						class:rev-day={d.tipo === 'rev'}
-						class:has-note={!!d.registro?.nota}
-						class:drag-over={arrastando && arrastando !== d.data && movivel}
-						ondragover={(e) => movivel && e.preventDefault()}
-						ondrop={(e) => {
-							e.preventDefault();
-							onDrop(d);
-						}}
-					>
-						<span class="nday">
-							<b>{String(d.n).padStart(3, '0')}</b>{weekdayShort(d.data)}
-							{fc(d.data)}
-							{#if d.reordenado}<span class="reord" title="Reorganizado manualmente">•</span>{/if}
-						</span>
-
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<span
-							class="items"
-							draggable={movivel}
-							ondragstart={() => (arrastando = d.data)}
-							ondragend={() => (arrastando = null)}
-						>
-							{#if d.itens.length === 0}
-								<span class="item">
-									<span
-										class="tag"
-										style={d.tipo === 'rev'
-											? 'background:var(--warn-soft);color:var(--warn)'
-											: 'background:var(--bg-hover);color:var(--accent)'}>{rotulo(d.tipo)}</span
-									>
-									<span class="tema-txt">
-										<TemaTexto tema={d.tema} />{#if d.tipo === 'rev' && d.meta > 0}<em
-												>{d.meta} questões</em
-											>{/if}
-									</span>
-								</span>
-							{:else}
-								{#each d.itens as it, i (i)}
-									<span class="item">
-										<span class="tag" style={tagStyle(disc[it.disciplina]?.cor ?? 0)}>{it.disciplina}</span>
-										<span class="tema-txt"
-											><TemaTexto tema={it.tema} />{#if it.passada === 2}<em>2ª passada</em>{/if}</span
-										>
-									</span>
-								{/each}
-							{/if}
-						</span>
-
-						<DiaLog dia={d} variant="row" />
-
-						{#if movivel}
-							<span class="row-move">
-								<button
-									class="mv-btn"
-									disabled={!vizinho(d, -1)}
-									title="Antecipar"
-									aria-label="Antecipar matéria"
-									onclick={() => trocar(d, -1)}>◀</button
-								>
-								<button
-									class="mv-btn"
-									disabled={!vizinho(d, 1)}
-									title="Adiar"
-									aria-label="Adiar matéria"
-									onclick={() => trocar(d, 1)}>▶</button
-								>
-							</span>
-						{:else}
-							<span class="row-move"></span>
-						{/if}
-					</div>
-				{/each}
-			</div>
+			</section>
 		{/each}
 	</div>
 {/if}
+
+<style>
+	.semana + .semana {
+		margin-top: 26px;
+	}
+	.sem-head {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin-bottom: 12px;
+	}
+	.sem-head h2 {
+		margin: 0;
+		font-size: 19px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+	}
+	.per {
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.fase {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		padding: 4px 9px;
+		border-radius: 5px;
+		background: var(--good-soft);
+		color: var(--good);
+	}
+	.fase.reta {
+		background: var(--danger-soft);
+		color: var(--danger);
+	}
+	.fase-nota {
+		margin: -4px 0 12px;
+		font-size: 13px;
+		color: var(--text-muted);
+	}
+	.sem-bal {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		/* the hour readout should not jitter as it updates */
+		font-family: var(--font-mono);
+		font-size: 12px;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.mini-bar {
+		width: 90px;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-hover);
+		overflow: hidden;
+		display: block;
+	}
+	.mini-bar i {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+		width: 0;
+	}
+	.dias {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	@media (max-width: 620px) {
+		.sem-bal {
+			margin-left: 0;
+			width: 100%;
+		}
+	}
+</style>

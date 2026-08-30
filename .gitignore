@@ -15,3 +15,6 @@ design-directions/
 
 # Per-machine MCP server config
 .mcp.json
+
+# local design scratch (canvas artboards)
+.design-cronograma/
