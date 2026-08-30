@@ -27,11 +27,15 @@ type ConcursoInput struct {
 }
 
 type DisciplinaInput struct {
-	Nome     string       `json:"nome"`
-	Bloco    string       `json:"bloco"` // "esp" | "ger"
-	Questoes int          `json:"questoes"`
-	Temas    []string     `json:"temas"`
-	Fontes   []FonteInput `json:"fontes"`
+	Nome     string `json:"nome"`
+	Bloco    string `json:"bloco"` // "esp" | "ger"
+	Questoes int    `json:"questoes"`
+	// Peso is the points a question of this discipline is worth. 0 means "use
+	// the block default" (1 for ger, 2 for esp) — preserved for manual
+	// registration. A positive value from the user overrides it.
+	Peso   int          `json:"peso"`
+	Temas  []string     `json:"temas"`
+	Fontes []FonteInput `json:"fontes"`
 }
 
 type FonteInput struct {
@@ -70,37 +74,78 @@ type ConcursoDetalhe struct {
 
 // ---- edital import wizard (POST /api/editais/*) ----
 
-// CargosResposta — step 1. The client keeps `texto` and passes it back on the
-// next steps.
-type CargosResposta struct {
-	Texto      string       `json:"texto"`
-	ArquivoURI string       `json:"arquivoUri"`
-	MIME       string       `json:"mime"`
-	Banca      string       `json:"banca"`
-	Cargos     []CargoOpcao `json:"cargos"`
+// EditalAlertaResposta is a review flag from the edital processor.
+type EditalAlertaResposta struct {
+	Codigo    string `json:"codigo"`
+	Gravidade string `json:"gravidade"` // "info" | "warning" | "blocker"
+	Mensagem  string `json:"mensagem"`
+	Campo     string `json:"campo,omitempty"`
+}
+
+// AnaliseResposta — step 1. The client keeps `documentoId` and passes it back on
+// the next steps.
+type AnaliseResposta struct {
+	DocumentoID  string                 `json:"documentoId"`
+	Banca        string                 `json:"banca"`
+	TotalPaginas int                    `json:"totalPaginas"`
+	PaginasOCR   int                    `json:"paginasOcr"`
+	Cargos       []CargoOpcao           `json:"cargos"`
+	Alertas      []EditalAlertaResposta `json:"alertas"`
 }
 
 type CargoOpcao struct {
-	Codigo       string `json:"codigo"`
-	Nome         string `json:"nome"`
-	Escolaridade string `json:"escolaridade"`
-	Vagas        int    `json:"vagas"`
+	Codigo        string `json:"codigo"`
+	Nome          string `json:"nome"`
+	Especialidade string `json:"especialidade,omitempty"`
+	Escolaridade  string `json:"escolaridade,omitempty"`
+	// Vagas is null when the edital did not state a number.
+	Vagas *int `json:"vagas"`
 }
 
-// EstruturaResposta — step 2, the disciplines + schedule for the chosen cargo.
+// EstruturaResposta — step 2: the groups and disciplines for the chosen cargo.
+// Question counts the edital did not break down are null; the wizard makes the
+// user fill an estimate or ratear explicitly before saving.
 type EstruturaResposta struct {
-	Nome            string            `json:"nome"`
-	Prova           string            `json:"prova"`
-	ProvaDiscursiva bool              `json:"provaDiscursiva"`
-	Gerais          []DisciplinaInput `json:"gerais"`
-	Especificas     []DisciplinaInput `json:"especificas"`
-	Marcos          []MarcoInput      `json:"marcos"`
-	Avisos          []string          `json:"avisos"`
+	Nome        string                 `json:"nome"`
+	Prova       string                 `json:"prova"`
+	Gerais      []GrupoResposta        `json:"gerais"`
+	Especificas []GrupoResposta        `json:"especificas"`
+	Discursivas []DiscursivaResposta   `json:"discursivas"`
+	Duracao     *DuracaoResposta       `json:"duracao"`
+	Marcos      []MarcoInput           `json:"marcos"`
+	Alertas     []EditalAlertaResposta `json:"alertas"`
+}
+
+type GrupoResposta struct {
+	Kind        string               `json:"kind"` // "ger" | "esp" | "outro"
+	Rotulo      string               `json:"rotulo"`
+	Total       *int                 `json:"total"`
+	Peso        *float64             `json:"peso"`
+	PesoEscopo  string               `json:"pesoEscopo,omitempty"`
+	Disciplinas []DisciplinaExtraida `json:"disciplinas"`
+}
+
+type DisciplinaExtraida struct {
+	Nome     string   `json:"nome"`
+	Questoes *int     `json:"questoes"` // null unless the edital broke it down
+	Peso     *float64 `json:"peso"`     // null unless stated per discipline
+}
+
+type DiscursivaResposta struct {
+	Modalidade string `json:"modalidade"` // "redacao" | "estudo_de_caso" | "outro"
+	Rotulo     string `json:"rotulo"`
+	Questoes   *int   `json:"questoes"`
+}
+
+type DuracaoResposta struct {
+	Minutos int    `json:"minutos"`
+	Escopo  string `json:"escopo"` // "exam_set" | "single_prova" | "unknown"
 }
 
 // ConteudoEditalResposta — step 3, the syllabus topics per discipline.
 type ConteudoEditalResposta struct {
-	Itens []ConteudoEditalDisc `json:"itens"`
+	Itens   []ConteudoEditalDisc   `json:"itens"`
+	Alertas []EditalAlertaResposta `json:"alertas"`
 }
 
 type ConteudoEditalDisc struct {
@@ -108,81 +153,97 @@ type ConteudoEditalDisc struct {
 	Temas []string `json:"temas"`
 }
 
-func cargosParaResposta(c port.EditalCargos) CargosResposta {
-	out := CargosResposta{
-		Texto:      c.Texto,
-		ArquivoURI: c.ArquivoURI,
-		MIME:       c.MIME,
-		Banca:      strings.TrimSpace(c.Banca),
-		Cargos:     []CargoOpcao{},
+func editalAlertasParaResposta(in []port.EditalAlerta) []EditalAlertaResposta {
+	out := make([]EditalAlertaResposta, 0, len(in))
+	for _, a := range in {
+		out = append(out, EditalAlertaResposta{
+			Codigo:    a.Codigo,
+			Gravidade: a.Gravidade,
+			Mensagem:  a.Mensagem,
+			Campo:     a.Campo,
+		})
 	}
-	for _, cg := range c.Cargos {
+	return out
+}
+
+func analiseParaResposta(a port.EditalAnalise) AnaliseResposta {
+	out := AnaliseResposta{
+		DocumentoID:  a.DocumentoID,
+		Banca:        strings.TrimSpace(a.Banca),
+		TotalPaginas: a.TotalPaginas,
+		PaginasOCR:   a.PaginasOCR,
+		Cargos:       []CargoOpcao{},
+		Alertas:      editalAlertasParaResposta(a.Alertas),
+	}
+
+	for _, cg := range a.Cargos {
 		out.Cargos = append(out.Cargos, CargoOpcao{
-			Codigo:       cg.Codigo,
-			Nome:         cg.Nome,
-			Escolaridade: cg.Escolaridade,
-			Vagas:        cg.Vagas,
+			Codigo:        cg.Codigo,
+			Nome:          cg.Nome,
+			Especialidade: cg.Especialidade,
+			Escolaridade:  cg.Escolaridade,
+			Vagas:         cg.Vagas,
 		})
 	}
 
 	return out
 }
 
+func gruposParaResposta(in []port.EditalGrupo) []GrupoResposta {
+	out := make([]GrupoResposta, 0, len(in))
+	for _, g := range in {
+		discs := make([]DisciplinaExtraida, 0, len(g.Disciplinas))
+		for _, d := range g.Disciplinas {
+			discs = append(discs, DisciplinaExtraida{
+				Nome:     strings.TrimSpace(d.Nome),
+				Questoes: d.Questoes,
+				Peso:     d.Peso,
+			})
+		}
+		out = append(out, GrupoResposta{
+			Kind:        g.Kind,
+			Rotulo:      strings.TrimSpace(g.Rotulo),
+			Total:       g.Total,
+			Peso:        g.Peso,
+			PesoEscopo:  g.PesoEscopo,
+			Disciplinas: discs,
+		})
+	}
+	return out
+}
+
 func estruturaParaResposta(e port.EditalEstrutura) EstruturaResposta {
 	out := EstruturaResposta{
-		Nome:            strings.TrimSpace(e.Nome),
-		Prova:           strings.TrimSpace(e.Prova),
-		ProvaDiscursiva: e.ProvaDiscursiva,
-		Gerais:          discParaInput(e.Gerais, "ger"),
-		Especificas:     discParaInput(e.Especificas, "esp"),
-		Marcos:          []MarcoInput{},
-		Avisos:          []string{},
+		Nome:        strings.TrimSpace(e.NomeSugerido),
+		Prova:       strings.TrimSpace(e.DataProva),
+		Gerais:      gruposParaResposta(e.GruposGerais),
+		Especificas: gruposParaResposta(e.GruposEspecificos),
+		Discursivas: []DiscursivaResposta{},
+		Marcos:      []MarcoInput{},
+		Alertas:     editalAlertasParaResposta(e.Alertas),
 	}
 
-	if out.Prova == "" {
-		out.Avisos = append(out.Avisos, "o edital não trazia data de prova definida — preencha antes de salvar")
-	}
-	if len(out.Gerais) == 0 && len(out.Especificas) == 0 {
-		out.Avisos = append(out.Avisos, "não consegui identificar as disciplinas — ajuste manualmente")
+	for _, d := range e.Discursivas {
+		out.Discursivas = append(out.Discursivas, DiscursivaResposta{
+			Modalidade: d.Modalidade,
+			Rotulo:     strings.TrimSpace(d.Rotulo),
+			Questoes:   d.Questoes,
+		})
 	}
 
-	distGer := distribuirBloco(out.Gerais, "ger", e.TotalGerais)
-	distEsp := distribuirBloco(out.Especificas, "esp", e.TotalEspecificas)
-
-	if distGer || distEsp {
-		out.Avisos = append(out.Avisos,
-			"o edital só informou o total de questões por bloco — distribuí igualmente entre as disciplinas; ajuste se souber a divisão")
+	if e.Duracao != nil {
+		out.Duracao = &DuracaoResposta{Minutos: e.Duracao.Minutos, Escopo: e.Duracao.Escopo}
 	}
 
 	for _, m := range e.Marcos {
 		if strings.TrimSpace(m.Data) == "" {
 			continue
 		}
-
 		out.Marcos = append(out.Marcos, MarcoInput{
 			Data:      strings.TrimSpace(m.Data),
 			DataFim:   strings.TrimSpace(m.DataFim),
 			Titulo:    strings.TrimSpace(m.Titulo),
 			ExigeAcao: m.ExigeAcao,
-		})
-	}
-
-	return out
-}
-
-func discParaInput(ds []port.EditalDisciplina, bloco string) []DisciplinaInput {
-	out := make([]DisciplinaInput, 0, len(ds))
-	for _, d := range ds {
-		if strings.TrimSpace(d.Nome) == "" {
-			continue
-		}
-
-		out = append(out, DisciplinaInput{
-			Nome:     strings.TrimSpace(d.Nome),
-			Bloco:    bloco,
-			Questoes: maxZero(d.Questoes),
-			Temas:    []string{},
-			Fontes:   []FonteInput{},
 		})
 	}
 
@@ -218,6 +279,7 @@ func detalheDe(c concurso.Concurso) ConcursoDetalhe {
 			Nome:     d.Nome,
 			Bloco:    string(d.Bloco),
 			Questoes: d.QuestoesPadrao,
+			Peso:     d.Peso,
 			Temas:    append([]string{}, d.Temas...),
 			Fontes:   []FonteInput{},
 		}
@@ -277,10 +339,15 @@ func concursoFromInput(in ConcursoInput) (concurso.Concurso, []string) {
 			bloco = concurso.BlocoEspecifico
 		}
 
+		peso := concurso.Peso[bloco]
+		if di.Peso > 0 {
+			peso = di.Peso
+		}
+
 		d := concurso.Disciplina{
 			Nome:           strings.TrimSpace(di.Nome),
 			Bloco:          bloco,
-			Peso:           concurso.Peso[bloco],
+			Peso:           peso,
 			QuestoesPadrao: maxZero(di.Questoes),
 			Temas:          limparLinhas(di.Temas),
 			Fontes:         []concurso.Fonte{},
@@ -339,42 +406,6 @@ func concursoFromInput(in ConcursoInput) (concurso.Concurso, []string) {
 	}
 
 	return c, avisos
-}
-
-// distribuirBloco spreads `total` questions across every discipline of `bloco`
-// that currently has 0, largest-remainder style. It only acts when the whole
-// block is unset. Returns whether it changed anything.
-func distribuirBloco(discs []DisciplinaInput, bloco string, total int) bool {
-	if total <= 0 {
-		return false
-	}
-
-	idx := []int{}
-	for i, d := range discs {
-		if d.Bloco != bloco {
-			continue
-		}
-		if d.Questoes > 0 {
-			return false // the edital did break this block down — leave it
-		}
-		idx = append(idx, i)
-	}
-
-	if len(idx) == 0 {
-		return false
-	}
-
-	base := total / len(idx)
-	resto := total % len(idx)
-
-	for n, i := range idx {
-		discs[i].Questoes = base
-		if n < resto {
-			discs[i].Questoes++
-		}
-	}
-
-	return true
 }
 
 func limparLinhas(xs []string) []string {

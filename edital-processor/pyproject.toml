@@ -1,0 +1,78 @@
+[project]
+name = "edital-processor"
+version = "0.1.0"
+description = "annyGo internal service: turns a concurso edital PDF into a reviewable structured preview"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.4",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "python-multipart==0.0.32",
+    "pymupdf==1.28.2",
+    "pdfplumber==0.11.10",
+    "pillow==12.3.0",
+    "pytesseract==0.3.13",
+    "google-genai==2.20.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "httpx==0.28.1",
+    "ruff==0.16.5",
+    "mypy==2.3.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "PTH", "RUF"]
+# N818: our typed errors are a closed family with a common base; the "Error"
+# suffix on every one adds noise without adding clarity.
+# B008: Depends(...) in a parameter default is the documented FastAPI idiom.
+ignore = ["N818", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["N806"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pdfplumber.*", "pytesseract.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# PyMuPDF ships type hints but they are incomplete: nearly every method comes
+# back as untyped, so strict mode's no-untyped-call fires on ordinary use.
+# Scope the relaxation to the two modules that touch it directly.
+module = ["app.services.extraction", "app.services.validation", "app.services.ocr"]
+disallow_untyped_calls = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: local integration tests (real Tesseract, PDF fixtures)",
+    "gemini: hits the real Gemini API; runs only when GEMINI_API_KEY is set",
+    "realpdf: needs the real edital PDF at tests/fixtures/edital_real.pdf",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

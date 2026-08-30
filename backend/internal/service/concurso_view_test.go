@@ -8,95 +8,90 @@ import (
 	"annygo/internal/port"
 )
 
+func ptrInt(n int) *int { return &n }
+
+func ptrFloat(f float64) *float64 { return &f }
+
 func TestEstruturaParaResposta(t *testing.T) {
 	t.Parallel()
 
 	base := port.EditalEstrutura{
-		Nome:             "TCE-GO — Técnico de Controle Externo (TI)",
-		Prova:            "2027-01-17",
-		ProvaDiscursiva:  true,
-		TotalGerais:      25,
-		TotalEspecificas: 45,
-		Gerais: []port.EditalDisciplina{
-			{Nome: "Língua Portuguesa", Questoes: 0},
-			{Nome: "Matemática", Questoes: 0},
-			{Nome: "Legislação Institucional", Questoes: 0},
+		NomeSugerido: "TCE-GO — Técnico de Controle Externo (TI)",
+		DataProva:    "2027-01-17",
+		GruposGerais: []port.EditalGrupo{
+			{
+				Kind:       "ger",
+				Rotulo:     "Conhecimentos Gerais",
+				Total:      ptrInt(25),
+				Peso:       ptrFloat(1),
+				PesoEscopo: "group",
+				Disciplinas: []port.EditalDisciplina{
+					{Nome: "Língua Portuguesa"},
+					{Nome: "Matemática"},
+				},
+			},
 		},
-		Especificas: []port.EditalDisciplina{
-			{Nome: "Engenharia de Software", Questoes: 0},
-			{Nome: "Banco de Dados", Questoes: 0},
+		GruposEspecificos: []port.EditalGrupo{
+			{
+				Kind:   "esp",
+				Rotulo: "Conhecimentos Específicos",
+				Total:  ptrInt(45),
+				Peso:   ptrFloat(2),
+				Disciplinas: []port.EditalDisciplina{
+					{Nome: "Engenharia de Software", Questoes: ptrInt(10)},
+				},
+			},
 		},
+		Discursivas: []port.EditalDiscursiva{
+			{Modalidade: "estudo_de_caso", Rotulo: "Estudo de Caso", Questoes: ptrInt(1)},
+		},
+		Duracao: &port.EditalDuracao{Minutos: 270, Escopo: "exam_set"},
 		Marcos: []port.EditalMarco{
 			{Data: "2026-10-05", DataFim: "2026-11-06", Titulo: "Inscrições", ExigeAcao: true},
 			{Data: "", Titulo: "lixo sem data"},
 		},
+		Alertas: []port.EditalAlerta{
+			{Codigo: "questions_not_broken_down", Gravidade: "blocker", Mensagem: "informe a estimativa"},
+		},
 	}
 
-	t.Run("blocos rotulados e total distribuído", func(t *testing.T) {
+	t.Run("mapeia grupos, duração e alertas — sem inventar questões", func(t *testing.T) {
 		t.Parallel()
 
 		got := estruturaParaResposta(base)
 
-		if got.Prova != "2027-01-17" || !got.ProvaDiscursiva {
+		if got.Prova != "2027-01-17" || got.Nome == "" {
 			t.Errorf("cabeçalho: %+v", got)
 		}
-		for _, d := range got.Gerais {
-			if d.Bloco != "ger" {
-				t.Errorf("disciplina geral com bloco %q", d.Bloco)
+		if len(got.Gerais) != 1 || got.Gerais[0].Kind != "ger" {
+			t.Fatalf("grupos gerais: %+v", got.Gerais)
+		}
+		if got.Gerais[0].Total == nil || *got.Gerais[0].Total != 25 {
+			t.Errorf("total geral: %+v", got.Gerais[0].Total)
+		}
+		// The edital gave only the group total — every discipline stays null.
+		for _, d := range got.Gerais[0].Disciplinas {
+			if d.Questoes != nil {
+				t.Errorf("disciplina %q recebeu questões inventadas: %v", d.Nome, *d.Questoes)
 			}
 		}
-		for _, d := range got.Especificas {
-			if d.Bloco != "esp" {
-				t.Errorf("disciplina específica com bloco %q", d.Bloco)
-			}
+		// Where the edital did break it down, the value is kept.
+		if got.Especificas[0].Disciplinas[0].Questoes == nil ||
+			*got.Especificas[0].Disciplinas[0].Questoes != 10 {
+			t.Errorf("questões específicas não preservadas: %+v", got.Especificas[0].Disciplinas[0])
 		}
 
-		ger, esp := 0, 0
-		for _, d := range got.Gerais {
-			ger += d.Questoes
+		if got.Duracao == nil || got.Duracao.Minutos != 270 || got.Duracao.Escopo != "exam_set" {
+			t.Errorf("duração: %+v", got.Duracao)
 		}
-		for _, d := range got.Especificas {
-			esp += d.Questoes
+		if len(got.Discursivas) != 1 || got.Discursivas[0].Modalidade != "estudo_de_caso" {
+			t.Errorf("discursivas: %+v", got.Discursivas)
 		}
-		if ger != 25 || esp != 45 {
-			t.Errorf("distribuição ger=%d esp=%d, quero 25/45", ger, esp)
-		}
-
 		if len(got.Marcos) != 1 {
 			t.Errorf("marco sem data deveria ter sido descartado: %+v", got.Marcos)
 		}
-		if !hasAvisoContendo(got.Avisos, "distribuí igualmente") {
-			t.Errorf("faltou aviso da distribuição: %v", got.Avisos)
-		}
-	})
-
-	t.Run("sem prova gera aviso", func(t *testing.T) {
-		t.Parallel()
-
-		e := base
-		e.Prova = ""
-
-		got := estruturaParaResposta(e)
-		if !hasAvisoContendo(got.Avisos, "data de prova") {
-			t.Errorf("avisos = %v", got.Avisos)
-		}
-	})
-
-	t.Run("não distribui bloco já preenchido", func(t *testing.T) {
-		t.Parallel()
-
-		e := port.EditalEstrutura{
-			Prova:       "2027-01-17",
-			TotalGerais: 25,
-			Gerais: []port.EditalDisciplina{
-				{Nome: "Português", Questoes: 15},
-				{Nome: "Matemática", Questoes: 0},
-			},
-		}
-
-		got := estruturaParaResposta(e)
-		if got.Gerais[1].Questoes != 0 {
-			t.Errorf("não deveria distribuir: %+v", got.Gerais)
+		if len(got.Alertas) != 1 || got.Alertas[0].Gravidade != "blocker" {
+			t.Errorf("alertas: %+v", got.Alertas)
 		}
 	})
 }
@@ -125,13 +120,31 @@ func TestConcursoFromInput(t *testing.T) {
 			t.Errorf("prova = %v", c.ProvaPadrao)
 		}
 		if c.Disciplinas[0].Peso != 2 || c.Disciplinas[1].Peso != 1 {
-			t.Errorf("pesos = %d/%d", c.Disciplinas[0].Peso, c.Disciplinas[1].Peso)
+			t.Errorf("pesos default = %d/%d, quero 2/1", c.Disciplinas[0].Peso, c.Disciplinas[1].Peso)
 		}
 		if c.Disciplinas[1].Bloco != concurso.BlocoGeral {
 			t.Errorf("bloco normalizado = %q", c.Disciplinas[1].Bloco)
 		}
 		if err := c.Validar(); err != nil {
 			t.Errorf("Validar: %v", err)
+		}
+	})
+
+	t.Run("peso do usuário sobrepõe o default do bloco", func(t *testing.T) {
+		t.Parallel()
+
+		in := base
+		in.Disciplinas = []DisciplinaInput{
+			{Nome: "Constitucional", Bloco: "esp", Questoes: 15, Peso: 3},
+			{Nome: "Português", Bloco: "ger", Questoes: 10}, // no peso -> default 1
+		}
+
+		c, _ := concursoFromInput(in)
+		if c.Disciplinas[0].Peso != 3 {
+			t.Errorf("peso do usuário = %d, quero 3", c.Disciplinas[0].Peso)
+		}
+		if c.Disciplinas[1].Peso != 1 {
+			t.Errorf("peso default = %d, quero 1", c.Disciplinas[1].Peso)
 		}
 	})
 

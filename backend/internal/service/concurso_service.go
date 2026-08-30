@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"annygo/internal/domain/concurso"
-	"annygo/internal/platform/pdftext"
 	"annygo/internal/port"
 
 	"github.com/google/uuid"
@@ -12,86 +11,69 @@ import (
 
 // ConcursoService manages the concursos a user registers.
 type ConcursoService struct {
-	repo   port.ConcursoRepository
-	edital port.EditalAnalisador
+	repo      port.ConcursoRepository
+	processor port.EditalProcessor
 }
 
-func NewConcursoService(repo port.ConcursoRepository, edital port.EditalAnalisador) *ConcursoService {
-	return &ConcursoService{repo: repo, edital: edital}
+func NewConcursoService(repo port.ConcursoRepository, processor port.EditalProcessor) *ConcursoService {
+	return &ConcursoService{repo: repo, processor: processor}
 }
 
 // ImportacaoDisponivel reports whether the edital importer is wired.
 func (s *ConcursoService) ImportacaoDisponivel() bool {
-	return s.edital != nil && s.edital.Disponivel()
+	return s.processor != nil && s.processor.Disponivel()
 }
 
-// prepararEntrada extracts a text layer from the PDF when there is one — that
-// keeps the later steps cheap and lets the client stop re-uploading the file.
-// Scanned PDFs have no text layer, so the raw bytes travel to the model instead.
-func prepararEntrada(in port.EditalEntrada) port.EditalEntrada {
-	if len(in.PDF) == 0 || in.Texto != "" {
-		return in
-	}
-
-	if txt, err := pdftext.Extrair(in.PDF); err == nil {
-		in.Texto = txt
-		in.PDF = nil
-	}
-
-	return in
-}
-
-// AnalisarEdital is wizard step 1: lists the cargos, returning the extracted
-// text when the PDF had one (the client then reuses it instead of re-uploading).
-func (s *ConcursoService) AnalisarEdital(ctx context.Context, in port.EditalEntrada) (CargosResposta, error) {
-	res, err := s.edital.Cargos(ctx, prepararEntrada(in))
+// AnalisarEdital is wizard step 1: uploads the edital to the processor and
+// returns the document handle plus the cargos. ownerRef binds the document to
+// this user for the later steps.
+func (s *ConcursoService) AnalisarEdital(
+	ctx context.Context,
+	ownerRef string,
+	up port.EditalUpload,
+) (AnaliseResposta, error) {
+	res, err := s.processor.Analisar(ctx, ownerRef, up)
 	if err != nil {
-		return CargosResposta{}, err
+		return AnaliseResposta{}, err
 	}
 
-	return cargosParaResposta(res), nil
+	return analiseParaResposta(res), nil
 }
 
-// EstruturaDoCargo is wizard step 2: the disciplines, exam date and schedule for
-// the chosen cargo, with block totals already spread across the disciplines.
-//
-// The two AI calls run sequentially, not in parallel: on the free tier two
-// simultaneous requests trip the per-minute limit and the whole step hangs on
-// retries. The disciplines come first (they are the point of the step); the
-// schedule is best-effort and its failure only drops the marcos.
+// EstruturaDoCargo is wizard step 2: the groups, disciplines, exam basics and
+// schedule for the chosen cargo. Question counts the edital did not break down
+// stay nil — nothing is invented.
 func (s *ConcursoService) EstruturaDoCargo(
 	ctx context.Context,
-	in port.EditalEntrada,
-	cargo string,
+	ownerRef, documentoID, cargo string,
 ) (EstruturaResposta, error) {
-	in = prepararEntrada(in)
-
-	est, err := s.edital.Estrutura(ctx, in, cargo)
+	est, err := s.processor.Estrutura(ctx, ownerRef, documentoID, cargo)
 	if err != nil {
 		return EstruturaResposta{}, err
-	}
-
-	if marcos, errCr := s.edital.Cronograma(ctx, in); errCr == nil {
-		est.Marcos = marcos
 	}
 
 	return estruturaParaResposta(est), nil
 }
 
 // ConteudoDoEdital is wizard step 3: the syllabus topics for the given
-// disciplines.
+// disciplines. A fresh upload is accepted (documentoID empty) so the edit
+// screen's "extract topics" flow keeps working without the wizard.
 func (s *ConcursoService) ConteudoDoEdital(
 	ctx context.Context,
-	in port.EditalEntrada,
+	ownerRef, documentoID, cargo string,
 	disciplinas []string,
+	up port.EditalUpload,
 ) (ConteudoEditalResposta, error) {
-	itens, err := s.edital.Conteudo(ctx, prepararEntrada(in), disciplinas)
+	res, err := s.processor.Conteudo(ctx, ownerRef, documentoID, cargo, disciplinas, up)
 	if err != nil {
 		return ConteudoEditalResposta{}, err
 	}
 
-	out := ConteudoEditalResposta{Itens: make([]ConteudoEditalDisc, 0, len(itens))}
-	for _, it := range itens {
+	out := ConteudoEditalResposta{
+		Itens:   make([]ConteudoEditalDisc, 0, len(res.Itens)),
+		Alertas: editalAlertasParaResposta(res.Alertas),
+	}
+	for _, it := range res.Itens {
 		out.Itens = append(out.Itens, ConteudoEditalDisc{Nome: it.Nome, Temas: it.Temas})
 	}
 

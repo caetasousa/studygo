@@ -53,7 +53,7 @@ func (h *ConcursoHandler) guardaImport(w http.ResponseWriter, r *http.Request) b
 
 	if !h.concursos.ImportacaoDisponivel() {
 		writeJSON(w, h.logger, http.StatusServiceUnavailable, map[string]string{
-			"erro": "importação por IA indisponível — configure GEMINI_API_KEY ou cadastre manualmente",
+			"erro": "importação por IA indisponível — o processador de editais não está configurado; cadastre manualmente",
 		})
 
 		return false
@@ -65,19 +65,23 @@ func (h *ConcursoHandler) guardaImport(w http.ResponseWriter, r *http.Request) b
 }
 
 // AnalisarEdital — wizard step 1. Accepts JSON {"texto": "..."} or
-// multipart/form-data with a "pdf" file; returns the cargos + normalized text.
+// multipart/form-data with a "file" field; returns the document handle + cargos.
 func (h *ConcursoHandler) AnalisarEdital(w http.ResponseWriter, r *http.Request) {
 	if !h.guardaImport(w, r) {
 		return
 	}
 
-	entrada, err := lerEntradaEdital(r)
+	up, _, err := lerUploadEdital(r)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
+	if up.Vazia() {
+		writeError(w, r, h.logger, errBadRequest)
+		return
+	}
 
-	resp, err := h.concursos.AnalisarEdital(r.Context(), entrada)
+	resp, err := h.concursos.AnalisarEdital(r.Context(), ownerRefDe(r), up)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -86,26 +90,27 @@ func (h *ConcursoHandler) AnalisarEdital(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
-// EstruturaEdital — wizard step 2. Takes the edital (text or PDF, same shapes as
-// step 1) plus the chosen "cargo".
+// EstruturaEdital — wizard step 2. Takes {"documentoId", "cargo"}.
 func (h *ConcursoHandler) EstruturaEdital(w http.ResponseWriter, r *http.Request) {
 	if !h.guardaImport(w, r) {
 		return
 	}
 
-	entrada, extras, err := lerEntradaComExtras(r)
-	if err != nil {
+	var body struct {
+		DocumentoID string `json:"documentoId"`
+		Cargo       string `json:"cargo"`
+	}
+	if err := decode(r, &body); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	cargo := strings.TrimSpace(extras.Cargo)
-	if entrada.Vazia() || cargo == "" {
+	if strings.TrimSpace(body.DocumentoID) == "" || strings.TrimSpace(body.Cargo) == "" {
 		writeError(w, r, h.logger, errBadRequest)
 		return
 	}
 
-	resp, err := h.concursos.EstruturaDoCargo(r.Context(), entrada, cargo)
+	resp, err := h.concursos.EstruturaDoCargo(r.Context(), ownerRefDe(r), body.DocumentoID, body.Cargo)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -114,24 +119,32 @@ func (h *ConcursoHandler) EstruturaEdital(w http.ResponseWriter, r *http.Request
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
-// ConteudoEdital — wizard step 3. Takes the edital plus the discipline list.
+// ConteudoEdital — wizard step 3, and the edit screen's "extract topics". Takes
+// {"documentoId", "cargo", "disciplinas"} OR a fresh upload (multipart / text)
+// plus "cargo" and "disciplinas".
 func (h *ConcursoHandler) ConteudoEdital(w http.ResponseWriter, r *http.Request) {
 	if !h.guardaImport(w, r) {
 		return
 	}
 
-	entrada, extras, err := lerEntradaComExtras(r)
+	up, extras, err := lerUploadEdital(r)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	if entrada.Vazia() || len(extras.Disciplinas) == 0 {
+	if len(extras.Disciplinas) == 0 {
+		writeError(w, r, h.logger, errBadRequest)
+		return
+	}
+	if extras.DocumentoID == "" && up.Vazia() {
 		writeError(w, r, h.logger, errBadRequest)
 		return
 	}
 
-	resp, err := h.concursos.ConteudoDoEdital(r.Context(), entrada, extras.Disciplinas)
+	resp, err := h.concursos.ConteudoDoEdital(
+		r.Context(), ownerRefDe(r), extras.DocumentoID, extras.Cargo, extras.Disciplinas, up,
+	)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -140,44 +153,54 @@ func (h *ConcursoHandler) ConteudoEdital(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
-// editalExtras are the per-step fields that travel next to the edital.
+// editalExtras are the per-step fields that travel next to a fresh upload.
 type editalExtras struct {
-	Cargo       string   `json:"cargo"`
-	Disciplinas []string `json:"disciplinas"`
+	DocumentoID string
+	Cargo       string
+	Disciplinas []string
 }
 
-func lerEntradaEdital(r *http.Request) (port.EditalEntrada, error) {
-	in, _, err := lerEntradaComExtras(r)
-
-	return in, err
+// ownerRefDe returns the opaque per-user handle the processor binds documents
+// to. The user id is fine — it never leaves the compose network.
+func ownerRefDe(r *http.Request) string {
+	if id, ok := userID(r.Context()); ok {
+		return id.String()
+	}
+	return ""
 }
 
-// lerEntradaComExtras accepts either JSON {"texto", "cargo", "disciplinas"} or
-// multipart/form-data with a "pdf" file plus "cargo"/"disciplinas" fields.
-func lerEntradaComExtras(r *http.Request) (port.EditalEntrada, editalExtras, error) {
+// lerUploadEdital accepts JSON {"texto", "documentoId", "cargo", "disciplinas"}
+// or multipart/form-data with a "file" plus those fields.
+func lerUploadEdital(r *http.Request) (port.EditalUpload, editalExtras, error) {
 	var extras editalExtras
 
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := r.ParseMultipartForm(maxEditalPDF); err != nil {
-			return port.EditalEntrada{}, extras, errBadRequest
+			return port.EditalUpload{}, extras, errBadRequest
 		}
 
+		extras.DocumentoID = r.FormValue("documentoId")
 		extras.Cargo = r.FormValue("cargo")
 		if ds := r.FormValue("disciplinas"); ds != "" {
 			if err := json.Unmarshal([]byte(ds), &extras.Disciplinas); err != nil {
-				return port.EditalEntrada{}, extras, errBadRequest
+				return port.EditalUpload{}, extras, errBadRequest
 			}
 		}
 
-		file, header, err := r.FormFile("pdf")
+		if txt := r.FormValue("texto"); txt != "" {
+			return port.EditalUpload{Texto: txt}, extras, nil
+		}
+
+		file, header, err := r.FormFile("file")
 		if err != nil {
-			return port.EditalEntrada{}, extras, errBadRequest
+			// no file and no text is allowed when a documentoId carries the work
+			return port.EditalUpload{}, extras, nil
 		}
 		defer file.Close()
 
 		data, err := io.ReadAll(io.LimitReader(file, maxEditalPDF))
 		if err != nil {
-			return port.EditalEntrada{}, extras, errBadRequest
+			return port.EditalUpload{}, extras, errBadRequest
 		}
 
 		mime := header.Header.Get("Content-Type")
@@ -185,33 +208,24 @@ func lerEntradaComExtras(r *http.Request) (port.EditalEntrada, editalExtras, err
 			mime = "application/pdf"
 		}
 
-		return port.EditalEntrada{PDF: data, MIME: mime}, extras, nil
+		return port.EditalUpload{PDF: data, MIME: mime}, extras, nil
 	}
 
 	var body struct {
 		Texto       string   `json:"texto"`
-		ArquivoURI  string   `json:"arquivoUri"`
-		MIME        string   `json:"mime"`
+		DocumentoID string   `json:"documentoId"`
 		Cargo       string   `json:"cargo"`
 		Disciplinas []string `json:"disciplinas"`
 	}
-
 	if err := decode(r, &body); err != nil {
-		return port.EditalEntrada{}, extras, err
+		return port.EditalUpload{}, extras, err
 	}
 
-	if body.Texto == "" && body.ArquivoURI == "" {
-		return port.EditalEntrada{}, extras, errBadRequest
-	}
-
+	extras.DocumentoID = body.DocumentoID
 	extras.Cargo = body.Cargo
 	extras.Disciplinas = body.Disciplinas
 
-	return port.EditalEntrada{
-		Texto:      body.Texto,
-		ArquivoURI: body.ArquivoURI,
-		MIME:       body.MIME,
-	}, extras, nil
+	return port.EditalUpload{Texto: body.Texto}, extras, nil
 }
 
 func (h *ConcursoHandler) Get(w http.ResponseWriter, r *http.Request) {
