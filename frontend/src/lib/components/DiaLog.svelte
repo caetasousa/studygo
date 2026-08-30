@@ -3,6 +3,7 @@
 	import type { Dia, RegistroBlocoInput } from '$lib/types';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { debounce, parseNum, parseInteger } from '$lib/debounce';
+	import IconButton from './IconButton.svelte';
 
 	let {
 		dia,
@@ -327,16 +328,17 @@
 		</label>
 	</div>
 {:else}
-	<button
-		type="button"
-		class="resumo"
-		class:filled={resumo !== ''}
-		aria-expanded={aberto}
-		title={resumo ? 'Editar o que você estudou neste dia' : 'Registrar o que você estudou neste dia'}
+	<!-- Same register icon the activities use, so the control means one thing
+	     across the schedule. What was recorded shows beside it when there is
+	     something to show, instead of the word "registrar". -->
+	{#if resumo !== ''}
+		<span class="resumo filled">{resumo}</span>
+	{/if}
+	<IconButton
+		icon="registrar"
+		label={resumo ? 'Editar o que você estudou neste dia' : 'Registrar o que você estudou neste dia'}
 		onclick={() => (aberto = !aberto)}
-	>
-		{resumo || 'registrar'}
-	</button>
+	/>
 	<input
 		type="checkbox"
 		class="checkbox rowchk"
@@ -494,34 +496,19 @@
 		cursor: pointer;
 	}
 
-	/* "Registrar" is the main action of a day, so it looks like a button instead
-	   of faint monospaced text that reads as a label. */
+	/* What was recorded, shown beside the icon. It is a readout now, not the
+	   control — the icon is the control. */
 	.resumo {
-		font-family: inherit;
-		font-size: 12.5px;
-		font-weight: 500;
-		text-align: center;
-		padding: 6px 12px;
-		min-height: 32px;
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		color: var(--text-muted);
-		cursor: pointer;
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		font-variant-numeric: tabular-nums;
+		color: var(--good);
+		font-weight: 600;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.resumo:hover,
-	.resumo:focus-visible {
-		background: var(--bg-soft);
-		border-color: var(--border);
-		color: var(--text);
-	}
-	.resumo.filled {
-		color: var(--good);
-		font-weight: 600;
-	}
+
 	/* The day is a flex block now, so the log panel simply takes the full width
 	   under the activities instead of being placed into a grid area. */
 	.painel-row {

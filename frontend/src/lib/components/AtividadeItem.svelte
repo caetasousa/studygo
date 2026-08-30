@@ -17,7 +17,6 @@
 		item,
 		data,
 		indice,
-		total,
 		podeMover,
 		datasDisponiveis,
 		onMover,
@@ -29,8 +28,8 @@
 	}: {
 		item: ItemDia;
 		data: string;
+		/** slot of this activity in its day, used as the drop position */
 		indice: number;
-		total: number;
 		podeMover: boolean;
 		/** Dates that accept activities, for the "move to another day" list. */
 		datasDisponiveis: string[];
@@ -192,21 +191,12 @@
 			/>
 		{/if}
 		{#if movivel}
-			<IconButton
-				icon="anterior"
-				label="Mover para cima"
-				disabled={indice === 0}
-				onclick={() => mover(data, indice - 1)}
-			/>
-			<IconButton
-				icon="proximo"
-				label="Mover para baixo"
-				disabled={indice >= total - 1}
-				onclick={() => mover(data, indice + 1)}
-			/>
+			<!-- Reordering is done by dragging. This menu is not a duplicate of it:
+			     it is the only path for keyboard, screen readers and touch, where
+			     the HTML5 drag API does not fire. -->
 			<IconButton
 				icon="chevron"
-				label="Mais ações para {nome} — {tema}"
+				label="Mover ou trocar {nome} — {tema}"
 				onclick={() => (menuAberto = !menuAberto)}
 			/>
 		{/if}

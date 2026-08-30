@@ -190,7 +190,6 @@
 								item={it}
 								data={dia.data}
 								indice={i}
-								total={dia.itens.length}
 								podeMover={movivel}
 								{datasDisponiveis}
 								{onMover}

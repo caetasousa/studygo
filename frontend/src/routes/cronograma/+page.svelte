@@ -43,19 +43,18 @@
 	// Rearranging is per-activity: a whole day is never swapped with another, so
 	// there is no day-level drag or swap here — only AtividadeItem moves.
 	let arrastandoAtv = $state<string | null>(null);
-	let ultimoMovimento = $state<{ id: string; data: string; posicao: number } | null>(null);
-	let aviso = $state<string | null>(null);
 
 	// Days that can receive an activity: the ones the engine filled with content.
 	const datasDisponiveis = $derived(
 		(plano?.dias ?? []).filter((d) => d.itens.length > 0).map((d) => d.data)
 	);
 
-	function posicaoAtual(id: string): { data: string; posicao: number } | null {
+	/** The date an activity currently sits on, or null if it is not in the plan. */
+	function dataAtual(id: string): string | null {
 		for (const d of plano?.dias ?? []) {
-			const i = d.itens.findIndex((x) => x.id === id);
-			if (i >= 0) return { data: d.data, posicao: i };
+			if (d.itens.some((x) => x.id === id)) return d.data;
 		}
+
 		return null;
 	}
 
@@ -65,33 +64,18 @@
 	 * what "move this to the 2nd" means when the 2nd is already full.
 	 */
 	async function mover(id: string, data: string, posicao: number) {
-		const antes = posicaoAtual(id);
+		const origem = dataAtual(id);
 		const destino = plano?.dias.find((d) => d.data === data);
 
 		// An occupied slot swaps the two activities; an empty one is a plain move.
 		// Same-day reordering always inserts, since there is no second day to
 		// exchange with.
 		const ocupado = !!destino && posicao < destino.itens.length;
-		const trocar = ocupado && antes?.data !== data;
+		const trocar = ocupado && origem !== data;
 
-		const ok = await planoStore.moverAtividade(id, data, posicao, trocar);
-
-		if (ok && antes) {
-			ultimoMovimento = { id, ...antes };
-			aviso = trocar ? 'Matérias trocadas.' : 'Atividade movida.';
-		} else if (!ok) {
-			// The store already restored the plan it committed last, so the board is
-			// back where it was; planoStore.erro carries the reason.
-			aviso = null;
-		}
-	}
-
-	async function desfazer() {
-		if (!ultimoMovimento) return;
-		const { id, data, posicao } = ultimoMovimento;
-		ultimoMovimento = null;
-		aviso = null;
-		await planoStore.moverAtividade(id, data, posicao);
+		// A move that worked needs no announcement — the board shows it. Only a
+		// refusal does, and planoStore.erro carries that.
+		await planoStore.moverAtividade(id, data, posicao, trocar);
 	}
 
 	function soltarAtv(data: string, posicao: number) {
@@ -113,20 +97,12 @@
 	<PanoramaPlano {plano} />
 
 	<div class="page">
-		{#if aviso || planoStore.erro}
+		{#if planoStore.erro}
 			<div class="mov-aviso" role="status" aria-live="polite">
-				<span>{planoStore.erro ?? aviso}</span>
-				{#if ultimoMovimento && !planoStore.erro}
-					<button type="button" class="btn" onclick={desfazer}>Desfazer</button>
-				{/if}
-				<button
-					type="button"
-					class="btn"
-					onclick={() => {
-						aviso = null;
-						planoStore.erro = null;
-					}}>Dispensar</button
-				>
+				<span>{planoStore.erro}</span>
+				<button type="button" class="btn" onclick={() => (planoStore.erro = null)}>
+					Dispensar
+				</button>
 			</div>
 		{/if}
 
