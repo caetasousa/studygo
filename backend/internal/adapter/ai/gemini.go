@@ -414,10 +414,10 @@ func textoDaResposta(payload []byte) (string, error) {
 }
 
 // maxTentativas rides out the "high demand" 503/429s the flash models throw
-// during congestion spikes. Kept low on purpose: when the provider is rate
-// limiting us, retrying for minutes only makes the whole wizard hang — a fast
-// 503 lets the user try again in a moment.
-const maxTentativas = 3
+// during congestion spikes (~14s of backoff). Kept short on purpose: when the
+// provider is rate limiting us for the day, retrying for minutes only makes the
+// whole wizard hang — a fast failure lets the user try again in a moment.
+const maxTentativas = 4
 
 func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body []byte) ([]byte, int, error) {
 	var lastErr error
@@ -451,7 +451,7 @@ func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body [
 		select {
 		case <-ctx.Done():
 			return nil, 0, fmt.Errorf("%w: %w (última resposta do provedor: %v)", port.ErrProvedorIndisponivel, ctx.Err(), lastErr)
-		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s
+		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s, 8s
 		}
 	}
 
