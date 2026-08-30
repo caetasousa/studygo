@@ -40,23 +40,8 @@
 		return d.itens.length > 0 && !d.registro?.concluido;
 	}
 
-	function vizinho(d: Dia, dir: -1 | 1): Dia | null {
-		if (!plano) return null;
-		const i = plano.dias.findIndex((x) => x.data === d.data);
-		for (let j = i + dir; j >= 0 && j < plano.dias.length; j += dir) {
-			if (diaMovivel(plano.dias[j])) return plano.dias[j];
-		}
-		return null;
-	}
-
-	function trocar(d: Dia, dir: -1 | 1) {
-		const alvo = vizinho(d, dir);
-		if (alvo) void planoStore.reordenar(d.data, alvo.data);
-	}
-
-	let arrastando = $state<string | null>(null);
-
-	// --- individual activity moves ---
+	// Rearranging is per-activity: a whole day is never swapped with another, so
+	// there is no day-level drag or swap here — only AtividadeItem moves.
 	let arrastandoAtv = $state<string | null>(null);
 	let ultimoMovimento = $state<{ id: string; data: string; posicao: number } | null>(null);
 	let aviso = $state<string | null>(null);
@@ -101,12 +86,6 @@
 		void mover(id, data, posicao);
 	}
 
-	function onDrop(destino: Dia) {
-		if (arrastando && arrastando !== destino.data && diaMovivel(destino)) {
-			void planoStore.reordenar(arrastando, destino.data);
-		}
-		arrastando = null;
-	}
 </script>
 
 <PageHead
@@ -172,14 +151,7 @@
 							dia={d}
 							movivel={diaMovivel(d)}
 							{datasDisponiveis}
-							temAnterior={!!vizinho(d, -1)}
-							temProximo={!!vizinho(d, 1)}
-							arrastandoDia={arrastando}
 							onMover={mover}
-							onTrocar={(dir) => trocar(d, dir)}
-							onArrastarDia={() => (arrastando = d.data)}
-							onLargarDia={() => (arrastando = null)}
-							onSoltarDia={() => onDrop(d)}
 							onArrastarAtv={(id) => (arrastandoAtv = id)}
 							onSoltarAtv={(pos) => soltarAtv(d.data, pos)}
 						/>

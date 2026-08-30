@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { planoStore } from '$lib/stores/plano.svelte';
+	import Ajuste from '$lib/components/Ajuste.svelte';
+	import { planoStore, applyTheme, ehTema, type Tema } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { DIAS_CURTOS, DIAS_SEMANA, ORDEM_DIAS, nf1 } from '$lib/format';
@@ -13,6 +14,27 @@
 
 	function salvar(patch: ConfigInput) {
 		void planoStore.salvarConfig(patch);
+	}
+
+	// ---- aparência ----
+	// The config screen is the single place the theme is chosen; the sidebar no
+	// longer carries a second, competing control.
+	const TEMA_OPCOES: { v: Tema; r: string }[] = [
+		{ v: 'light', r: 'Claro' },
+		{ v: 'dark', r: 'Escuro' },
+		{ v: 'system', r: 'Do sistema' }
+	];
+
+	const temaAtual = $derived<Tema>(ehTema(cfg?.temaUi) ? cfg.temaUi : 'dark');
+	const temaDesc = $derived(
+		temaAtual === 'system'
+			? 'Seguindo o tema do seu sistema operacional — muda sozinho quando ele muda.'
+			: 'Fixo em ' + (temaAtual === 'light' ? 'claro' : 'escuro') + ', em qualquer aparelho.'
+	);
+
+	function setTema(t: Tema) {
+		applyTheme(t); // instant feedback; the save below persists it
+		salvar({ temaUi: t });
 	}
 
 	function toggleDia(wd: number) {
@@ -68,13 +90,34 @@
 		editandoIntervalos ? intervalosTexto : (cfg?.intervalos ?? []).join(', ')
 	);
 
+	let intervalosErro = $state<string | null>(null);
+
+	// Worked example of what the current intervals actually do, so the effect on
+	// the schedule is visible without having to generate it.
+	const intervalosDesc = $derived.by(() => {
+		const dias = cfg?.intervalos ?? [];
+		if (dias.length === 0) return 'Sem revisões automáticas.';
+		const lista = dias.join(', ');
+		return `Estudou hoje? O tópico volta ${dias.length === 1 ? 'uma vez' : dias.length + ' vezes'}: ${lista} ${dias.length === 1 ? 'dia' : 'dias'} depois.`;
+	});
+
 	function commitIntervalos() {
 		editandoIntervalos = false;
-		const nums = intervalosTexto
-			.split(/[,\s]+/)
-			.map((x) => parseInt(x, 10))
-			.filter((n) => Number.isFinite(n) && n > 0);
-		if (nums.length > 0) salvar({ intervalos: nums });
+		const bruto = intervalosTexto.trim();
+		if (!bruto) {
+			intervalosErro = null;
+			return;
+		}
+		const pedacos = bruto.split(/[,\s]+/).filter(Boolean);
+		const nums = pedacos.map((x) => parseInt(x, 10));
+		if (nums.some((n) => !Number.isFinite(n) || n <= 0)) {
+			intervalosErro = 'Use apenas números de dias maiores que zero, separados por vírgula.';
+			return;
+		}
+		intervalosErro = null;
+		// Ascending and de-duplicated: "7, 1, 7" is the same schedule as "1, 7".
+		const limpo = [...new Set(nums)].sort((a, b) => a - b);
+		if (limpo.length > 0) salvar({ intervalos: limpo });
 	}
 
 	// Ciclo semanal como rascunho local — enviado ao sair do campo, para não
@@ -243,11 +286,47 @@
 					da prova. Ele segue o dia que você escolher aqui — mude para domingo, sábado ou qualquer
 					outro e o cronograma acompanha, com cor própria.
 				</p>
+			</div>
+		</div>
 
-				<h2 class="sec">Ritmo de estudo</h2>
-				<div class="form-grid">
-					<div class="field">
-						<label for="minbloco">Minutos por bloco</label>
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Aparência</h2>
+				<Ajuste
+					titulo="Tema"
+					descricao={temaDesc}
+				>
+					{#snippet controle()}
+						<div class="day-sel" role="group" aria-label="Tema da interface">
+							{#each TEMA_OPCOES as t (t.v)}
+								<button
+									type="button"
+									aria-pressed={temaAtual === t.v}
+									style="width:auto;padding:0 12px"
+									onclick={() => setTema(t.v)}>{t.r}</button
+								>
+							{/each}
+						</div>
+					{/snippet}
+				</Ajuste>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Ritmo de estudo</h2>
+				<p class="page-sub" style="margin:0 0 4px">
+					Quanto você estuda por dia. Alterar estes valores regenera o cronograma —
+					seus registros de horas e questões são preservados.
+				</p>
+
+				<Ajuste
+					titulo="Minutos por bloco"
+					descricao="Duração de um bloco de estudo. Define o tamanho de cada atividade do cronograma."
+					para="minbloco"
+					unidade="min"
+				>
+					{#snippet controle()}
 						<input
 							id="minbloco"
 							type="number"
@@ -258,11 +337,16 @@
 							onchange={(e) =>
 								salvar({ minutosBloco: parseInt((e.target as HTMLInputElement).value, 10) })}
 						/>
-					</div>
-					<div class="field" style="flex:1 1 240px">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>Blocos por dia</label>
-						<div class="day-sel">
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Blocos por dia"
+					descricao="Quantos blocos cabem num dia de estudo."
+					valor="{nf1.format(cfg.horasDia)} h por dia"
+				>
+					{#snippet controle()}
+						<div class="day-sel" role="group" aria-label="Blocos por dia">
 							{#each BLOCOS as n (n)}
 								<button
 									type="button"
@@ -272,16 +356,87 @@
 								>
 							{/each}
 						</div>
-					</div>
-					<div class="field">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>Dá um dia de</label>
-						<output class="readout">{nf1.format(cfg.horasDia)} h</output>
-					</div>
-					<div class="field">
-						<label for="pf-prev">
-							Tempo da revisão espaçada — {Math.round(cfg.pctRevisao * 100)}% do dia
-						</label>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Simulados completos"
+					descricao="Com que frequência o cronograma reserva um dia inteiro para um simulado."
+				>
+					{#snippet controle()}
+						<div class="day-sel" role="group" aria-label="Frequência de simulados">
+							{#each SIMULADOS as s (s.v)}
+								<button
+									type="button"
+									aria-pressed={cfg.simulados === s.v}
+									style="width:auto;padding:0 10px"
+									onclick={() => salvar({ simulados: s.v })}>{s.r}</button
+								>
+							{/each}
+						</div>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Treinar a prova discursiva"
+					descricao="Reserva blocos para redação ou estudo de caso, quando o edital cobra."
+					para="pf-disc"
+				>
+					{#snippet controle()}
+						<input
+							id="pf-disc"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.discursiva}
+							onchange={(e) => salvar({ discursiva: e.currentTarget.checked })}
+						/>
+					{/snippet}
+				</Ajuste>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Revisão espaçada</h2>
+				<p class="page-sub" style="margin:0 0 4px">
+					Ao marcar um tópico como estudado, o sistema agenda revisões dele depois
+					dos intervalos abaixo.
+				</p>
+
+				<Ajuste
+					titulo="Criar revisões após"
+					descricao={intervalosDesc}
+					para="pf-int"
+					unidade="dias"
+				>
+					{#snippet controle()}
+						<input
+							id="pf-int"
+							type="text"
+							inputmode="numeric"
+							placeholder="1, 7, 30"
+							aria-describedby="pf-int-erro"
+							value={intervalosView}
+							oninput={(e) => {
+								editandoIntervalos = true;
+								intervalosTexto = e.currentTarget.value;
+							}}
+							onblur={commitIntervalos}
+							style="width:150px"
+						/>
+					{/snippet}
+				</Ajuste>
+				{#if intervalosErro}
+					<p id="pf-int-erro" class="ajuste-erro" role="alert">{intervalosErro}</p>
+				{/if}
+
+				<Ajuste
+					titulo="Tempo reservado para revisão"
+					descricao="Fatia do dia dedicada às revisões pendentes, antes do conteúdo novo."
+					para="pf-prev"
+					valor="{Math.round(cfg.pctRevisao * 100)}% do dia"
+				>
+					{#snippet controle()}
 						<input
 							id="pf-prev"
 							type="range"
@@ -292,25 +447,38 @@
 							onchange={(e) =>
 								salvar({ pctRevisao: parseInt((e.target as HTMLInputElement).value, 10) / 100 })}
 						/>
-					</div>
-					<div class="field" style="flex:1 1 220px">
-						<label for="pf-int">Revisão espaçada — dias, separados por vírgula</label>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Revisar resolvendo questões"
+					descricao="Quando ligado, a revisão vira uma bateria de questões em vez de releitura."
+					para="pf-revq"
+				>
+					{#snippet controle()}
 						<input
-							id="pf-int"
-							type="text"
-							inputmode="numeric"
-							placeholder="1, 7, 30"
-							value={intervalosView}
-							oninput={(e) => {
-								editandoIntervalos = true;
-								intervalosTexto = e.currentTarget.value;
-							}}
-							onblur={commitIntervalos}
-							style="width:100%"
+							id="pf-revq"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.revisaoPorQuestoes}
+							onchange={(e) => salvar({ revisaoPorQuestoes: e.currentTarget.checked })}
 						/>
-					</div>
-					<div class="field">
-						<label for="pf-qrev">Questões por revisão</label>
+					{/snippet}
+				</Ajuste>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Questões</h2>
+
+				<Ajuste
+					titulo="Questões por revisão"
+					descricao="Quantidade usada ao criar automaticamente uma atividade de revisão por questões. Você pode alterar em cada atividade."
+					para="pf-qrev"
+					unidade="questões"
+				>
+					{#snippet controle()}
 						<input
 							id="pf-qrev"
 							type="number"
@@ -320,19 +488,16 @@
 							onchange={(e) =>
 								salvar({ questoesPorRevisao: parseInt(e.currentTarget.value, 10) })}
 						/>
-					</div>
-					<div class="field">
-						<label for="pf-revq">Revisão por questões</label>
-						<input
-							id="pf-revq"
-							type="checkbox"
-							class="checkbox"
-							checked={cfg.revisaoPorQuestoes}
-							onchange={(e) => salvar({ revisaoPorQuestoes: e.currentTarget.checked })}
-						/>
-					</div>
-					<div class="field">
-						<label for="pf-pct">Questões no bloco — {Math.round(cfg.pctQuestoes * 100)}%</label>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Parte do bloco dedicada a questões"
+					descricao="Num bloco de teoria + questões, quanto do tempo vai para resolver questões."
+					para="pf-pct"
+					valor="{Math.round(cfg.pctQuestoes * 100)}% do bloco"
+				>
+					{#snippet controle()}
 						<input
 							id="pf-pct"
 							type="range"
@@ -340,36 +505,18 @@
 							max="90"
 							step="10"
 							value={Math.round(cfg.pctQuestoes * 100)}
-							onchange={(e) =>
-								salvar({ pctQuestoes: parseInt(e.currentTarget.value, 10) / 100 })}
+							onchange={(e) => salvar({ pctQuestoes: parseInt(e.currentTarget.value, 10) / 100 })}
 						/>
-					</div>
-					<div class="field">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>Simulados completos</label>
-						<div class="day-sel">
-							{#each SIMULADOS as s (s.v)}
-								<button
-									type="button"
-									aria-pressed={cfg.simulados === s.v}
-									style="width:auto;padding:0 10px"
-									onclick={() => salvar({ simulados: s.v })}>{s.r}</button
-								>
-							{/each}
-						</div>
-					</div>
-					<div class="field">
-						<label for="pf-disc">Prova discursiva</label>
-						<input
-							id="pf-disc"
-							type="checkbox"
-							class="checkbox"
-							checked={cfg.discursiva}
-							onchange={(e) => salvar({ discursiva: e.currentTarget.checked })}
-						/>
-					</div>
-					<div class="field">
-						<label for="pf-limiar">Aproveitamento fraco abaixo de</label>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Aproveitamento fraco abaixo de"
+					descricao="Abaixo desta taxa de acerto a matéria é sinalizada como ponto fraco nas estatísticas."
+					para="pf-limiar"
+					unidade="%"
+				>
+					{#snippet controle()}
 						<input
 							id="pf-limiar"
 							type="number"
@@ -378,8 +525,13 @@
 							value={cfg.limiarFraco}
 							onchange={(e) => salvar({ limiarFraco: parseInt(e.currentTarget.value, 10) })}
 						/>
-					</div>
-				</div>
+					{/snippet}
+				</Ajuste>
+			</div>
+		</div>
+
+		<div class="card">
+			<div class="card-body">
 
 				<h3 class="modos-t">Peso e método por matéria</h3>
 				<p class="page-sub" style="margin:0 0 10px;font-size:12px">
@@ -452,7 +604,7 @@
 								class="mv-btn"
 								aria-label="Remover semana"
 								disabled={ciclo.length <= 1}
-								onclick={() => rmSemana(i)}>✕</button
+								onclick={() => rmSemana(i)}>remover</button
 							>
 						</div>
 					{/each}
@@ -463,8 +615,10 @@
 
 				<h2 class="sec">Reordenação manual</h2>
 				<p class="page-sub" style="margin-top:0">
-					No Cronograma, use as setas ◀ ▶ de cada dia — ou arraste o bloco da matéria — para trocá-lo
-					de lugar. Dias concluídos e dias fixos não podem ser movidos.
+					No Cronograma, cada matéria é movida sozinha: use as setas para mudá-la de
+					posição no dia, o menu <b>…</b> para enviá-la a outra data, ou arraste-a. O
+					dia inteiro não é movido — só as matérias dentro dele. Dias concluídos e
+					dias fixos não podem ser alterados.
 				</p>
 				<div class="form-grid">
 					<button class="btn" disabled={plano.reordenados.length === 0} onclick={restaurar}>
@@ -500,12 +654,10 @@
 {/if}
 
 <style>
-	.readout {
-		font-family: var(--font-mono);
-		font-size: 14px;
-		font-weight: 600;
-		padding: 7px 0;
-		color: var(--text);
+	.ajuste-erro {
+		margin: -6px 0 10px;
+		font-size: 12px;
+		color: var(--danger);
 	}
 	.modos-t {
 		font-size: 13px;

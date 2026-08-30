@@ -1,6 +1,5 @@
 <script lang="ts">
 	import DiaLog from './DiaLog.svelte';
-	import IconButton from './IconButton.svelte';
 	import TemaTexto from './TemaTexto.svelte';
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
@@ -17,37 +16,25 @@
 	 *
 	 * A rest day (no items, not a review) collapses to a single quiet line
 	 * instead of a full card — it carries no work to show.
+	 *
+	 * The day is not a movable unit: rearranging happens one activity at a time
+	 * (see AtividadeItem), so a day carries no swap arrows and is not a drag
+	 * source or a drop target.
 	 */
 	let {
 		dia,
 		movivel,
 		datasDisponiveis,
-		temAnterior,
-		temProximo,
 		onMover,
-		onTrocar,
-		onArrastarDia,
-		onLargarDia,
-		onSoltarDia,
 		onArrastarAtv,
-		onSoltarAtv,
-		arrastandoDia
+		onSoltarAtv
 	}: {
 		dia: Dia;
 		movivel: boolean;
 		datasDisponiveis: string[];
-		temAnterior: boolean;
-		temProximo: boolean;
 		onMover: (id: string, data: string, posicao: number) => void;
-		onTrocar: (dir: -1 | 1) => void;
-		onArrastarDia: () => void;
-		/** drag finished without a drop target accepting it */
-		onLargarDia: () => void;
-		onSoltarDia: () => void;
 		onArrastarAtv: (id: string) => void;
 		onSoltarAtv: (posicao: number) => void;
-		/** date being dragged, so this card can show itself as a drop target */
-		arrastandoDia: string | null;
 	} = $props();
 
 	const hoje = $derived(dia.data === hojeISO());
@@ -55,7 +42,6 @@
 	// A day the engine left empty and that is not a review is a rest day: it has
 	// nothing to log and nothing to move, so it does not earn a card.
 	const descanso = $derived(dia.itens.length === 0 && !revisao);
-	const alvoDrop = $derived(!!arrastandoDia && arrastandoDia !== dia.data && movivel);
 
 	const diaNum = $derived(Number(dia.data.slice(8, 10)));
 	const mes = $derived(MESES[Number(dia.data.slice(5, 7)) - 1]);
@@ -72,19 +58,7 @@
 		<span class="folga-tx"><TemaTexto tema={dia.tema} /></span>
 	</div>
 {:else}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="dia"
-		class:hoje
-		class:revisao
-		class:concluido={dia.registro?.concluido}
-		class:alvo={alvoDrop}
-		ondragover={(e) => movivel && e.preventDefault()}
-		ondrop={(e) => {
-			e.preventDefault();
-			onSoltarDia();
-		}}
-	>
+	<div class="dia" class:hoje class:revisao class:concluido={dia.registro?.concluido}>
 		<!-- The date plaque: weekday, number, month — read top to bottom, fixed
 		     width, so every card's content starts at the same x. -->
 		<div class="placa">
@@ -106,30 +80,10 @@
 				{/if}
 				<span class="acoes">
 					<DiaLog {dia} variant="row" />
-					{#if movivel}
-						<IconButton
-							icon="anterior"
-							label="Trocar este dia com o anterior"
-							disabled={!temAnterior}
-							onclick={() => onTrocar(-1)}
-						/>
-						<IconButton
-							icon="proximo"
-							label="Trocar este dia com o próximo"
-							disabled={!temProximo}
-							onclick={() => onTrocar(1)}
-						/>
-					{/if}
 				</span>
 			</div>
 
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="conteudo"
-				draggable={movivel}
-				ondragstart={onArrastarDia}
-				ondragend={onLargarDia}
-			>
+			<div class="conteudo">
 				{#if dia.itens.length === 0}
 					<div class="especial">
 						<span class="tema-txt">
@@ -170,10 +124,6 @@
 	}
 	.dia.hoje {
 		border-color: var(--accent);
-	}
-	.dia.alvo {
-		outline: 2px dashed var(--accent);
-		outline-offset: -2px;
 	}
 
 	/* ---- date plaque ---- */
@@ -269,19 +219,16 @@
 	.conteudo {
 		padding: 4px 6px;
 	}
-	.conteudo[draggable='true'] {
-		cursor: grab;
-	}
-	.conteudo[draggable='true']:active {
-		cursor: grabbing;
-	}
 	.atvs {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
+	/* Line the special day's text up with the topic column of an ordinary day:
+	   8px of row padding + the 18px handle + its 10px gap. Without this, a
+	   review day's text sits 28px to the left of every other day's. */
 	.especial {
-		padding: 8px;
+		padding: 8px 8px 8px 36px;
 	}
 	.tema-txt {
 		font-size: 14px;
@@ -327,6 +274,10 @@
 	@media (max-width: 620px) {
 		.dia {
 			grid-template-columns: 1fr;
+		}
+		/* the handle is hidden on touch, so the indent it paid for goes too */
+		.especial {
+			padding-left: 8px;
 		}
 		.placa {
 			flex-direction: row;
