@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -21,10 +22,24 @@ var _ port.EditalAnalisador = (*GeminiAnalisador)(nil)
 
 const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
 
+// modelosPadrao is the fallback chain. The lite flash models lead: they are fast
+// (~1s) and have the widest free-tier headroom, while the premium flash aliases
+// carry a 20 requests/day cap that one wizard run (4+ calls) burns through by
+// midday. Every entry is tried before the request is given up on, so a "high
+// demand" 503 on one model no longer fails the whole import.
+var modelosPadrao = []string{
+	"gemini-flash-lite-latest",
+	"gemini-3.5-flash-lite",
+	"gemini-3.1-flash-lite",
+	"gemini-flash-latest",
+}
+
 // GeminiAnalisador reads an edital with the Gemini generateContent API.
 type GeminiAnalisador struct {
-	apiKey  string
-	model   string
+	apiKey string
+	// models is the fallback chain, tried in order: when one is congested the
+	// next takes over instead of us backing off against a model that is down.
+	models  []string
 	http    *http.Client
 	baseURL string // fmt template: "…/models/%s:generateContent?key=%s"
 	// uploadURL / filesURL back the Files API, used so a big PDF is uploaded
@@ -40,13 +55,14 @@ func NewGeminiAnalisador(apiKey, model string) *GeminiAnalisador {
 	// currently points at gemini-3.7-flash, whose free tier is 20 requests/day —
 	// one wizard run is 4+ calls, so it 429s by midday. The lite flash is fast
 	// (~1s) and has room to spare.
-	if model == "" {
-		model = "gemini-flash-lite-latest"
+	models := modelosPadrao
+	if model != "" {
+		models = append([]string{model}, modelosPadrao...)
 	}
 
 	return &GeminiAnalisador{
 		apiKey:       apiKey,
-		model:        model,
+		models:       models,
 		http:         &http.Client{Timeout: 210 * time.Second},
 		baseURL:      geminiEndpoint,
 		uploadURL:    uploadEndpoint,
@@ -332,7 +348,7 @@ func (g *GeminiAnalisador) gerar(
 		return fmt.Errorf("encoding request: %w", err)
 	}
 
-	payload, status, err := g.postWithRetry(ctx, fmt.Sprintf(g.baseURL, g.model, g.apiKey), raw)
+	payload, status, err := g.postWithRetry(ctx, raw)
 	if err != nil {
 		return err
 	}
@@ -419,43 +435,62 @@ func textoDaResposta(payload []byte) (string, error) {
 // whole wizard hang — a fast failure lets the user try again in a moment.
 const maxTentativas = 4
 
-func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body []byte) ([]byte, int, error) {
+// postWithRetry walks the model chain, retrying each model on transient status
+// before moving to the next. A congestion 503 on the leading model therefore
+// costs one backoff round, not the whole import.
+func (g *GeminiAnalisador) postWithRetry(ctx context.Context, body []byte) ([]byte, int, error) {
 	var lastErr error
 
-	for tentativa := 1; tentativa <= maxTentativas; tentativa++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-		if err != nil {
-			return nil, 0, fmt.Errorf("building request: %w", err)
-		}
+	for _, modelo := range g.models {
+		url := fmt.Sprintf(g.baseURL, modelo, g.apiKey)
 
-		req.Header.Set("Content-Type", "application/json")
+		for tentativa := 1; tentativa <= maxTentativas; tentativa++ {
+			payload, status, err := g.postOnce(ctx, url, body)
+			if err != nil {
+				lastErr = fmt.Errorf("modelo %s: %w", modelo, err)
+			} else {
+				if !transiente(status) {
+					return payload, status, nil
+				}
 
-		resp, err := g.http.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("calling gemini: %w", err)
-		} else {
-			payload, _ := io.ReadAll(io.LimitReader(resp.Body, 12<<20))
-			resp.Body.Close()
-
-			if !transiente(resp.StatusCode) {
-				return payload, resp.StatusCode, nil
+				lastErr = fmt.Errorf("modelo %s respondeu %d: %s", modelo, status, snippet(payload))
 			}
 
-			lastErr = fmt.Errorf("gemini respondeu %d: %s", resp.StatusCode, snippet(payload))
+			if tentativa == maxTentativas {
+				break
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil, 0, fmt.Errorf("%w: %w (última resposta do provedor: %v)", port.ErrProvedorIndisponivel, ctx.Err(), lastErr)
+			case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s, 8s
+			}
 		}
 
-		if tentativa == maxTentativas {
-			break
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, 0, fmt.Errorf("%w: %w (última resposta do provedor: %v)", port.ErrProvedorIndisponivel, ctx.Err(), lastErr)
-		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s, 8s
-		}
+		slog.WarnContext(ctx, "edital import: modelo indisponível, tentando o próximo",
+			"modelo", modelo, "erro", lastErr)
 	}
 
 	return nil, 0, fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, lastErr)
+}
+
+func (g *GeminiAnalisador) postOnce(ctx context.Context, url string, body []byte) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("building request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.http.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("calling gemini: %w", err)
+	}
+	defer resp.Body.Close()
+
+	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 12<<20))
+
+	return payload, resp.StatusCode, nil
 }
 
 func transiente(status int) bool {

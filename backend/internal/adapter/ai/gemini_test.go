@@ -369,8 +369,11 @@ func TestGeminiAnalisador_erros(t *testing.T) {
 		if err == nil {
 			t.Fatal("esperava erro após esgotar os retries")
 		}
-		if s.calls != maxTentativas {
-			t.Errorf("deveria ter esgotado as %d tentativas; calls=%d", maxTentativas, s.calls)
+		// Every model in the chain is retried before the import gives up, so a
+		// congested leading model no longer decides the outcome on its own.
+		if want := maxTentativas * len(analisadorAt(s).models); s.calls != want {
+			t.Errorf("deveria ter tentado %d vezes (%d tentativas x %d modelos); calls=%d",
+				want, maxTentativas, len(analisadorAt(s).models), s.calls)
 		}
 		if !errors.Is(err, port.ErrProvedorIndisponivel) {
 			t.Errorf("503 esgotado deveria ser ErrProvedorIndisponivel; erro = %v", err)
