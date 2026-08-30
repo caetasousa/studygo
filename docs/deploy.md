@@ -42,7 +42,7 @@ cp inventory/hosts.ini.example inventory/hosts.ini
 
 cp inventory/group_vars/vps/secrets.yml.example inventory/group_vars/vps/secrets.yml
 #   edite: letsencrypt_email, jwt_secret, postgres_password
-#   opcional: gemini_api_key (liga a importação de edital por IA)
+#   opcional: gemini_api_key + edital_processor_token (liga a importação de edital por IA)
 
 #   ajuste o domínio em inventory/group_vars/vps/main.yml (app_domain)
 
@@ -79,7 +79,7 @@ worker pode subir junto sem corrida) e é seguro repetir.
 | Onde | Arquivo | Contém |
 |---|---|---|
 | Inventário | `ansible/inventory/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
-| Segredos | `ansible/inventory/group_vars/vps/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key` |
+| Segredos | `ansible/inventory/group_vars/vps/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token` |
 | Não-secreto | `ansible/inventory/group_vars/vps/main.yml` (versionado) | `app_domain`, portas, nome do banco |
 
 ## Avisos

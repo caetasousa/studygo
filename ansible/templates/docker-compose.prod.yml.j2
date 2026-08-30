@@ -15,11 +15,26 @@ services:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
       CORS_ORIGIN: "https://{{ app_domain }}"
-      GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
-      GEMINI_MODEL: "{{ gemini_model | default('gemini-flash-lite-latest') }}"
+      EDITAL_PROCESSOR_URL: "http://edital-processor:8000"
+      EDITAL_PROCESSOR_TOKEN: "{{ edital_processor_token }}"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Internal only — no published port.
+  edital-processor:
+    image: "{{ edital_processor_image }}"
+    restart: unless-stopped
+    environment:
+      EP_SERVICE_TOKEN: "{{ edital_processor_token }}"
+      EP_GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
+    volumes:
+      - edital_work:/var/lib/edital-processor/work
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   worker:
     image: "{{ backend_image }}"
@@ -49,3 +64,4 @@ services:
 
 volumes:
   postgres_data:
+  edital_work:
