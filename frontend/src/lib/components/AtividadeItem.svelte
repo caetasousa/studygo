@@ -22,9 +22,9 @@
 		datasDisponiveis,
 		onMover,
 		onArrastar,
+		onLargar,
 		onSoltar,
 		concluida = false,
-		onAlternarConcluida,
 		onRegistrar
 	}: {
 		item: ItemDia;
@@ -36,16 +36,22 @@
 		datasDisponiveis: string[];
 		onMover: (id: string, data: string, posicao: number) => void;
 		onArrastar?: (id: string) => void;
+		/** drag ended without a drop landing */
+		onLargar?: () => void;
 		onSoltar?: (posicao: number) => void;
-		/** this discipline finished on this day */
+		/** this activity finished, shown as a quiet mark (edited in its form) */
 		concluida?: boolean;
-		onAlternarConcluida?: (marcado: boolean) => void;
-		/** opens the day's log focused on this discipline */
-		onRegistrar?: () => void;
+		/** Opens this activity's form. Receives the trigger so focus can return. */
+		onRegistrar?: (gatilho: HTMLElement) => void;
 	} = $props();
 
 	let menuAberto = $state(false);
 	let escolhendoData = $state(false);
+	// Two-step target picking: first the date, then the exact slot in it. This is
+	// the keyboard/touch equivalent of dropping onto a specific row.
+	let dataEscolhida = $state<string | null>(null);
+	// Tapping the sigla reveals the full name — the touch equivalent of hover.
+	let nomeVisivel = $state(false);
 
 	const disc = $derived(planoStore.discIndex);
 	const nome = $derived(disc[item.disciplina]?.nome ?? item.disciplina);
@@ -53,7 +59,9 @@
 	// keeps the topic text starting at the same x on every line. The full name
 	// stays as the tooltip and in the accessible name, so the abbreviation is
 	// never the only way to know what it is.
-	const sigla = $derived(item.disciplina);
+	// Display only: the codigo (D01…) stays the key, the sigla is what a reader
+	// can decode at a glance.
+	const sigla = $derived(planoStore.siglaIndex[item.disciplina] ?? item.disciplina);
 	const cor = $derived(disc[item.disciplina]?.cor ?? 0);
 	const tema = $derived(semNumeroInicial(item.tema));
 
@@ -63,25 +71,80 @@
 	function mover(destino: string, posicao: number) {
 		menuAberto = false;
 		escolhendoData = false;
+		dataEscolhida = null;
 		onMover(item.id, destino, posicao);
 	}
 
 	const proximaData = $derived(datasDisponiveis.find((d) => d > data) ?? null);
+
+	/** The chosen day's activities, so the user can pick an exact slot. */
+	const itensDoDestino = $derived(
+		dataEscolhida === null
+			? []
+			: (planoStore.plano?.dias.find((d) => d.data === dataEscolhida)?.itens ?? []).map((it) => ({
+					id: it.id,
+					rotulo: `${planoStore.discIndex[it.disciplina]?.nome ?? it.disciplina} — ${semNumeroInicial(it.tema)}`
+				}))
+	);
+
+	// --- drag and drop ----------------------------------------------------
+	// `sobre` drives the drop affordance: this row is a swap target when it holds
+	// an activity, which is every case here (an empty slot is the day's own drop
+	// zone, handled by DiaCard).
+	let sobre = $state(false);
+	let arrastandoEu = $state(false);
+
+	function inicio(e: DragEvent) {
+		if (!movivel) {
+			e.preventDefault();
+			return;
+		}
+
+		arrastandoEu = true;
+		onArrastar?.(item.id);
+
+		// A move, not a copy — and carry the id so a drop outside this component
+		// still knows what was dragged.
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', item.id);
+		}
+	}
+
+	function fim() {
+		arrastandoEu = false;
+		sobre = false;
+		onLargar?.();
+	}
 </script>
 
 <div
 	class="atv"
 	class:movida={item.movida}
 	class:feita={concluida}
+	class:arrastando={arrastandoEu}
+	class:alvo-troca={sobre && !arrastandoEu}
 	draggable={movivel}
-	ondragstart={() => onArrastar?.(item.id)}
-	ondragover={(e) => e.preventDefault()}
+	ondragstart={inicio}
+	ondragend={fim}
+	ondragover={(e) => {
+		if (arrastandoEu) return;
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		sobre = true;
+	}}
+	ondragleave={() => (sobre = false)}
 	ondrop={(e) => {
 		e.preventDefault();
-		onSoltar?.(indice);
+		e.stopPropagation();
+		sobre = false;
+		if (!arrastandoEu) onSoltar?.(indice);
 	}}
 	role="listitem"
 >
+	{#if sobre && !arrastandoEu}
+		<span class="dica-troca" aria-hidden="true">trocar</span>
+	{/if}
 	{#if movivel}
 		<span class="alca" aria-hidden="true" title="Arraste para reorganizar">
 			<NavIcon name="balanceamento" size="sm" />
@@ -90,8 +153,20 @@
 		<span class="alca vazia" aria-hidden="true"></span>
 	{/if}
 
-	<span class="chip" style={tagStyle(cor)} title={nome}>{sigla}</span>
-	<span class="sr-only">{nome}</span>
+	<!-- The name is reachable three ways, since `title` alone is invisible to
+	     touch and unreliable with a keyboard: a focusable chip that reveals the
+	     name on hover AND focus, plus the always-present accessible name. -->
+	<button
+		type="button"
+		class="chip"
+		style={tagStyle(cor)}
+		title={nome}
+		aria-label={nome}
+		onclick={() => (nomeVisivel = !nomeVisivel)}
+	>
+		{sigla}
+	</button>
+	<span class="nome-balao" class:visivel={nomeVisivel} aria-hidden="true">{nome}</span>
 
 	<span class="txt">
 		<span class="tema">{tema}</span>
@@ -100,23 +175,21 @@
 	</span>
 
 	<span class="acoes">
+		{#if concluida}
+			<span class="feito-marca" title="Concluída" aria-label="Concluída">
+				<NavIcon name="check" size="sm" />
+			</span>
+		{/if}
 		{#if onRegistrar}
+			<!-- The pointerdown guard stops the row's drag from starting when the
+			     press lands on this button, which otherwise makes the icon
+			     unreliable on touch and with a slow mouse. -->
 			<IconButton
 				icon="registrar"
-				label="Registrar horas e questões de {nome}"
-				onclick={onRegistrar}
+				label="Registrar estudo de {nome}"
+				onclick={(e) => onRegistrar?.(e.currentTarget as HTMLElement)}
+				onpointerdown={(e) => e.stopPropagation()}
 			/>
-		{/if}
-		{#if onAlternarConcluida}
-			<label class="ok" title="Marcar {nome} como concluída">
-				<input
-					type="checkbox"
-					class="checkbox"
-					checked={concluida}
-					onchange={(e) => onAlternarConcluida(e.currentTarget.checked)}
-				/>
-				<span class="sr-only">Concluí {nome} — {tema}</span>
-			</label>
 		{/if}
 		{#if movivel}
 			<IconButton
@@ -161,19 +234,41 @@
 				<button type="button" role="menuitem" onclick={() => (menuAberto = false)}>
 					Cancelar
 				</button>
-			{:else}
-				<p class="menu-tit">Mover para:</p>
+			{:else if dataEscolhida === null}
+				<p class="menu-tit">Mover para qual data?</p>
 				<div class="datas">
-					{#each datasDisponiveis.slice(0, 30) as d (d)}
+					<!-- Every valid date, not a truncated window: the schedule runs for
+					     months and the useful target is often far from today. -->
+					{#each datasDisponiveis as d (d)}
 						<button
 							type="button"
 							role="menuitem"
 							class:atual={d === data}
-							onclick={() => mover(d, 0)}
+							onclick={() => (dataEscolhida = d)}
 						>
 							{fl(d)}
 						</button>
 					{/each}
+				</div>
+			{:else}
+				<p class="menu-tit">Onde, em {fl(dataEscolhida)}?</p>
+				<div class="datas">
+					<!-- Landing ON an activity swaps the two; landing at the end moves. -->
+					{#each itensDoDestino as alvo, i (alvo.id || i)}
+						<button type="button" role="menuitem" onclick={() => mover(dataEscolhida!, i)}>
+							Trocar com {alvo.rotulo}
+						</button>
+					{/each}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => mover(dataEscolhida!, itensDoDestino.length)}
+					>
+						Mover para o fim do dia
+					</button>
+					<button type="button" role="menuitem" onclick={() => (dataEscolhida = null)}>
+						Voltar às datas
+					</button>
 				</div>
 			{/if}
 		</div>
@@ -200,6 +295,60 @@
 	.atv:hover {
 		background: var(--bg-hover);
 	}
+	.atv[draggable='true'] {
+		cursor: grab;
+	}
+	.atv[draggable='true']:active {
+		cursor: grabbing;
+	}
+	/* The row being dragged stays visible but recedes, so the cursor's own drag
+	   image reads as the thing in motion. */
+	.atv.arrastando {
+		opacity: 0.4;
+	}
+	/* A drop here swaps the two activities — said in words as well as colour. */
+	.atv.alvo-troca {
+		background: var(--accent-soft);
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+		/* a slight lift, so the target reads as raised toward the pointer */
+		transform: translateY(-1px);
+	}
+	.dica-troca {
+		position: absolute;
+		top: -9px;
+		right: 10px;
+		z-index: 2;
+		font-family: var(--font-mono);
+		font-size: 9px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+		padding: 2px 7px;
+		border-radius: 4px;
+		background: var(--accent);
+		color: var(--bg);
+	}
+	/* Confirms the landing without animating the whole list. */
+	@keyframes assentar {
+		from {
+			background: var(--accent-soft);
+		}
+		to {
+			background: transparent;
+		}
+	}
+	.atv.movida {
+		animation: assentar 0.45s ease-out;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.atv.alvo-troca {
+			transform: none;
+		}
+		.atv.movida {
+			animation: none;
+		}
+	}
 	.alca {
 		display: grid;
 		place-items: center;
@@ -222,6 +371,9 @@
 	   being clipped. */
 	.chip {
 		flex: none;
+		border: 0;
+		cursor: help;
+		font-family: var(--font-mono);
 		min-width: 52px;
 		box-sizing: border-box;
 		text-align: center;
@@ -233,6 +385,33 @@
 		padding: 3px 7px;
 		border-radius: 5px;
 		white-space: nowrap;
+	}
+	.chip:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	/* The full name, revealed by hover, keyboard focus or a tap. `title` alone
+	   reaches neither touch nor most screen-reader/keyboard paths. */
+	.nome-balao {
+		position: absolute;
+		top: -6px;
+		left: 34px;
+		z-index: 5;
+		display: none;
+		padding: 4px 9px;
+		border-radius: 6px;
+		background: var(--bg-card);
+		border: 1px solid var(--border-strong);
+		box-shadow: var(--shadow-pop);
+		font-size: 12px;
+		color: var(--text);
+		white-space: nowrap;
+		pointer-events: none;
+	}
+	.chip:hover ~ .nome-balao,
+	.chip:focus-visible ~ .nome-balao,
+	.nome-balao.visivel {
+		display: block;
 	}
 	.txt {
 		display: flex;
@@ -261,16 +440,17 @@
 		gap: 2px;
 		align-self: center;
 	}
-	/* The check gets the same hit area as the icon buttons beside it, so the row
-	   of controls reads as one strip rather than a checkbox tacked on. */
-	.ok {
+	/* A completed activity shows a quiet check; the state itself is edited in the
+	   activity's own form. */
+	.feito-marca {
 		display: grid;
 		place-items: center;
 		width: var(--icon-hit);
 		height: var(--icon-hit);
-		cursor: pointer;
+		color: var(--good);
 		flex: none;
 	}
+
 	/* A finished activity settles back without becoming unreadable. */
 	.atv.feita .tema {
 		color: var(--text-faint);

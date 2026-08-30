@@ -58,6 +58,7 @@ func NewRouter(
 	guard("POST /api/concursos/{slug}/plano/tec/preview", h.Plano.PreviewTEC)
 	guard("POST /api/concursos/{slug}/plano/tec", h.Plano.ImportarTEC)
 	guard("POST /api/concursos/{slug}/plano/reordenar", h.Plano.Reordenar)
+	guard("POST /api/concursos/{slug}/plano/atividades/mover", h.Plano.MoverAtividade)
 	guard("POST /api/concursos/{slug}/plano/restaurar-ordem", h.Plano.RestaurarOrdem)
 	guard("GET /api/concursos/{slug}/plano/estatisticas", h.Plano.Estatisticas)
 	guard("GET /api/concursos/{slug}/plano/caderno", h.Plano.Caderno)

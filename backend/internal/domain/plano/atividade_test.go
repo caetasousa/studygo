@@ -381,3 +381,84 @@ func TestTrocarAtividades_RecusaDiaConcluido(t *testing.T) {
 		t.Fatalf("erro = %v, quer ErrDiaConcluido", err)
 	}
 }
+
+func TestIDDerivado_EstavelEResolvivel(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{
+			N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo,
+			Itens: []plano.ItemDia{
+				{Disciplina: "POR", Tema: "Crase"},
+				{Disciplina: "MAT", Tema: "Frações"},
+			},
+		},
+	}
+
+	derivadas := plano.DerivarAtividades(dias)
+	if len(derivadas) != 2 {
+		t.Fatalf("derivadas = %d, quer 2", len(derivadas))
+	}
+
+	// Deterministic: deriving twice yields the same ids, which is what lets the
+	// browser address an activity it was served earlier.
+	outra := plano.DerivarAtividades(dias)
+	for i := range derivadas {
+		if derivadas[i].ID != outra[i].ID {
+			t.Fatalf("id instável: %q vs %q", derivadas[i].ID, outra[i].ID)
+		}
+
+		if !plano.EhIDDerivado(derivadas[i].ID) {
+			t.Fatalf("id %q devia ser reconhecido como derivado", derivadas[i].ID)
+		}
+	}
+
+	// After materialisation the synthetic id must still find its activity.
+	armazenadas := []plano.Atividade{
+		{ID: "uuid-a", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR"},
+		{ID: "uuid-b", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT"},
+	}
+
+	got, ok := plano.ResolverIDDerivado(armazenadas, derivadas[1].ID)
+	if !ok || got != "uuid-b" {
+		t.Fatalf("ResolverIDDerivado = %q, %v; quer uuid-b, true", got, ok)
+	}
+
+	if _, ok := plano.ResolverIDDerivado(armazenadas, plano.IDDerivado(dia(2026, 9, 9), 0)); ok {
+		t.Fatal("slot inexistente devia falhar em vez de resolver")
+	}
+}
+
+// A move between days in different months must not confuse day-of-month with
+// the date, which is why every id and lookup carries the full ISO date.
+func TestMoverAtividade_EntreMeses(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 8, 31), Tipo: plano.TipoEstudo},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo},
+	}
+
+	atividades := []plano.Atividade{
+		{ID: "a", Data: dia(2026, 8, 31), Posicao: 0, Disciplina: "POR"},
+		{ID: "b", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "MAT"},
+	}
+
+	out, err := plano.TrocarAtividades(atividades, dias, "a", dia(2026, 9, 2), 0, nadaConcluido)
+	if err != nil {
+		t.Fatalf("TrocarAtividades: %v", err)
+	}
+
+	if got := posicoes(t, out, dia(2026, 9, 2)); len(got) != 1 || got[0] != "a" {
+		t.Errorf("02/09 = %v, quer [a]", got)
+	}
+
+	if got := posicoes(t, out, dia(2026, 8, 31)); len(got) != 1 || got[0] != "b" {
+		t.Errorf("31/08 = %v, quer [b]", got)
+	}
+
+	// Nothing may be duplicated or dropped by a swap.
+	if len(out) != len(atividades) {
+		t.Errorf("total = %d, quer %d", len(out), len(atividades))
+	}
+}

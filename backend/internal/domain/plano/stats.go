@@ -32,6 +32,26 @@ type RegistroBloco struct {
 	// Concluido marks this discipline done on its own, independently of the
 	// day's own flag: a day can be half finished.
 	Concluido bool
+	// AtividadeID ties the record to one scheduled activity, which is the real
+	// unit of work: a day may schedule the same discipline twice, and each
+	// occurrence records and completes on its own. Empty on records made before
+	// activities were materialised, which still key on (data, disciplina).
+	AtividadeID string
+}
+
+// BlocoDeAtividade returns the record for one scheduled activity, or nil.
+func (r Registro) BlocoDeAtividade(id string) *RegistroBloco {
+	if id == "" {
+		return nil
+	}
+
+	for i := range r.Blocos {
+		if r.Blocos[i].AtividadeID == id {
+			return &r.Blocos[i]
+		}
+	}
+
+	return nil
 }
 
 // BlocoDe returns the record for one discipline of the day, or nil.

@@ -240,6 +240,8 @@ export interface RegistroBloco {
 	nota: string;
 	/** This discipline finished, independently of the day's own flag. */
 	concluido: boolean;
+	/** The scheduled activity this record belongs to. Empty on legacy rows. */
+	atividadeId: string;
 }
 
 export interface Registro {
@@ -373,6 +375,8 @@ export interface RegistroBlocoInput {
 	acertos: number | null;
 	nota: string;
 	concluido: boolean;
+	/** Addresses one activity; preferred over `disciplina`. */
+	atividadeId: string;
 }
 
 export interface RegistroInput {

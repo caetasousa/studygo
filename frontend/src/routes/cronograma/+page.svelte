@@ -67,14 +67,21 @@
 	async function mover(id: string, data: string, posicao: number) {
 		const antes = posicaoAtual(id);
 		const destino = plano?.dias.find((d) => d.data === data);
+
+		// An occupied slot swaps the two activities; an empty one is a plain move.
+		// Same-day reordering always inserts, since there is no second day to
+		// exchange with.
 		const ocupado = !!destino && posicao < destino.itens.length;
 		const trocar = ocupado && antes?.data !== data;
+
 		const ok = await planoStore.moverAtividade(id, data, posicao, trocar);
+
 		if (ok && antes) {
 			ultimoMovimento = { id, ...antes };
-			aviso = 'Atividade movida.';
+			aviso = trocar ? 'Matérias trocadas.' : 'Atividade movida.';
 		} else if (!ok) {
-			// planoStore.erro already carries the reason; the plan itself is untouched.
+			// The store already restored the plan it committed last, so the board is
+			// back where it was; planoStore.erro carries the reason.
 			aviso = null;
 		}
 	}
@@ -160,7 +167,9 @@
 							movivel={diaMovivel(d)}
 							{datasDisponiveis}
 							onMover={mover}
+							arrastandoAlgo={arrastandoAtv !== null}
 							onArrastarAtv={(id) => (arrastandoAtv = id)}
+							onLargarAtv={() => (arrastandoAtv = null)}
 							onSoltarAtv={(pos) => soltarAtv(d.data, pos)}
 						/>
 					{/each}

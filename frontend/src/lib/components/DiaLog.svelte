@@ -31,11 +31,12 @@
 		dia.itens.length > 0
 			? dia.itens.map((it) => ({
 					codigo: it.disciplina,
+					atividadeId: it.id,
 					nome: disc[it.disciplina]?.nome ?? it.disciplina,
 					cor: disc[it.disciplina]?.cor ?? 0,
 					questoes: diaDeQuestoes || (modos[it.disciplina] ?? 'completo') !== 'teoria'
 				}))
-			: [{ codigo: '', nome: 'O dia', cor: -1, questoes: true }]
+			: [{ codigo: '', atividadeId: '', nome: 'O dia', cor: -1, questoes: true }]
 	);
 
 	const algumaComQuestoes = $derived(linhas.some((l) => l.questoes));
@@ -130,6 +131,7 @@
 			? linhas
 					.map((l) => ({
 						disciplina: l.codigo,
+						atividadeId: l.atividadeId,
 						...campo(l.codigo),
 						nota: '',
 						concluido: feitos[l.codigo] ?? false

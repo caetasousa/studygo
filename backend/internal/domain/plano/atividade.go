@@ -3,6 +3,7 @@ package plano
 import (
 	"errors"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -159,6 +160,58 @@ func TrocarAtividades(
 	return saida, nil
 }
 
+// prefixoDerivado marks an id the engine synthesised for an activity that has
+// never been stored. It is deliberately not a uuid: the repository rejects it,
+// which is what stops a synthetic id from reaching the database by accident.
+const prefixoDerivado = "gen:"
+
+// IDDerivado is the stable id of a generated (never-moved) activity: its slot
+// in the plan. It lets the UI address an activity on the very first load,
+// before any move has been persisted, without turning GET into a write.
+//
+// It is stable only while the plan is not rearranged, which is exactly its
+// lifetime: the first move materialises every activity with a real uuid.
+func IDDerivado(data time.Time, posicao int) string {
+	return prefixoDerivado + day(data).Format("2006-01-02") + ":" + itoa(posicao)
+}
+
+// EhIDDerivado reports whether an id is a synthetic slot id rather than a
+// stored activity's uuid.
+func EhIDDerivado(id string) bool {
+	return strings.HasPrefix(id, prefixoDerivado)
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+
+	var b []byte
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+
+	return string(b)
+}
+
+// ResolverIDDerivado maps a synthetic slot id back to the stored activity that
+// now occupies that slot, which is how the first move of a never-arranged plan
+// finds its target.
+func ResolverIDDerivado(atividades []Atividade, id string) (string, bool) {
+	if !EhIDDerivado(id) {
+		return id, true
+	}
+
+	for _, a := range atividades {
+		if IDDerivado(a.Data, a.Posicao) == id {
+			return a.ID, true
+		}
+	}
+
+	return "", false
+}
+
 // MoverAtividade moves one activity to (data, posicao) and returns the full new
 // ordering of every day it touched, so the caller can persist positions
 // densely and atomically.
@@ -301,6 +354,7 @@ func DerivarAtividades(dias []Dia) []Atividade {
 		for i, it := range d.Itens {
 			dia, pos := d.Data, i
 			out = append(out, Atividade{
+				ID:         IDDerivado(d.Data, i),
 				Data:       day(d.Data),
 				Posicao:    i,
 				Disciplina: it.Disciplina,

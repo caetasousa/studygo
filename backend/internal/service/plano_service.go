@@ -121,8 +121,20 @@ func (s *PlanoService) RegistrarDia(
 		reg.Horas, reg.Questoes, reg.Acertos = reg.Totais()
 	}
 
-	// Mirror the artifact: logging hours auto-marks the day done.
-	if reg.Horas != nil && *reg.Horas != 0 && !reg.Concluido {
+	// With per-activity records the day's flag is DERIVED, never asserted: it is
+	// done when every activity SCHEDULED for that day is done. Counting only the
+	// blocks that arrived would mark a two-subject day complete as soon as the
+	// first subject was recorded — exactly what per-activity completion exists to
+	// stop.
+	//
+	// Days that schedule no subjects (simulado, revisão, véspera) keep the
+	// artifact's rule: there, logging hours does mean the day is done.
+	agendadas := s.atividadesAgendadas(ctx, c, salvo, data)
+
+	switch {
+	case agendadas > 0:
+		reg.Concluido = concluidasNoDia(reg.Blocos) >= agendadas
+	case reg.Horas != nil && *reg.Horas != 0 && !reg.Concluido:
 		reg.Concluido = true
 	}
 
@@ -140,6 +152,44 @@ func (s *PlanoService) RegistrarDia(
 	}
 
 	return s.montar(ctx, c, salvo)
+}
+
+// concluidasNoDia counts the recorded activities that are marked done.
+func concluidasNoDia(bs []plano.RegistroBloco) int {
+	n := 0
+
+	for _, b := range bs {
+		if b.Concluido {
+			n++
+		}
+	}
+
+	return n
+}
+
+// atividadesAgendadas reports how many subject activities the plan schedules for
+// one day — the denominator for "is this day finished". Returns 0 for days that
+// carry no subjects, which keep the day-level rule.
+func (s *PlanoService) atividadesAgendadas(
+	ctx context.Context,
+	c concurso.Concurso,
+	salvo plano.Salvo,
+	data time.Time,
+) int {
+	res := plano.Gerar(salvo.Config, &c)
+	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
+
+	if as, err := s.planos.ListAtividades(ctx, salvo.ID); err == nil && len(as) > 0 {
+		plano.AplicarAtividades(res.Dias, as)
+	}
+
+	for _, d := range res.Dias {
+		if plano.DayOf(d.Data).Equal(plano.DayOf(data)) {
+			return len(d.Itens)
+		}
+	}
+
+	return 0
 }
 
 // enfileirarDoDia queues the spaced review for every topic the given day
@@ -326,14 +376,26 @@ func (s *PlanoService) MoverAtividade(
 	// First move on this plan: materialise what the engine generated, so ids
 	// exist to move around.
 	if len(atividades) == 0 {
-		atividades = plano.DerivarAtividades(res.Dias)
-		if err := s.planos.ReplaceAtividades(ctx, salvo.ID, atividades); err != nil {
+		derivadas := plano.DerivarAtividades(res.Dias)
+		if err := s.planos.ReplaceAtividades(ctx, salvo.ID, derivadas); err != nil {
 			return PlanoResposta{}, err
 		}
 
 		if atividades, err = s.planos.ListAtividades(ctx, salvo.ID); err != nil {
 			return PlanoResposta{}, err
 		}
+	}
+
+	// The client may address an activity by the deterministic slot id it was
+	// served before anything was stored. Resolve it against what now exists,
+	// so the very first drag works instead of failing "não encontrada".
+	if plano.EhIDDerivado(mov.ID) {
+		resolvido, ok := plano.ResolverIDDerivado(atividades, mov.ID)
+		if !ok {
+			return PlanoResposta{}, ErrValidacao{Msg: "atividade não encontrada"}
+		}
+
+		mov.ID = resolvido
 	}
 
 	concluido := func(d time.Time) bool {
@@ -798,14 +860,29 @@ func containsInt(xs []int, x int) bool {
 }
 
 // blocosDoInput keeps only the blocks whose discipline exists in the concurso
-// and that actually carry a value, one row per discipline.
+// and that actually carry a value.
+//
+// One row per ACTIVITY when the caller addresses activities, so a day that
+// schedules the same discipline twice records each occurrence separately;
+// otherwise one row per discipline, as before.
 func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.RegistroBloco {
 	out := make([]plano.RegistroBloco, 0, len(in))
 	visto := map[string]bool{}
 
 	for _, b := range in {
 		codigo := strings.TrimSpace(b.Disciplina)
-		if codigo == "" || visto[codigo] || c.DisciplinaByCodigo(codigo) == nil {
+		if codigo == "" || c.DisciplinaByCodigo(codigo) == nil {
+			continue
+		}
+
+		// Dedupe on the activity when there is one, so two occurrences of the
+		// same subject in a day no longer collapse into a single row.
+		chave := strings.TrimSpace(b.AtividadeID)
+		if chave == "" {
+			chave = "disc:" + codigo
+		}
+
+		if visto[chave] {
 			continue
 		}
 
@@ -817,15 +894,16 @@ func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.Registr
 			continue
 		}
 
-		visto[codigo] = true
+		visto[chave] = true
 
 		out = append(out, plano.RegistroBloco{
-			Disciplina: codigo,
-			Horas:      b.Horas,
-			Questoes:   b.Questoes,
-			Acertos:    naoMaiorQue(b.Acertos, b.Questoes),
-			Nota:       strings.TrimSpace(b.Nota),
-			Concluido:  b.Concluido,
+			Disciplina:  codigo,
+			Horas:       b.Horas,
+			Questoes:    b.Questoes,
+			Acertos:     naoMaiorQue(b.Acertos, b.Questoes),
+			Nota:        strings.TrimSpace(b.Nota),
+			Concluido:   b.Concluido,
+			AtividadeID: strings.TrimSpace(b.AtividadeID),
 		})
 	}
 

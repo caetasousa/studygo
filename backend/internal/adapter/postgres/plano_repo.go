@@ -175,7 +175,8 @@ func (r *PlanoRepo) loadRegistros(ctx context.Context, planoID uuid.UUID, s *pla
 func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT data, disciplina, horas::float8, questoes, acertos, nota, concluido
+		`SELECT data, disciplina, horas::float8, questoes, acertos, nota, concluido,
+		        COALESCE(atividade_id::text, '')
 		 FROM registros_bloco WHERE plano_id = $1 ORDER BY data, disciplina`,
 		planoID,
 	)
@@ -192,6 +193,7 @@ func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s
 
 		if err := rows.Scan(
 			&data, &b.Disciplina, &b.Horas, &b.Questoes, &b.Acertos, &b.Nota, &b.Concluido,
+			&b.AtividadeID,
 		); err != nil {
 			return fmt.Errorf("scanning registro_bloco: %w", err)
 		}
@@ -429,9 +431,11 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 	for _, b := range reg.Blocos {
 		if _, err := tx.Exec(
 			ctx,
-			`INSERT INTO registros_bloco (plano_id, data, disciplina, horas, questoes, acertos, nota, concluido)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			`INSERT INTO registros_bloco
+			   (plano_id, data, disciplina, horas, questoes, acertos, nota, concluido, atividade_id)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid)`,
 			planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota, b.Concluido,
+			b.AtividadeID,
 		); err != nil {
 			return fmt.Errorf("inserting registro_bloco: %w", err)
 		}

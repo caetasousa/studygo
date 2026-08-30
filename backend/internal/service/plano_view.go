@@ -78,6 +78,9 @@ type RegistroBlocoInput struct {
 	Acertos    *int     `json:"acertos"`
 	Nota       string   `json:"nota"`
 	Concluido  bool     `json:"concluido"`
+	// AtividadeID addresses one scheduled activity. Preferred over Disciplina,
+	// which cannot tell two occurrences of the same subject in a day apart.
+	AtividadeID string `json:"atividadeId"`
 }
 
 // PlanoResposta is the fat payload for GET /api/plano.
@@ -212,13 +215,14 @@ type RegistroResposta struct {
 }
 
 type RegistroBlocoResposta struct {
-	Disciplina string   `json:"disciplina"`
-	Horas      *float64 `json:"horas"`
-	Questoes   *int     `json:"questoes"`
-	Acertos    *int     `json:"acertos"`
-	Erros      *int     `json:"erros"`
-	Nota       string   `json:"nota"`
-	Concluido  bool     `json:"concluido"`
+	Disciplina  string   `json:"disciplina"`
+	Horas       *float64 `json:"horas"`
+	Questoes    *int     `json:"questoes"`
+	Acertos     *int     `json:"acertos"`
+	Erros       *int     `json:"erros"`
+	Nota        string   `json:"nota"`
+	Concluido   bool     `json:"concluido"`
+	AtividadeID string   `json:"atividadeId"`
 }
 
 type MarcoResposta struct {
@@ -354,13 +358,14 @@ func registroToResposta(r plano.Registro) *RegistroResposta {
 
 	for _, b := range r.Blocos {
 		out.Blocos = append(out.Blocos, RegistroBlocoResposta{
-			Disciplina: b.Disciplina,
-			Horas:      b.Horas,
-			Questoes:   b.Questoes,
-			Acertos:    b.Acertos,
-			Erros:      errosDe(b.Questoes, b.Acertos),
-			Nota:       b.Nota,
-			Concluido:  b.Concluido,
+			Disciplina:  b.Disciplina,
+			Horas:       b.Horas,
+			Questoes:    b.Questoes,
+			Acertos:     b.Acertos,
+			Erros:       errosDe(b.Questoes, b.Acertos),
+			Nota:        b.Nota,
+			Concluido:   b.Concluido,
+			AtividadeID: b.AtividadeID,
 		})
 	}
 

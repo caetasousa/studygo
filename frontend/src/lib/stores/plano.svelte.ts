@@ -1,15 +1,55 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
+import { aplicarMovimento, blocosComAtividade, diaConcluido, siglas } from '$lib/estudo';
 import type {
 	AnotacaoInput,
 	Caderno,
 	ConfigInput,
 	Estatisticas,
+	ItemDia,
 	PlanoResposta,
 	PreviewTEC,
+	Registro,
+	RegistroBloco,
+	RegistroBlocoInput,
 	RegistroInput
 } from '$lib/types';
+
+/**
+ * Finds what is recorded for ONE scheduled activity.
+ *
+ * Prefers the activity id, which is the only key that tells two occurrences of
+ * the same discipline in a day apart. Falls back to the discipline for records
+ * written before activities were addressable — but only when no block claims an
+ * activity id, so a legacy row never shadows a properly keyed one.
+ */
+export function blocoDaAtividade(
+	reg: Registro | null | undefined,
+	item: Pick<ItemDia, 'id' | 'disciplina'>
+): RegistroBloco | null {
+	const blocos = reg?.blocos ?? [];
+
+	if (item.id) {
+		const porID = blocos.find((b) => b.atividadeId === item.id);
+		if (porID) return porID;
+	}
+
+	const legado = blocos.find((b) => !b.atividadeId && b.disciplina === item.disciplina);
+
+	return legado ?? null;
+}
+
+/** Optimistic local rearrangement, mirroring the backend's move/swap rules. */
+function moverLocalmente(
+	p: PlanoResposta,
+	id: string,
+	data: string,
+	posicao: number,
+	trocar: boolean
+): PlanoResposta {
+	return { ...p, dias: aplicarMovimento(p.dias, id, data, posicao, trocar) };
+}
 
 const cacheKey = (slug: string) => `annygo.plano.${slug}.v1`;
 
@@ -45,6 +85,14 @@ class PlanoStore {
 		}
 		return m;
 	});
+
+	/**
+	 * Display siglas by codigo — RL, LP, BD. Derived from the names, never
+	 * stored: the codigo stays the technical key everything else is joined on.
+	 */
+	siglaIndex = $derived.by<Record<string, string>>(() =>
+		siglas(this.plano?.concurso.disciplinas ?? [])
+	);
 
 	private get slug(): string {
 		const s = concursoStore.ativoSlug;
@@ -109,70 +157,6 @@ class PlanoStore {
 	salvarConfig = (input: ConfigInput) => this.run((s) => api.salvarConfig(s, input));
 	registrarDia = (data: string, input: RegistroInput) =>
 		this.run((s) => api.registrarDia(s, data, input));
-
-	/**
-	 * Marks one discipline of one day done, or undoes it, preserving everything
-	 * else already recorded for that day.
-	 *
-	 * Ticking with no hours logged fills in the day's default share, so a check
-	 * alone still counts towards the totals; unticking takes that back only when
-	 * it was filled in this way, never hours the user typed.
-	 */
-	concluirDisciplina = (data: string, codigo: string, marcado: boolean) => {
-		const d = this.plano?.dias.find((x) => x.data === data);
-		if (!d) return Promise.resolve();
-
-		const reg = d.registro;
-		const codigos = d.itens.map((i) => i.disciplina);
-		const padrao = this.plano?.config.horasDia ?? null;
-		const fatia =
-			padrao !== null && codigos.length > 0
-				? Math.round((padrao / codigos.length) * 100) / 100
-				: null;
-
-		const blocos = codigos.map((c) => {
-			const b = reg?.blocos?.find((x) => x.disciplina === c);
-			const eu = c === codigo;
-			const feito = eu ? marcado : (b?.concluido ?? reg?.concluido ?? false);
-			let horas = b?.horas ?? null;
-
-			if (eu && marcado && horas === null) horas = fatia;
-			// Undo the automatic fill, but never a value that was typed in.
-			if (eu && !marcado && horas !== null && fatia !== null && horas === fatia) horas = null;
-
-			return {
-				disciplina: c,
-				horas,
-				questoes: b?.questoes ?? null,
-				acertos: b?.acertos ?? null,
-				nota: b?.nota ?? '',
-				concluido: feito
-			};
-		});
-
-		const soma = (f: (b: (typeof blocos)[number]) => number | null): number | null => {
-			let t: number | null = null;
-			for (const b of blocos) {
-				const v = f(b);
-				if (v !== null) t = (t ?? 0) + v;
-			}
-			return t;
-		};
-
-		return this.run((s) =>
-			api.registrarDia(s, data, {
-				horas: soma((b) => b.horas),
-				questoes: soma((b) => b.questoes),
-				acertos: soma((b) => b.acertos),
-				// The day is done once every discipline in it is.
-				concluido: blocos.length > 0 && blocos.every((b) => b.concluido),
-				nota: reg?.nota ?? '',
-				blocos: blocos.filter(
-					(b) => b.horas !== null || b.questoes !== null || b.acertos !== null || b.concluido
-				)
-			})
-		);
-	};
 	limparRegistros = () => this.run((s) => api.limparRegistros(s));
 	marcarMarco = (id: string, cumprido: boolean) => this.run((s) => api.marcarMarco(s, id, cumprido));
 	registrarRevisao = (id: string, questoes: number, acertos: number) =>
@@ -180,12 +164,81 @@ class PlanoStore {
 	reordenar = (a: string, b: string) => this.run((s) => api.reordenar(s, a, b));
 
 	/**
-	 * Moves one activity. Returns whether it succeeded, so the caller can show a
-	 * message and offer Undo.
+	 * Saves ONE scheduled activity's record, leaving every other subject of that
+	 * day exactly as it was.
 	 *
-	 * On failure the plan is left exactly as it was: `run` only commits a new
-	 * plan when the request resolves, so a rejected move never leaves the UI
-	 * showing a position the server did not accept.
+	 * The day's other blocks are re-sent unchanged (the API replaces the day's
+	 * block set), and the day's totals are recomputed from all of them. The day
+	 * counts as done only when every activity in it does — the flag is derived,
+	 * never set by hand.
+	 *
+	 * Returns an error message on failure, or null on success, so the caller can
+	 * keep the form open and show what went wrong.
+	 */
+	salvarAtividade = async (
+		data: string,
+		atividadeId: string,
+		disciplina: string,
+		v: {
+			horas: number | null;
+			questoes: number | null;
+			acertos: number | null;
+			concluido: boolean;
+			nota: string;
+		}
+	): Promise<string | null> => {
+		const d = this.plano?.dias.find((x) => x.data === data);
+		if (!d) return 'dia não encontrado';
+
+		const reg = d.registro;
+
+		// Rebuild the day's block set: this activity from the form, every other
+		// from what is already stored. Addressed by atividadeId so two occurrences
+		// of the same discipline in a day stay independent.
+		const blocos: RegistroBlocoInput[] = blocosComAtividade(
+			d.itens,
+			reg?.blocos ?? [],
+			atividadeId,
+			v
+		).map((b) => ({ ...b, nota: b.nota }));
+
+		const soma = (f: (b: RegistroBlocoInput) => number | null): number | null => {
+			let t: number | null = null;
+			for (const b of blocos) {
+				const x = f(b);
+				if (x !== null) t = (t ?? 0) + x;
+			}
+			return t;
+		};
+
+		try {
+			this.commit(
+				await api.registrarDia(this.slug, data, {
+					horas: soma((b) => b.horas),
+					questoes: soma((b) => b.questoes),
+					acertos: soma((b) => b.acertos),
+					concluido: diaConcluido(blocos),
+					nota: reg?.nota ?? '',
+					blocos: blocos.filter(
+						(b) =>
+							b.horas !== null || b.questoes !== null || b.acertos !== null ||
+							b.concluido || b.nota !== ''
+					)
+				})
+			);
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível salvar';
+		}
+	};
+
+	/**
+	 * Moves one activity, optimistically.
+	 *
+	 * The board is rearranged locally first so the drop feels immediate, then the
+	 * server's authoritative plan replaces it. If the request fails the previous
+	 * plan is restored exactly, so a rejected move leaves no trace on screen.
 	 */
 	moverAtividade = async (
 		id: string,
@@ -193,11 +246,19 @@ class PlanoStore {
 		posicao: number,
 		trocar = false
 	): Promise<boolean> => {
+		// Snapshot for rollback. A structural clone keeps the optimistic edit from
+		// aliasing the object we intend to restore.
+		const anterior = this.plano ? structuredClone($state.snapshot(this.plano)) : null;
+
+		if (this.plano) this.plano = moverLocalmente(this.plano, id, data, posicao, trocar);
+
 		try {
 			this.commit(await api.moverAtividade(this.slug, id, data, posicao, trocar));
 
 			return true;
 		} catch (e) {
+			// Put the board back exactly as it was before the optimistic edit.
+			if (anterior) this.plano = anterior;
 			this.erro = e instanceof Error ? e.message : 'Não foi possível mover a atividade';
 
 			return false;
