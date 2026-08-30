@@ -565,6 +565,18 @@ func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput
 		atual.LimiarFraco = *in.LimiarFraco
 	}
 
+	if in.BlocosPorDia != nil {
+		atual.BlocosPorDia = *in.BlocosPorDia
+	}
+
+	if in.PctRevisao != nil {
+		atual.PctRevisao = *in.PctRevisao
+	}
+
+	if in.CicloRevisao != nil {
+		atual.CicloRevisao = cicloDoInput(*in.CicloRevisao)
+	}
+
 	for codigo, modo := range in.Modos {
 		if c.DisciplinaByCodigo(codigo) == nil {
 			continue
@@ -573,7 +585,31 @@ func aplicarPerfilInput(atual plano.Perfil, c concurso.Concurso, in *PerfilInput
 		atual.Modos[codigo] = plano.Modo(modo)
 	}
 
+	for codigo, r := range in.Reforcos {
+		if c.DisciplinaByCodigo(codigo) == nil {
+			continue
+		}
+
+		atual.Reforcos[codigo] = r
+	}
+
 	return atual.Normalizar()
+}
+
+// cicloDoInput turns the wire form of the weekly rotation into domain items.
+// An empty list means "use the default cycle", not "no weekly review".
+func cicloDoInput(in []CicloItemInput) []concurso.RevItem {
+	out := make([]concurso.RevItem, 0, len(in))
+
+	for _, it := range in {
+		out = append(out, concurso.RevItem{
+			Ordem:    len(out),
+			Titulo:   strings.TrimSpace(it.Titulo),
+			Questoes: maxZero(it.Questoes),
+		})
+	}
+
+	return out
 }
 
 func normalizarDias(dias []int) []int {

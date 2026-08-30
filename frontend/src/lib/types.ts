@@ -137,6 +137,11 @@ export interface ConcursoInfo {
 export type Simulados = 'nunca' | 'quinzenal' | 'semanal';
 export type Modo = 'completo' | 'questoes' | 'teoria';
 
+export interface CicloItem {
+	titulo: string;
+	questoes: number;
+}
+
 export interface Perfil {
 	simulados: Simulados;
 	discursiva: boolean;
@@ -146,6 +151,11 @@ export interface Perfil {
 	questoesPorRevisao: number;
 	limiarFraco: number;
 	modos: Record<string, Modo>;
+	blocosPorDia: number;
+	pctRevisao: number;
+	reforcos: Record<string, number>;
+	cicloRevisao: CicloItem[];
+	minutosPorBloco: number;
 }
 
 export interface PerfilInput {
@@ -157,6 +167,10 @@ export interface PerfilInput {
 	questoesPorRevisao?: number;
 	limiarFraco?: number;
 	modos?: Record<string, Modo>;
+	blocosPorDia?: number;
+	pctRevisao?: number;
+	reforcos?: Record<string, number>;
+	cicloRevisao?: CicloItem[];
 }
 
 export interface Config {

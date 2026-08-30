@@ -1,5 +1,11 @@
 package plano
 
+import (
+	"strings"
+
+	"annygo/internal/domain/concurso"
+)
+
 // Frequencia is how often a full mock exam shows up in the reta final.
 type Frequencia string
 
@@ -32,7 +38,31 @@ type Perfil struct {
 	QuestoesPorRevisao int
 	LimiarFraco        int // % below which a battery counts as weak
 	Modos              map[string]Modo
+
+	// BlocosPorDia is how many disciplines a study day covers. The artifact
+	// always used two; someone who can sit down for five subjects gets five.
+	BlocosPorDia int
+
+	// PctRevisao is the slice of the day the spaced-review tail takes.
+	PctRevisao float64
+
+	// Reforcos gives a discipline extra weight, by codigo. 1 is normal; 2 makes
+	// it show up twice as often and take twice the minutes when it does — the
+	// lever for a subject you are struggling with.
+	Reforcos map[string]float64
+
+	// CicloRevisao is the weekly-review rotation of the base phase. Empty means
+	// the concurso's own, or RevCicloPadrao.
+	CicloRevisao []concurso.RevItem
 }
+
+// Limites of the tunable fields, shared with the service's validation.
+const (
+	BlocosMin  = 1
+	BlocosMax  = 6
+	ReforcoMin = 0.25
+	ReforcoMax = 3
+)
 
 // PerfilPadrao reproduces the artifact's behaviour exactly: a full mock exam on
 // the last day of every reta-final week, an essay on the day before it, and the
@@ -48,6 +78,10 @@ func PerfilPadrao() Perfil {
 		QuestoesPorRevisao: 10,
 		LimiarFraco:        70,
 		Modos:              map[string]Modo{},
+		BlocosPorDia:       2,
+		PctRevisao:         0.16,
+		Reforcos:           map[string]float64{},
+		CicloRevisao:       nil,
 	}
 }
 
@@ -107,7 +141,56 @@ func (p Perfil) Normalizar() Perfil {
 		p.Modos = map[string]Modo{}
 	}
 
+	if p.BlocosPorDia < BlocosMin || p.BlocosPorDia > BlocosMax {
+		p.BlocosPorDia = padrao.BlocosPorDia
+	}
+
+	if p.PctRevisao < 0 || p.PctRevisao > 0.4 {
+		p.PctRevisao = padrao.PctRevisao
+	}
+
+	if p.Reforcos == nil {
+		p.Reforcos = map[string]float64{}
+	}
+
+	p.CicloRevisao = cicloValido(p.CicloRevisao)
+
 	return p
+}
+
+// ReforcoDe is a discipline's extra weight, defaulting to 1 and clamped to a
+// range where the plan still makes sense.
+func (p Perfil) ReforcoDe(codigo string) float64 {
+	r, ok := p.Reforcos[codigo]
+	if !ok || r == 0 {
+		return 1
+	}
+
+	return min(max(r, ReforcoMin), ReforcoMax)
+}
+
+// cicloValido drops entries with no title, so a half-filled form cannot leave
+// the weekly review with a blank headline.
+func cicloValido(itens []concurso.RevItem) []concurso.RevItem {
+	out := make([]concurso.RevItem, 0, len(itens))
+
+	for _, it := range itens {
+		if strings.TrimSpace(it.Titulo) == "" {
+			continue
+		}
+
+		out = append(out, concurso.RevItem{
+			Ordem:    len(out),
+			Titulo:   strings.TrimSpace(it.Titulo),
+			Questoes: max(0, it.Questoes),
+		})
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 // intervalosValidos keeps the positive, strictly increasing entries — a review

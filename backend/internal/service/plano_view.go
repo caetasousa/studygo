@@ -30,14 +30,24 @@ type ConfigInput struct {
 // PerfilInput patches the study profile. Every field is optional — a nil field
 // leaves that setting untouched.
 type PerfilInput struct {
-	Simulados          *string           `json:"simulados"`
-	Discursiva         *bool             `json:"discursiva"`
-	Intervalos         *[]int            `json:"intervalos"`
-	PctQuestoes        *float64          `json:"pctQuestoes"`
-	RevisaoPorQuestoes *bool             `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao *int              `json:"questoesPorRevisao"`
-	LimiarFraco        *int              `json:"limiarFraco"`
-	Modos              map[string]string `json:"modos"`
+	Simulados          *string            `json:"simulados"`
+	Discursiva         *bool              `json:"discursiva"`
+	Intervalos         *[]int             `json:"intervalos"`
+	PctQuestoes        *float64           `json:"pctQuestoes"`
+	RevisaoPorQuestoes *bool              `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao *int               `json:"questoesPorRevisao"`
+	LimiarFraco        *int               `json:"limiarFraco"`
+	Modos              map[string]string  `json:"modos"`
+	BlocosPorDia       *int               `json:"blocosPorDia"`
+	PctRevisao         *float64           `json:"pctRevisao"`
+	Reforcos           map[string]float64 `json:"reforcos"`
+	CicloRevisao       *[]CicloItemInput  `json:"cicloRevisao"`
+}
+
+// CicloItemInput is one week of the base-phase review rotation.
+type CicloItemInput struct {
+	Titulo   string `json:"titulo"`
+	Questoes int    `json:"questoes"`
 }
 
 // RegistroInput is one day's log coming from the client.
@@ -131,14 +141,19 @@ type ConfigResposta struct {
 }
 
 type PerfilResposta struct {
-	Simulados          string            `json:"simulados"`
-	Discursiva         bool              `json:"discursiva"`
-	Intervalos         []int             `json:"intervalos"`
-	PctQuestoes        float64           `json:"pctQuestoes"`
-	RevisaoPorQuestoes bool              `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao int               `json:"questoesPorRevisao"`
-	LimiarFraco        int               `json:"limiarFraco"`
-	Modos              map[string]string `json:"modos"`
+	Simulados          string             `json:"simulados"`
+	Discursiva         bool               `json:"discursiva"`
+	Intervalos         []int              `json:"intervalos"`
+	PctQuestoes        float64            `json:"pctQuestoes"`
+	RevisaoPorQuestoes bool               `json:"revisaoPorQuestoes"`
+	QuestoesPorRevisao int                `json:"questoesPorRevisao"`
+	LimiarFraco        int                `json:"limiarFraco"`
+	Modos              map[string]string  `json:"modos"`
+	BlocosPorDia       int                `json:"blocosPorDia"`
+	PctRevisao         float64            `json:"pctRevisao"`
+	Reforcos           map[string]float64 `json:"reforcos"`
+	CicloRevisao       []CicloItemInput   `json:"cicloRevisao"`
+	MinutosPorBloco    int                `json:"minutosPorBloco"` // derivado, para a tela
 }
 
 // DiaResposta is one plan day plus the user's record and timed breakdown.

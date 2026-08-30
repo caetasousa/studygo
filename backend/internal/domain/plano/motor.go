@@ -2,6 +2,7 @@ package plano
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -57,7 +58,9 @@ func construir(
 		revCiclo = RevCicloPadrao
 	}
 
-	revCiclo = ajustarCiclo(revCiclo, perfil)
+	if len(perfil.CicloRevisao) > 0 {
+		revCiclo = perfil.CicloRevisao
+	}
 
 	vesp := addDays(cfg.Prova, -1)
 	ancora := mondayOf(cfg.Inicio)
@@ -99,8 +102,13 @@ func construir(
 	diasEst := filterPapel(estudo, "est")
 	diasRevD := filterPapel(estudo, "revd")
 
-	res.Slots = distribui(len(diasEst)*2, codes, pontos, soma)
-	res.SlotsReta = distribui(len(diasRevD)*2, codes, pontos, soma)
+	// A distribuição usa o peso com reforço; res.Pontos segue sendo o peso puro
+	// da prova, que é o que a tela de balanceamento mostra.
+	dist, somaDist := pesosDistribuicao(codes, pontos, perfil)
+	n := perfil.BlocosPorDia
+
+	res.Slots = distribui(len(diasEst)*n, codes, dist, somaDist)
+	res.SlotsReta = distribui(len(diasRevD)*n, codes, dist, somaDist)
 
 	filas := map[string][]reparteItem{}
 	ptr := map[string]int{}
@@ -112,8 +120,8 @@ func construir(
 		filasR[k] = reparte(temas[k], res.SlotsReta[k])
 	}
 
-	ordem := despareia(ordena(res.Slots, pontos, codes, soma))
-	ordemR := despareia(ordena(res.SlotsReta, pontos, codes, soma))
+	ordem := despareia(ordena(res.Slots, dist, codes, somaDist), n)
+	ordemR := despareia(ordena(res.SlotsReta, dist, codes, somaDist), n)
 
 	res.Simulado = simulado(cfg, c)
 	simTema := res.Simulado.Tema()
@@ -138,11 +146,11 @@ func construir(
 		case d.papel == "est":
 			base.Tipo = TipoEstudo
 			base.Meta = metaEstudo
-			base.Itens = puxaBloco(codes, ordem, &oi, filas, ptr, "")
+			base.Itens = puxaBloco(ordem, &oi, n, filas, ptr, "")
 		case d.papel == "revd":
 			base.Tipo = TipoRevisaoDirigida
 			base.Meta = metaRevD
-			base.Itens = puxaBloco(codes, ordemR, &ori, filasR, ptrR, "Revisão dirigida — ")
+			base.Itens = puxaBloco(ordemR, &ori, n, filasR, ptrR, "Revisão dirigida — ")
 		case d.papel == "sim":
 			base.Tipo = TipoSimulado
 			base.Meta = simMeta
@@ -273,27 +281,6 @@ func querSimulado(perfil Perfil, semanaReta int) bool {
 	}
 }
 
-// ajustarCiclo rewrites the weekly-review cycle so it never asks for something
-// the user turned off — a mock exam or an essay become question batteries.
-func ajustarCiclo(ciclo []concurso.RevItem, perfil Perfil) []concurso.RevItem {
-	out := make([]concurso.RevItem, len(ciclo))
-	copy(out, ciclo)
-
-	for i := range out {
-		titulo := strings.ToLower(out[i].Titulo)
-
-		switch {
-		case perfil.Simulados == SimuladoNunca && strings.Contains(titulo, "simulado"):
-			out[i].Titulo = "Bateria dirigida de questões nos temas da semana, com correção comentada"
-		case !perfil.Discursiva && strings.Contains(titulo, "discursiva"):
-			out[i].Titulo = "Bateria extra de questões nos temas mais fracos da semana"
-			out[i].Questoes = perfil.QuestoesPorRevisao * 3
-		}
-	}
-
-	return out
-}
-
 // renumera assigns 1-based day numbers and compacts week numbers so they run
 // 1..N with no gaps.
 func renumera(dias []Dia) {
@@ -339,19 +326,19 @@ func (c Composicao) Tema() string {
 	)
 }
 
-// puxaBloco consumes up to two discipline slots from ordem and pulls the next
+// puxaBloco consumes up to n discipline slots from ordem and pulls the next
 // queued topic for each. prefix, when set, is prepended to the topic text.
 func puxaBloco(
-	codes []string,
 	ordem []string,
 	cursor *int,
+	n int,
 	filas map[string][]reparteItem,
 	ptr map[string]int,
 	prefix string,
 ) []ItemDia {
 	itens := []ItemDia{}
 
-	for b := 0; b < 2; b++ {
+	for b := 0; b < n; b++ {
 		if *cursor >= len(ordem) {
 			break
 		}
@@ -497,39 +484,68 @@ func ordena(slots, pontos map[string]int, codes []string, soma int) []string {
 	return ordem
 }
 
-// despareia swaps entries so the two blocks of a day never share a discipline,
-// pulling a later distinct entry forward when a clash is found.
-func despareia(ordem []string) []string {
-	for i := 0; i+1 < len(ordem); i += 2 {
-		if ordem[i] != ordem[i+1] {
-			continue
-		}
+// despareia swaps entries so the n blocks of a day never repeat a discipline,
+// pulling a later distinct entry forward when a clash is found. The candidate
+// has to be absent from this day and its own day has to be free of the
+// discipline being pushed out, so a swap never trades one clash for another.
+func despareia(ordem []string, n int) []string {
+	if n < 2 {
+		return ordem
+	}
 
-		j := i + 2
+	for inicio := 0; inicio < len(ordem); inicio += n {
+		fim := minInt(inicio+n, len(ordem))
 
-		for j < len(ordem) {
-			same := ordem[j] == ordem[i]
-
-			var adjacente bool
-			if j%2 == 0 {
-				adjacente = j+1 < len(ordem) && ordem[j+1] == ordem[i]
-			} else {
-				adjacente = ordem[j-1] == ordem[i]
+		for i := inicio + 1; i < fim; i++ {
+			if !contemEntre(ordem, inicio, i, ordem[i]) {
+				continue
 			}
 
-			if !same && !adjacente {
+			for j := fim; j < len(ordem); j++ {
+				if contemEntre(ordem, inicio, fim, ordem[j]) {
+					continue
+				}
+
+				gi := (j / n) * n
+				if contemEntre(ordem, gi, minInt(gi+n, len(ordem)), ordem[i]) {
+					continue
+				}
+
+				ordem[i], ordem[j] = ordem[j], ordem[i]
+
 				break
 			}
-
-			j++
-		}
-
-		if j < len(ordem) {
-			ordem[i+1], ordem[j] = ordem[j], ordem[i+1]
 		}
 	}
 
 	return ordem
+}
+
+func contemEntre(xs []string, inicio, fim int, alvo string) bool {
+	for i := inicio; i < fim && i < len(xs); i++ {
+		if xs[i] == alvo {
+			return true
+		}
+	}
+
+	return false
+}
+
+// pesosDistribuicao scales the exam weights by each discipline's reforço. The
+// values are multiplied by 100 first so a fractional reforço still lands on
+// integers; distribui and ordena are both ratio-based, so the scale itself
+// changes nothing.
+func pesosDistribuicao(codes []string, pontos map[string]int, perfil Perfil) (map[string]int, int) {
+	out := make(map[string]int, len(codes))
+	soma := 0
+
+	for _, k := range codes {
+		v := int(math.Round(float64(pontos[k]) * perfil.ReforcoDe(k) * 100))
+		out[k] = v
+		soma += v
+	}
+
+	return out, soma
 }
 
 func filterPapel(dias []*diaTmp, papel string) []*diaTmp {
@@ -556,6 +572,14 @@ func contains(xs []int, x int) bool {
 
 func maxInt(a, b int) int {
 	if a > b {
+		return a
+	}
+
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
 		return a
 	}
 

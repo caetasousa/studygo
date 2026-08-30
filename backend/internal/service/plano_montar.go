@@ -164,11 +164,11 @@ func montarConfig(salvo plano.Salvo) ConfigResposta {
 		RetaFinalDias: salvo.Config.RetaFinalDias,
 		TemaUI:        salvo.TemaUI,
 		Questoes:      salvo.Config.Questoes,
-		Perfil:        montarPerfil(salvo.Config.Perfil),
+		Perfil:        montarPerfil(salvo.Config.Perfil, salvo.Config.HorasDia),
 	}
 }
 
-func montarPerfil(p plano.Perfil) PerfilResposta {
+func montarPerfil(p plano.Perfil, horasDia float64) PerfilResposta {
 	p = p.Normalizar()
 
 	modos := make(map[string]string, len(p.Modos))
@@ -176,7 +176,22 @@ func montarPerfil(p plano.Perfil) PerfilResposta {
 		modos[codigo] = string(m)
 	}
 
+	reforcos := make(map[string]float64, len(p.Reforcos))
+	for codigo := range p.Reforcos {
+		reforcos[codigo] = p.ReforcoDe(codigo)
+	}
+
+	ciclo := make([]CicloItemInput, 0, len(p.CicloRevisao))
+	for _, it := range p.CicloRevisao {
+		ciclo = append(ciclo, CicloItemInput{Titulo: it.Titulo, Questoes: it.Questoes})
+	}
+
 	return PerfilResposta{
+		BlocosPorDia:       p.BlocosPorDia,
+		PctRevisao:         p.PctRevisao,
+		Reforcos:           reforcos,
+		CicloRevisao:       ciclo,
+		MinutosPorBloco:    minutosPorBloco(horasDia, p),
 		Simulados:          string(p.Simulados),
 		Discursiva:         p.Discursiva,
 		Intervalos:         p.Intervalos,
@@ -513,4 +528,16 @@ func revisoesDoDia(rs []plano.Revisao, cfg plano.Config, agora time.Time) []Revi
 	}
 
 	return out
+}
+
+// minutosPorBloco is what one normal (reforço 1) study block lasts, rounded to
+// five minutes — the number the profile screen shows next to blocos por dia.
+func minutosPorBloco(horasDia float64, p plano.Perfil) int {
+	if p.BlocosPorDia <= 0 {
+		return 0
+	}
+
+	m := horasDia * 60 * (1 - p.PctRevisao) / float64(p.BlocosPorDia)
+
+	return int(math.Round(m/5)) * 5
 }

@@ -33,39 +33,40 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 	h := ctx.HorasDia * 60
 
 	if len(d.Itens) > 0 {
+		perfil := ctx.Perfil.Normalizar()
 		rev := d.Tipo == TipoRevisaoDirigida
-		porBloco := int(math.Round(float64(d.Meta) / float64(len(d.Itens))))
 
+		// Sem nada vencendo, o tempo da revisão volta para o conteúdo em vez de
+		// mandar revisar o vazio.
+		pctRevisao := perfil.PctRevisao
+		if len(d.Revisoes) == 0 {
+			pctRevisao = 0
+		}
+
+		minutos := repartirMinutos(h*(1-pctRevisao), d.Itens, perfil)
 		out := make([]Bloco, 0, len(d.Itens)+1)
 
-		perfil := ctx.Perfil.Normalizar()
-
 		for idx, it := range d.Itens {
-			rotulo := "1º bloco"
-			if idx == 1 {
-				rotulo = "2º bloco"
+			// As questões do dia seguem o mesmo peso dos minutos: a matéria
+			// reforçada leva um bloco maior e uma bateria maior junto.
+			porBloco := 0
+			if h > 0 {
+				porBloco = int(math.Round(float64(d.Meta) * float64(minutos[idx]) / (h * (1 - pctRevisao))))
 			}
 
 			out = append(out, Bloco{
-				Minutos: m5(h * 0.42),
-				Titulo:  rotulo + " — " + ctx.Nomes[it.Disciplina],
+				Minutos: minutos[idx],
+				Titulo:  rotuloBloco(idx) + " — " + ctx.Nomes[it.Disciplina],
 				Detalhe: detalheDoBloco(perfil.ModoDe(it.Disciplina), rev, porBloco),
 			})
 		}
 
-		// Sem nada vencendo, o tempo da revisão volta para o conteúdo em vez de
-		// mandar revisar o vazio.
-		if len(d.Revisoes) == 0 && len(out) > 0 {
-			extra := m5(h*0.16) / len(out)
-			for i := range out {
-				out[i].Minutos += extra
-			}
-
+		if pctRevisao == 0 {
 			return out
 		}
 
 		out = append(out, Bloco{
-			Minutos: m5(h * 0.16),
+			Minutos: m5(h * pctRevisao),
 			Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
 			Detalhe: revisaoDetalhe(perfil, d.Revisoes),
 		})
@@ -147,4 +148,58 @@ func revisaoDetalhe(perfil Perfil, vencendo []Revisao) string {
 	}
 
 	return "reconstrua de memória cada tema ao lado e confira o resumo depois"
+}
+
+// ordinais names the study blocks of a day; past the sixth the number is used.
+var ordinais = []string{"1º bloco", "2º bloco", "3º bloco", "4º bloco", "5º bloco", "6º bloco"}
+
+func rotuloBloco(idx int) string {
+	if idx < len(ordinais) {
+		return ordinais[idx]
+	}
+
+	return strconv.Itoa(idx+1) + "º bloco"
+}
+
+// repartirMinutos splits the content time across the day's blocks in proportion
+// to each discipline's reforço, rounding to 5 minutes and giving the leftover to
+// the heaviest block so the day still adds up.
+func repartirMinutos(total float64, itens []ItemDia, perfil Perfil) []int {
+	pesos := make([]float64, len(itens))
+	soma := 0.0
+
+	for i, it := range itens {
+		pesos[i] = perfil.ReforcoDe(it.Disciplina)
+		soma += pesos[i]
+	}
+
+	if soma == 0 {
+		soma = float64(len(itens))
+		for i := range pesos {
+			pesos[i] = 1
+		}
+	}
+
+	out := make([]int, len(itens))
+	usado := 0
+
+	for i := range itens {
+		out[i] = m5(total * pesos[i] / soma)
+		usado += out[i]
+	}
+
+	if sobra := m5(total) - usado; sobra != 0 {
+		maior := 0
+		for i := range pesos {
+			if pesos[i] > pesos[maior] {
+				maior = i
+			}
+		}
+
+		if out[maior]+sobra > 0 {
+			out[maior] += sobra
+		}
+	}
+
+	return out
 }
