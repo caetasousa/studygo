@@ -57,8 +57,11 @@
 		}
 	});
 
+	// Before a plan is loaded (login, registration, a brand-new account) there is no
+	// stored preference to honour, and the app's default look is dark — so pin it
+	// rather than letting the OS decide for those screens.
 	$effect(() => {
-		applyTheme(planoStore.plano?.config.temaUi);
+		applyTheme(planoStore.plano?.config.temaUi ?? 'dark');
 	});
 </script>
 
@@ -80,4 +83,9 @@
 		</main>
 	</div>
 	<div class="saved-toast" class:on={planoStore.salvo}>Salvo</div>
+{:else}
+	<!-- Signed out on a private route: the redirect effect above is already on its
+	     way to /login. Without this branch the document renders empty, which reads
+	     as a broken app rather than a moment of transition. -->
+	<p class="page-sub" style="padding:32px">Carregando…</p>
 {/if}
