@@ -1,6 +1,7 @@
 <script lang="ts">
 	import NavIcon from './NavIcon.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
+	import { api } from '$lib/api';
 	import type { ConcursoInput, DisciplinaInput } from '$lib/types';
 
 	let {
@@ -9,6 +10,10 @@
 		erro = null,
 		avisos = [],
 		textoBotao = 'Salvar concurso',
+		// When set, an "extract topics with AI" panel is shown: it reprocesses the
+		// edital and fills every discipline that has no topics yet. Only useful when
+		// editing an existing concurso (the wizard already does this inline).
+		mostrarExtracao = false,
 		onsubmit
 	}: {
 		inicial?: ConcursoInput;
@@ -16,8 +21,57 @@
 		erro?: string | null;
 		avisos?: string[];
 		textoBotao?: string;
+		mostrarExtracao?: boolean;
 		onsubmit: (input: ConcursoInput) => void;
 	} = $props();
+
+	// ---- AI topic extraction (edit mode) ----
+	let editalTexto = $state('');
+	let editalPdf = $state<File | null>(null);
+	let extraindo = $state(false);
+	let extracaoErro = $state<string | null>(null);
+	let extracaoOk = $state<string | null>(null);
+
+	async function extrairTemas() {
+		const fonte = editalPdf
+			? { pdf: editalPdf }
+			: editalTexto.trim()
+				? { texto: editalTexto.trim() }
+				: null;
+		if (!fonte) {
+			extracaoErro = 'Cole o texto do edital ou anexe o PDF.';
+			return;
+		}
+
+		extraindo = true;
+		extracaoErro = null;
+		extracaoOk = null;
+		try {
+			const nomes = discs.map((d) => d.nome.trim()).filter(Boolean);
+			const res = await api.conteudoEdital(fonte, nomes);
+			const mapa = new Map(res.itens.map((it) => [it.nome.trim().toLowerCase(), it.temas]));
+			let preenchidas = 0;
+			for (const d of discs) {
+				if (d.temasTexto.trim()) continue; // não sobrescreve o que já existe
+				const t = mapa.get(d.nome.trim().toLowerCase());
+				if (t?.length) {
+					d.temasTexto = t.join('\n');
+					preenchidas++;
+				}
+			}
+			extracaoOk =
+				preenchidas > 0
+					? `Temas preenchidos em ${preenchidas} disciplina(s). Confira e salve.`
+					: 'A IA não retornou temas para as disciplinas ainda vazias.';
+		} catch (e) {
+			extracaoErro =
+				e instanceof Error
+					? e.message
+					: 'Não foi possível extrair os temas agora — tente de novo em instantes.';
+		} finally {
+			extraindo = false;
+		}
+	}
 
 	function vazia(): DisciplinaInput {
 		return { nome: '', bloco: 'esp', questoes: 0, temas: [], fontes: [] };
@@ -192,6 +246,59 @@
 			</div>
 		</div>
 	</div>
+
+	{#if mostrarExtracao}
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Extrair temas com IA</h2>
+				<p class="page-sub" style="margin-top:0">
+					Cole o edital (a parte de conteúdo programático) ou anexe o PDF. A IA lê e preenche os
+					temas de cada disciplina que ainda está <b>sem temas</b> — o que já foi preenchido à mão
+					não é tocado.
+				</p>
+
+				<div class="field" style="margin-top:10px">
+					<label for="cf-edital-pdf">PDF do edital</label>
+					<input
+						id="cf-edital-pdf"
+						type="file"
+						accept="application/pdf"
+						onchange={(e) => (editalPdf = e.currentTarget.files?.[0] ?? null)}
+					/>
+				</div>
+				<div class="field" style="margin-top:10px">
+					<label for="cf-edital-txt">…ou cole o texto do edital</label>
+					<textarea
+						id="cf-edital-txt"
+						rows="6"
+						bind:value={editalTexto}
+						placeholder={'CONHECIMENTOS ESPECÍFICOS\n1 Língua Portuguesa: 1.1 ...'}
+						style="width:100%"
+					></textarea>
+				</div>
+
+				{#if extracaoErro}
+					<div class="form-error" style="margin-top:10px">{extracaoErro}</div>
+				{/if}
+				{#if extracaoOk}
+					<div class="callout" style="margin-top:10px">
+						<span class="em"><NavIcon name="info" /></span>
+						<div>{extracaoOk}</div>
+					</div>
+				{/if}
+
+				<button
+					type="button"
+					class="btn"
+					style="margin-top:12px"
+					disabled={extraindo}
+					onclick={extrairTemas}
+				>
+					{extraindo ? 'Extraindo…' : 'Extrair temas'}
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="card-body">

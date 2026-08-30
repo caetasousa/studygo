@@ -167,9 +167,11 @@
 			}
 			montarRevisao();
 		} catch (e) {
+			// A IA falhou nesta etapa. Não avança em silêncio: sem temas a página de
+			// conteúdo fica vazia e o usuário não percebe que faltou. Ele pode tentar
+			// de novo, ou seguir sem temas de propósito (botão na própria etapa).
 			erro = trata(e);
-			// deixa o usuário seguir mesmo sem os temas
-			montarRevisao();
+			etapa = 'conteudo';
 		} finally {
 			processando = false;
 		}
@@ -405,6 +407,25 @@
 			buscarConteudo,
 			'Buscar conteúdo programático'
 		)}
+	{/if}
+
+	<!-- ETAPA 5: CONTEÚDO — só aparece quando a IA falhou nesta etapa -->
+	{#if etapa === 'conteudo' && !processando}
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Conteúdo programático</h2>
+				<p class="page-sub" style="margin-top:0">
+					A IA não conseguiu extrair os temas agora — normalmente é sobrecarga
+					temporária do provedor. Você pode tentar de novo, ou seguir sem os temas
+					e adicioná-los depois em <b>editar o concurso</b>.
+				</p>
+				<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+					<button class="btn" onclick={buscarConteudo}>Tentar de novo</button>
+					<button class="btn" onclick={montarRevisao}>Seguir sem os temas</button>
+					<button class="btn" onclick={() => (etapa = 'especificas')}>← voltar</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 
 	<!-- ETAPA 6: REVISÃO / MANUAL -->

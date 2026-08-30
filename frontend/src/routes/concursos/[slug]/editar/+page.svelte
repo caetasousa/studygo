@@ -56,7 +56,7 @@
 {#if carregando}
 	<p class="page-sub">Carregando…</p>
 {:else if inicial}
-	<ConcursoForm {inicial} {erro} {enviando} textoBotao="Salvar alterações" onsubmit={salvar} />
+	<ConcursoForm {inicial} {erro} {enviando} mostrarExtracao textoBotao="Salvar alterações" onsubmit={salvar} />
 {:else}
 	<div class="form-error">{erro}</div>
 {/if}
