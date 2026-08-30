@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DiaLog from '$lib/components/DiaLog.svelte';
+	import TemaTexto from '$lib/components/TemaTexto.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fc, hojeISO, diffDays, nf1, rotulo, tagStyle, weekdayShort } from '$lib/format';
 	import type { Dia } from '$lib/types';
@@ -65,7 +66,7 @@
 </script>
 
 <PageHead
-	emoji="🗂️"
+	icone="cronograma"
 	titulo="Cronograma"
 	sub="Todas as semanas do plano, do início até a véspera da prova."
 />
@@ -119,7 +120,7 @@
 						<span class="nday">
 							<b>{String(d.n).padStart(3, '0')}</b>{weekdayShort(d.data)}
 							{fc(d.data)}
-							{#if d.reordenado}<span title="Reorganizado manualmente">🔀</span>{/if}
+							{#if d.reordenado}<span class="reord" title="Reorganizado manualmente">•</span>{/if}
 						</span>
 
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -138,7 +139,9 @@
 											: 'background:var(--bg-hover);color:var(--accent)'}>{rotulo(d.tipo)}</span
 									>
 									<span class="tema-txt">
-										{d.tema}{#if d.tipo === 'rev' && d.meta > 0}<em>{d.meta} questões</em>{/if}
+										<TemaTexto tema={d.tema} />{#if d.tipo === 'rev' && d.meta > 0}<em
+												>{d.meta} questões</em
+											>{/if}
 									</span>
 								</span>
 							{:else}
@@ -146,7 +149,7 @@
 									<span class="item">
 										<span class="tag" style={tagStyle(disc[it.disciplina]?.cor ?? 0)}>{it.disciplina}</span>
 										<span class="tema-txt"
-											>{it.tema}{#if it.passada === 2}<em>2ª passada</em>{/if}</span
+											><TemaTexto tema={it.tema} />{#if it.passada === 2}<em>2ª passada</em>{/if}</span
 										>
 									</span>
 								{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 
@@ -22,7 +23,7 @@
 </script>
 
 <PageHead
-	emoji="📖"
+	icone="conteudo"
 	titulo="Conteúdo programático"
 	sub="A ementa do edital, matéria por matéria."
 	mostrarProps={false}
@@ -31,7 +32,7 @@
 {#if plano && semTemas}
 	<div class="page">
 		<div class="callout">
-			<span class="em">📖</span>
+			<span class="em"><NavIcon name="info" /></span>
 			<div>
 				Nenhum tema cadastrado ainda. O plano funciona sem eles — o dia mostra o nome da
 				disciplina —, mas com a ementa cada dia recebe um tema específico. Adicione os temas em
@@ -42,7 +43,10 @@
 	</div>
 {:else if plano}
 	<div class="page prog">
-		{#if plano.concurso.conteudo.length > 0}
+		<!-- `concurso.conteudo` is the raw edital text; the grouped ementa below is
+		     the same syllabus, structured. Showing both repeats every topic twice,
+		     so the raw block only stands in when there are no temas to group. -->
+		{#if totalTemas === 0 && plano.concurso.conteudo.length > 0}
 			{#each plano.concurso.conteudo as item, i (i)}
 				{#if item.tipo === 'ficha'}
 					<div class="prog-card">{item.texto}</div>

@@ -139,7 +139,11 @@ class PlanoStore {
 
 export const planoStore = new PlanoStore();
 
-/** applyTheme reflects the persisted temaUi onto <html data-theme>. */
+/**
+ * applyTheme reflects the persisted temaUi onto <html data-theme>.
+ * 'system' clears the attribute and lets tokens.css decide: dark unless the OS
+ * actively asks for light, so a machine with no stated preference stays dark.
+ */
 export function applyTheme(tema: 'light' | 'dark' | 'system' | undefined) {
 	if (!browser) return;
 	const root = document.documentElement;

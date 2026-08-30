@@ -2,6 +2,7 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DiaLog from '$lib/components/DiaLog.svelte';
 	import RevisoesDoDia from '$lib/components/RevisoesDoDia.svelte';
+	import TemaTexto from '$lib/components/TemaTexto.svelte';
 	import { linkQuestoes } from '$lib/tec';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fc, fl, hojeISO, diffDays, nf1, rotulo, tagStyle } from '$lib/format';
@@ -26,14 +27,16 @@
 		return plano.marcos.find((m) => (m.dataFim ?? m.dataInicio) >= h) ?? null;
 	});
 
-	function temaLinha(d: Dia): string {
-		if (d.itens.length === 0) return `${rotulo(d.tipo)} · ${d.tema}`;
-		return d.itens.map((it) => `${it.disciplina} ${it.tema}`).join(' · ');
+	/** Linhas de um dia na lista "Próximos dias": uma por bloco, com a
+	 *  disciplina separada do tema para o texto não virar um parágrafo corrido. */
+	function linhasDoDia(d: Dia): { rotulo: string; tema: string }[] {
+		if (d.itens.length === 0) return [{ rotulo: rotulo(d.tipo), tema: d.tema }];
+		return d.itens.map((it) => ({ rotulo: it.disciplina, tema: it.tema }));
 	}
 </script>
 
 <PageHead
-	emoji="☀️"
+	icone="hoje"
 	titulo="Hoje"
 	sub="O que estudar agora, com o tempo de cada matéria calculado pelo peso dela na prova."
 />
@@ -120,13 +123,20 @@
 			<RevisoesDoDia revisoes={diaAtual?.revisoes ?? []} />
 
 			<div class="card">
-				<div class="card-top">📆 Próximos dias</div>
+				<div class="card-top">Próximos dias</div>
 				<div class="card-body">
 					<ul class="prox-list">
 						{#each proximos as d (d.data)}
 							<li>
 								<span class="dt">{fc(d.data)}</span>
-								<span>{temaLinha(d)}</span>
+								<span class="prox-blocos">
+									{#each linhasDoDia(d) as l, i (i)}
+										<span class="prox-bloco">
+											<span class="prox-rot">{l.rotulo}</span>
+											<span class="prox-tema"><TemaTexto tema={l.tema} limite={2} /></span>
+										</span>
+									{/each}
+								</span>
 							</li>
 						{/each}
 					</ul>
@@ -134,7 +144,7 @@
 			</div>
 
 			<div class="card">
-				<div class="card-top">📉 Onde você está devendo</div>
+				<div class="card-top">Onde você está devendo</div>
 				<div class="card-body">
 					{#if deficit.length === 0}
 						Lance suas primeiras horas para o painel comparar o tempo aplicado com o peso de cada
@@ -157,7 +167,7 @@
 			</div>
 
 			<div class="card">
-				<div class="card-top">📌 Próxima data do edital</div>
+				<div class="card-top">Próxima data do edital</div>
 				<div class="card-body">
 					{#if proxMarco}
 						<div>
@@ -185,5 +195,29 @@
 	}
 	.rev-meta b {
 		color: var(--warn);
+	}
+	.prox-blocos {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		min-width: 0;
+	}
+	.prox-bloco {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+	.prox-rot {
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		font-weight: 600;
+	}
+	.prox-tema {
+		color: var(--text);
+		line-height: 1.35;
 	}
 </style>

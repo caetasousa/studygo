@@ -42,30 +42,166 @@ a {
 	min-height: 100vh;
 }
 
-/* ---------- sidebar ---------- */
+/* ---------- sidebar (two-level: icon rail + expandable panel) ----------
+   The rail is always visible; the panel carries the labels and the footer.
+   `.app.rail` collapses the panel to zero width, leaving only the rail. */
 .sidebar {
-	width: 250px;
 	flex: none;
-	background: var(--bg-side);
-	border-right: 1px solid var(--border);
 	display: flex;
-	flex-direction: column;
-	padding: 16px 12px;
-	gap: 14px;
 	position: sticky;
 	top: 0;
 	height: 100vh;
-	overflow-y: auto;
+	background: var(--bg-side);
+	border-right: 1px solid var(--border);
+	z-index: 30;
 }
+
+/* --- level 1: the icon rail --- */
+.rail {
+	width: 56px;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 12px 0;
+	border-right: 1px solid var(--border);
+	background: var(--bg-side);
+	/* a short viewport must scroll the rail rather than clip the footer off it */
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-width: none;
+}
+.rail::-webkit-scrollbar {
+	display: none;
+}
+.rail-mark {
+	width: 34px;
+	height: 34px;
+	border-radius: 8px;
+	background: var(--bg-hover);
+	color: var(--text);
+	display: grid;
+	place-items: center;
+	font-weight: 700;
+	font-size: 15px;
+	text-decoration: none;
+	flex: none;
+	margin-bottom: 6px;
+}
+.rail-mark:hover {
+	background: var(--border);
+}
+.rail-sep {
+	width: 24px;
+	height: 1px;
+	background: var(--border);
+	margin: 6px 0;
+	flex: none;
+}
+.rail-item {
+	width: 38px;
+	height: 38px;
+	border: 0;
+	background: transparent;
+	border-radius: 8px;
+	display: grid;
+	place-items: center;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0;
+	flex: none;
+	position: relative;
+	text-decoration: none;
+}
+.rail-item:hover {
+	background: var(--bg-hover);
+	color: var(--text);
+}
+.rail-item.active {
+	background: var(--accent-soft);
+	color: var(--accent-strong);
+}
+.rail-item svg {
+	width: 19px;
+	height: 19px;
+	display: block;
+}
+/* tooltip, shown only while the panel is collapsed */
+.rail-item::after {
+	content: attr(data-label);
+	position: absolute;
+	left: calc(100% + 10px);
+	top: 50%;
+	transform: translateY(-50%);
+	background: var(--text);
+	color: var(--bg);
+	font-size: 12px;
+	font-weight: 500;
+	white-space: nowrap;
+	padding: 5px 9px;
+	border-radius: 6px;
+	box-shadow: var(--shadow-pop);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.12s ease;
+	z-index: 50;
+}
+.app.rail-only .rail-item:hover::after {
+	opacity: 1;
+}
+.rail-foot {
+	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding-top: 12px;
+	margin-bottom: 4px;
+	border-top: 1px solid var(--border);
+	width: 34px;
+	flex: none;
+}
+.rail-foot .ring {
+	width: 30px;
+	height: 30px;
+}
+.rail-foot .ring i {
+	width: 22px;
+	height: 22px;
+}
+
+/* --- level 2: the label panel --- */
+.side-panel {
+	width: 202px;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	padding: 12px 10px;
+	gap: 10px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	transition: width 0.16s ease;
+}
+.app.rail-only .side-panel {
+	width: 0;
+	padding-left: 0;
+	padding-right: 0;
+	overflow: hidden;
+}
+
 .side-top {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 4px 6px;
+	gap: 9px;
+	padding: 6px 8px;
+	border-radius: 7px;
+	text-decoration: none;
+	color: inherit;
+	min-width: 0;
 }
-.side-emoji {
-	font-size: 22px;
-	line-height: 1;
+.side-top:hover {
+	background: var(--bg-hover);
 }
 .side-title {
 	display: flex;
@@ -74,12 +210,22 @@ a {
 	min-width: 0;
 }
 .side-title strong {
-	font-size: 14px;
-	font-weight: 700;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--text);
+	/* long concurso names must not blow the panel out */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
 }
 .side-title span {
-	font-size: 11.5px;
+	font-size: 11px;
 	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .side-nav {
 	display: flex;
@@ -93,7 +239,7 @@ a {
 	background: transparent;
 	border: 0;
 	border-radius: 6px;
-	padding: 7px 8px;
+	padding: 7px 9px;
 	font-size: 13.5px;
 	font-weight: 500;
 	color: var(--text-muted);
@@ -101,12 +247,9 @@ a {
 	text-align: left;
 	width: 100%;
 	text-decoration: none;
-}
-.side-item .ic {
-	font-size: 15px;
-	width: 18px;
-	text-align: center;
-	flex: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .side-item:hover {
 	background: var(--bg-hover);
@@ -127,21 +270,21 @@ a {
 	display: flex;
 	align-items: center;
 	gap: 11px;
-	padding: 10px 8px;
+	padding: 10px 6px 0;
 	border-top: 1px solid var(--border);
 }
 .ring {
-	width: 40px;
-	height: 40px;
+	width: 36px;
+	height: 36px;
 	border-radius: 50%;
 	flex: none;
 	display: grid;
 	place-items: center;
-	background: conic-gradient(var(--accent) calc(var(--ring-pct, 0) * 1%), var(--bg-soft) 0);
+	background: conic-gradient(var(--accent) calc(var(--ring-pct, 0) * 1%), var(--bg-hover) 0);
 }
 .ring i {
-	width: 30px;
-	height: 30px;
+	width: 27px;
+	height: 27px;
 	border-radius: 50%;
 	background: var(--bg-side);
 	display: block;
@@ -156,6 +299,7 @@ a {
 	font-family: var(--font-mono);
 	font-size: 16px;
 	font-variant-numeric: tabular-nums;
+	color: var(--text);
 }
 .side-count span {
 	font-size: 10.5px;
@@ -163,6 +307,8 @@ a {
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 }
+
+/* theme control — the only place in the app that switches light/dark */
 .theme-row {
 	display: flex;
 	gap: 4px;
@@ -170,26 +316,42 @@ a {
 }
 .theme-btn {
 	flex: 1;
+	height: 26px;
 	background: transparent;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	padding: 6px 0;
-	font-size: 14px;
+	padding: 0;
 	cursor: pointer;
 	color: var(--text-muted);
+	display: grid;
+	place-items: center;
+}
+.theme-btn svg {
+	width: 14px;
+	height: 14px;
+	display: block;
+}
+.theme-btn:hover {
+	background: var(--bg-hover);
+	color: var(--text);
 }
 .theme-btn.active {
 	background: var(--bg-card);
-	color: var(--text);
+	color: var(--accent-strong);
 	border-color: var(--border-strong);
 }
 .side-user {
-	font-size: 11.5px;
+	font-size: 11px;
 	color: var(--text-faint);
 	padding: 0 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+}
+.side-user span {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .side-user button {
 	background: transparent;
@@ -198,9 +360,10 @@ a {
 	text-align: left;
 	cursor: pointer;
 	padding: 0;
-	font-size: 11.5px;
+	font-size: 11px;
 	text-decoration: underline;
 }
+
 .menu-toggle {
 	display: none;
 	position: fixed;
@@ -212,9 +375,16 @@ a {
 	border-radius: 7px;
 	width: 36px;
 	height: 36px;
-	font-size: 16px;
 	cursor: pointer;
 	box-shadow: var(--shadow-pop);
+	color: var(--text);
+	place-items: center;
+	padding: 0;
+}
+.menu-toggle svg {
+	width: 18px;
+	height: 18px;
+	display: block;
 }
 .scrim {
 	display: none;
@@ -302,9 +472,16 @@ a {
 	line-height: 1.5;
 }
 .callout .em {
-	font-size: 16px;
+	width: 16px;
+	height: 16px;
 	flex: none;
-	margin-top: 1px;
+	margin-top: 2px;
+	display: block;
+	color: var(--text-faint);
+}
+.callout.warn .em,
+.callout.danger .em {
+	color: inherit;
 }
 .callout b {
 	color: var(--text);
@@ -663,6 +840,12 @@ a:focus-visible {
 	font-weight: 600;
 	font-size: 12px;
 }
+/* marker for a day the user dragged out of its generated position */
+.reord {
+	color: var(--accent);
+	font-size: 14px;
+	line-height: 1;
+}
 .items {
 	display: grid;
 	gap: 5px;
@@ -714,9 +897,14 @@ a:focus-visible {
 	text-transform: uppercase;
 	padding: 3px 6px;
 	border-radius: 4px;
-	white-space: nowrap;
 	text-align: center;
 	font-weight: 600;
+	/* Long labels ("REVISÃO — RESOLUÇÃO DE QUESTÕES") used to be `nowrap` inside a
+	   fixed 96px grid column, so they overflowed onto the tema text beside them.
+	   Wrapping keeps the whole label readable inside its own column. */
+	min-width: 0;
+	overflow-wrap: anywhere;
+	line-height: 1.35;
 }
 .tema-txt {
 	font-size: 13px;
@@ -780,6 +968,12 @@ a:focus-visible {
 /* ---------- tables ---------- */
 .tbl-wrap {
 	overflow-x: auto;
+	/* a wide table (balanceamento has 12 columns) scrolls; fade the right edge so
+	   the cut is visibly a scroll, not a truncation */
+	background:
+		linear-gradient(to right, var(--bg) 30%, transparent) left / 24px 100% no-repeat,
+		linear-gradient(to left, var(--bg) 30%, transparent) right / 24px 100% no-repeat;
+	background-attachment: local, local;
 }
 table.tbl {
 	width: 100%;
@@ -814,6 +1008,14 @@ table.tbl td:first-child {
 	font-family: var(--font-ui);
 	font-size: 13px;
 	padding-left: 0;
+	/* Without a width the name column collapses to fit the numeric ones, and long
+	   discipline names wrap into 6 lines. The table scrolls in .tbl-wrap instead. */
+	min-width: 168px;
+	line-height: 1.35;
+}
+table.tbl td:first-child .chip-dot {
+	/* keep the colour marker on the first line of a wrapped name */
+	vertical-align: 0.08em;
 }
 table.tbl td input {
 	width: 52px;
@@ -826,6 +1028,24 @@ table.tbl tfoot td {
 	border-top: 2px solid var(--text);
 	font-weight: 700;
 }
+/* toggle that folds a long, mostly-empty listing */
+.ver-mais {
+	background: transparent;
+	border: 0;
+	padding: 10px 0 0;
+	margin: 0;
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--accent);
+	cursor: pointer;
+	text-decoration: underline;
+}
+.ver-mais:hover {
+	color: var(--accent-strong);
+}
+
 .dev.neg {
 	color: var(--danger);
 	font-weight: 600;
@@ -1090,6 +1310,7 @@ table.tbl tfoot td {
 .chart {
 	display: flex;
 	align-items: flex-end;
+	justify-content: flex-start;
 	gap: 3px;
 	height: 140px;
 	padding: 8px 0;
@@ -1097,8 +1318,13 @@ table.tbl tfoot td {
 	overflow-x: auto;
 }
 .chart .bar {
-	flex: 1 0 8px;
+	/* grow to share the width, but never balloon when there are only a few days */
+	flex: 1 1 8px;
 	min-width: 8px;
+	max-width: 34px;
+	/* the bar is the full-height track; `i` is the filled part, sized in %, so the
+	   track needs a resolved height for that percentage to mean anything */
+	align-self: stretch;
 	background: var(--accent-soft);
 	border-radius: 2px 2px 0 0;
 	position: relative;
@@ -1279,7 +1505,15 @@ table.tbl tfoot td {
 
 @media (max-width: 900px) {
 	.menu-toggle {
-		display: block;
+		display: grid;
+	}
+	/* In the drawer the rail alone would be useless — always show the labels,
+	   whatever the collapsed preference is on desktop. */
+	.app.rail-only .side-panel {
+		width: 202px;
+		padding-left: 10px;
+		padding-right: 10px;
+		overflow-y: auto;
 	}
 	.sidebar {
 		position: fixed;

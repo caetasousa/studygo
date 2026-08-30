@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { goto } from '$app/navigation';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { api, ApiError, type FonteEdital } from '$lib/api';
@@ -225,7 +226,7 @@
 </script>
 
 <div class="crumb">Concursos <span class="sep">/</span> Novo</div>
-<h1 class="page-title"><span>➕</span><span>Cadastrar concurso</span></h1>
+<h1 class="page-title"><span>Cadastrar concurso</span></h1>
 <p class="page-sub">
 	{primeiroConcurso
 		? 'Bem-vindo! Cadastre seu primeiro concurso e o plano de estudos é gerado na hora.'
@@ -261,10 +262,10 @@
 	{#if etapa === 'edital' && !processando}
 		<div class="card">
 			<div class="card-body">
-				<h2 class="sec" style="margin-top:0">📄 Enviar o edital</h2>
+				<h2 class="sec" style="margin-top:0">Enviar o edital</h2>
 				{#if semIA}
 					<div class="callout" style="margin-bottom:12px">
-						<span class="em">ℹ️</span>
+						<span class="em"><NavIcon name="info" /></span>
 						<div>A importação por IA não está ligada neste servidor. Use o cadastro manual abaixo.</div>
 					</div>
 				{/if}
@@ -274,7 +275,7 @@
 						<input type="file" accept="application/pdf" onchange={escolherArquivo} disabled={semIA} hidden />
 					</label>
 					{#if arquivo}
-						<span class="file-chip">📄 {arquivo.name} · {fmtTam(arquivo.size)}</span>
+						<span class="file-chip">{arquivo.name} · {fmtTam(arquivo.size)}</span>
 					{/if}
 				</div>
 				<div class="field" style="margin-top:14px">
@@ -301,7 +302,7 @@
 
 		<div class="card">
 			<div class="card-body">
-				<h2 class="sec" style="margin-top:0">✍️ Preencher manualmente</h2>
+				<h2 class="sec" style="margin-top:0">Preencher manualmente</h2>
 				<p class="page-sub" style="margin-top:0">Nome, data da prova e as disciplinas. Leva um minuto.</p>
 				<button class="btn" onclick={() => (etapa = 'manual')}>Cadastrar manualmente</button>
 			</div>
@@ -354,7 +355,7 @@
 				</p>
 				{#if avisos.length}
 					<div class="callout warn" style="margin-bottom:10px">
-						<span class="em">🟡</span>
+						<span class="em"><NavIcon name="alerta" /></span>
 						<div>
 							<ul style="margin:0;padding-left:16px">
 								{#each avisos as a (a)}<li>{a}</li>{/each}

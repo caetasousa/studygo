@@ -58,7 +58,7 @@
 
 <div class="card">
 	<div class="card-top">
-		🔁 Revisão espaçada
+		Revisão espaçada
 		{#if revisoes.length}<span class="cont">{revisoes.length}</span>{/if}
 	</div>
 	<div class="card-body">

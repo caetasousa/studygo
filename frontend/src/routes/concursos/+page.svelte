@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { goto } from '$app/navigation';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
@@ -29,7 +30,7 @@
 </script>
 
 <div class="crumb">Estudos <span class="sep">/</span> Meus concursos</div>
-<h1 class="page-title"><span>📁</span><span>Meus concursos</span></h1>
+<h1 class="page-title"><span>Meus concursos</span></h1>
 <p class="page-sub">Cada concurso tem seu próprio plano, progresso e caderno de erros.</p>
 
 <div class="page">
@@ -37,7 +38,7 @@
 
 	{#if concursoStore.lista.length === 0}
 		<div class="callout">
-			<span class="em">📭</span>
+			<span class="em"><NavIcon name="info" /></span>
 			<div>Você ainda não cadastrou nenhum concurso.</div>
 		</div>
 	{:else}

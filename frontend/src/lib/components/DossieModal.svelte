@@ -44,7 +44,7 @@
 		onclick={(e) => e.stopPropagation()}
 	>
 		<div class="card-top">
-			📓 Dossiê para o NotebookLM {#if dossie}· {dossie.disciplina}{/if}
+			Dossiê para o NotebookLM {#if dossie}· {dossie.disciplina}{/if}
 			<button class="mv-btn" style="margin-left:auto" aria-label="Fechar" onclick={onclose}>✕</button>
 		</div>
 		<div class="card-body">

@@ -6,10 +6,19 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore, applyTheme } from '$lib/stores/plano.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import NavIcon from '$lib/components/NavIcon.svelte';
+	import { browser } from '$app/environment';
 
 	let { children } = $props();
 
 	let menuOpen = $state(false);
+
+	const RAIL_KEY = 'annygo:rail';
+	let railOnly = $state(browser && localStorage.getItem(RAIL_KEY) === '1');
+
+	$effect(() => {
+		if (browser) localStorage.setItem(RAIL_KEY, railOnly ? '1' : '0');
+	});
 
 	const publicRoutes = ['/login', '/registro'];
 	const isPublic = $derived(publicRoutes.includes(page.url.pathname));
@@ -56,11 +65,13 @@
 {#if isPublic}
 	{@render children()}
 {:else if auth.isAuthenticated}
-	<button class="menu-toggle" aria-label="Abrir menu" onclick={() => (menuOpen = !menuOpen)}>☰</button>
+	<button class="menu-toggle" aria-label="Abrir menu" onclick={() => (menuOpen = !menuOpen)}>
+		<NavIcon name="menu" />
+	</button>
 	<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 	<div class="scrim" class:on={menuOpen} onclick={() => (menuOpen = false)}></div>
-	<div class="app">
-		<Sidebar bind:open={menuOpen} />
+	<div class="app" class:rail-only={railOnly}>
+		<Sidebar bind:open={menuOpen} bind:railOnly />
 		<main class="main">
 			{#if planoStore.erro && !isConcursoAdmin}
 				<div class="form-error" style="margin-bottom:16px">{planoStore.erro}</div>

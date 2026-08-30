@@ -25,7 +25,7 @@
 
 <div class="auth-wrap">
 	<div class="auth-card">
-		<h1><span>🏛️</span> Criar conta</h1>
+		<h1>Criar conta</h1>
 		<p class="sub">Leva 20 segundos. O plano começa com as datas do edital.</p>
 
 		<form class="auth-form" onsubmit={submit}>

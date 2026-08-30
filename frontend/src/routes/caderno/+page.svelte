@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DossieModal from '$lib/components/DossieModal.svelte';
 	import ImportarTEC from '$lib/components/ImportarTEC.svelte';
@@ -71,7 +72,7 @@
 </script>
 
 <PageHead
-	emoji="📓"
+	icone="caderno"
 	titulo="Caderno de erros"
 	sub="Tudo o que você marcou para revisar: anotações livres, notas dos dias e as baterias com aproveitamento baixo."
 	mostrarProps={false}
@@ -87,7 +88,7 @@
 	<div class="page">
 		{#if dados.vencendoHoje.length > 0}
 			<div class="callout">
-				<span class="em">🔁</span>
+				<span class="em"><NavIcon name="info" /></span>
 				<div>
 					<b>{dados.vencendoHoje.length} temas vencendo hoje</b> na revisão espaçada. Lance o
 					resultado em <a href="/">Hoje</a> — o que ficar abaixo de
@@ -101,7 +102,7 @@
 		{#if disciplinas.length > 0}
 			<div class="card">
 				<div class="card-body">
-					<h2 class="sec" style="margin-top:0">📓 Estudar no NotebookLM</h2>
+					<h2 class="sec" style="margin-top:0">Estudar no NotebookLM</h2>
 					<p class="page-sub" style="margin-top:0">
 						Gera um dossiê da disciplina (ementa + leis cadastradas + suas anotações) pronto para colar
 						como fonte no NotebookLM e pedir um guia de estudos ou áudio.

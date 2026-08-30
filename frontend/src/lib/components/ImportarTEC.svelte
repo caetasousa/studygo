@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from './NavIcon.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { hojeISO } from '$lib/format';
 	import type { PreviewTEC } from '$lib/types';
@@ -66,7 +67,7 @@
 
 <div class="card">
 	<div class="card-body">
-		<h2 class="sec" style="margin-top:0">🎯 Importar desempenho do TEC</h2>
+		<h2 class="sec" style="margin-top:0">Importar desempenho do TEC</h2>
 		<p class="page-sub" style="margin-top:0">
 			No TEC, abra <b>Estatísticas</b> e use <b>Exportar para planilha</b>; salve como
 			<b>CSV</b> e envie aqui. Os assuntos são casados com os temas do edital: viram o registro do
@@ -78,7 +79,7 @@
 
 		{#if resultado}
 			<div class="callout">
-				<span class="em">✅</span>
+				<span class="em"><NavIcon name="info" /></span>
 				<div>
 					Importados <b>{resultado.casados.length} assuntos</b> — {resultado.questoes} questões,
 					{resultado.acertos} acertos. O registro de {data} foi preenchido por disciplina.
@@ -113,7 +114,7 @@
 
 			{#if previa.semCorrespondencia.length > 0}
 				<div class="callout warn" style="margin-top:12px">
-					<span class="em">🟡</span>
+					<span class="em"><NavIcon name="alerta" /></span>
 					<div>
 						<b>{previa.semCorrespondencia.length} assuntos sem correspondência</b> — vão ser
 						ignorados. Para trazê-los, acrescente o tema à disciplina em

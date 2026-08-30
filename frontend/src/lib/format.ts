@@ -67,3 +67,15 @@ export function rotulo(tipo: string): string {
 export function fmtMinutos(min: number): string {
 	return `${min} min`;
 }
+
+/**
+ * partesTema splits a tema into the topics the engine joined with " · ".
+ * Reta-final days carry a whole discipline's ementa in one string, which reads
+ * as an unbroken wall of text — callers show the first few and count the rest.
+ */
+export function partesTema(tema: string): string[] {
+	return tema
+		.split('·')
+		.map((p) => p.trim())
+		.filter(Boolean);
+}

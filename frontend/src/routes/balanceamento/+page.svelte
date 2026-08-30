@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { nf1, nf0 } from '$lib/format';
@@ -67,7 +68,7 @@
 </script>
 
 <PageHead
-	emoji="⚖️"
+	icone="balanceamento"
 	titulo="Balanceamento"
 	sub="Como as horas se dividem entre as disciplinas, e o quanto você está aplicando de fato."
 />
@@ -75,7 +76,7 @@
 {#if plano}
 	<div class="page">
 		<div class="callout">
-			<span class="em">⚖️</span>
+			<span class="em"><NavIcon name="info" /></span>
 			<div>
 				<b>Como o tempo é dividido.</b> Cada questão de Conhecimentos Gerais vale 1 ponto; cada questão
 				de Específicos vale 2. O número de questões por disciplina é uma <b>estimativa editável</b> —

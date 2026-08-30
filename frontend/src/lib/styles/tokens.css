@@ -1,5 +1,121 @@
-/* Design tokens ported verbatim from the artifact "Estudos TCE-GO B02". */
+/* Design tokens ported from the artifact "Estudos TCE-GO B02".
+
+   Dark is the app default, so the dark palette lives on bare :root and the
+   light one is opt-in: either the viewer picks "claro" (data-theme="light")
+   or, while following the system, the OS actively asks for light. A system
+   that states no preference therefore stays dark. */
 :root {
+	/* native controls (scrollbars, date pickers, form widgets) follow the theme */
+	color-scheme: dark;
+	--bg: #1e1d1b;
+	--bg-side: #242320;
+	--bg-hover: rgba(255, 255, 255, 0.07);
+	--bg-card: #242320;
+	--bg-soft: #2a2926;
+	--border: rgba(255, 255, 255, 0.11);
+	--border-strong: rgba(255, 255, 255, 0.2);
+	--text: #e8e6de;
+	--text-muted: #a19e92;
+	--text-faint: #716e63;
+	--accent: #8ab8e2;
+	--accent-strong: #a9cbe9;
+	--accent-soft: rgba(138, 184, 226, 0.14);
+	--warn: #dcae55;
+	--warn-soft: rgba(220, 174, 85, 0.14);
+	--danger: #e08c8c;
+	--danger-soft: rgba(224, 140, 140, 0.14);
+	--good: #7ecda8;
+	--good-soft: rgba(126, 205, 168, 0.14);
+	--shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
+	--font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+	--c0-bg: rgba(138, 184, 226, 0.16);
+	--c0-tx: #9ecdf5;
+	--c1-bg: rgba(87, 209, 187, 0.15);
+	--c1-tx: #8fe0cc;
+	--c2-bg: rgba(146, 207, 116, 0.16);
+	--c2-tx: #aee093;
+	--c3-bg: rgba(178, 150, 247, 0.16);
+	--c3-tx: #cab8f7;
+	--c4-bg: rgba(240, 140, 190, 0.15);
+	--c4-tx: #f0a8cf;
+	--c5-bg: rgba(240, 160, 90, 0.16);
+	--c5-tx: #f3bb82;
+	--c6-bg: rgba(230, 195, 80, 0.16);
+	--c6-tx: #ecd487;
+	--c7-bg: rgba(230, 120, 110, 0.16);
+	--c7-tx: #f0a29a;
+	--c8-bg: rgba(196, 154, 116, 0.18);
+	--c8-tx: #d5b087;
+	--c9-bg: rgba(200, 198, 190, 0.15);
+	--c9-tx: #c2c0b6;
+	--c10-bg: rgba(130, 150, 240, 0.16);
+	--c10-tx: #adbcf2;
+	--c11-bg: rgba(190, 224, 110, 0.16);
+	--c11-tx: #cbe397;
+	--c12-bg: rgba(240, 120, 160, 0.15);
+	--c12-tx: #f0a8c4;
+}
+
+/* Light: only when the OS actively asks for it and the viewer has not
+   pinned dark. */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) {
+		color-scheme: light;
+		--bg: #ffffff;
+		--bg-side: #f7f6f3;
+		--bg-hover: rgba(55, 53, 47, 0.07);
+		--bg-card: #ffffff;
+		--bg-soft: #f2f1ed;
+		--border: rgba(55, 53, 47, 0.13);
+		--border-strong: rgba(55, 53, 47, 0.24);
+		--text: #2f2d28;
+		--text-muted: #78766b;
+		--text-faint: #a3a196;
+		--accent: #2c5c86;
+		--accent-strong: #1f4d75;
+		--accent-soft: #e8f1f8;
+		--warn: #946711;
+		--warn-soft: #faf1dc;
+		--danger: #a23b3b;
+		--danger-soft: #fbeceb;
+		--good: #2f7d5e;
+		--good-soft: #e9f5ef;
+		--shadow-pop: 0 6px 20px rgba(30, 28, 22, 0.12), 0 1px 2px rgba(30, 28, 22, 0.06);
+		--font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+		--font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+		--c0-bg: #e7f0fa;
+		--c0-tx: #1a5c96;
+		--c1-bg: #e3f4ef;
+		--c1-tx: #12746a;
+		--c2-bg: #eaf5e4;
+		--c2-tx: #2f6b2f;
+		--c3-bg: #f1ecfa;
+		--c3-tx: #5b3fa0;
+		--c4-bg: #fbebf3;
+		--c4-tx: #a13d76;
+		--c5-bg: #fbeee0;
+		--c5-tx: #9a5b1c;
+		--c6-bg: #faf3d6;
+		--c6-tx: #8a6d13;
+		--c7-bg: #fbe9e7;
+		--c7-tx: #a23b3b;
+		--c8-bg: #f1e7de;
+		--c8-tx: #6d4b31;
+		--c9-bg: #eceae6;
+		--c9-tx: #57554d;
+		--c10-bg: #e9edfa;
+		--c10-tx: #3c4fa0;
+		--c11-bg: #eef6d9;
+		--c11-tx: #5c7a1d;
+		--c12-bg: #fbe8ee;
+		--c12-tx: #9c2f52;
+	}
+}
+
+/* Light pinned explicitly by the viewer. */
+:root[data-theme="light"] {
+	color-scheme: light;
 	--bg: #ffffff;
 	--bg-side: #f7f6f3;
 	--bg-hover: rgba(55, 53, 47, 0.07);
@@ -48,104 +164,4 @@
 	--c11-tx: #5c7a1d;
 	--c12-bg: #fbe8ee;
 	--c12-tx: #9c2f52;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) {
-		--bg: #1e1d1b;
-		--bg-side: #242320;
-		--bg-hover: rgba(255, 255, 255, 0.07);
-		--bg-card: #242320;
-		--bg-soft: #2a2926;
-		--border: rgba(255, 255, 255, 0.11);
-		--border-strong: rgba(255, 255, 255, 0.2);
-		--text: #e8e6de;
-		--text-muted: #a19e92;
-		--text-faint: #716e63;
-		--accent: #8ab8e2;
-		--accent-strong: #a9cbe9;
-		--accent-soft: rgba(138, 184, 226, 0.14);
-		--warn: #dcae55;
-		--warn-soft: rgba(220, 174, 85, 0.14);
-		--danger: #e08c8c;
-		--danger-soft: rgba(224, 140, 140, 0.14);
-		--good: #7ecda8;
-		--good-soft: rgba(126, 205, 168, 0.14);
-		--shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
-		--c0-bg: rgba(138, 184, 226, 0.16);
-		--c0-tx: #9ecdf5;
-		--c1-bg: rgba(87, 209, 187, 0.15);
-		--c1-tx: #8fe0cc;
-		--c2-bg: rgba(146, 207, 116, 0.16);
-		--c2-tx: #aee093;
-		--c3-bg: rgba(178, 150, 247, 0.16);
-		--c3-tx: #cab8f7;
-		--c4-bg: rgba(240, 140, 190, 0.15);
-		--c4-tx: #f0a8cf;
-		--c5-bg: rgba(240, 160, 90, 0.16);
-		--c5-tx: #f3bb82;
-		--c6-bg: rgba(230, 195, 80, 0.16);
-		--c6-tx: #ecd487;
-		--c7-bg: rgba(230, 120, 110, 0.16);
-		--c7-tx: #f0a29a;
-		--c8-bg: rgba(196, 154, 116, 0.18);
-		--c8-tx: #d5b087;
-		--c9-bg: rgba(200, 198, 190, 0.15);
-		--c9-tx: #c2c0b6;
-		--c10-bg: rgba(130, 150, 240, 0.16);
-		--c10-tx: #adbcf2;
-		--c11-bg: rgba(190, 224, 110, 0.16);
-		--c11-tx: #cbe397;
-		--c12-bg: rgba(240, 120, 160, 0.15);
-		--c12-tx: #f0a8c4;
-	}
-}
-
-:root[data-theme='dark'] {
-	--bg: #1e1d1b;
-	--bg-side: #242320;
-	--bg-hover: rgba(255, 255, 255, 0.07);
-	--bg-card: #242320;
-	--bg-soft: #2a2926;
-	--border: rgba(255, 255, 255, 0.11);
-	--border-strong: rgba(255, 255, 255, 0.2);
-	--text: #e8e6de;
-	--text-muted: #a19e92;
-	--text-faint: #716e63;
-	--accent: #8ab8e2;
-	--accent-strong: #a9cbe9;
-	--accent-soft: rgba(138, 184, 226, 0.14);
-	--warn: #dcae55;
-	--warn-soft: rgba(220, 174, 85, 0.14);
-	--danger: #e08c8c;
-	--danger-soft: rgba(224, 140, 140, 0.14);
-	--good: #7ecda8;
-	--good-soft: rgba(126, 205, 168, 0.14);
-	--shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
-	--c0-bg: rgba(138, 184, 226, 0.16);
-	--c0-tx: #9ecdf5;
-	--c1-bg: rgba(87, 209, 187, 0.15);
-	--c1-tx: #8fe0cc;
-	--c2-bg: rgba(146, 207, 116, 0.16);
-	--c2-tx: #aee093;
-	--c3-bg: rgba(178, 150, 247, 0.16);
-	--c3-tx: #cab8f7;
-	--c4-bg: rgba(240, 140, 190, 0.15);
-	--c4-tx: #f0a8cf;
-	--c5-bg: rgba(240, 160, 90, 0.16);
-	--c5-tx: #f3bb82;
-	--c6-bg: rgba(230, 195, 80, 0.16);
-	--c6-tx: #ecd487;
-	--c7-bg: rgba(230, 120, 110, 0.16);
-	--c7-tx: #f0a29a;
-	--c8-bg: rgba(196, 154, 116, 0.18);
-	--c8-tx: #d5b087;
-	--c9-bg: rgba(200, 198, 190, 0.15);
-	--c9-tx: #c2c0b6;
-	--c10-bg: rgba(130, 150, 240, 0.16);
-	--c10-tx: #adbcf2;
-	--c11-bg: rgba(190, 224, 110, 0.16);
-	--c11-tx: #cbe397;
-	--c12-bg: rgba(240, 120, 160, 0.15);
-	--c12-tx: #f0a8c4;
 }

@@ -422,7 +422,9 @@ func (s *PlanoService) garantirPlano(
 	novo := plano.NewSalvo()
 	novo.UserID = userID
 	novo.ConcursoID = c.ID
-	novo.TemaUI = "system"
+	// Dark is the app's default look; "system" and "light" stay available in the
+	// sidebar for whoever prefers them.
+	novo.TemaUI = "dark"
 	novo.Config = defaultConfig(c, s.clock.Now())
 
 	return s.planos.UpsertPlano(ctx, novo)

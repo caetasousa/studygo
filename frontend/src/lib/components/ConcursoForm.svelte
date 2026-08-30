@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NavIcon from './NavIcon.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
 	import type { ConcursoInput, DisciplinaInput } from '$lib/types';
 
@@ -150,7 +151,7 @@
 
 	{#if avisos.length > 0}
 		<div class="callout warn" style="margin-bottom:14px">
-			<span class="em">🟡</span>
+			<span class="em"><NavIcon name="alerta" /></span>
 			<div>
 				<b>Confira antes de salvar:</b>
 				<ul style="margin:6px 0 0;padding-left:18px">

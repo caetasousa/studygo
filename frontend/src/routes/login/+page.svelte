@@ -24,7 +24,7 @@
 
 <div class="auth-wrap">
 	<div class="auth-card">
-		<h1><span>🏛️</span> Entrar</h1>
+		<h1>Entrar</h1>
 		<p class="sub">Seu plano de estudos para o concurso, salvo na nuvem.</p>
 
 		<form class="auth-form" onsubmit={submit}>

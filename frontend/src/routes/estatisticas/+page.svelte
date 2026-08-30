@@ -25,10 +25,29 @@
 	const maxSemana = $derived(
 		dados ? Math.max(1, ...dados.porSemana.map((s) => Math.max(s.horasPrevisto, s.horasLancado))) : 1
 	);
+
+	// A fresh plan has every week at 0 h lançado, which renders dozens of identical
+	// rows. Show the weeks that carry data (plus the following one) and fold the
+	// untouched tail behind a toggle.
+	let verTodasSemanas = $state(false);
+
+	// Weeks up to the last one with activity, plus the next — on a plan with no
+	// registros at all that is just the first week, which is the point: an empty
+	// table of 20 identical rows says nothing.
+	const semanasComDados = $derived.by(() => {
+		const todas = dados?.porSemana ?? [];
+		const ultima = todas.reduce((acc, s, i) => (s.horasLancado > 0 || s.questoes > 0 ? i : acc), -1);
+		return todas.slice(0, ultima + 2);
+	});
+
+	const semanasVisiveis = $derived(
+		verTodasSemanas ? (dados?.porSemana ?? []) : semanasComDados
+	);
+	const semanasOcultas = $derived((dados?.porSemana.length ?? 0) - semanasVisiveis.length);
 </script>
 
 <PageHead
-	emoji="📈"
+	icone="estatisticas"
 	titulo="Estatísticas"
 	sub="Sua evolução ao longo do plano: horas, acertos e sequência de dias estudados."
 	mostrarProps={false}
@@ -39,10 +58,10 @@
 {:else if dados}
 	<div class="page">
 		<div class="props">
-			<div class="prop">🔥 Streak <b>{dados.streak}</b> dias</div>
-			<div class="prop">⏱️ Horas <b>{nf1.format(dados.horasTotal)}</b></div>
-			<div class="prop">✍️ Questões <b>{nf0.format(dados.questoesTotal)}</b></div>
-			<div class="prop">🎯 Acerto <b>{pctAcerto !== null ? pctAcerto + '%' : '—'}</b></div>
+			<div class="prop">Streak <b>{dados.streak}</b> dias</div>
+			<div class="prop">Horas <b>{nf1.format(dados.horasTotal)}</b></div>
+			<div class="prop">Questões <b>{nf0.format(dados.questoesTotal)}</b></div>
+			<div class="prop">Acerto <b>{pctAcerto !== null ? pctAcerto + '%' : '—'}</b></div>
 		</div>
 
 		<h2 class="sec">Sequência atual</h2>
@@ -82,7 +101,7 @@
 					<tr><th>Semana</th><th>Previsto</th><th>Lançado</th><th>Aproveitamento</th><th>Questões</th></tr>
 				</thead>
 				<tbody>
-					{#each dados.porSemana as s (s.semana)}
+					{#each semanasVisiveis as s (s.semana)}
 						<tr>
 							<td>Semana {String(s.semana).padStart(2, '0')}</td>
 							<td>{nf1.format(s.horasPrevisto)} h</td>
@@ -103,6 +122,13 @@
 				</tbody>
 			</table>
 		</div>
+		{#if semanasOcultas > 0 || verTodasSemanas}
+			<button class="ver-mais" onclick={() => (verTodasSemanas = !verTodasSemanas)}>
+				{verTodasSemanas
+					? 'mostrar só as semanas com registro'
+					: `mostrar as outras ${semanasOcultas} semanas`}
+			</button>
+		{/if}
 
 		<h2 class="sec">Acerto por disciplina</h2>
 		<div class="tbl-wrap">

@@ -160,7 +160,7 @@
 </script>
 
 <PageHead
-	emoji="⚙️"
+	icone="config"
 	titulo="Configurações"
 	sub="Datas, ritmo de estudo e seus dados."
 	mostrarProps={false}
@@ -482,7 +482,7 @@
 					<a class="btn" href="/concursos/{plano.concurso.slug}/editar"
 						>✏️ Editar disciplinas e datas</a
 					>
-					<a class="btn" href="/concursos">📁 Trocar de concurso</a>
+					<a class="btn" href="/concursos">Trocar de concurso</a>
 				</div>
 
 				<h2 class="sec">Dados</h2>
