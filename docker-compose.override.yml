@@ -1,0 +1,44 @@
+# Local development overrides. Compose loads this automatically on top of
+# docker-compose.yml, so `docker compose up` gives you hot reload; production
+# (ansible/deploy.yml) renders its own compose file and never sees this one.
+#
+# Frontend: vite dev server with the source bind-mounted, so a save in the
+# editor reaches the browser without a rebuild.
+# Backend:  `go run` under a file watcher, so a .go save restarts the server.
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # Vite proxies /api to the backend over the compose network, so the
+      # browser stays same-origin and needs no CORS.
+      VITE_API_PROXY: "http://backend:8080"
+      # Bind-mounted source: poll for changes, since host filesystem events do
+      # not cross the mount reliably (WSL2, macOS).
+      VITE_USE_POLLING: "1"
+    volumes:
+      - ./frontend:/app
+      # Keep the image's node_modules: the bind mount above would otherwise
+      # hide them behind the host directory (which has none, or has the wrong
+      # platform's binaries).
+      - /app/node_modules
+      # SvelteKit's generated files are container-local for the same reason.
+      - /app/.svelte-kit
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    volumes:
+      - ./backend:/src
+      # Cache modules and build artefacts across restarts, so a rebuild after a
+      # save is seconds rather than a full re-download.
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    restart: unless-stopped
+
+volumes:
+  go_mod_cache:
+  go_build_cache:

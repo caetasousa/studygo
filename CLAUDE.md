@@ -38,6 +38,19 @@ docker compose down
 docker compose logs -f backend
 ```
 
+**Hot reload is on by default.** `docker-compose.override.yml` is loaded
+automatically by Compose, and points `frontend` and `backend` at their
+Dockerfiles' `dev` stages: the frontend runs the vite dev server, the backend
+runs `go run` under an `inotifywait` loop (`backend/dev-run.sh`), both with the
+source bind-mounted. A save in the editor reaches the browser (or restarts the
+API in ~5 s) with no rebuild — `--build` is only needed when a dependency
+changes. `VITE_USE_POLLING=1` is set there because host filesystem events do
+not cross a bind mount reliably on WSL2/macOS. To run the production images
+locally instead, bypass the override with
+`docker compose -f docker-compose.yml up -d --build`; `ansible/deploy.yml`
+never sees it, and `docker build` with no `--target` still yields the
+production stage (nginx / distroless).
+
 Config is env vars (see `.env.example` at root). **`JWT_SECRET` is required**; `DATABASE_URL` is built by Compose from `POSTGRES_*`. The backend runs migrations on boot (advisory-locked, so the `worker` can run them too without racing). Edital import needs `GEMINI_API_KEY` (read by `edital-processor`, not the backend) and `EDITAL_PROCESSOR_TOKEN` (a shared secret on the compose network); with them unset, manual registration still works.
 
 ## Architecture
