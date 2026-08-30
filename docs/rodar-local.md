@@ -46,7 +46,7 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | de quanto em quanto tempo o worker roda |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
-| `GEMINI_MODEL` | | `gemini-flash-latest` | modelo usado na importação (alias rolante; pine `gemini-3.7-flash` para fixar) |
+| `GEMINI_MODEL` | | `gemini-flash-lite-latest` | modelo da importação. É o Flash *lite* de propósito: cota grátis alta e ~1s por chamada. `gemini-flash-latest` é melhor mas tem ~20 req/dia no free tier |
 
 ## 2. Desenvolvimento com hot-reload
 

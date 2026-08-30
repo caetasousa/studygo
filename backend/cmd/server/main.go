@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"annygo/internal/adapter/ai"
 	"annygo/internal/adapter/crypto"
@@ -89,6 +90,11 @@ func run(logger *slog.Logger) error {
 	srv := httpserver.New(
 		cfg.ServerAddr,
 		httpserver.WithHandler(handler),
+		// The edital-import endpoints wait on Gemini (up to ~90s per call, two
+		// calls in a step). Everything else answers in milliseconds; a generous
+		// write timeout just keeps a slow-but-successful AI response from being
+		// cut off mid-body.
+		httpserver.WithWriteTimeout(240*time.Second),
 	)
 
 	logger.Info("server starting", slog.String("addr", cfg.ServerAddr))

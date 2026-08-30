@@ -53,8 +53,12 @@ func (s *ConcursoService) AnalisarEdital(ctx context.Context, in port.EditalEntr
 }
 
 // EstruturaDoCargo is wizard step 2: the disciplines, exam date and schedule for
-// the chosen cargo, with block totals already spread across the disciplines. The
-// disciplines and the (edital-wide) schedule are fetched concurrently.
+// the chosen cargo, with block totals already spread across the disciplines.
+//
+// The two AI calls run sequentially, not in parallel: on the free tier two
+// simultaneous requests trip the per-minute limit and the whole step hangs on
+// retries. The disciplines come first (they are the point of the step); the
+// schedule is best-effort and its failure only drops the marcos.
 func (s *ConcursoService) EstruturaDoCargo(
 	ctx context.Context,
 	in port.EditalEntrada,
@@ -62,33 +66,12 @@ func (s *ConcursoService) EstruturaDoCargo(
 ) (EstruturaResposta, error) {
 	in = prepararEntrada(in)
 
-	var (
-		est    port.EditalEstrutura
-		marcos []port.EditalMarco
-		errEst error
-		errCr  error
-	)
-
-	done := make(chan struct{}, 2)
-
-	go func() {
-		est, errEst = s.edital.Estrutura(ctx, in, cargo)
-		done <- struct{}{}
-	}()
-	go func() {
-		marcos, errCr = s.edital.Cronograma(ctx, in)
-		done <- struct{}{}
-	}()
-
-	<-done
-	<-done
-
-	if errEst != nil {
-		return EstruturaResposta{}, errEst
+	est, err := s.edital.Estrutura(ctx, in, cargo)
+	if err != nil {
+		return EstruturaResposta{}, err
 	}
 
-	// The schedule is a nice-to-have; a failure there just drops the marcos.
-	if errCr == nil {
+	if marcos, errCr := s.edital.Cronograma(ctx, in); errCr == nil {
 		est.Marcos = marcos
 	}
 

@@ -36,8 +36,12 @@ type GeminiAnalisador struct {
 }
 
 func NewGeminiAnalisador(apiKey, model string) *GeminiAnalisador {
+	// gemini-flash-lite-latest, not gemini-flash-latest: the premium flash alias
+	// currently points at gemini-3.7-flash, whose free tier is 20 requests/day —
+	// one wizard run is 4+ calls, so it 429s by midday. The lite flash is fast
+	// (~1s) and has room to spare.
 	if model == "" {
-		model = "gemini-flash-latest"
+		model = "gemini-flash-lite-latest"
 	}
 
 	return &GeminiAnalisador{
@@ -309,19 +313,17 @@ func (g *GeminiAnalisador) gerar(
 	schema map[string]any,
 	out any,
 ) error {
-	ctx, cancel := context.WithTimeout(ctx, 200*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
 	// No temperature/top_p/top_k: the Gemini 3 flash models deprecated them and a
 	// low temperature there degrades output (looping, truncation). The JSON mode
-	// + responseSchema already pin the shape. thinkingLevel "low" keeps a pure
-	// extraction fast — it does not need deep reasoning.
+	// + responseSchema already pin the shape.
 	body := map[string]any{
 		"contents": []map[string]any{{"role": "user", "parts": parts}},
 		"generationConfig": map[string]any{
 			"responseMimeType": "application/json",
 			"responseSchema":   schema,
-			"thinkingConfig":   map[string]any{"thinkingLevel": "low"},
 		},
 	}
 
@@ -411,10 +413,11 @@ func textoDaResposta(payload []byte) (string, error) {
 	return texto, nil
 }
 
-// maxTentativas rides out the "high demand" 503s the flash models throw during
-// congestion spikes — with the exponential backoff below that is ~30s of waiting
-// before giving up.
-const maxTentativas = 5
+// maxTentativas rides out the "high demand" 503/429s the flash models throw
+// during congestion spikes. Kept low on purpose: when the provider is rate
+// limiting us, retrying for minutes only makes the whole wizard hang — a fast
+// 503 lets the user try again in a moment.
+const maxTentativas = 3
 
 func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body []byte) ([]byte, int, error) {
 	var lastErr error
@@ -447,8 +450,8 @@ func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body [
 
 		select {
 		case <-ctx.Done():
-			return nil, 0, fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, ctx.Err())
-		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s, 8s, 16s
+			return nil, 0, fmt.Errorf("%w: %w (última resposta do provedor: %v)", port.ErrProvedorIndisponivel, ctx.Err(), lastErr)
+		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s
 		}
 	}
 
