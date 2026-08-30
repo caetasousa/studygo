@@ -5,7 +5,13 @@
 	import { api, ApiError, type FonteEdital } from '$lib/api';
 	import ConcursoForm from '$lib/components/ConcursoForm.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
-	import type { CargoOpcao, ConcursoInput, DisciplinaInput } from '$lib/types';
+	import type {
+		AlertaResposta,
+		CargoOpcao,
+		ConcursoInput,
+		DisciplinaInput,
+		GrupoResposta
+	} from '$lib/types';
 
 	type Etapa = 'edital' | 'cargo' | 'gerais' | 'especificas' | 'conteudo' | 'revisao' | 'manual';
 
@@ -19,26 +25,29 @@
 	let arquivo = $state<File | null>(null);
 	let textoEdital = $state('');
 
-	// after "analisar" — the edital source reused by the later steps: the text the
-	// backend extracted, or the PDF itself when it is a scanned file.
-	let fonte = $state<FonteEdital | null>(null);
+	// after "analisar" — the opaque handle the processor bound to this user's
+	// document; the later steps carry only this.
+	let documentoId = $state('');
 	let banca = $state('');
 	let cargos = $state<CargoOpcao[]>([]);
 	let cargoSel = $state<string | null>(null);
 
-	// after "estrutura"
+	// after "estrutura". `questoes` is null when the edital gave only the group
+	// total — the user must fill an estimate or ratear before saving.
 	interface DiscRow {
 		nome: string;
-		questoes: number;
+		questoes: number | null;
+		peso: number | null;
 		temasTexto: string;
 	}
 	let gerais = $state<DiscRow[]>([]);
 	let especificas = $state<DiscRow[]>([]);
+	let grupoGerais = $state<GrupoResposta | null>(null);
+	let grupoEspecificos = $state<GrupoResposta | null>(null);
 	let prova = $state('');
-	let provaDiscursiva = $state(false);
 	let marcos = $state<ConcursoInput['marcos']>([]);
 	let nomeSugerido = $state('');
-	let avisos = $state<string[]>([]);
+	let alertas = $state<AlertaResposta[]>([]);
 
 	// final
 	let inicialRevisao = $state<ConcursoInput | undefined>(undefined);
@@ -92,16 +101,11 @@
 		const entrada: FonteEdital = arquivo ? { pdf: arquivo } : { texto: textoEdital };
 		try {
 			const res = await api.analisarEdital(entrada);
-			// Reuse the cheapest handle on the next steps: extracted text, or the
-			// URI of the PDF the backend uploaded (scanned file, no text layer).
-			fonte = res.texto
-				? { texto: res.texto }
-				: res.arquivoUri
-					? { arquivoUri: res.arquivoUri, mime: res.mime }
-					: entrada;
+			documentoId = res.documentoId;
 			banca = res.banca;
 			cargos = res.cargos;
-			cargoSel = cargos.length === 1 ? cargos[0].nome : null;
+			// Prefer selecting by the stable cargo code.
+			cargoSel = cargos.length === 1 ? cargos[0].codigo : null;
 			etapa = 'cargo';
 		} catch (e) {
 			erro = trata(e);
@@ -111,20 +115,26 @@
 	}
 
 	async function buscarEstrutura() {
-		if (!cargoSel || !fonte) return;
+		if (!cargoSel || !documentoId) return;
 		processando = true;
 		erro = null;
-		progresso = `Buscando as disciplinas de "${cargoSel}"…`;
+		const rotulo = cargos.find((c) => c.codigo === cargoSel)?.nome ?? cargoSel;
+		progresso = `Buscando a estrutura de "${rotulo}"…`;
 		try {
-			const est = await api.estruturaEdital(fonte, cargoSel);
+			const est = await api.estruturaEdital(documentoId, cargoSel);
 			nomeSugerido = est.nome;
 			prova = est.prova;
-			provaDiscursiva = est.provaDiscursiva;
 			marcos = est.marcos;
-			avisos = est.avisos;
-			// A etapa "estrutura" já costuma trazer temas; o passo seguinte os refina.
-			gerais = est.gerais.map(paraLinha);
-			especificas = est.especificas.map(paraLinha);
+			alertas = est.alertas;
+			grupoGerais = est.gerais[0] ?? null;
+			grupoEspecificos = est.especificas[0] ?? null;
+			gerais = est.gerais.flatMap((g) => g.disciplinas.map(paraLinha));
+			especificas = est.especificas.flatMap((g) => g.disciplinas.map(paraLinha));
+			// The edital gives the group total but rarely splits it per discipline.
+			// Seed the even split so the step opens usable; it is an estimate and
+			// every field stays editable.
+			preencherEstimativa(gerais, grupoGerais);
+			preencherEstimativa(especificas, grupoEspecificos);
 			etapa = 'gerais';
 		} catch (e) {
 			erro = trata(e);
@@ -133,16 +143,40 @@
 		}
 	}
 
-	function paraLinha(d: DisciplinaInput): DiscRow {
-		return {
-			nome: d.nome,
-			questoes: d.questoes,
-			temasTexto: (d.temas ?? []).join('\n')
-		};
+	function paraLinha(d: { nome: string; questoes: number | null; peso: number | null }): DiscRow {
+		return { nome: d.nome, questoes: d.questoes, peso: d.peso, temasTexto: '' };
 	}
 
 	function addDisc(lista: DiscRow[]) {
-		lista.push({ nome: '', questoes: 0, temasTexto: '' });
+		lista.push({ nome: '', questoes: null, peso: null, temasTexto: '' });
+	}
+
+	// Split a group's total equally across its disciplines — only on an explicit
+	// user action, and the values are an estimate, not extracted data.
+	function ratear(lista: DiscRow[], total: number | null) {
+		if (!total || lista.length === 0) return;
+		const base = Math.floor(total / lista.length);
+		const resto = total % lista.length;
+		lista.forEach((d, i) => (d.questoes = base + (i < resto ? 1 : 0)));
+	}
+
+	// Seed an even split when the edital gave the group total but no per-discipline
+	// breakdown. Never overwrites a number the edital did provide.
+	function preencherEstimativa(lista: DiscRow[], grupo: GrupoResposta | null) {
+		if (!grupo || grupo.total === null) return;
+		if (!lista.length || !lista.every((d) => d.questoes === null)) return;
+		ratear(lista, grupo.total);
+	}
+
+	function somaQuestoes(lista: DiscRow[]): number {
+		return lista.reduce((a, d) => a + (d.questoes ?? 0), 0);
+	}
+
+	// Per-step: each screen is gated only by the rows it actually shows. Checking
+	// both lists at once deadlocks step 3, whose "next" would wait on disciplines
+	// that are only filled in on step 4.
+	function faltaEstimarEm(lista: DiscRow[]): boolean {
+		return lista.some((d) => d.nome.trim() && d.questoes === null);
 	}
 	function rmDisc(lista: DiscRow[], i: number) {
 		lista.splice(i, 1);
@@ -150,7 +184,7 @@
 
 	async function buscarConteudo() {
 		const todas = [...gerais, ...especificas].map((d) => d.nome.trim()).filter(Boolean);
-		if (todas.length === 0 || !fonte) {
+		if (todas.length === 0 || !documentoId) {
 			montarRevisao();
 			return;
 		}
@@ -159,7 +193,11 @@
 		erro = null;
 		progresso = `Extraindo o conteúdo programático de ${todas.length} disciplinas…`;
 		try {
-			const res = await api.conteudoEdital(fonte, todas);
+			const res = await api.conteudoEdital(
+				{ documentoId },
+				cargoSel ?? '',
+				todas
+			);
 			const mapa = new Map(res.itens.map((it) => [it.nome.trim().toLowerCase(), it.temas]));
 			for (const d of [...gerais, ...especificas]) {
 				const t = mapa.get(d.nome.trim().toLowerCase());
@@ -183,7 +221,8 @@
 			.map((d) => ({
 				nome: d.nome.trim(),
 				bloco,
-				questoes: Math.max(0, d.questoes || 0),
+				questoes: Math.max(0, d.questoes ?? 0),
+				peso: Math.max(0, Math.round(d.peso ?? 0)),
 				temas: d.temasTexto
 					.split('\n')
 					.map((t) => t.trim())
@@ -201,7 +240,7 @@
 		inicialRevisao = {
 			nome: nomeSugerido,
 			banca,
-			cargo: cargoSel ?? '',
+			cargo: cargos.find((c) => c.codigo === cargoSel)?.nome ?? cargoSel ?? '',
 			emoji: '📚',
 			prova,
 			retaFinalDias: 28,
@@ -348,19 +387,32 @@
 	{/if}
 
 	<!-- ETAPA 3 e 4: DISCIPLINAS -->
-	{#snippet listaDisc(titulo: string, rows: DiscRow[], voltar: () => void, avancar: () => void, textoAvancar: string)}
+	{#snippet listaDisc(
+		titulo: string,
+		rows: DiscRow[],
+		grupo: GrupoResposta | null,
+		voltar: () => void,
+		avancar: () => void,
+		textoAvancar: string
+	)}
+		{@const falta = faltaEstimarEm(rows)}
 		<div class="card">
 			<div class="card-body">
 				<h2 class="sec" style="margin-top:0">{titulo}</h2>
-				<p class="page-sub" style="margin-top:0">
-					Revise o que a IA extraiu. Ajuste os nomes, o nº de questões, adicione ou remova.
-				</p>
-				{#if avisos.length}
+				{#if grupo}
+					<p class="page-sub" style="margin-top:0">
+						{grupo.rotulo}{#if grupo.total !== null} — <b>{grupo.total} questões</b> no grupo{/if}{#if grupo.peso !== null}, peso <b>{grupo.peso}</b>{/if}.
+						{#if grupo.disciplinas.every((x) => x.questoes === null)}
+							O edital não dividiu as questões por disciplina — informe uma estimativa ou rateie.
+						{/if}
+					</p>
+				{/if}
+				{#if alertas.length}
 					<div class="callout warn" style="margin-bottom:10px">
 						<span class="em"><NavIcon name="alerta" /></span>
 						<div>
 							<ul style="margin:0;padding-left:16px">
-								{#each avisos as a (a)}<li>{a}</li>{/each}
+								{#each alertas as a (a.codigo + (a.campo ?? ''))}<li>{a.mensagem}</li>{/each}
 							</ul>
 						</div>
 					</div>
@@ -371,7 +423,17 @@
 				{#each rows as d, i (i)}
 					<div class="disc-linha">
 						<input type="text" bind:value={d.nome} />
-						<input type="number" min="0" max="80" bind:value={d.questoes} />
+						<input
+							type="number"
+							min="0"
+							max="80"
+							placeholder="—"
+							value={d.questoes ?? ''}
+							oninput={(e) => {
+								const v = (e.target as HTMLInputElement).value;
+								d.questoes = v === '' ? null : Math.max(0, Number(v));
+							}}
+						/>
 						<button
 							class="mv-btn"
 							aria-label="Remover"
@@ -380,11 +442,28 @@
 						>
 					</div>
 				{/each}
-				<button class="btn" style="margin-top:12px" onclick={() => addDisc(rows)}>+ disciplina</button>
+				<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+					<button class="btn" onclick={() => addDisc(rows)}>+ disciplina</button>
+					{#if grupo && grupo.total !== null}
+						<button class="btn" onclick={() => ratear(rows, grupo.total)}>
+							Ratear {grupo.total} como estimativa
+						</button>
+					{/if}
+				</div>
+				{#if grupo && grupo.total !== null}
+					<p class="page-sub" style="margin-top:8px;font-size:12.5px">
+						Soma informada: <b>{somaQuestoes(rows)}</b> / {grupo.total} do grupo{#if somaQuestoes(rows) !== grupo.total} — <span style="color:var(--warn)">não bate</span>{/if}
+					</p>
+				{/if}
 				<div style="display:flex;gap:10px;margin-top:16px">
 					<button class="btn" onclick={voltar}>← voltar</button>
-					<button class="btn primary" onclick={avancar}>{textoAvancar} →</button>
+					<button class="btn primary" disabled={falta} onclick={avancar}>{textoAvancar} →</button>
 				</div>
+				{#if falta}
+					<p class="page-sub" style="margin-top:6px;font-size:12.5px;color:var(--warn)">
+						Preencha o nº de questões (ou rateie) em todas as disciplinas antes de continuar.
+					</p>
+				{/if}
 			</div>
 		</div>
 	{/snippet}
@@ -393,6 +472,7 @@
 		{@render listaDisc(
 			'Conhecimentos gerais',
 			gerais,
+			grupoGerais,
 			() => (etapa = 'cargo'),
 			() => (etapa = 'especificas'),
 			'Próximo: específicas'
@@ -403,6 +483,7 @@
 		{@render listaDisc(
 			'Conhecimentos específicos do cargo',
 			especificas,
+			grupoEspecificos,
 			() => (etapa = 'gerais'),
 			buscarConteudo,
 			'Buscar conteúdo programático'
@@ -432,7 +513,7 @@
 	{#if etapa === 'revisao' || etapa === 'manual'}
 		<ConcursoForm
 			inicial={inicialRevisao}
-			{avisos}
+			avisos={alertas.map((a) => a.mensagem)}
 			{erro}
 			{enviando}
 			textoBotao="Criar concurso"
@@ -444,7 +525,7 @@
 				onclick={() => {
 					etapa = 'edital';
 					inicialRevisao = undefined;
-					avisos = [];
+					alertas = [];
 				}}>← começar de novo</button
 			>
 		</p>

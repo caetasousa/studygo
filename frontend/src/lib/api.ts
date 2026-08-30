@@ -2,7 +2,7 @@ import { auth } from '$lib/stores/auth.svelte';
 import type {
 	AnotacaoInput,
 	Caderno,
-	CargosResposta,
+	AnaliseResposta,
 	ConcursoDetalhe,
 	ConcursoInput,
 	ConcursoLista,
@@ -79,32 +79,32 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
 const planoBase = (slug: string) => `/api/concursos/${encodeURIComponent(slug)}/plano`;
 
 /**
- * The edital as the wizard carries it between steps: the file on the first call,
- * then whatever cheap handle came back — the extracted text, or the URI of the
- * PDF the backend uploaded to the provider (scanned files have no text layer).
+ * How the edital enters the wizard's first step: a file or pasted text. After
+ * step 1 it is carried by an opaque `documentoId` instead.
  */
 export type FonteEdital =
-	| { pdf: File; texto?: never; arquivoUri?: never; mime?: never }
-	| { texto: string; pdf?: never; arquivoUri?: never; mime?: never }
-	| { arquivoUri: string; mime: string; pdf?: never; texto?: never };
+	| { pdf: File; texto?: never }
+	| { texto: string; pdf?: never };
 
 interface ExtrasEdital {
+	documentoId?: string;
 	cargo?: string;
 	disciplinas?: string[];
 }
 
-/** bodyDe builds multipart for a file upload, JSON for text or a file URI. */
-function bodyDe(fonte: FonteEdital, extras: ExtrasEdital = {}): RequestInit {
-	if (fonte.pdf) {
+/** bodyDe builds multipart for a file upload, JSON otherwise. */
+function bodyDe(fonte: FonteEdital | null, extras: ExtrasEdital = {}): RequestInit {
+	if (fonte && 'pdf' in fonte && fonte.pdf) {
 		const form = new FormData();
-		form.append('pdf', fonte.pdf);
+		form.append('file', fonte.pdf);
+		if (extras.documentoId) form.append('documentoId', extras.documentoId);
 		if (extras.cargo) form.append('cargo', extras.cargo);
 		if (extras.disciplinas) form.append('disciplinas', JSON.stringify(extras.disciplinas));
 		return { method: 'POST', body: form };
 	}
 
-	const { pdf: _pdf, ...resto } = fonte;
-	return { method: 'POST', body: JSON.stringify({ ...resto, ...extras }) };
+	const texto = fonte && 'texto' in fonte ? fonte.texto : undefined;
+	return { method: 'POST', body: JSON.stringify({ texto, ...extras }) };
 }
 
 export const api = {
@@ -126,16 +126,28 @@ export const api = {
 		request<void>(`/api/concursos/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
 
 	// ---- edital import wizard ----
-	// The edital travels on every step: as text when the PDF had a text layer,
-	// otherwise as the file itself (scanned PDFs have no text to reuse).
+	// Step 1 takes the file or text and returns a documentoId; steps 2 and 3
+	// carry only the id (step 3 also accepts a fresh upload for the edit screen).
 	analisarEdital: (fonte: FonteEdital) =>
-		request<CargosResposta>('/api/editais/analisar', bodyDe(fonte)),
+		request<AnaliseResposta>('/api/editais/analisar', bodyDe(fonte)),
 
-	estruturaEdital: (fonte: FonteEdital, cargo: string) =>
-		request<EstruturaResposta>('/api/editais/estrutura', bodyDe(fonte, { cargo })),
+	estruturaEdital: (documentoId: string, cargo: string) =>
+		request<EstruturaResposta>('/api/editais/estrutura', {
+			method: 'POST',
+			body: JSON.stringify({ documentoId, cargo })
+		}),
 
-	conteudoEdital: (fonte: FonteEdital, disciplinas: string[]) =>
-		request<ConteudoEditalResposta>('/api/editais/conteudo', bodyDe(fonte, { disciplinas })),
+	conteudoEdital: (
+		src: { documentoId: string } | { fonte: FonteEdital },
+		cargo: string,
+		disciplinas: string[]
+	) =>
+		request<ConteudoEditalResposta>(
+			'/api/editais/conteudo',
+			'documentoId' in src
+				? { method: 'POST', body: JSON.stringify({ documentoId: src.documentoId, cargo, disciplinas }) }
+				: bodyDe(src.fonte, { cargo, disciplinas })
+		),
 
 	// ---- plano ----
 	getPlano: (slug: string) => request<PlanoResposta>(planoBase(slug)),

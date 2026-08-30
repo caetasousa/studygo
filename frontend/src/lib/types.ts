@@ -44,6 +44,8 @@ export interface DisciplinaInput {
 	nome: string;
 	bloco: 'esp' | 'ger';
 	questoes: number;
+	/** 0 = use the block default (1 for ger, 2 for esp); a positive value overrides it. */
+	peso: number;
 	temas: string[];
 	fontes: FonteInput[];
 }
@@ -79,33 +81,73 @@ export interface ConcursoDetalhe {
 
 // ---- edital import wizard ----
 
+export interface AlertaResposta {
+	codigo: string;
+	gravidade: 'info' | 'warning' | 'blocker';
+	mensagem: string;
+	campo?: string;
+}
+
 export interface CargoOpcao {
 	codigo: string;
 	nome: string;
-	escolaridade: string;
-	vagas: number;
+	especialidade?: string;
+	escolaridade?: string;
+	/** null when the edital did not state a number. */
+	vagas: number | null;
 }
 
-export interface CargosResposta {
-	texto: string;
-	arquivoUri: string;
-	mime: string;
+export interface AnaliseResposta {
+	documentoId: string;
 	banca: string;
+	totalPaginas: number;
+	paginasOcr: number;
 	cargos: CargoOpcao[];
+	alertas: AlertaResposta[];
+}
+
+export interface DisciplinaExtraida {
+	nome: string;
+	/** null unless the edital broke the group's total down by discipline. */
+	questoes: number | null;
+	/** null unless a weight was stated for this discipline specifically. */
+	peso: number | null;
+}
+
+export interface GrupoResposta {
+	kind: 'ger' | 'esp' | 'outro';
+	rotulo: string;
+	total: number | null;
+	peso: number | null;
+	pesoEscopo?: 'group' | 'discipline';
+	disciplinas: DisciplinaExtraida[];
+}
+
+export interface DiscursivaResposta {
+	modalidade: 'redacao' | 'estudo_de_caso' | 'outro';
+	rotulo: string;
+	questoes: number | null;
+}
+
+export interface DuracaoResposta {
+	minutos: number;
+	escopo: 'exam_set' | 'single_prova' | 'unknown';
 }
 
 export interface EstruturaResposta {
 	nome: string;
 	prova: string;
-	provaDiscursiva: boolean;
-	gerais: DisciplinaInput[];
-	especificas: DisciplinaInput[];
+	gerais: GrupoResposta[];
+	especificas: GrupoResposta[];
+	discursivas: DiscursivaResposta[];
+	duracao: DuracaoResposta | null;
 	marcos: MarcoInput[];
-	avisos: string[];
+	alertas: AlertaResposta[];
 }
 
 export interface ConteudoEditalResposta {
 	itens: { nome: string; temas: string[] }[];
+	alertas: AlertaResposta[];
 }
 
 export interface Disciplina {
