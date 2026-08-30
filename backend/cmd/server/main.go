@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"annygo/internal/adapter/ai"
 	"annygo/internal/adapter/crypto"
+	"annygo/internal/adapter/editalproc"
 	"annygo/internal/adapter/httpapi"
 	"annygo/internal/adapter/postgres"
 	"annygo/internal/platform/config"
@@ -62,10 +62,10 @@ func run(logger *slog.Logger) error {
 	concursoRepo := postgres.NewConcursoRepo(pool)
 	planoRepo := postgres.NewPlanoRepo(pool)
 
-	var editalParser port.EditalAnalisador = ai.Indisponivel{}
-	if cfg.GeminiAPIKey != "" {
-		editalParser = ai.NewGeminiAnalisador(cfg.GeminiAPIKey, cfg.GeminiModel)
-		logger.Info("edital import enabled", slog.String("model", cfg.GeminiModel))
+	var editalProc port.EditalProcessor = editalproc.Indisponivel{}
+	if cfg.EditalProcessorURL != "" {
+		editalProc = editalproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken)
+		logger.Info("edital import enabled", slog.String("processor", cfg.EditalProcessorURL))
 	}
 
 	authService := service.NewAuthService(userRepo, hasher, tokens, clock, cfg.RefreshTTL)
@@ -73,7 +73,7 @@ func run(logger *slog.Logger) error {
 	handlers := httpapi.Handlers{
 		Health:   httpapi.NewHealthHandler(service.NewHealthService(pool), logger),
 		Auth:     httpapi.NewAuthHandler(authService, logger),
-		Concurso: httpapi.NewConcursoHandler(service.NewConcursoService(concursoRepo, editalParser), logger),
+		Concurso: httpapi.NewConcursoHandler(service.NewConcursoService(concursoRepo, editalProc), logger),
 		Plano:    httpapi.NewPlanoHandler(service.NewPlanoService(planoRepo, concursoRepo, clock), logger),
 	}
 

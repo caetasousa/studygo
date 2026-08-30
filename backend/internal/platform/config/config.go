@@ -20,8 +20,10 @@ type Config struct {
 	Argon2        Argon2Params
 	RunMigrations bool
 
-	GeminiAPIKey string
-	GeminiModel  string
+	// EditalProcessorURL / Token point at the internal Python service that
+	// processes edital PDFs. Empty URL disables AI import.
+	EditalProcessorURL   string
+	EditalProcessorToken string
 }
 
 // Argon2Params configures the argon2id password hasher. Defaults follow the
@@ -36,13 +38,13 @@ type Argon2Params struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		ServerAddr:    getEnv("SERVER_ADDR", ":8080"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		CORSOrigin:    getEnv("CORS_ORIGIN", "http://localhost:5173"),
-		JWTSecret:     os.Getenv("JWT_SECRET"),
-		RunMigrations: getEnvBool("RUN_MIGRATIONS", true),
-		GeminiAPIKey:  os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:   getEnv("GEMINI_MODEL", "gemini-flash-lite-latest"),
+		ServerAddr:           getEnv("SERVER_ADDR", ":8080"),
+		DatabaseURL:          os.Getenv("DATABASE_URL"),
+		CORSOrigin:           getEnv("CORS_ORIGIN", "http://localhost:5173"),
+		JWTSecret:            os.Getenv("JWT_SECRET"),
+		RunMigrations:        getEnvBool("RUN_MIGRATIONS", true),
+		EditalProcessorURL:   os.Getenv("EDITAL_PROCESSOR_URL"),
+		EditalProcessorToken: os.Getenv("EDITAL_PROCESSOR_TOKEN"),
 		Argon2: Argon2Params{
 			Memory:      uint32(getEnvInt("ARGON2_MEMORY_KIB", 19*1024)),
 			Iterations:  uint32(getEnvInt("ARGON2_ITERATIONS", 2)),

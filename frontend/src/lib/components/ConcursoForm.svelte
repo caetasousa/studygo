@@ -1,7 +1,7 @@
 <script lang="ts">
 	import NavIcon from './NavIcon.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
-	import { api } from '$lib/api';
+	import { api, type FonteEdital } from '$lib/api';
 	import type { ConcursoInput, DisciplinaInput } from '$lib/types';
 
 	let {
@@ -33,7 +33,7 @@
 	let extracaoOk = $state<string | null>(null);
 
 	async function extrairTemas() {
-		const fonte = editalPdf
+		const fonte: FonteEdital | null = editalPdf
 			? { pdf: editalPdf }
 			: editalTexto.trim()
 				? { texto: editalTexto.trim() }
@@ -48,7 +48,7 @@
 		extracaoOk = null;
 		try {
 			const nomes = discs.map((d) => d.nome.trim()).filter(Boolean);
-			const res = await api.conteudoEdital(fonte, nomes);
+			const res = await api.conteudoEdital({ fonte }, cargo.trim(), nomes);
 			const mapa = new Map(res.itens.map((it) => [it.nome.trim().toLowerCase(), it.temas]));
 			let preenchidas = 0;
 			for (const d of discs) {
@@ -74,7 +74,7 @@
 	}
 
 	function vazia(): DisciplinaInput {
-		return { nome: '', bloco: 'esp', questoes: 0, temas: [], fontes: [] };
+		return { nome: '', bloco: 'esp', questoes: 0, peso: 0, temas: [], fontes: [] };
 	}
 
 	// The form owns editable copies seeded from `inicial` at mount. Parents only
@@ -104,6 +104,8 @@
 		nome: string;
 		bloco: 'esp' | 'ger';
 		questoes: number;
+		// 0 = block default (1 ger / 2 esp). A positive value overrides it.
+		peso: number;
 		temasTexto: string;
 		fontesTexto: string;
 	}
@@ -113,6 +115,7 @@
 			nome: d.nome,
 			bloco: d.bloco,
 			questoes: d.questoes,
+			peso: d.peso ?? 0,
 			temasTexto: (d.temas ?? []).join('\n'),
 			fontesTexto: (d.fontes ?? []).map((f) => `${f.titulo} | ${f.url}`).join('\n')
 		}))
@@ -141,7 +144,7 @@
 	);
 
 	function addDisc() {
-		discs.push({ nome: '', bloco: 'esp', questoes: 0, temasTexto: '', fontesTexto: '' });
+		discs.push({ nome: '', bloco: 'esp', questoes: 0, peso: 0, temasTexto: '', fontesTexto: '' });
 	}
 	function rmDisc(i: number) {
 		discs.splice(i, 1);
@@ -170,6 +173,7 @@
 			nome: d.nome.trim(),
 			bloco: d.bloco,
 			questoes: Math.max(0, d.questoes || 0),
+			peso: Math.max(0, Math.round(d.peso || 0)),
 			temas: d.temasTexto
 				.split('\n')
 				.map((t) => t.trim())
@@ -338,6 +342,18 @@
 							<div class="field">
 								<label for="cf-d{i}-q">Questões</label>
 								<input id="cf-d{i}-q" type="number" min="0" max="80" step="1" bind:value={d.questoes} />
+							</div>
+							<div class="field">
+								<label for="cf-d{i}-p">Peso</label>
+								<input
+									id="cf-d{i}-p"
+									type="number"
+									min="0"
+									max="10"
+									step="1"
+									placeholder={d.bloco === 'esp' ? '2' : '1'}
+									bind:value={d.peso}
+								/>
 							</div>
 							<div class="field" style="justify-content:flex-end">
 								<button

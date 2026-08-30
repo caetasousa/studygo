@@ -45,8 +45,8 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `SERVER_PORT` / `FRONTEND_PORT` | | `8080` / `5173` | portas expostas no host |
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | de quanto em quanto tempo o worker roda |
-| `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
-| `GEMINI_MODEL` | | `gemini-flash-lite-latest` | modelo da importação. É o Flash *lite* de propósito: cota grátis alta e ~1s por chamada. `gemini-flash-latest` é melhor mas tem ~20 req/dia no free tier |
+| `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
+| `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
 
 ## 2. Desenvolvimento com hot-reload
 

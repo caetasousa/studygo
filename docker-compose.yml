@@ -16,11 +16,27 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-annygo}:${POSTGRES_PASSWORD:-annygo}@postgres:5432/${POSTGRES_DB:-annygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
-      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      GEMINI_MODEL: "${GEMINI_MODEL:-gemini-flash-lite-latest}"
+      EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
+      EDITAL_PROCESSOR_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  # Internal-only: turns edital PDFs into a reviewable structured preview.
+  # No host port — the backend reaches it over the compose network.
+  edital-processor:
+    build: ./edital-processor
+    environment:
+      EP_SERVICE_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
+      EP_GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+    volumes:
+      - edital_work:/var/lib/edital-processor/work
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   worker:
@@ -54,3 +70,4 @@ services:
 
 volumes:
   postgres_data:
+  edital_work:

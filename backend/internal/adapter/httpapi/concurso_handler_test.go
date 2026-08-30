@@ -41,59 +41,52 @@ func (f *fakeConcursoRepo) CreateConcurso(_ context.Context, c concurso.Concurso
 	return c, nil
 }
 
-type fakeAnalisador struct {
+type fakeProcessor struct {
 	disponivel bool
-	cargos     port.EditalCargos
+	analise    port.EditalAnalise
 	estrutura  port.EditalEstrutura
-	marcos     []port.EditalMarco
-	conteudo   []port.EditalConteudoDisciplina
+	conteudo   port.EditalConteudo
 	err        error
 
-	gotEntrada port.EditalEntrada
-	gotCargo   string
-	gotDiscs   []string
+	gotOwnerRef string
+	gotDocID    string
+	gotCargo    string
+	gotDiscs    []string
+	gotUpload   port.EditalUpload
 }
 
-func (f *fakeAnalisador) Disponivel() bool { return f.disponivel }
+func (f *fakeProcessor) Disponivel() bool { return f.disponivel }
 
-func (f *fakeAnalisador) Cargos(_ context.Context, in port.EditalEntrada) (port.EditalCargos, error) {
-	f.gotEntrada = in
-
-	return f.cargos, f.err
+func (f *fakeProcessor) Analisar(_ context.Context, ownerRef string, up port.EditalUpload) (port.EditalAnalise, error) {
+	f.gotOwnerRef = ownerRef
+	f.gotUpload = up
+	return f.analise, f.err
 }
 
-func (f *fakeAnalisador) Estrutura(
-	_ context.Context,
-	in port.EditalEntrada,
-	cargo string,
-) (port.EditalEstrutura, error) {
+func (f *fakeProcessor) Estrutura(_ context.Context, ownerRef, docID, cargo string) (port.EditalEstrutura, error) {
+	f.gotOwnerRef = ownerRef
+	f.gotDocID = docID
 	f.gotCargo = cargo
-	f.gotEntrada = in
-
 	return f.estrutura, f.err
 }
 
-func (f *fakeAnalisador) Cronograma(context.Context, port.EditalEntrada) ([]port.EditalMarco, error) {
-	return f.marcos, nil
-}
-
-func (f *fakeAnalisador) Conteudo(
-	_ context.Context,
-	in port.EditalEntrada,
-	ds []string,
-) ([]port.EditalConteudoDisciplina, error) {
+func (f *fakeProcessor) Conteudo(_ context.Context, ownerRef, docID, cargo string, ds []string, up port.EditalUpload) (port.EditalConteudo, error) {
+	f.gotOwnerRef = ownerRef
+	f.gotDocID = docID
+	f.gotCargo = cargo
 	f.gotDiscs = ds
-	f.gotEntrada = in
-
+	f.gotUpload = up
 	return f.conteudo, f.err
 }
 
-func newHandler(an port.EditalAnalisador) (*ConcursoHandler, *fakeConcursoRepo) {
+func newHandler(an port.EditalProcessor) (*ConcursoHandler, *fakeConcursoRepo) {
 	repo := &fakeConcursoRepo{}
 	svc := service.NewConcursoService(repo, an)
 
 	return NewConcursoHandler(svc, slog.New(slog.NewTextHandler(io.Discard, nil))), repo
 }
+
+func ptrInt(n int) *int { return &n }
 
 func withUser(r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), userIDKey, uuid.New()))
@@ -119,20 +112,22 @@ func decodeBody(t *testing.T, rec *httptest.ResponseRecorder, v any) {
 func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 	t.Parallel()
 
-	cargos := port.EditalCargos{
-		Texto: "EDITAL TCE-GO Nº 01/2026 ...",
-		Banca: "FCC",
+	analise := port.EditalAnalise{
+		DocumentoID:  "doc-abc-123",
+		Banca:        "FCC",
+		TotalPaginas: 26,
+		PaginasOCR:   26,
 		Cargos: []port.EditalCargo{
-			{Codigo: "A01", Nome: "Técnico Administrativo", Vagas: 6},
-			{Codigo: "B02", Nome: "Tecnologia da Informação", Vagas: 10},
+			{Codigo: "A01", Nome: "Técnico Administrativo", Vagas: ptrInt(6)},
+			{Codigo: "B02", Nome: "Tecnologia da Informação", Vagas: ptrInt(10)},
 		},
 	}
 
 	t.Run("json com texto", func(t *testing.T) {
 		t.Parallel()
 
-		an := &fakeAnalisador{disponivel: true, cargos: cargos}
-		h, _ := newHandler(an)
+		p := &fakeProcessor{disponivel: true, analise: analise}
+		h, _ := newHandler(p)
 
 		rec := httptest.NewRecorder()
 		h.AnalisarEdital(rec, post("/api/editais/analisar", `{"texto":"EDITAL ..."}`, "application/json"))
@@ -140,30 +135,36 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 		}
-		if an.gotEntrada.Texto == "" {
-			t.Error("o texto não chegou ao analisador")
+		if p.gotUpload.Texto == "" {
+			t.Error("o texto não chegou ao processador")
+		}
+		if p.gotOwnerRef == "" {
+			t.Error("o ownerRef não foi propagado")
 		}
 
-		var resp service.CargosResposta
+		var resp service.AnaliseResposta
 		decodeBody(t, rec, &resp)
+		if resp.DocumentoID != "doc-abc-123" {
+			t.Errorf("documentoId = %q", resp.DocumentoID)
+		}
 		if len(resp.Cargos) != 2 || resp.Cargos[1].Codigo != "B02" {
 			t.Errorf("cargos = %+v", resp.Cargos)
 		}
-		if resp.Texto == "" {
-			t.Error("a resposta deveria devolver o texto para os próximos passos")
+		if resp.Cargos[0].Vagas == nil || *resp.Cargos[0].Vagas != 6 {
+			t.Errorf("vagas A01 = %v", resp.Cargos[0].Vagas)
 		}
 	})
 
 	t.Run("multipart com pdf", func(t *testing.T) {
 		t.Parallel()
 
-		an := &fakeAnalisador{disponivel: true, cargos: cargos}
-		h, _ := newHandler(an)
+		p := &fakeProcessor{disponivel: true, analise: analise}
+		h, _ := newHandler(p)
 
 		var buf bytes.Buffer
 		mw := multipart.NewWriter(&buf)
-		fw, _ := mw.CreateFormFile("pdf", "edital.pdf")
-		_, _ = fw.Write([]byte("%PDF-1.7 conteúdo qualquer que não é um pdf de verdade"))
+		fw, _ := mw.CreateFormFile("file", "edital.pdf")
+		_, _ = fw.Write([]byte("%PDF-1.7 conteúdo"))
 		_ = mw.Close()
 
 		req := withUser(httptest.NewRequest(http.MethodPost, "/api/editais/analisar", &buf))
@@ -175,16 +176,15 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 		}
-		// pdftext.Extrair fails on the fake bytes -> the PDF is forwarded as-is
-		if len(an.gotEntrada.PDF) == 0 {
-			t.Error("o PDF ilegível deveria ter sido repassado ao analisador")
+		if len(p.gotUpload.PDF) == 0 {
+			t.Error("o PDF deveria ter chegado ao processador")
 		}
 	})
 
 	t.Run("503 quando indisponível", func(t *testing.T) {
 		t.Parallel()
 
-		h, _ := newHandler(&fakeAnalisador{disponivel: false})
+		h, _ := newHandler(&fakeProcessor{disponivel: false})
 		rec := httptest.NewRecorder()
 		h.AnalisarEdital(rec, post("/api/editais/analisar", `{"texto":"x"}`, "application/json"))
 
@@ -193,10 +193,10 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 		}
 	})
 
-	t.Run("erro do analisador vira 500", func(t *testing.T) {
+	t.Run("erro do processador vira 500", func(t *testing.T) {
 		t.Parallel()
 
-		h, _ := newHandler(&fakeAnalisador{disponivel: true, err: errAnalisadorFalhou})
+		h, _ := newHandler(&fakeProcessor{disponivel: true, err: errAnalisadorFalhou})
 		rec := httptest.NewRecorder()
 		h.AnalisarEdital(rec, post("/api/editais/analisar", `{"texto":"x"}`, "application/json"))
 
@@ -205,11 +205,11 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 		}
 	})
 
-	t.Run("provedor sobrecarregado vira 503 com dica de retry", func(t *testing.T) {
+	t.Run("processador sobrecarregado vira 503 com dica de retry", func(t *testing.T) {
 		t.Parallel()
 
-		falha := fmt.Errorf("%w: gemini respondeu 503: high demand", port.ErrProvedorIndisponivel)
-		h, _ := newHandler(&fakeAnalisador{disponivel: true, err: falha})
+		falha := fmt.Errorf("%w: processador respondeu 503: high demand", port.ErrProvedorIndisponivel)
+		h, _ := newHandler(&fakeProcessor{disponivel: true, err: falha})
 		rec := httptest.NewRecorder()
 		h.AnalisarEdital(rec, post("/api/editais/analisar", `{"texto":"x"}`, "application/json"))
 
@@ -227,7 +227,7 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 	t.Run("sem auth", func(t *testing.T) {
 		t.Parallel()
 
-		h, _ := newHandler(&fakeAnalisador{disponivel: true, cargos: cargos})
+		h, _ := newHandler(&fakeProcessor{disponivel: true, analise: analise})
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/api/editais/analisar", strings.NewReader(`{"texto":"x"}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -239,129 +239,93 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 	})
 }
 
-// --- wizard: step 2 estrutura ---
-
 func TestConcursoHandler_EstruturaEdital(t *testing.T) {
 	t.Parallel()
 
-	an := &fakeAnalisador{
+	p := &fakeProcessor{
 		disponivel: true,
-		marcos:     []port.EditalMarco{{Data: "2026-10-05", Titulo: "Inscrições", ExigeAcao: true}},
 		estrutura: port.EditalEstrutura{
-			Nome:             "TCE-GO — TI",
-			Prova:            "2027-01-17",
-			TotalGerais:      25,
-			TotalEspecificas: 45,
-			Gerais:           []port.EditalDisciplina{{Nome: "Português"}, {Nome: "Matemática"}},
-			Especificas:      []port.EditalDisciplina{{Nome: "Eng. Software"}},
+			NomeSugerido: "TCE-GO — TI",
+			DataProva:    "2027-01-17",
+			GruposGerais: []port.EditalGrupo{
+				{Kind: "ger", Rotulo: "Conhecimentos Gerais", Total: ptrInt(25),
+					Disciplinas: []port.EditalDisciplina{{Nome: "Português"}, {Nome: "Matemática"}}},
+			},
+			GruposEspecificos: []port.EditalGrupo{
+				{Kind: "esp", Rotulo: "Conhecimentos Específicos", Total: ptrInt(45),
+					Disciplinas: []port.EditalDisciplina{{Nome: "Eng. Software", Questoes: ptrInt(45)}}},
+			},
+			Marcos: []port.EditalMarco{{Data: "2026-10-05", Titulo: "Inscrições", ExigeAcao: true}},
 		},
 	}
-	h, _ := newHandler(an)
+	h, _ := newHandler(p)
 
 	rec := httptest.NewRecorder()
 	h.EstruturaEdital(rec, post("/api/editais/estrutura",
-		`{"texto":"EDITAL ...","cargo":"Tecnologia da Informação"}`, "application/json"))
+		`{"documentoId":"doc-abc-123","cargo":"B02"}`, "application/json"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
-	if an.gotCargo != "Tecnologia da Informação" {
-		t.Errorf("cargo = %q", an.gotCargo)
+	if p.gotDocID != "doc-abc-123" || p.gotCargo != "B02" {
+		t.Errorf("docID=%q cargo=%q", p.gotDocID, p.gotCargo)
 	}
 
 	var resp service.EstruturaResposta
 	decodeBody(t, rec, &resp)
 
-	if len(resp.Gerais) != 2 || len(resp.Especificas) != 1 {
-		t.Fatalf("disciplinas: %d ger, %d esp", len(resp.Gerais), len(resp.Especificas))
+	if len(resp.Gerais) != 1 || len(resp.Especificas) != 1 {
+		t.Fatalf("grupos: %d ger, %d esp", len(resp.Gerais), len(resp.Especificas))
 	}
-	if resp.Gerais[0].Bloco != "ger" || resp.Especificas[0].Bloco != "esp" {
-		t.Errorf("blocos: %q / %q", resp.Gerais[0].Bloco, resp.Especificas[0].Bloco)
+	// The group total is kept; disciplines the edital did not break down stay null.
+	if resp.Gerais[0].Total == nil || *resp.Gerais[0].Total != 25 {
+		t.Errorf("total geral = %v", resp.Gerais[0].Total)
 	}
-	sg := resp.Gerais[0].Questoes + resp.Gerais[1].Questoes
-	if sg != 25 || resp.Especificas[0].Questoes != 45 {
-		t.Errorf("distribuição: ger=%d esp=%d", sg, resp.Especificas[0].Questoes)
+	for _, d := range resp.Gerais[0].Disciplinas {
+		if d.Questoes != nil {
+			t.Errorf("disciplina %q recebeu questões inventadas", d.Nome)
+		}
 	}
-	// Cronograma runs in parallel and is merged in.
 	if len(resp.Marcos) != 1 {
-		t.Errorf("marcos = %d, esperava o cronograma mesclado", len(resp.Marcos))
-	}
-}
-
-// TestConcursoHandler_EstruturaEdital_PDF covers the scanned-PDF path: the file
-// travels on step 2 too, since there is no text to reuse.
-func TestConcursoHandler_EstruturaEdital_PDF(t *testing.T) {
-	t.Parallel()
-
-	an := &fakeAnalisador{
-		disponivel: true,
-		estrutura: port.EditalEstrutura{
-			Nome:   "X",
-			Prova:  "2027-01-17",
-			Gerais: []port.EditalDisciplina{{Nome: "Português", Questoes: 10}},
-		},
-	}
-	h, _ := newHandler(an)
-
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	fw, _ := mw.CreateFormFile("pdf", "edital.pdf")
-	_, _ = fw.Write([]byte("%PDF-1.7 conteúdo escaneado"))
-	_ = mw.WriteField("cargo", "Tecnologia da Informação")
-	_ = mw.Close()
-
-	req := withUser(httptest.NewRequest(http.MethodPost, "/api/editais/estrutura", &buf))
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	rec := httptest.NewRecorder()
-
-	h.EstruturaEdital(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-	if len(an.gotEntrada.PDF) == 0 {
-		t.Error("o PDF deveria ter chegado ao analisador na etapa 2")
-	}
-	if an.gotCargo != "Tecnologia da Informação" {
-		t.Errorf("cargo = %q", an.gotCargo)
+		t.Errorf("marcos = %d", len(resp.Marcos))
 	}
 }
 
 func TestConcursoHandler_EstruturaEdital_semCargo(t *testing.T) {
 	t.Parallel()
 
-	h, _ := newHandler(&fakeAnalisador{disponivel: true})
+	h, _ := newHandler(&fakeProcessor{disponivel: true})
 	rec := httptest.NewRecorder()
-	h.EstruturaEdital(rec, post("/api/editais/estrutura", `{"texto":"x","cargo":""}`, "application/json"))
+	h.EstruturaEdital(rec, post("/api/editais/estrutura", `{"documentoId":"x","cargo":""}`, "application/json"))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", rec.Code)
 	}
 }
 
-// --- wizard: step 3 conteúdo ---
-
 func TestConcursoHandler_ConteudoEdital(t *testing.T) {
 	t.Parallel()
 
-	an := &fakeAnalisador{
+	p := &fakeProcessor{
 		disponivel: true,
-		conteudo: []port.EditalConteudoDisciplina{
-			{Nome: "Português", Temas: []string{"Crase", "Concordância"}},
-			{Nome: "Eng. Software", Temas: []string{"Scrum"}},
+		conteudo: port.EditalConteudo{
+			Itens: []port.EditalConteudoDisciplina{
+				{Nome: "Português", Temas: []string{"Crase", "Concordância"}},
+				{Nome: "Eng. Software", Temas: []string{"Scrum"}},
+			},
 		},
 	}
-	h, _ := newHandler(an)
+	h, _ := newHandler(p)
 
 	rec := httptest.NewRecorder()
 	h.ConteudoEdital(rec, post("/api/editais/conteudo",
-		`{"texto":"EDITAL ...","disciplinas":["Português","Eng. Software"]}`, "application/json"))
+		`{"documentoId":"doc-abc-123","cargo":"B02","disciplinas":["Português","Eng. Software"]}`, "application/json"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
-	if len(an.gotDiscs) != 2 {
-		t.Errorf("disciplinas enviadas: %v", an.gotDiscs)
+	if len(p.gotDiscs) != 2 || p.gotDocID != "doc-abc-123" {
+		t.Errorf("docID=%q discs=%v", p.gotDocID, p.gotDiscs)
 	}
 
 	var resp service.ConteudoEditalResposta
@@ -371,12 +335,47 @@ func TestConcursoHandler_ConteudoEdital(t *testing.T) {
 	}
 }
 
+func TestConcursoHandler_ConteudoEdital_uploadFresco(t *testing.T) {
+	t.Parallel()
+
+	// The edit-screen flow: no documentoId, a fresh PDF plus disciplines.
+	p := &fakeProcessor{
+		disponivel: true,
+		conteudo:   port.EditalConteudo{Itens: []port.EditalConteudoDisciplina{{Nome: "X", Temas: []string{"t"}}}},
+	}
+	h, _ := newHandler(p)
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", "edital.pdf")
+	_, _ = fw.Write([]byte("%PDF-1.7 x"))
+	_ = mw.WriteField("cargo", "B02")
+	_ = mw.WriteField("disciplinas", `["X"]`)
+	_ = mw.Close()
+
+	req := withUser(httptest.NewRequest(http.MethodPost, "/api/editais/conteudo", &buf))
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+
+	h.ConteudoEdital(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if len(p.gotUpload.PDF) == 0 {
+		t.Error("o PDF fresco deveria ter chegado ao processador")
+	}
+	if p.gotDocID != "" {
+		t.Errorf("não deveria haver documentoId: %q", p.gotDocID)
+	}
+}
+
 func TestConcursoHandler_ConteudoEdital_semDisciplinas(t *testing.T) {
 	t.Parallel()
 
-	h, _ := newHandler(&fakeAnalisador{disponivel: true})
+	h, _ := newHandler(&fakeProcessor{disponivel: true})
 	rec := httptest.NewRecorder()
-	h.ConteudoEdital(rec, post("/api/editais/conteudo", `{"texto":"x","disciplinas":[]}`, "application/json"))
+	h.ConteudoEdital(rec, post("/api/editais/conteudo", `{"documentoId":"x","disciplinas":[]}`, "application/json"))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d", rec.Code)
@@ -388,7 +387,7 @@ func TestConcursoHandler_ConteudoEdital_semDisciplinas(t *testing.T) {
 func TestConcursoHandler_Criar(t *testing.T) {
 	t.Parallel()
 
-	h, repo := newHandler(&fakeAnalisador{})
+	h, repo := newHandler(&fakeProcessor{})
 
 	body := `{"nome":"TJ-SP Escrevente","prova":"2026-05-10",
 	          "disciplinas":[{"nome":"Direito Constitucional","bloco":"esp","questoes":15}]}`
@@ -409,7 +408,7 @@ func TestConcursoHandler_Criar(t *testing.T) {
 func TestConcursoHandler_Criar_invalido(t *testing.T) {
 	t.Parallel()
 
-	h, _ := newHandler(&fakeAnalisador{})
+	h, _ := newHandler(&fakeProcessor{})
 
 	body := `{"nome":"X","prova":"2026-05-10","disciplinas":[{"nome":"A","bloco":"esp","questoes":0}]}`
 	rec := httptest.NewRecorder()

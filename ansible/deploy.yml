@@ -7,9 +7,11 @@
   vars:
     backend_image: "annygo-backend:latest"
     frontend_image: "annygo-frontend:latest"
+    edital_processor_image: "annygo-edital-processor:latest"
     remote_app_dir: /opt/annygo
     backend_tarball: /tmp/annygo-backend.tar
     frontend_tarball: /tmp/annygo-frontend.tar
+    edital_processor_tarball: /tmp/annygo-edital-processor.tar
 
   tasks:
     - name: Build images locally
@@ -19,6 +21,7 @@
       loop:
         - { image: "{{ backend_image }}", context: "backend" }
         - { image: "{{ frontend_image }}", context: "frontend" }
+        - { image: "{{ edital_processor_image }}", context: "edital-processor" }
       delegate_to: localhost
       become: false
 
@@ -27,6 +30,7 @@
       loop:
         - { image: "{{ backend_image }}", tar: "{{ backend_tarball }}" }
         - { image: "{{ frontend_image }}", tar: "{{ frontend_tarball }}" }
+        - { image: "{{ edital_processor_image }}", tar: "{{ edital_processor_tarball }}" }
       delegate_to: localhost
       become: false
 
@@ -38,12 +42,14 @@
       loop:
         - "{{ backend_tarball }}"
         - "{{ frontend_tarball }}"
+        - "{{ edital_processor_tarball }}"
 
     - name: Load images on the VPS
       command: "docker load -i {{ item }}"
       loop:
         - "{{ backend_tarball }}"
         - "{{ frontend_tarball }}"
+        - "{{ edital_processor_tarball }}"
 
     - name: Remove tarballs from the VPS
       file:
@@ -52,6 +58,7 @@
       loop:
         - "{{ backend_tarball }}"
         - "{{ frontend_tarball }}"
+        - "{{ edital_processor_tarball }}"
 
     - name: Remove local tarballs
       file:
@@ -60,6 +67,7 @@
       loop:
         - "{{ backend_tarball }}"
         - "{{ frontend_tarball }}"
+        - "{{ edital_processor_tarball }}"
       delegate_to: localhost
       become: false
 
