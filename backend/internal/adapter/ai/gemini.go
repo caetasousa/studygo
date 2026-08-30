@@ -324,6 +324,10 @@ func (g *GeminiAnalisador) gerar(
 	}
 
 	if status != http.StatusOK {
+		if culpaDoProvedor(status) {
+			return fmt.Errorf("%w: gemini respondeu %d: %s", port.ErrProvedorIndisponivel, status, snippet(payload))
+		}
+
 		return fmt.Errorf("gemini respondeu %d: %s", status, snippet(payload))
 	}
 
@@ -388,12 +392,12 @@ func (g *GeminiAnalisador) postWithRetry(ctx context.Context, url string, body [
 
 		select {
 		case <-ctx.Done():
-			return nil, 0, ctx.Err()
+			return nil, 0, fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, ctx.Err())
 		case <-time.After(g.backoff << (tentativa - 1)): // 2s, 4s, 8s, 16s
 		}
 	}
 
-	return nil, 0, lastErr
+	return nil, 0, fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, lastErr)
 }
 
 func transiente(status int) bool {
@@ -404,6 +408,13 @@ func transiente(status int) bool {
 	default:
 		return false
 	}
+}
+
+// culpaDoProvedor reports whether a non-OK status is the provider's fault (rate
+// limit, overload, any 5xx) rather than a bad request from us — the former is
+// worth retrying and gets surfaced as a 503, the latter is a real bug.
+func culpaDoProvedor(status int) bool {
+	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
 // ---- schema + decode helpers ----

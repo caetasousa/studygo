@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"annygo/internal/port"
 )
 
 // The Files API lets a big PDF be uploaded once and referenced by URI on every
@@ -73,13 +75,17 @@ func (g *GeminiAnalisador) iniciarUpload(ctx context.Context, tamanho int, mime 
 
 	resp, err := g.http.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("iniciando upload: %w", err)
+		return "", fmt.Errorf("%w: iniciando upload: %w", port.ErrProvedorIndisponivel, err)
 	}
 	defer resp.Body.Close()
 
 	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode != http.StatusOK {
+		if culpaDoProvedor(resp.StatusCode) {
+			return "", fmt.Errorf("%w: upload start respondeu %d: %s", port.ErrProvedorIndisponivel, resp.StatusCode, snippet(payload))
+		}
+
 		return "", fmt.Errorf("upload start respondeu %d: %s", resp.StatusCode, snippet(payload))
 	}
 
@@ -108,13 +114,17 @@ func (g *GeminiAnalisador) finalizarUpload(
 
 	resp, err := g.http.Do(req)
 	if err != nil {
-		return arquivoRemoto{}, fmt.Errorf("enviando arquivo: %w", err)
+		return arquivoRemoto{}, fmt.Errorf("%w: enviando arquivo: %w", port.ErrProvedorIndisponivel, err)
 	}
 	defer resp.Body.Close()
 
 	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode != http.StatusOK {
+		if culpaDoProvedor(resp.StatusCode) {
+			return arquivoRemoto{}, fmt.Errorf("%w: upload respondeu %d: %s", port.ErrProvedorIndisponivel, resp.StatusCode, snippet(payload))
+		}
+
 		return arquivoRemoto{}, fmt.Errorf("upload respondeu %d: %s", resp.StatusCode, snippet(payload))
 	}
 
@@ -158,7 +168,7 @@ func (g *GeminiAnalisador) aguardarAtivo(ctx context.Context, nome string) error
 
 		resp, err := g.http.Do(req)
 		if err != nil {
-			return fmt.Errorf("consultando arquivo: %w", err)
+			return fmt.Errorf("%w: consultando arquivo: %w", port.ErrProvedorIndisponivel, err)
 		}
 
 		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -178,10 +188,10 @@ func (g *GeminiAnalisador) aguardarAtivo(ctx context.Context, nome string) error
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, ctx.Err())
 		case <-time.After(g.pollInterval):
 		}
 	}
 
-	return fmt.Errorf("o arquivo não ficou pronto a tempo")
+	return fmt.Errorf("%w: o arquivo não ficou pronto a tempo", port.ErrProvedorIndisponivel)
 }

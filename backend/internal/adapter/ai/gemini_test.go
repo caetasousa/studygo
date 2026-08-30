@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -302,16 +303,21 @@ func TestGeminiAnalisador_erros(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		prep    func(*geminiStub)
-		wantSub string
+		name        string
+		prep        func(*geminiStub)
+		wantSub     string
+		transitorio bool // wrapped in port.ErrProvedorIndisponivel → 503, not 500
 	}{
-		{"modelo 404", func(s *geminiStub) { s.status = 404; s.replies = []string{`{"error":{"code":404,"message":"gone"}}`} }, "404"},
-		{"resposta não-JSON", func(s *geminiStub) { s.replies = []string{`<html>502</html>`} }, "decoding gemini response"},
-		{"sem candidates", func(s *geminiStub) { s.replies = []string{`{"candidates":[]}`} }, "não retornou conteúdo"},
+		{"modelo 404", func(s *geminiStub) { s.status = 404; s.replies = []string{`{"error":{"code":404,"message":"gone"}}`} }, "404", false},
+		{"resposta não-JSON", func(s *geminiStub) { s.replies = []string{`<html>502</html>`} }, "decoding gemini response", false},
+		{"sem candidates", func(s *geminiStub) { s.replies = []string{`{"candidates":[]}`} }, "não retornou conteúdo", false},
 		{"json interno inválido", func(s *geminiStub) {
 			s.replies = []string{`{"candidates":[{"content":{"parts":[{"text":"desculpe, não sei responder"}]}}]}`}
-		}, "json inválido"},
+		}, "json inválido", false},
+		{"500 persistente é culpa do provedor", func(s *geminiStub) {
+			s.status = http.StatusInternalServerError
+			s.replies = []string{`{"error":{"code":500,"message":"internal"}}`}
+		}, "500", true},
 	}
 
 	for _, tt := range tests {
@@ -324,6 +330,9 @@ func TestGeminiAnalisador_erros(t *testing.T) {
 			_, err := analisadorAt(s).Cargos(context.Background(), port.EditalEntrada{Texto: "x"})
 			if err == nil || !strings.Contains(err.Error(), tt.wantSub) {
 				t.Fatalf("erro = %v, queria conter %q", err, tt.wantSub)
+			}
+			if got := errors.Is(err, port.ErrProvedorIndisponivel); got != tt.transitorio {
+				t.Errorf("errors.Is(ErrProvedorIndisponivel) = %v, queria %v (erro: %v)", got, tt.transitorio, err)
 			}
 		})
 	}
@@ -341,6 +350,9 @@ func TestGeminiAnalisador_erros(t *testing.T) {
 		}
 		if s.calls != maxTentativas {
 			t.Errorf("deveria ter esgotado as %d tentativas; calls=%d", maxTentativas, s.calls)
+		}
+		if !errors.Is(err, port.ErrProvedorIndisponivel) {
+			t.Errorf("503 esgotado deveria ser ErrProvedorIndisponivel; erro = %v", err)
 		}
 	})
 }

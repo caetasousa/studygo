@@ -9,6 +9,12 @@ import (
 // is configured.
 var ErrImportacaoIndisponivel = errors.New("importação por IA indisponível")
 
+// ErrProvedorIndisponivel wraps a transient failure from the AI provider — an
+// overloaded model, an upstream 5xx, a timeout. The request is not malformed and
+// can be retried later, so the API surfaces it as a 503 with a retry hint rather
+// than a generic "erro interno".
+var ErrProvedorIndisponivel = errors.New("provedor de IA indisponível no momento")
+
 // EditalEntrada is the edital as the analyser sees it. Asking a model to
 // transcribe a whole edital does not work, so the source travels with every
 // call, in whichever of these forms is cheapest:

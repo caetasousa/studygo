@@ -9,6 +9,7 @@ import (
 	"annygo/internal/domain/concurso"
 	"annygo/internal/domain/plano"
 	"annygo/internal/domain/user"
+	"annygo/internal/port"
 	"annygo/internal/service"
 )
 
@@ -32,7 +33,17 @@ func writeJSON(w http.ResponseWriter, logger *slog.Logger, status int, v any) {
 func writeError(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
 	status, msg := classify(err)
 
-	if status >= http.StatusInternalServerError {
+	switch {
+	case errors.Is(err, port.ErrProvedorIndisponivel):
+		// Not our bug — the AI provider is overloaded or slow. Worth a line for
+		// ops visibility, but a warning, not an error.
+		logger.WarnContext(
+			r.Context(),
+			"edital import: provider unavailable",
+			slog.String("path", r.URL.Path),
+			slog.Any("error", err),
+		)
+	case status >= http.StatusInternalServerError:
 		logger.ErrorContext(
 			r.Context(),
 			"request failed",
@@ -67,6 +78,9 @@ func classify(err error) (int, string) {
 		return http.StatusBadRequest, err.Error()
 	case errors.Is(err, errUnauthorized):
 		return http.StatusUnauthorized, "não autenticado"
+	case errors.Is(err, port.ErrProvedorIndisponivel):
+		return http.StatusServiceUnavailable,
+			"a IA está sobrecarregada agora — tente de novo em alguns minutos ou cadastre o concurso manualmente"
 	default:
 		return http.StatusInternalServerError, "erro interno"
 	}

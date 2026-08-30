@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -201,6 +202,25 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 
 		if rec.Code != http.StatusInternalServerError {
 			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("provedor sobrecarregado vira 503 com dica de retry", func(t *testing.T) {
+		t.Parallel()
+
+		falha := fmt.Errorf("%w: gemini respondeu 503: high demand", port.ErrProvedorIndisponivel)
+		h, _ := newHandler(&fakeAnalisador{disponivel: true, err: falha})
+		rec := httptest.NewRecorder()
+		h.AnalisarEdital(rec, post("/api/editais/analisar", `{"texto":"x"}`, "application/json"))
+
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+		}
+
+		var body struct{ Erro string }
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		if !strings.Contains(body.Erro, "sobrecarregada") {
+			t.Errorf("mensagem = %q, queria falar em sobrecarga", body.Erro)
 		}
 	})
 
