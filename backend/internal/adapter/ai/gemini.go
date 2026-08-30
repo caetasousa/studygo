@@ -331,29 +331,72 @@ func (g *GeminiAnalisador) gerar(
 		return fmt.Errorf("gemini respondeu %d: %s", status, snippet(payload))
 	}
 
-	var parsed struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
+	texto, err := textoDaResposta(payload)
+	if err != nil {
+		return err
 	}
 
-	if err := json.Unmarshal(payload, &parsed); err != nil {
-		return fmt.Errorf("decoding gemini response: %w", err)
-	}
-
-	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
-		return fmt.Errorf("gemini não retornou conteúdo")
-	}
-
-	if err := json.Unmarshal([]byte(parsed.Candidates[0].Content.Parts[0].Text), out); err != nil {
+	if err := json.Unmarshal([]byte(texto), out); err != nil {
 		return fmt.Errorf("gemini devolveu json inválido: %w", err)
 	}
 
 	return nil
+}
+
+// textoDaResposta pulls the answer text out of a generateContent envelope. The
+// thinking models (Gemini 3 flash) can split a candidate into several parts and
+// prepend reasoning parts flagged "thought": true — those carry no answer and
+// must be skipped, and the visible parts are concatenated in order.
+func textoDaResposta(payload []byte) (string, error) {
+	var parsed struct {
+		Candidates []struct {
+			FinishReason string `json:"finishReason"`
+			Content      struct {
+				Parts []struct {
+					Text    string `json:"text"`
+					Thought bool   `json:"thought"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
+	}
+
+	if err := json.Unmarshal(payload, &parsed); err != nil {
+		return "", fmt.Errorf("decoding gemini response: %w", err)
+	}
+
+	if parsed.PromptFeedback.BlockReason != "" {
+		return "", fmt.Errorf("gemini bloqueou o pedido (%s)", parsed.PromptFeedback.BlockReason)
+	}
+
+	if len(parsed.Candidates) == 0 {
+		return "", fmt.Errorf("gemini não retornou conteúdo")
+	}
+
+	cand := parsed.Candidates[0]
+
+	var b strings.Builder
+	for _, p := range cand.Content.Parts {
+		if p.Thought || p.Text == "" {
+			continue
+		}
+
+		b.WriteString(p.Text)
+	}
+
+	texto := strings.TrimSpace(b.String())
+	if texto == "" {
+		motivo := cand.FinishReason
+		if motivo == "" {
+			motivo = "sem texto na resposta"
+		}
+
+		return "", fmt.Errorf("gemini não retornou conteúdo (%s)", motivo)
+	}
+
+	return texto, nil
 }
 
 // maxTentativas rides out the "high demand" 503s the flash models throw during

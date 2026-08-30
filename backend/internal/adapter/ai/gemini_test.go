@@ -110,6 +110,27 @@ func analisadorAt(s *geminiStub) *GeminiAnalisador {
 func TestGeminiAnalisador_Cargos(t *testing.T) {
 	t.Parallel()
 
+	t.Run("ignora as partes de raciocínio e junta o texto visível", func(t *testing.T) {
+		t.Parallel()
+
+		s := newStub(t)
+		// Gemini 3 flash devolve o raciocínio numa parte "thought": true e pode
+		// quebrar a resposta em vários pedaços.
+		s.replies = []string{`{"candidates":[{"finishReason":"STOP","content":{"parts":[` +
+			`{"text":"o edital tem um cargo","thought":true},` +
+			`{"text":"{\"banca\":\"FGV\",\"cargos\":[{\"codigo\":\"B02\",\"nome\":"},` +
+			`{"text":"\"TI\",\"escolaridade\":\"Médio\",\"vagas\":3}]}"}` +
+			`]}}]}`}
+
+		got, err := analisadorAt(s).Cargos(context.Background(), port.EditalEntrada{Texto: "EDITAL..."})
+		if err != nil {
+			t.Fatalf("Cargos: %v", err)
+		}
+		if got.Banca != "FGV" || len(got.Cargos) != 1 || got.Cargos[0].Codigo != "B02" {
+			t.Fatalf("resultado: %+v", got)
+		}
+	})
+
 	t.Run("texto vai como texto e volta ecoado", func(t *testing.T) {
 		t.Parallel()
 
