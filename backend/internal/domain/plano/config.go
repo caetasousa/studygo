@@ -97,10 +97,18 @@ func ConfigPadrao() Config {
 func (c Config) Normalizar() Config {
 	d := ConfigPadrao()
 
-	// Simulados == "" means the method was never chosen: adopt every default,
-	// keeping any maps already populated.
+	// Simulados == "" means the study method was never chosen: adopt the
+	// defaults. The one exception is BlocosPorDia — a saved, in-range value is
+	// the user's answer to "how many disciplines a day", and overwriting it here
+	// is what silently reverted 3 blocks back to 2 on the next load, so the
+	// schedule kept showing two disciplines a day.
+	//
+	// Booleans and percentages stay unconditional: their zero value is
+	// indistinguishable from "never set", so preserving them would freeze an
+	// unanswered question as an answer (Discursiva=false, for one).
 	if c.Simulados == "" {
 		modos, reforcos, ciclo := c.Modos, c.Reforcos, c.CicloRevisao
+		blocos := c.BlocosPorDia
 
 		c.BlocosPorDia = d.BlocosPorDia
 		c.PctRevisao = d.PctRevisao
@@ -111,6 +119,10 @@ func (c Config) Normalizar() Config {
 		c.Discursiva = d.Discursiva
 		c.PctQuestoes = d.PctQuestoes
 		c.LimiarFraco = d.LimiarFraco
+
+		if blocos >= BlocosMin && blocos <= BlocosMax {
+			c.BlocosPorDia = blocos
+		}
 
 		c.Modos = nonNilModos(modos)
 		c.Reforcos = nonNilReforcos(reforcos)

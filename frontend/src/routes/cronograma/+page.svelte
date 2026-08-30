@@ -43,6 +43,9 @@
 	// Rearranging is per-activity: a whole day is never swapped with another, so
 	// there is no day-level drag or swap here — only AtividadeItem moves.
 	let arrastandoAtv = $state<string | null>(null);
+	// Slot a touch drag is hovering, so the target row can show "trocar" without
+	// the dragover events that touch never fires.
+	let sobrevoo = $state<{ data: string; posicao: number } | null>(null);
 
 	// Days that can receive an activity: the ones the engine filled with content.
 	const datasDisponiveis = $derived(
@@ -145,7 +148,12 @@
 							onMover={mover}
 							arrastandoAlgo={arrastandoAtv !== null}
 							onArrastarAtv={(id) => (arrastandoAtv = id)}
-							onLargarAtv={() => (arrastandoAtv = null)}
+							onLargarAtv={() => {
+								arrastandoAtv = null;
+								sobrevoo = null;
+							}}
+							onSobrevoar={(alvo) => (sobrevoo = alvo)}
+							{sobrevoo}
 							onSoltarAtv={(pos) => soltarAtv(d.data, pos)}
 						/>
 					{/each}

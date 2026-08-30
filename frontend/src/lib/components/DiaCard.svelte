@@ -30,6 +30,8 @@
 		onMover,
 		onArrastarAtv,
 		onLargarAtv,
+		onSobrevoar,
+		sobrevoo = null,
 		onSoltarAtv,
 		arrastandoAlgo = false,
 		onTrocarComDestino
@@ -40,6 +42,9 @@
 		onMover: (id: string, data: string, posicao: number) => void;
 		onArrastarAtv: (id: string) => void;
 		onLargarAtv: () => void;
+		onSobrevoar?: (alvo: { data: string; posicao: number } | null) => void;
+		/** slot a touch drag is currently over, anywhere in the plan */
+		sobrevoo?: { data: string; posicao: number } | null;
 		onSoltarAtv: (posicao: number) => void;
 		/** true while some activity is being dragged, so drop zones can show */
 		arrastandoAlgo?: boolean;
@@ -154,14 +159,11 @@
 		<div class="corpo">
 			<div class="faixa">
 				<span class="faixa-n">
-					dia {dia.n}{#if !revisao} · {resumoItens}{/if}
+					dia {dia.n}{#if dia.itens.length > 0} · {resumoItens}{/if}
 					{#if dia.reordenado}
 						<span class="reord" title="Reorganizado manualmente">•</span>
 					{/if}
 				</span>
-				{#if revisao}
-					<span class="selo">Revisão semanal</span>
-				{/if}
 				{#if dia.itens.length === 0}
 					<!-- Special days (simulado, revisão geral) have no subjects to split
 					     by, so the day itself stays the unit and keeps its own control. -->
@@ -195,6 +197,8 @@
 								{onMover}
 								onArrastar={onArrastarAtv}
 								onLargar={onLargarAtv}
+								onSobrevoar={onSobrevoar}
+								sobrevoado={sobrevoo?.data === dia.data && sobrevoo?.posicao === i}
 								onSoltar={onSoltarAtv}
 								concluida={feita(it.disciplina, it.id)}
 								onRegistrar={(el) => {
@@ -333,17 +337,6 @@
 		color: var(--accent);
 		font-size: 14px;
 		line-height: 1;
-	}
-	.selo {
-		font-family: var(--font-mono);
-		font-size: 10px;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		font-weight: 600;
-		padding: 3px 8px;
-		border-radius: 5px;
-		background: var(--warn-soft);
-		color: var(--warn);
 	}
 	.acoes {
 		display: flex;

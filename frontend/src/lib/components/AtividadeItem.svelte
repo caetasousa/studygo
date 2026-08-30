@@ -3,6 +3,7 @@
 	import IconButton from './IconButton.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { semNumeroInicial } from '$lib/estudo';
+	import { alvoNoPonto, arrastarToque } from '$lib/arrastarToque';
 	import { fl, tagStyle } from '$lib/format';
 	import type { ItemDia } from '$lib/types';
 
@@ -22,6 +23,8 @@
 		onMover,
 		onArrastar,
 		onLargar,
+		onSobrevoar,
+		sobrevoado = false,
 		onSoltar,
 		concluida = false,
 		onRegistrar
@@ -37,6 +40,10 @@
 		onArrastar?: (id: string) => void;
 		/** drag ended without a drop landing */
 		onLargar?: () => void;
+		/** touch drag is hovering this slot (or null); lifts the drop affordance */
+		onSobrevoar?: (alvo: { data: string; posicao: number } | null) => void;
+		/** true while a touch drag hovers THIS row */
+		sobrevoado?: boolean;
 		onSoltar?: (posicao: number) => void;
 		/** this activity finished, shown as a quiet mark (edited in its form) */
 		concluida?: boolean;
@@ -115,6 +122,27 @@
 		sobre = false;
 		onLargar?.();
 	}
+
+	// --- touch: press and hold ---------------------------------------------
+	// The row the finger is currently over, so the same "trocar" affordance the
+	// mouse gets is shown on touch too.
+	function toqueMoveu(x: number, y: number) {
+		const alvo = alvoNoPonto(x, y);
+		onSobrevoar?.(alvo && alvo.data === data && alvo.posicao === indice ? null : alvo);
+	}
+
+	function toqueSoltou(x: number, y: number) {
+		const alvo = alvoNoPonto(x, y);
+
+		arrastandoEu = false;
+		onSobrevoar?.(null);
+
+		if (alvo && !(alvo.data === data && alvo.posicao === indice)) {
+			onMover(item.id, alvo.data, alvo.posicao);
+		} else {
+			onLargar?.();
+		}
+	}
 </script>
 
 <div
@@ -122,7 +150,19 @@
 	class:movida={item.movida}
 	class:feita={concluida}
 	class:arrastando={arrastandoEu}
-	class:alvo-troca={sobre && !arrastandoEu}
+	class:alvo-troca={(sobre || sobrevoado) && !arrastandoEu}
+	data-atv-dia={data}
+	data-atv-pos={indice}
+	use:arrastarToque={{
+		ativo: movivel,
+		onInicio: () => {
+			arrastandoEu = true;
+			onArrastar?.(item.id);
+		},
+		onMover: toqueMoveu,
+		onSoltar: toqueSoltou,
+		onCancelar: fim
+	}}
 	draggable={movivel}
 	ondragstart={inicio}
 	ondragend={fim}
@@ -141,11 +181,11 @@
 	}}
 	role="listitem"
 >
-	{#if sobre && !arrastandoEu}
+	{#if (sobre || sobrevoado) && !arrastandoEu}
 		<span class="dica-troca" aria-hidden="true">trocar</span>
 	{/if}
 	{#if movivel}
-		<span class="alca" aria-hidden="true" title="Arraste para reorganizar">
+		<span class="alca" aria-hidden="true" title="Arraste para reorganizar (no celular, segure e arraste)">
 			<NavIcon name="balanceamento" size="sm" />
 		</span>
 	{:else}
@@ -191,14 +231,17 @@
 			/>
 		{/if}
 		{#if movivel}
-			<!-- Reordering is done by dragging. This menu is not a duplicate of it:
-			     it is the only path for keyboard, screen readers and touch, where
-			     the HTML5 drag API does not fire. -->
-			<IconButton
-				icon="chevron"
-				label="Mover ou trocar {nome} — {tema}"
+			<!-- Pointer and touch both drag (hold to lift). This stays for keyboard
+			     and screen readers, which have no drag gesture at all — it is
+			     reachable by Tab but does not add a visible control to the row. -->
+			<button
+				type="button"
+				class="mover-teclado"
+				aria-expanded={menuAberto}
 				onclick={() => (menuAberto = !menuAberto)}
-			/>
+			>
+				Mover ou trocar {nome} — {tema}
+			</button>
 		{/if}
 	</span>
 
@@ -287,6 +330,13 @@
 	}
 	.atv[draggable='true'] {
 		cursor: grab;
+		/* Let the browser scroll vertically as usual; the hold gesture calls
+		   preventDefault itself once it decides a drag has begun, so the page
+		   does not move under the finger mid-drag. */
+		touch-action: pan-y;
+		/* A long press must not raise the text-selection or callout UI. */
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 	.atv[draggable='true']:active {
 		cursor: grabbing;
@@ -295,6 +345,10 @@
 	   image reads as the thing in motion. */
 	.atv.arrastando {
 		opacity: 0.4;
+		/* Lifted: on touch there is no browser-drawn drag image, so the row itself
+		   has to read as picked up. */
+		transform: scale(0.99);
+		box-shadow: var(--shadow-pop);
 	}
 	/* A drop here swaps the two activities — said in words as well as colour. */
 	.atv.alvo-troca {
@@ -303,6 +357,38 @@
 		outline-offset: -2px;
 		/* a slight lift, so the target reads as raised toward the pointer */
 		transform: translateY(-1px);
+	}
+	/* Visible only to keyboard and assistive tech: the row is dragged by pointer
+	   or by holding on touch, so this control does not need to occupy space —
+	   but it must never be unreachable. It appears when focused. */
+	.mover-teclado {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+	}
+	.mover-teclado:focus-visible {
+		position: static;
+		width: auto;
+		height: auto;
+		margin: 0;
+		clip: auto;
+		overflow: visible;
+		padding: 6px 10px;
+		border: 1px solid var(--accent);
+		border-radius: 7px;
+		background: var(--bg-card);
+		font-size: 12px;
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.dica-troca {
 		position: absolute;

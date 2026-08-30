@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { alvoNoPonto } from '$lib/arrastarToque';
 import {
 	PESO_PADRAO,
 	agruparPorBloco,
@@ -466,5 +467,32 @@ describe('registro por atividade', () => {
 		const out = blocosComAtividade(itens, legado, 'atv-1', VAZIO);
 
 		expect(out.find((b) => b.atividadeId === 'atv-2')).toMatchObject({ horas: 3, concluido: true });
+	});
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('alvoNoPonto', () => {
+	// The touch drop target is resolved from coordinates, since touch fires no
+	// dragover. These cover the parsing contract, not the DOM hit-testing.
+	function fakeElement(dia?: string, pos?: string) {
+		return {
+			closest: () => (dia === undefined ? null : { dataset: { atvDia: dia, atvPos: pos } })
+		} as unknown as Element;
+	}
+
+	it('lê a data ISO e a posição do slot sob o ponto', () => {
+		vi.stubGlobal('document', { elementFromPoint: () => fakeElement('2026-09-02', '1') });
+		expect(alvoNoPonto(10, 10)).toEqual({ data: '2026-09-02', posicao: 1 });
+	});
+
+	it('devolve null quando não há atividade sob o ponto', () => {
+		vi.stubGlobal('document', { elementFromPoint: () => fakeElement(undefined) });
+		expect(alvoNoPonto(10, 10)).toBeNull();
+	});
+
+	it('rejeita uma posição não numérica em vez de mover para NaN', () => {
+		vi.stubGlobal('document', { elementFromPoint: () => fakeElement('2026-09-02', 'abc') });
+		expect(alvoNoPonto(10, 10)).toBeNull();
 	});
 });
