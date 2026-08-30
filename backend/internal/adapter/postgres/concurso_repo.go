@@ -201,11 +201,20 @@ func (r *ConcursoRepo) DeleteConcurso(ctx context.Context, id uuid.UUID) error {
 }
 
 // inserirConteudoDoConcurso inserts disciplinas (+ temas + fontes), marcos and
-// conteudo for c.ID. Codigos are assigned D01..DNN by slice order.
+// conteudo for c.ID. Codigos are mnemonics derived from each name (see
+// concurso.Siglas) because they are what the schedule shows on every activity
+// chip: "DIRAD" is readable where "D04" is not.
 func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
+	nomes := make([]string, len(c.Disciplinas))
+	for i := range c.Disciplinas {
+		nomes[i] = c.Disciplinas[i].Nome
+	}
+
+	codigos := concurso.Siglas(nomes)
+
 	for i := range c.Disciplinas {
 		d := &c.Disciplinas[i]
-		d.Codigo = fmt.Sprintf("D%02d", i+1)
+		d.Codigo = codigos[i]
 		d.Ordem = i
 
 		if err := tx.QueryRow(
