@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DiaLog from './DiaLog.svelte';
+	import NavIcon from './NavIcon.svelte';
 	import TemaTexto from './TemaTexto.svelte';
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
@@ -155,6 +156,26 @@
 	const blocoRevisao = $derived(dia.blocos.find((b) => ehRevisao(b.titulo)) ?? null);
 
 	/**
+	 * The subject being revised, taken from the block's title.
+	 *
+	 * The block carries the topics in its `detalhe`, but the row only shows the
+	 * subject: the day's own subjects are named the same way, and the detail
+	 * belongs in the notebook the link opens.
+	 */
+	const materiaRevisada = $derived(
+		blocoRevisao?.titulo.startsWith('Revisão — ')
+			? blocoRevisao.titulo.slice('Revisão — '.length)
+			: ''
+	);
+
+	/** The codigo behind that name, so the link can point at its notebook. */
+	const disciplinaRevisada = $derived(
+		Object.keys(planoStore.discIndex).find(
+			(c) => planoStore.discIndex[c]?.nome === materiaRevisada
+		) ?? ''
+	);
+
+	/**
 	 * Minutes per activity, by position.
 	 *
 	 * The engine emits one content block per item of the day, in the same order,
@@ -265,11 +286,22 @@
 				     Settings was invisible exactly where it is meant to be followed. -->
 				{#if blocoRevisao}
 					<div class="revisao-bloco">
+						<span class="rev-alca" aria-hidden="true"></span>
 						<span class="rev-min">{blocoRevisao.minutos} min</span>
-						<span class="rev-txt">
-							<strong>{blocoRevisao.titulo}</strong>
-							<span>{blocoRevisao.detalhe}</span>
-						</span>
+						<span class="rev-selo">REV</span>
+						<span class="rev-nome">{materiaRevisada || 'Revisão'}</span>
+						{#if materiaRevisada}
+							<a
+								class="rev-link"
+								href="/caderno#{disciplinaRevisada}"
+								title="Abrir o caderno de erros de {materiaRevisada}"
+								aria-label="Abrir o caderno de erros de {materiaRevisada}"
+							>
+								<NavIcon name="registrar" size="sm" />
+							</a>
+						{:else}
+							<span></span>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -409,36 +441,65 @@
 	}
 	/* Set apart from the subjects above without competing with them: this is what
 	   closes the day, not another thing to move. */
+	/* Same column structure as an activity row — handle | minutes | code |
+	   subject | action — so the review lines up with the subjects above it
+	   instead of reading as a footnote. */
 	.revisao-bloco {
-		display: flex;
+		display: grid;
+		grid-template-columns: 18px auto auto minmax(0, 1fr) auto;
 		align-items: baseline;
-		gap: 10px;
-		margin: 4px 6px 2px;
-		padding: 9px 10px;
+		gap: 6px 10px;
+		margin: 2px 6px;
+		padding: 7px 8px;
 		border-top: 1px dashed var(--border);
 	}
+	.rev-alca {
+		width: 18px;
+	}
 	.rev-min {
-		flex: none;
 		font-family: var(--font-mono);
 		font-size: 11px;
-		color: var(--warn);
+		color: var(--text-faint);
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
-	.rev-txt {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
+	/* Stands in for a discipline chip, in the review colour. */
+	.rev-selo {
+		min-width: 52px;
+		box-sizing: border-box;
+		text-align: center;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		padding: 3px 7px;
+		border-radius: 5px;
+		background: var(--warn-soft);
+		color: var(--warn);
+		white-space: nowrap;
+	}
+	.rev-nome {
+		font-size: 14px;
+		line-height: 1.5;
+		color: var(--text);
 		min-width: 0;
 	}
-	.rev-txt strong {
-		font-size: 13px;
-		font-weight: 600;
+	.rev-link {
+		display: grid;
+		place-items: center;
+		width: var(--icon-hit);
+		height: var(--icon-hit);
+		align-self: center;
+		border-radius: 8px;
+		color: var(--text-muted);
+	}
+	.rev-link:hover {
+		background: var(--bg-hover);
 		color: var(--text);
 	}
-	.rev-txt span {
-		font-size: 12px;
-		line-height: 1.45;
-		color: var(--text-muted);
+	.rev-link:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 
 	.selo-feito {

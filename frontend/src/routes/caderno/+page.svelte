@@ -164,7 +164,9 @@
 			</p>
 			<div class="cad-grid">
 				{#each dados.porDisciplina as d (d.disciplina)}
-					<div class="card cad-disc">
+					<!-- The schedule's review block links straight here, so each
+					     discipline needs an anchor of its own. -->
+					<div class="card cad-disc" id={d.disciplina}>
 						<div class="card-top">
 							<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
 							<b>{d.nome}</b>
