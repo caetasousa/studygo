@@ -84,38 +84,26 @@
 	];
 
 	// Intervalos de revisão editados como rascunho local, enviados ao sair do campo.
+	// Turning the block off must not forget how long it was, or turning it back
+	// on would silently reset to the default.
+	let ultimaDuracao = $state(20);
+
+	$effect(() => {
+		if (cfg && cfg.minutosRevisao > 0) ultimaDuracao = cfg.minutosRevisao;
+	});
+
+	const mostrarDesc = $derived(
+		cfg && cfg.minutosRevisao > 0
+			? `Ligado: cada dia de estudo do cronograma termina com um bloco de ${cfg.minutosRevisao} min de revisão.`
+			: 'Desligado: o cronograma mostra só os blocos de matéria.'
+	);
+
 	const semanalDesc = $derived(
 		cfg?.revisaoSemanal
 			? 'Ligado: um dia inteiro por semana sai do conteúdo e vira revisão. São ~11 dias de matéria nova a menos num ciclo.'
 			: 'Desligado: a semana inteira é conteúdo, e a revisão acontece no bloco diário acima.'
 	);
 
-	const previaBlocos = $derived.by(() => {
-		if (!cfg) return [];
-
-		const revMin = cfg.minutosRevisao;
-		const porBloco = cfg.minutosBloco;
-
-		const out = [];
-		for (let i = 0; i < cfg.blocosPorDia; i++) {
-			out.push({ rotulo: `${i + 1}º bloco`, minutos: porBloco, revisao: false });
-		}
-
-		if (revMin > 0) out.push({ rotulo: 'Revisão', minutos: revMin, revisao: true });
-
-		return out;
-	});
-
-	const previaTexto = $derived.by(() => {
-		if (!cfg) return '';
-
-		const rev = previaBlocos.find((b) => b.revisao);
-		if (!rev) {
-			return 'Sem fatia de revisão: o dia inteiro é conteúdo novo.';
-		}
-
-		return `${rev.minutos} min no fim do dia, com questões dos assuntos que você errou nas matérias daquele dia.`;
-	});
 
 
 
@@ -407,24 +395,22 @@
 					{/snippet}
 				</Ajuste>
 
-				<!-- What the settings actually produce, so the effect is visible here
-				     instead of only after opening the schedule. -->
-				<div class="previa">
-					<span class="previa-tit">No cronograma, um dia fica assim:</span>
-					<div class="previa-barra">
-						{#each previaBlocos as b (b.rotulo)}
-							<span
-								class="previa-fatia"
-								class:rev={b.revisao}
-								style="flex:{b.minutos}"
-								title="{b.rotulo} — {b.minutos} min"
-							>
-								{b.minutos}min
-							</span>
-						{/each}
-					</div>
-					<span class="previa-leg">{previaTexto}</span>
-				</div>
+				<Ajuste
+					titulo="Mostrar o bloco de revisão no cronograma"
+					descricao={mostrarDesc}
+					para="pf-revmostrar"
+				>
+					{#snippet controle()}
+						<input
+							id="pf-revmostrar"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.minutosRevisao > 0}
+							onchange={(e) =>
+								salvar({ minutosRevisao: e.currentTarget.checked ? ultimaDuracao : 0 })}
+						/>
+					{/snippet}
+				</Ajuste>
 
 				<Ajuste
 					titulo="Reservar um dia da semana só para revisão"
@@ -629,52 +615,6 @@
 {/if}
 
 <style>
-	/* The settings only mattered once you opened the schedule; this shows the day
-	   they produce, here, in proportion. */
-	.previa {
-		margin: 14px 0 4px;
-		padding: 12px 14px;
-		background: var(--bg-soft);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-	}
-	.previa-tit {
-		display: block;
-		font-size: 11px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		font-weight: 600;
-		color: var(--text-faint);
-		margin-bottom: 8px;
-	}
-	.previa-barra {
-		display: flex;
-		gap: 3px;
-		height: 30px;
-	}
-	.previa-fatia {
-		display: grid;
-		place-items: center;
-		border-radius: 5px;
-		background: var(--accent-soft);
-		color: var(--accent-strong);
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		min-width: 0;
-		overflow: hidden;
-		white-space: nowrap;
-	}
-	.previa-fatia.rev {
-		background: var(--warn-soft);
-		color: var(--warn);
-	}
-	.previa-leg {
-		display: block;
-		margin-top: 8px;
-		font-size: 12px;
-		line-height: 1.5;
-		color: var(--text-muted);
-	}
 	.modos-t {
 		font-size: 13px;
 		font-weight: 600;

@@ -135,6 +135,16 @@
 		gatilho = null;
 	}
 
+	/**
+	 * The day's review block, when the plan has one.
+	 *
+	 * The engine returns every block of the day; the subjects are already drawn
+	 * as activities above, so only the review one is left to show here.
+	 */
+	const blocoRevisao = $derived(
+		dia.blocos.find((b) => b.titulo === 'Revisão' || b.titulo.startsWith('Caderno de erros')) ?? null
+	);
+
 	// The header band says what the day holds, so the count is worth stating.
 	const resumoItens = $derived(
 		dia.itens.length === 1 ? '1 atividade' : `${dia.itens.length} atividades`
@@ -228,6 +238,19 @@
 								mover para o fim deste dia
 							</div>
 						{/if}
+					</div>
+				{/if}
+
+				<!-- The review block. It is part of the day the engine planned, but the
+				     schedule only ever showed the subjects — so a block configured in
+				     Settings was invisible exactly where it is meant to be followed. -->
+				{#if blocoRevisao}
+					<div class="revisao-bloco">
+						<span class="rev-min">{blocoRevisao.minutos} min</span>
+						<span class="rev-txt">
+							<strong>{blocoRevisao.titulo}</strong>
+							<span>{blocoRevisao.detalhe}</span>
+						</span>
 					</div>
 				{/if}
 			</div>
@@ -365,6 +388,40 @@
 		background: var(--accent-soft);
 		color: var(--accent);
 	}
+	/* Set apart from the subjects above without competing with them: this is what
+	   closes the day, not another thing to move. */
+	.revisao-bloco {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		margin: 4px 6px 2px;
+		padding: 9px 10px;
+		border-top: 1px dashed var(--border);
+	}
+	.rev-min {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--warn);
+		font-variant-numeric: tabular-nums;
+	}
+	.rev-txt {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.rev-txt strong {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text);
+	}
+	.rev-txt span {
+		font-size: 12px;
+		line-height: 1.45;
+		color: var(--text-muted);
+	}
+
 	.selo-feito {
 		margin-left: auto;
 		font-family: var(--font-mono);
