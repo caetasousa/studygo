@@ -1,4 +1,6 @@
 <script lang="ts">
+	import IconButton from '$lib/components/IconButton.svelte';
+	import { PESO_PADRAO, pareceEmentaCorrida, sugerirTopicos } from '$lib/estudo';
 	import NavIcon from './NavIcon.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
 	import { api, type FonteEdital } from '$lib/api';
@@ -143,8 +145,65 @@
 		discs.filter((d) => d.bloco === 'ger').reduce((a, d) => a + (d.questoes || 0), 0)
 	);
 
+	// --- dividir uma ementa corrida em tópicos ---
+	// Offered, never applied silently: the user sees the suggestion, edits it and
+	// confirms. Stored data is only touched when the form is saved.
+	let divisao = $state<{ disc: number; linhas: string[] } | null>(null);
+
+	function podeDividir(texto: string): boolean {
+		const linhas = texto.split('\n').filter((l) => l.trim());
+		return linhas.some((l) => pareceEmentaCorrida(l));
+	}
+
+	function abrirDivisao(i: number) {
+		const atual = discs[i].temasTexto.split('\n').filter((l) => l.trim());
+		// Long prose lines are split; lines already granular are left alone.
+		const linhas = atual.flatMap((l) => (pareceEmentaCorrida(l) ? sugerirTopicos(l) : [l.trim()]));
+		divisao = { disc: i, linhas };
+	}
+
+	function editarLinhaDivisao(idx: number, valor: string) {
+		if (!divisao) return;
+		const copia = [...divisao.linhas];
+		copia[idx] = valor;
+		divisao = { ...divisao, linhas: copia };
+	}
+
+	function removerLinhaDivisao(idx: number) {
+		if (!divisao) return;
+		divisao = { ...divisao, linhas: divisao.linhas.filter((_, n) => n !== idx) };
+	}
+
+	function addLinhaDivisao() {
+		if (!divisao) return;
+		divisao = { ...divisao, linhas: [...divisao.linhas, ''] };
+	}
+
+	function aplicarDivisao() {
+		if (!divisao) return;
+		const limpo = divisao.linhas.map((l) => l.trim()).filter(Boolean);
+		if (limpo.length > 0) discs[divisao.disc].temasTexto = limpo.join('\n');
+		divisao = null;
+	}
+
 	function addDisc() {
-		discs.push({ nome: '', bloco: 'esp', questoes: 0, peso: 0, temasTexto: '', fontesTexto: '' });
+		discs.push({
+			nome: '',
+			bloco: 'esp',
+			questoes: 0,
+			peso: PESO_PADRAO.esp,
+			temasTexto: '',
+			fontesTexto: ''
+		});
+	}
+
+	// Changing the group re-applies that group's default weight, unless the user
+	// had typed a weight of their own.
+	function onBloco(i: number, bloco: 'esp' | 'ger') {
+		const d = discs[i];
+		const anterior: 'esp' | 'ger' = bloco === 'esp' ? 'ger' : 'esp';
+		if (!d.peso || d.peso === PESO_PADRAO[anterior]) d.peso = PESO_PADRAO[bloco];
+		d.bloco = bloco;
 	}
 	function rmDisc(i: number) {
 		discs.splice(i, 1);
@@ -329,13 +388,13 @@
 										type="button"
 										aria-pressed={d.bloco === 'esp'}
 										style="width:auto;padding:0 10px"
-										onclick={() => (d.bloco = 'esp')}>Específicas</button
+										onclick={() => onBloco(i, 'esp')}>Específicas</button
 									>
 									<button
 										type="button"
 										aria-pressed={d.bloco === 'ger'}
 										style="width:auto;padding:0 10px"
-										onclick={() => (d.bloco = 'ger')}>Gerais</button
+										onclick={() => onBloco(i, 'ger')}>Gerais</button
 									>
 								</div>
 							</div>
@@ -371,7 +430,7 @@
 							</summary>
 							<div class="form-grid" style="margin-top:10px">
 								<div class="field" style="flex:1 1 320px">
-									<label for="cf-d{i}-temas">Temas — um por linha</label>
+									<label for="cf-d{i}-temas">Tópicos — um por linha</label>
 									<textarea
 										id="cf-d{i}-temas"
 										rows="4"
@@ -379,6 +438,15 @@
 										placeholder={'Crase\nConcordância verbal\nRegência nominal'}
 										style="width:100%"
 									></textarea>
+									{#if podeDividir(d.temasTexto)}
+										<p class="dica-dividir">
+											Um tópico aqui reúne a ementa inteira, então o cronograma trata a
+											matéria como um bloco só.
+											<button type="button" class="btn" onclick={() => abrirDivisao(i)}>
+												Dividir em tópicos…
+											</button>
+										</p>
+									{/if}
 								</div>
 								<div class="field" style="flex:1 1 320px">
 									<label for="cf-d{i}-fontes">Leis / materiais — "título | link" por linha</label>
@@ -422,7 +490,7 @@
 						<input id="cf-m{i}-a" type="checkbox" class="checkbox" bind:checked={m.exigeAcao} />
 					</div>
 					<div class="field" style="justify-content:flex-end">
-						<button type="button" class="btn danger" onclick={() => rmMarco(i)}>×</button>
+						<IconButton icon="fechar" label="Remover data" tom="perigo" onclick={() => rmMarco(i)} />
 					</div>
 				</div>
 			{/each}
@@ -436,3 +504,112 @@
 		</button>
 	</div>
 </form>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape' && divisao) divisao = null;
+	}}
+/>
+
+{#if divisao}
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div
+		class="dlg-fundo"
+		role="presentation"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) divisao = null;
+		}}
+	>
+		<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-div-t">
+			<h2 id="dlg-div-t" class="sec" style="margin-top:0">Dividir em tópicos</h2>
+			<p class="page-sub" style="margin-top:0">
+				Sugestão a partir da ementa. Edite, remova ou acrescente linhas — cada uma vira um
+				tópico do cronograma. Nada é alterado até você salvar o concurso.
+			</p>
+
+			<ol class="dlg-linhas">
+				{#each divisao.linhas as linha, idx (idx)}
+					<li>
+						<span class="dlg-num">{idx + 1}</span>
+						<input
+							type="text"
+							value={linha}
+							aria-label="Tópico {idx + 1}"
+							oninput={(e) => editarLinhaDivisao(idx, e.currentTarget.value)}
+						/>
+						<IconButton
+							icon="fechar"
+							label="Remover tópico {idx + 1}"
+							tom="perigo"
+							onclick={() => removerLinhaDivisao(idx)}
+						/>
+					</li>
+				{/each}
+			</ol>
+
+			<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+				<button type="button" class="btn" onclick={addLinhaDivisao}>+ tópico</button>
+				<span style="flex:1"></span>
+				<button type="button" class="btn" onclick={() => (divisao = null)}>Cancelar</button>
+				<button type="button" class="btn primary" onclick={aplicarDivisao}>
+					Usar {divisao.linhas.filter((l) => l.trim()).length} tópicos
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	.dica-dividir {
+		margin: 8px 0 0;
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--text-muted);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.dlg-fundo {
+		position: fixed;
+		inset: 0;
+		background: rgba(20, 18, 14, 0.45);
+		display: grid;
+		place-items: center;
+		padding: 20px;
+		z-index: 60;
+	}
+	.dlg {
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 20px;
+		width: min(680px, 100%);
+		max-height: 84vh;
+		overflow-y: auto;
+		box-shadow: var(--shadow-pop);
+	}
+	.dlg-linhas {
+		list-style: none;
+		margin: 14px 0 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.dlg-linhas li {
+		display: grid;
+		grid-template-columns: 2em minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 8px;
+	}
+	.dlg-num {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
+		text-align: right;
+	}
+	.dlg-linhas input {
+		width: 100%;
+	}
+</style>

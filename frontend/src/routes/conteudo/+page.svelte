@@ -2,19 +2,34 @@
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { agruparPorBloco, numeroHierarquico, pareceEmentaCorrida, semNumeroInicial } from '$lib/estudo';
 
 	const plano = $derived(planoStore.plano);
 
 	// The syllabus lives on the disciplines' temas — that is what the edital import
 	// fills in. `concurso.conteudo` is the artifact's free-form block list, kept as
 	// an optional preamble for whoever pasted the edital text by hand.
-	const grupos = $derived.by(() => {
-		const discs = plano?.concurso.disciplinas ?? [];
-		return [
-			{ rotulo: 'Conhecimentos específicos', itens: discs.filter((d) => d.bloco === 'esp') },
-			{ rotulo: 'Conhecimentos gerais', itens: discs.filter((d) => d.bloco === 'ger') }
-		].filter((g) => g.itens.length > 0);
+	//
+	// Order and numbering come from the shared study domain: conhecimentos gerais
+	// first, then específicas, with "1", "1.1" derived from position rather than
+	// read out of the stored text.
+	const grupos = $derived(agruparPorBloco(plano?.concurso.disciplinas ?? []));
+
+	// Matéria numbers run 1..N across the whole syllabus, so "3.2" is unambiguous
+	// no matter which group the matéria sits in.
+	const offset = $derived.by<Record<string, number>>(() => {
+		const m: Record<string, number> = {};
+		let acc = 0;
+		for (const g of grupos) {
+			m[g.bloco] = acc;
+			acc += g.itens.length;
+		}
+		return m;
 	});
+
+	function indiceGlobal(bloco: string, i: number): number {
+		return (offset[bloco] ?? 0) + i;
+	}
 
 	const totalTemas = $derived(
 		(plano?.concurso.disciplinas ?? []).reduce((a, d) => a + d.temas.length, 0)
@@ -60,23 +75,42 @@
 			{/each}
 		{/if}
 
-		{#each grupos as g (g.rotulo)}
+		{#each grupos as g (g.bloco)}
 			<h3>{g.rotulo}</h3>
-			{#each g.itens as d (d.codigo)}
+			{#each g.itens as d, di (d.codigo)}
 				<div class="ementa">
 					<h4>
-						<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>{d.nome}
-						<span class="qtd">{d.temas.length} {d.temas.length === 1 ? 'tema' : 'temas'}</span>
+						<span class="num-mat">{numeroHierarquico(indiceGlobal(g.bloco, di))}</span>
+						<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
+						<span class="mat-nome">{d.nome}</span>
+						<span class="qtd">
+							{d.temas.length}
+							{d.temas.length === 1 ? 'tópico' : 'tópicos'}
+						</span>
 					</h4>
 					{#if d.temas.length > 0}
-						<ol>
+						<ol class="topicos">
 							{#each d.temas as t, i (i)}
-								<li>{t}</li>
+								<li>
+									<span class="num-top">
+										{numeroHierarquico(indiceGlobal(g.bloco, di), i)}
+									</span>
+									<span class="top-txt">{semNumeroInicial(t)}</span>
+									{#if pareceEmentaCorrida(t)}
+										<a
+											class="dividir"
+											href="/concursos/{plano.concurso.slug}/editar"
+											title="Este tópico reúne a ementa inteira; abra a edição para dividi-lo"
+										>
+											dividir
+										</a>
+									{/if}
+								</li>
 							{/each}
 						</ol>
 					{:else}
 						<p class="vazia">
-							Sem temas cadastrados — os dias desta disciplina mostram só o nome dela.
+							Sem tópicos cadastrados — os dias desta matéria mostram só o nome dela.
 						</p>
 					{/if}
 				</div>
@@ -98,8 +132,19 @@
 	.ementa h4 {
 		display: flex;
 		align-items: baseline;
-		gap: 0;
+		gap: 7px;
 		margin-bottom: 8px;
+	}
+	.mat-nome {
+		min-width: 0;
+	}
+	/* Numbers are their own column so they never crowd the text they label. */
+	.num-mat {
+		font-family: var(--font-mono);
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--accent-strong);
+		flex: none;
 	}
 	.qtd {
 		margin-left: auto;
@@ -111,21 +156,51 @@
 		white-space: nowrap;
 		padding-left: 12px;
 	}
-	.ementa ol {
+	/* The list carries its own numbers, so the browser marker is off: a single
+	   running counter would contradict the "matéria.tópico" hierarchy. */
+	.topicos {
+		list-style: none;
 		margin: 0;
-		padding-left: 26px;
-		max-width: 74ch;
+		padding-left: 20px;
+		max-width: 78ch;
 	}
-	.ementa li {
+	.topicos li {
+		display: grid;
+		grid-template-columns: 3.2em minmax(0, 1fr) auto;
+		gap: 8px;
+		align-items: baseline;
 		font-size: 14px;
 		line-height: 1.55;
 		color: var(--text-muted);
-		margin-bottom: 3px;
+		padding: 2px 0;
 	}
-	.ementa li::marker {
+	.num-top {
 		font-family: var(--font-mono);
 		font-size: 11px;
 		color: var(--text-faint);
+		font-variant-numeric: tabular-nums;
+	}
+	.top-txt {
+		min-width: 0;
+	}
+	.dividir {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--warn);
+		white-space: nowrap;
+	}
+	@media (max-width: 560px) {
+		.topicos {
+			padding-left: 4px;
+		}
+		.topicos li {
+			grid-template-columns: 3.2em minmax(0, 1fr);
+		}
+		.dividir {
+			grid-column: 2;
+		}
 	}
 	.vazia {
 		font-style: italic;

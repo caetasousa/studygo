@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '$lib/components/IconButton.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { goto } from '$app/navigation';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
@@ -128,8 +129,14 @@
 			alertas = est.alertas;
 			grupoGerais = est.gerais[0] ?? null;
 			grupoEspecificos = est.especificas[0] ?? null;
-			gerais = est.gerais.flatMap((g) => g.disciplinas.map(paraLinha));
-			especificas = est.especificas.flatMap((g) => g.disciplinas.map(paraLinha));
+			// The edital states the weight per GROUP ("Conhecimentos Gerais ... peso 1",
+			// "Específicos ... peso 2"). Carry it down to each discipline so the user
+			// does not retype what the edital already said; a discipline that had its
+			// own weight keeps it.
+			gerais = est.gerais.flatMap((g) => g.disciplinas.map((d) => paraLinha(d, g.peso)));
+			especificas = est.especificas.flatMap((g) =>
+				g.disciplinas.map((d) => paraLinha(d, g.peso))
+			);
 			// The edital gives the group total but rarely splits it per discipline.
 			// Seed the even split so the step opens usable; it is an estimate and
 			// every field stays editable.
@@ -143,8 +150,18 @@
 		}
 	}
 
-	function paraLinha(d: { nome: string; questoes: number | null; peso: number | null }): DiscRow {
-		return { nome: d.nome, questoes: d.questoes, peso: d.peso, temasTexto: '' };
+	function paraLinha(
+		d: { nome: string; questoes: number | null; peso: number | null },
+		pesoGrupo: number | null = null
+	): DiscRow {
+		return {
+			nome: d.nome,
+			questoes: d.questoes,
+			// Per-discipline weight wins; otherwise the group's, which the edital
+			// almost always states.
+			peso: d.peso ?? pesoGrupo,
+			temasTexto: ''
+		};
 	}
 
 	function addDisc(lista: DiscRow[]) {
@@ -434,12 +451,13 @@
 								d.questoes = v === '' ? null : Math.max(0, Number(v));
 							}}
 						/>
-						<button
-							class="mv-btn"
-							aria-label="Remover"
+						<IconButton
+							icon="fechar"
+							label="Remover disciplina"
+							tom="perigo"
+							disabled={rows.length <= 1}
 							onclick={() => rmDisc(rows, i)}
-							disabled={rows.length <= 1}>✕</button
-						>
+						/>
 					</div>
 				{/each}
 				<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
