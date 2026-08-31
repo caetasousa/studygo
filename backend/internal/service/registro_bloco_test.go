@@ -182,3 +182,64 @@ func TestBlocosDoInput_DescartaIDDerivado(t *testing.T) {
 		t.Error("os números do registro se perderam")
 	}
 }
+
+// The client holds synthetic slot ids until something is stored. Dropping them
+// silently, as the persistence layer must, left the record with no activity
+// attached — so finishing a topic could not move it. They have to be resolved
+// against the materialised activities first.
+func TestResolverIDsDosBlocos(t *testing.T) {
+	t.Parallel()
+
+	d := time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)
+
+	atividades := []plano.Atividade{
+		{ID: "uuid-real", Data: d, Posicao: 0, Disciplina: "POR"},
+	}
+
+	t.Run("resolve o id sintético para o real", func(t *testing.T) {
+		t.Parallel()
+
+		got := resolverIDsDosBlocos([]RegistroBlocoInput{
+			{Disciplina: "POR", AtividadeID: plano.IDDerivado(d, 0)},
+		}, atividades)
+
+		if got[0].AtividadeID != "uuid-real" {
+			t.Errorf("AtividadeID = %q, quer uuid-real", got[0].AtividadeID)
+		}
+	})
+
+	t.Run("um id real passa intacto", func(t *testing.T) {
+		t.Parallel()
+
+		got := resolverIDsDosBlocos([]RegistroBlocoInput{
+			{Disciplina: "POR", AtividadeID: "uuid-real"},
+		}, atividades)
+
+		if got[0].AtividadeID != "uuid-real" {
+			t.Errorf("AtividadeID = %q, devia passar intacto", got[0].AtividadeID)
+		}
+	})
+
+	t.Run("slot inexistente vira vazio, não um id inválido", func(t *testing.T) {
+		t.Parallel()
+
+		got := resolverIDsDosBlocos([]RegistroBlocoInput{
+			{Disciplina: "POR", AtividadeID: plano.IDDerivado(d, 9)},
+		}, atividades)
+
+		if got[0].AtividadeID != "" {
+			t.Errorf("AtividadeID = %q, quer vazio", got[0].AtividadeID)
+		}
+	})
+
+	t.Run("não altera a entrada do chamador", func(t *testing.T) {
+		t.Parallel()
+
+		in := []RegistroBlocoInput{{Disciplina: "POR", AtividadeID: plano.IDDerivado(d, 0)}}
+		resolverIDsDosBlocos(in, atividades)
+
+		if !plano.EhIDDerivado(in[0].AtividadeID) {
+			t.Error("a fatia original foi modificada")
+		}
+	})
+}

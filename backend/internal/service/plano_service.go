@@ -104,6 +104,16 @@ func (s *PlanoService) RegistrarDia(
 		return PlanoResposta{}, ErrValidacao{Msg: "data inválida"}
 	}
 
+	// Materialise the plan's activities before the record is built.
+	//
+	// Until something is stored the client addresses activities by a synthetic
+	// slot id, which cannot be persisted and used to be dropped — so a record
+	// arrived with no activity attached and nothing could be moved by it.
+	// Resolving them here means every block carries a real id from the start.
+	if _, ats, err := s.prepararAtividades(ctx, c, salvo); err == nil {
+		in.Blocos = resolverIDsDosBlocos(in.Blocos, ats)
+	}
+
 	reg := plano.Registro{
 		Data:      data,
 		Horas:     in.Horas,
@@ -137,6 +147,19 @@ func (s *PlanoService) RegistrarDia(
 		reg.Concluido = true
 	}
 
+	// Finishing a topic that was scheduled further ahead brings it to the day it
+	// was actually finished on. Two blocks of one subject in a single sitting is
+	// a real week, and the schedule should say what happened rather than keep
+	// claiming the topic is still due later. The day it lands on simply holds
+	// one more activity than planned, and the days it left slide up.
+	//
+	// Done BEFORE the record is written: rearranging rewrites the whole activity
+	// layout, and a record already stored would come out the other side with its
+	// activity link cleared.
+	if err := s.trazerConcluidasParaODia(ctx, c, salvo, data, reg); err != nil {
+		return PlanoResposta{}, err
+	}
+
 	if err := s.planos.UpsertRegistro(ctx, salvo.ID, reg); err != nil {
 		return PlanoResposta{}, err
 	}
@@ -144,6 +167,84 @@ func (s *PlanoService) RegistrarDia(
 	salvo.Registros[data] = reg
 
 	return s.montar(ctx, c, salvo)
+}
+
+// resolverIDsDosBlocos turns the synthetic slot ids the client may be holding
+// into the real ids of the now-stored activities.
+func resolverIDsDosBlocos(
+	blocos []RegistroBlocoInput,
+	atividades []plano.Atividade,
+) []RegistroBlocoInput {
+	out := make([]RegistroBlocoInput, len(blocos))
+	copy(out, blocos)
+
+	for i := range out {
+		id := strings.TrimSpace(out[i].AtividadeID)
+		if !plano.EhIDDerivado(id) {
+			continue
+		}
+
+		if resolvido, ok := plano.ResolverIDDerivado(atividades, id); ok {
+			out[i].AtividadeID = resolvido
+		} else {
+			out[i].AtividadeID = ""
+		}
+	}
+
+	return out
+}
+
+// trazerConcluidasParaODia moves every activity marked done in this record that
+// the plan had scheduled for a LATER day onto `data`.
+//
+// Only forward-dated activities move: one already in the past stays where it
+// happened, and one already on this day is where it should be.
+func (s *PlanoService) trazerConcluidasParaODia(
+	ctx context.Context,
+	c concurso.Concurso,
+	salvo plano.Salvo,
+	data time.Time,
+	reg plano.Registro,
+) error {
+	feitas := make([]string, 0, len(reg.Blocos))
+
+	for _, b := range reg.Blocos {
+		if b.Concluido && b.AtividadeID != "" {
+			feitas = append(feitas, b.AtividadeID)
+		}
+	}
+
+	if len(feitas) == 0 {
+		return nil
+	}
+
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
+	if err != nil {
+		return err
+	}
+
+	concluido := s.diaConcluido(salvo)
+	mexeu := false
+
+	for _, id := range feitas {
+		atual := atividades
+
+		movidas, err := plano.AntecipouAtividade(atual, res.Dias, id, data, concluido)
+		if err != nil {
+			// A refusal here is not the caller's problem: the record itself was
+			// saved. Leave the activity where it is rather than failing the save.
+			continue
+		}
+
+		atividades = movidas
+		mexeu = true
+	}
+
+	if !mexeu {
+		return nil
+	}
+
+	return s.planos.ReplaceAtividades(ctx, salvo.ID, atividades)
 }
 
 // atividadeConcluida reports whether one activity has been marked done, which
