@@ -201,6 +201,17 @@ export const api = {
 			body: JSON.stringify({ id, data, posicao, trocar })
 		}),
 
+	/** Pushes a lost day's content forward, shifting the rest of the plan. */
+	adiarDia: (slug: string, data: string) =>
+		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}/adiar`, { method: 'POST' }),
+
+	/** Brings an activity forward to the day it was actually finished on. */
+	anteciparAtividade: (slug: string, id: string, data: string) =>
+		request<PlanoResposta>(`${planoBase(slug)}/atividades/antecipar`, {
+			method: 'POST',
+			body: JSON.stringify({ id, data })
+		}),
+
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 

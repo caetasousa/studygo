@@ -238,6 +238,51 @@ func (h *PlanoHandler) MoverAtividade(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
+// AdiarDia pushes a lost day's content forward, shifting the rest of the plan.
+func (h *PlanoHandler) AdiarDia(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	resp, err := h.planos.AdiarDia(r.Context(), id, slug, r.PathValue("data"))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
+// Antecipar brings an activity forward to the day it was actually finished on.
+func (h *PlanoHandler) Antecipar(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	var req service.AnteciparInput
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	resp, err := h.planos.AntecipouAtividade(r.Context(), id, slug, req)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
 func (h *PlanoHandler) RestaurarOrdem(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.ctx(r)
 	if !ok {

@@ -316,6 +316,32 @@ class PlanoStore {
 	};
 	restaurarOrdem = () => this.run((s) => api.restaurarOrdem(s));
 
+	/**
+	 * Pushes a lost day forward. Everything after it slides one study-day along,
+	 * so nothing is dropped — the plan just gets tighter at the end, which the
+	 * coverage warning already reports.
+	 */
+	adiarDia = async (data: string): Promise<string | null> => {
+		try {
+			this.commit(await api.adiarDia(this.slug, data));
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível adiar o dia';
+		}
+	};
+
+	/** Brings an activity forward to the day it was actually finished on. */
+	anteciparAtividade = async (id: string, data: string): Promise<string | null> => {
+		try {
+			this.commit(await api.anteciparAtividade(this.slug, id, data));
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível antecipar';
+		}
+	};
+
 	limpar() {
 		this.plano = null;
 		this.carregadoSlug = null;

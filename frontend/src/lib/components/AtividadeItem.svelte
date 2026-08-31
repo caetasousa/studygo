@@ -2,6 +2,7 @@
 	import NavIcon from './NavIcon.svelte';
 	import IconButton from './IconButton.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { hojeISO } from '$lib/format';
 	import { semNumeroInicial } from '$lib/estudo';
 	import { alvoNoPonto, arrastarToque } from '$lib/arrastarToque';
 	import { fl, tagStyle } from '$lib/format';
@@ -28,6 +29,7 @@
 		onSoltar,
 		concluida = false,
 		minutos = null,
+		onAntecipar,
 		onRegistrar
 	}: {
 		item: ItemDia;
@@ -50,6 +52,8 @@
 		concluida?: boolean;
 		/** planned length of this activity's block, in minutes */
 		minutos?: number | null;
+		/** brings this activity forward to today, when finished ahead of schedule */
+		onAntecipar?: (id: string) => void;
 		/** Opens this activity's form. Receives the trigger so focus can return. */
 		onRegistrar?: (gatilho: HTMLElement) => void;
 	} = $props();
@@ -86,6 +90,14 @@
 	}
 
 	const proximaData = $derived(datasDisponiveis.find((d) => d > data) ?? null);
+
+	// Only a topic still ahead can be brought forward.
+	const ehFuturo = $derived(data > hojeISO());
+
+	function antecipar() {
+		menuAberto = false;
+		onAntecipar?.(item.id);
+	}
 
 	/** The chosen day's activities, so the user can pick an exact slot. */
 	const itensDoDestino = $derived(
@@ -263,6 +275,13 @@
 			}}
 		>
 			{#if !escolhendoData}
+				{#if onAntecipar && ehFuturo}
+					<!-- Two blocks of one subject in a single sitting: the topic moves to
+					     the day it was actually finished on, not the day it was planned. -->
+					<button type="button" role="menuitem" onclick={antecipar}>
+						Já terminei este assunto hoje
+					</button>
+				{/if}
 				{#if proximaData}
 					<button type="button" role="menuitem" onclick={() => mover(proximaData, 0)}>
 						Enviar para o próximo dia disponível

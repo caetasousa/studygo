@@ -427,6 +427,13 @@ type ImportacaoTECInput struct {
 	Data string `json:"data"`
 }
 
+// AnteciparInput marks an activity as finished ahead of schedule: which one,
+// and the day it was actually finished on.
+type AnteciparInput struct {
+	ID   string `json:"id"`
+	Data string `json:"data"` // YYYY-MM-DD
+}
+
 // MoverAtividadeInput is a single activity move: which activity, and where it
 // lands. Deliberately minimal — the API sends only what changed, not the whole
 // schedule.

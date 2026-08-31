@@ -244,6 +244,147 @@ func (s *PlanoService) MarcarMarco(
 //
 // Registros are never touched: moving what is *planned* must not rewrite the
 // record of what was actually studied.
+// prepararAtividades generates the plan and makes sure every activity the
+// client can see also exists in the store.
+//
+// Shared by every operation that rearranges the schedule: the plan is generated,
+// not stored, so an activity only gets a real id once something touches it. The
+// first move of a plan materialises all of them; raising blocosPorDia later
+// materialises just the blocks that were added.
+func (s *PlanoService) prepararAtividades(
+	ctx context.Context,
+	c concurso.Concurso,
+	salvo plano.Salvo,
+) (plano.Resultado, []plano.Atividade, error) {
+	res := plano.Gerar(salvo.Config, &c)
+	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
+
+	atividades, err := s.planos.ListAtividades(ctx, salvo.ID)
+	if err != nil {
+		return plano.Resultado{}, nil, err
+	}
+
+	plano.AplicarAtividades(res.Dias, atividades)
+
+	if faltantes := plano.AtividadesFaltantes(res.Dias, atividades); len(faltantes) > 0 {
+		if err := s.planos.ReplaceAtividades(
+			ctx, salvo.ID, append(append([]plano.Atividade{}, atividades...), faltantes...),
+		); err != nil {
+			return plano.Resultado{}, nil, err
+		}
+
+		if atividades, err = s.planos.ListAtividades(ctx, salvo.ID); err != nil {
+			return plano.Resultado{}, nil, err
+		}
+	}
+
+	return res, atividades, nil
+}
+
+// diaConcluido reports whether a date is already recorded as done.
+func (s *PlanoService) diaConcluido(salvo plano.Salvo) func(time.Time) bool {
+	return func(d time.Time) bool {
+		r, ok := salvo.Registros[plano.DayOf(d)]
+
+		return ok && r.Concluido
+	}
+}
+
+// erroDeReplanejamento turns a domain refusal into a message that says what to
+// do next.
+func erroDeReplanejamento(err error) error {
+	switch {
+	case errors.Is(err, plano.ErrAtividadeNaoEncontrada):
+		return ErrValidacao{Msg: "atividade não encontrada"}
+	case errors.Is(err, plano.ErrDestinoInvalido):
+		return ErrValidacao{Msg: "esse dia não recebe atividades"}
+	case errors.Is(err, plano.ErrDiaConcluido):
+		return ErrValidacao{Msg: "um dia já concluído não pode ser reorganizado"}
+	default:
+		return err
+	}
+}
+
+// AdiarDia pushes a lost day's content forward, shifting the rest of the plan.
+func (s *PlanoService) AdiarDia(
+	ctx context.Context,
+	userID uuid.UUID,
+	slug string,
+	dataISO string,
+) (PlanoResposta, error) {
+	c, salvo, err := s.carregar(ctx, userID, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	data, ok := parseISODate(dataISO)
+	if !ok {
+		return PlanoResposta{}, ErrValidacao{Msg: "data inválida"}
+	}
+
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	movidas, err := plano.AdiarDia(atividades, res.Dias, data, s.diaConcluido(salvo))
+	if err != nil {
+		return PlanoResposta{}, erroDeReplanejamento(err)
+	}
+
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, movidas); err != nil {
+		return PlanoResposta{}, err
+	}
+
+	return s.montar(ctx, c, salvo)
+}
+
+// AntecipouAtividade brings an activity forward to the day it was finished on.
+func (s *PlanoService) AntecipouAtividade(
+	ctx context.Context,
+	userID uuid.UUID,
+	slug string,
+	in AnteciparInput,
+) (PlanoResposta, error) {
+	c, salvo, err := s.carregar(ctx, userID, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	hoje, ok := parseISODate(in.Data)
+	if !ok {
+		return PlanoResposta{}, ErrValidacao{Msg: "data inválida"}
+	}
+
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	id := in.ID
+	if plano.EhIDDerivado(id) {
+		resolvido, ok := plano.ResolverIDDerivado(atividades, id)
+		if !ok {
+			return PlanoResposta{}, ErrValidacao{Msg: "atividade não encontrada"}
+		}
+
+		id = resolvido
+	}
+
+	movidas, err := plano.AntecipouAtividade(
+		atividades, res.Dias, id, hoje, s.diaConcluido(salvo),
+	)
+	if err != nil {
+		return PlanoResposta{}, erroDeReplanejamento(err)
+	}
+
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, movidas); err != nil {
+		return PlanoResposta{}, err
+	}
+
+	return s.montar(ctx, c, salvo)
+}
+
 func (s *PlanoService) MoverAtividade(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -260,33 +401,9 @@ func (s *PlanoService) MoverAtividade(
 		return PlanoResposta{}, ErrValidacao{Msg: "data inválida"}
 	}
 
-	res := plano.Gerar(salvo.Config, &c)
-	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
-
-	atividades, err := s.planos.ListAtividades(ctx, salvo.ID)
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
 	if err != nil {
 		return PlanoResposta{}, err
-	}
-
-	// Materialise whatever the client can see but the store does not hold yet.
-	//
-	// That is the whole plan on the first move, and just the extra blocks after
-	// blocosPorDia is raised: those are served with the engine's slot ids, so
-	// without this a drag on the newly added subject failed "não encontrada".
-	// AplicarAtividades has already reconciled res.Dias, so its items carry
-	// exactly the ids the client was given.
-	plano.AplicarAtividades(res.Dias, atividades)
-
-	if faltantes := plano.AtividadesFaltantes(res.Dias, atividades); len(faltantes) > 0 {
-		if err := s.planos.ReplaceAtividades(
-			ctx, salvo.ID, append(append([]plano.Atividade{}, atividades...), faltantes...),
-		); err != nil {
-			return PlanoResposta{}, err
-		}
-
-		if atividades, err = s.planos.ListAtividades(ctx, salvo.ID); err != nil {
-			return PlanoResposta{}, err
-		}
 	}
 
 	// The client may address an activity by the deterministic slot id it was
@@ -308,11 +425,7 @@ func (s *PlanoService) MoverAtividade(
 	// The day-level guard is kept for the destination, where an activity-level
 	// one has nothing to point at: dropping into a day that is entirely done
 	// would still contradict its record.
-	concluido := func(d time.Time) bool {
-		r, ok := salvo.Registros[plano.DayOf(d)]
-
-		return ok && r.Concluido
-	}
+	concluido := s.diaConcluido(salvo)
 
 	if atividadeConcluida(salvo, atividades, mov.ID) {
 		return PlanoResposta{}, ErrValidacao{
@@ -329,15 +442,8 @@ func (s *PlanoService) MoverAtividade(
 		atividades, res.Dias, mov.ID, destino, mov.Posicao, concluido,
 	)
 
-	switch {
-	case errors.Is(err, plano.ErrAtividadeNaoEncontrada):
-		return PlanoResposta{}, ErrValidacao{Msg: "atividade não encontrada"}
-	case errors.Is(err, plano.ErrDestinoInvalido):
-		return PlanoResposta{}, ErrValidacao{Msg: "esse dia não recebe atividades"}
-	case errors.Is(err, plano.ErrDiaConcluido):
-		return PlanoResposta{}, ErrValidacao{Msg: "um dia já concluído não pode ser reorganizado"}
-	case err != nil:
-		return PlanoResposta{}, err
+	if err != nil {
+		return PlanoResposta{}, erroDeReplanejamento(err)
 	}
 
 	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, movidas); err != nil {

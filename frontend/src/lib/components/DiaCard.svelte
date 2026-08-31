@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DiaLog from './DiaLog.svelte';
+	import IconButton from './IconButton.svelte';
 	import NavIcon from './NavIcon.svelte';
 	import TemaTexto from './TemaTexto.svelte';
 	import AtividadeItem from './AtividadeItem.svelte';
@@ -81,6 +82,24 @@
 			? dia.itens.every((it) => feita(it.disciplina, it.id))
 			: (dia.registro?.concluido ?? false)
 	);
+
+	/**
+	 * A day can be pushed forward while it still has work and nothing recorded.
+	 * Once something is logged the day is history, not schedule.
+	 */
+	const podeAdiar = $derived(
+		dia.itens.length > 0 && !concluidoDerivado && !dia.registro?.horas
+	);
+
+	let adiando = $state(false);
+
+	async function adiar() {
+		if (adiando) return;
+
+		adiando = true;
+		await planoStore.adiarDia(dia.data);
+		adiando = false;
+	}
 
 	// Highlight state for the day's tail drop zone.
 	let vagaSobre = $state(false);
@@ -248,6 +267,7 @@
 								onSoltar={onSoltarAtv}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
+								onAntecipar={(id) => void planoStore.anteciparAtividade(id, hojeISO())}
 								onRegistrar={(el) => {
 									gatilho = el;
 									erroForm = null;
