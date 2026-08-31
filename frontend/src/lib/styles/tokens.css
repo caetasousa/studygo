@@ -55,6 +55,17 @@
 	--c11-tx: #cbe397;
 	--c12-bg: rgba(240, 120, 160, 0.15);
 	--c12-tx: #f0a8c4;
+
+	/* ---- icons ----
+	   One scale for the whole app, so a glyph's size is a role, never a local
+	   choice. These are theme-independent, so they are defined once here; the
+	   colours icons use are the ordinary text/accent tokens, which each theme
+	   already redefines. */
+	--icon-sm: 14px; /* supports a label: metric badges, inline hints */
+	--icon-md: 17px; /* default: buttons, page titles */
+	--icon-nav: 18px; /* sidebar and menu */
+	--icon-box: 20px; /* the alignment box a nav icon is centred in */
+	--icon-hit: 36px; /* minimum clickable area for an icon-only button */
 }
 
 /* Light: only when the OS actively asks for it and the viewer has not

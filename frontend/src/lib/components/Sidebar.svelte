@@ -3,9 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
-	import { planoStore, applyTheme } from '$lib/stores/plano.svelte';
+	import { planoStore } from '$lib/stores/plano.svelte';
 	import { diffDays, hojeISO } from '$lib/format';
-	import NavIcon from './NavIcon.svelte';
+	import SidebarNavItem from './SidebarNavItem.svelte';
+	import IconButton from './IconButton.svelte';
+	import PlanoPicker from './PlanoPicker.svelte';
 	import type { NavIconName } from './NavIcon.svelte';
 
 	let {
@@ -13,26 +15,49 @@
 		railOnly = $bindable(false)
 	}: { open?: boolean; railOnly?: boolean } = $props();
 
-	const links: { href: string; icon: NavIconName; label: string }[] = [
-		{ href: '/', icon: 'hoje', label: 'Hoje' },
-		{ href: '/cronograma', icon: 'cronograma', label: 'Cronograma' },
-		{ href: '/balanceamento', icon: 'balanceamento', label: 'Balanceamento' },
-		{ href: '/estatisticas', icon: 'estatisticas', label: 'Estatísticas' },
-		{ href: '/caderno', icon: 'caderno', label: 'Caderno de erros' },
-		{ href: '/datas', icon: 'datas', label: 'Datas do edital' },
-		{ href: '/conteudo', icon: 'conteudo', label: 'Conteúdo programático' }
+	interface Item {
+		href: string;
+		icon: NavIconName;
+		label: string;
+	}
+
+	// Grouped by what the user is doing, following the study flow:
+	// plan the content -> follow the schedule -> check how it is going.
+	const grupos: { titulo: string; itens: Item[] }[] = [
+		{
+			titulo: 'Estudar',
+			itens: [
+				{ href: '/', icon: 'hoje', label: 'Hoje' },
+				{ href: '/cronograma', icon: 'cronograma', label: 'Cronograma' },
+				{ href: '/caderno', icon: 'caderno', label: 'Caderno de erros' }
+			]
+		},
+		{
+			titulo: 'Meu concurso',
+			itens: [
+				{ href: '/conteudo', icon: 'conteudo', label: 'Conteúdo programático' },
+				{ href: '/datas', icon: 'datas', label: 'Datas do edital' }
+			]
+		},
+		{
+			titulo: 'Acompanhar',
+			itens: [
+				{ href: '/estatisticas', icon: 'estatisticas', label: 'Estatísticas' },
+				{ href: '/balanceamento', icon: 'balanceamento', label: 'Balanceamento' }
+			]
+		},
+		{
+			titulo: 'Ajustes',
+			itens: [
+				{ href: '/concursos', icon: 'concursos', label: 'Meus concursos' },
+				{ href: '/config', icon: 'config', label: 'Configurações' }
+			]
+		}
 	];
 
-	const admin: { href: string; icon: NavIconName; label: string }[] = [
-		{ href: '/config', icon: 'config', label: 'Configurações' },
-		{ href: '/concursos', icon: 'concursos', label: 'Meus concursos' }
-	];
-
-	const plano = $derived(planoStore.plano);
 	const ativo = $derived(concursoStore.ativo);
 	const diasParaProva = $derived(ativo ? Math.max(0, diffDays(hojeISO(), ativo.prova)) : null);
-	const progresso = $derived(plano?.props.progresso ?? 0);
-	const tema = $derived(plano?.config.temaUi ?? 'system');
+	const progresso = $derived(planoStore.plano?.props.progresso ?? 0);
 
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
@@ -40,146 +65,80 @@
 		return page.url.pathname.startsWith(href);
 	}
 
-	function trocar(e: Event) {
-		const slug = (e.target as HTMLSelectElement).value;
-		if (slug === '__novo') {
-			goto('/concursos/novo');
-			return;
-		}
+	// Collapsed only applies on desktop: in the mobile drawer the labels always show.
+	const compacto = $derived(railOnly && !open);
+
+	function trocar(slug: string) {
 		concursoStore.setAtivo(slug);
 		open = false;
+		// Land on Hoje: the previous page may not exist for the new plan, and the
+		// plan store reloads for the new slug (see the layout effect).
 		goto('/');
-	}
-
-	async function setTema(t: 'light' | 'dark' | 'system') {
-		applyTheme(t);
-		await planoStore.salvarConfig({ temaUi: t });
 	}
 </script>
 
-<aside class="sidebar" class:open>
-	<!-- level 1: icon rail, always visible -->
-	<div class="rail">
-		<button
-			class="rail-mark"
-			title={railOnly ? 'Expandir navegação' : 'Recolher navegação'}
-			aria-label={railOnly ? 'Expandir navegação' : 'Recolher navegação'}
+<aside id="nav-principal" class="sidebar" class:open aria-label="Navegação principal">
+	<!-- 1) app identity + the collapse control; 2) the active plan; 3) navigation -->
+	<div class="nav-head" class:compacto={compacto}>
+		{#if !compacto}
+			<span class="marca">annyGo</span>
+		{/if}
+		<IconButton
+			icon={railOnly ? 'expandir' : 'recolher'}
+			label={railOnly ? 'Expandir menu lateral' : 'Recolher menu lateral'}
 			onclick={() => (railOnly = !railOnly)}
-		>
-			a
-		</button>
-
-		{#each links as l (l.href)}
-			<a
-				class="rail-item"
-				class:active={isActive(l.href)}
-				href={l.href}
-				data-label={l.label}
-				aria-label={l.label}
-				onclick={() => (open = false)}
-			>
-				<NavIcon name={l.icon} />
-			</a>
-		{/each}
-
-		<div class="rail-sep"></div>
-
-		{#each admin as l (l.href)}
-			<a
-				class="rail-item"
-				class:active={isActive(l.href)}
-				href={l.href}
-				data-label={l.label}
-				aria-label={l.label}
-				onclick={() => (open = false)}
-			>
-				<NavIcon name={l.icon} />
-			</a>
-		{/each}
-
-		<div class="rail-foot">
-			<div class="ring" style="--ring-pct:{progresso}" title="{progresso}% do plano concluído">
-				<i></i>
-			</div>
-		</div>
+		/>
 	</div>
 
-	<!-- level 2: labels + footer -->
-	<div class="side-panel">
-		<a class="side-top" href="/concursos" onclick={() => (open = false)}>
-			<div class="side-title">
-				<strong>{ativo?.nome ?? 'Meus concursos'}</strong>
-				<span>{ativo?.banca || 'gerenciar concursos'}</span>
+	<PlanoPicker
+		planos={concursoStore.lista}
+		ativoSlug={concursoStore.ativoSlug}
+		carregando={!concursoStore.carregado}
+		{compacto}
+		onSelecionar={trocar}
+		onAdicionar={() => {
+			open = false;
+			goto('/concursos/novo');
+		}}
+	/>
+
+	<nav class="nav-groups">
+		{#each grupos as g (g.titulo)}
+			<div class="nav-group">
+				<h2 class="nav-group-title">{g.titulo}</h2>
+				<ul>
+					{#each g.itens as l (l.href)}
+						<li>
+							<SidebarNavItem
+								href={l.href}
+								icon={l.icon}
+								label={l.label}
+								active={isActive(l.href)}
+								{compacto}
+								onNavigate={() => (open = false)}
+							/>
+						</li>
+					{/each}
+				</ul>
 			</div>
-		</a>
+		{/each}
+	</nav>
 
-		{#if concursoStore.lista.length > 1}
-			<select value={concursoStore.ativoSlug} onchange={trocar} style="width:100%">
-				{#each concursoStore.lista as c (c.slug)}
-					<option value={c.slug}>{c.nome}</option>
-				{/each}
-				<option value="__novo">+ novo concurso…</option>
-			</select>
-		{/if}
-
-		<nav class="side-nav">
-			{#each links as l (l.href)}
-				<a
-					class="side-item"
-					class:active={isActive(l.href)}
-					href={l.href}
-					onclick={() => (open = false)}
-				>
-					{l.label}
-				</a>
-			{/each}
-			<div class="side-sep"></div>
-			{#each admin as l (l.href)}
-				<a
-					class="side-item"
-					class:active={isActive(l.href)}
-					href={l.href}
-					onclick={() => (open = false)}
-				>
-					{l.label}
-				</a>
-			{/each}
-		</nav>
-
-		<div class="side-bottom">
-			<div class="side-count">
+	<div class="nav-foot">
+		<div class="nav-progress" data-label="{progresso}% do plano concluído">
+			<div class="ring" style="--ring-pct:{progresso}" aria-hidden="true"><i></i></div>
+			<div class="nav-progress-txt">
 				<strong>{diasParaProva ?? '—'}</strong>
-				<span>dias p/ prova</span>
+				<span>dias p/ prova · {progresso}% feito</span>
 			</div>
 		</div>
 
-		<div class="theme-row">
+		<div class="nav-user">
+			<span class="nav-user-id" title="{auth.usuario?.nome} · {auth.usuario?.email}">
+				{auth.usuario?.nome}
+			</span>
 			<button
-				class="theme-btn"
-				class:active={tema === 'light'}
-				onclick={() => setTema('light')}
-				title="Tema claro"
-				aria-label="Tema claro"><NavIcon name="sol" /></button
-			>
-			<button
-				class="theme-btn"
-				class:active={tema === 'system'}
-				onclick={() => setTema('system')}
-				title="Seguir o sistema"
-				aria-label="Seguir o sistema"><NavIcon name="sistema" /></button
-			>
-			<button
-				class="theme-btn"
-				class:active={tema === 'dark'}
-				onclick={() => setTema('dark')}
-				title="Tema escuro"
-				aria-label="Tema escuro"><NavIcon name="lua" /></button
-			>
-		</div>
-
-		<div class="side-user">
-			<span>{auth.usuario?.nome} · {auth.usuario?.email}</span>
-			<button
+				class="nav-sair"
 				onclick={() => {
 					concursoStore.limpar();
 					planoStore.limpar();

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '$lib/components/IconButton.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import type { Dossie } from '$lib/types';
 
@@ -45,7 +46,9 @@
 	>
 		<div class="card-top">
 			Dossiê para o NotebookLM {#if dossie}· {dossie.disciplina}{/if}
-			<button class="mv-btn" style="margin-left:auto" aria-label="Fechar" onclick={onclose}>✕</button>
+			<span style="margin-left:auto">
+				<IconButton icon="fechar" label="Fechar" onclick={onclose} />
+			</span>
 		</div>
 		<div class="card-body">
 			{#if erro}

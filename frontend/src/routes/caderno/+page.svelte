@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '$lib/components/IconButton.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DossieModal from '$lib/components/DossieModal.svelte';
@@ -180,12 +181,12 @@
 							{/if}
 						</span>
 						<span class="fa">{nomeDisc(a.disciplina)}</span>
-						<button
-							class="mv-btn"
-							title="Remover"
-							aria-label="Remover anotação"
-							onclick={() => remover(a.id)}>✕</button
-						>
+						<IconButton
+							icon="fechar"
+							label="Remover anotação"
+							tom="perigo"
+							onclick={() => remover(a.id)}
+						/>
 					</div>
 				{/each}
 			</div>

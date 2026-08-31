@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '$lib/components/IconButton.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { goto } from '$app/navigation';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
@@ -59,12 +60,12 @@
 					<button class="btn" style="padding:6px 8px" onclick={() => abrir(c.slug)}>abrir</button>
 					<span style="display:flex;gap:4px">
 						<a class="btn" style="padding:6px 8px" href="/concursos/{c.slug}/editar">editar</a>
-						<button
-							class="mv-btn"
-							title="Excluir"
-							aria-label="Excluir concurso"
-							onclick={() => excluir(c.slug, c.nome)}>✕</button
-						>
+						<IconButton
+							icon="fechar"
+							label="Excluir concurso"
+							tom="perigo"
+							onclick={() => excluir(c.slug, c.nome)}
+						/>
 					</span>
 				</div>
 			{/each}
