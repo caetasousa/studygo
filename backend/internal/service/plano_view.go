@@ -243,10 +243,9 @@ type LinhaBalanceamento struct {
 	// actually asks.
 	Temas    int     `json:"temas"`
 	Passadas float64 `json:"passadas"`
-	// Revisoes is how many times the daily review queue goes over this
-	// discipline's whole topic list before the reta final — the answer to "how
-	// many times do I review Português".
-	Revisoes       float64 `json:"revisoes"`
+	// Visitas is how many days of the learning phase study this discipline —
+	// how many times you come back to it before the reta final.
+	Visitas        int     `json:"visitas"`
 	RevisoesGerais float64 `json:"revisoesGerais"`
 	// IntervaloDias is how many days pass, on average, between two days that
 	// study this discipline. It is what makes the cycle legible: "Português

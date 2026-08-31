@@ -24,7 +24,7 @@
 	const mediaIntervalo = $derived(media((l) => l.intervaloDias));
 	const voltas = $derived(planoStore.plano?.props.voltasRevisao ?? 0);
 	const mediaRevisoes = $derived(media((l) => l.revisoesGerais));
-	const mediaRevisoesDiarias = $derived(media((l) => l.revisoes));
+	const mediaVisitas = $derived(media((l) => l.visitas));
 
 	const plano = $derived(planoStore.plano);
 	const esp = $derived(plano?.balanceamento.filter((l) => l.bloco === 'esp') ?? []);
@@ -156,8 +156,8 @@
 				Ali cada bloco cobre vários tópicos de uma vez.
 			</li>
 			<li>
-				<b>Reviso</b> — quantas vezes a revisão de cada dia volta a esta matéria
-				inteira. Quem entra cedo no plano é revisado mais vezes.
+				<b>Volto</b> — em quantos dias eu volto a esta matéria antes da reta final.
+				É o número de vezes que ela reaparece no cronograma.
 			</li>
 		</ul>
 		<div class="tbl-wrap">
@@ -172,8 +172,8 @@
 						<th title="Vezes que vejo a matéria inteira aprendendo o conteúdo">
 							Aprendo
 						</th>
-						<th title="Vezes que a revisão diária volta a esta matéria inteira">
-							Reviso
+						<th title="Dias em que volto a esta matéria antes da reta final">
+							Volto
 						</th>
 						<th title="A reta final repassa cada matéria inteira uma vez">Reta final</th>
 					</tr>
@@ -201,7 +201,7 @@
 									</span>
 								{/if}
 							</td>
-							<td class="destaque">{nf1.format(l.revisoes)}×</td>
+							<td class="destaque">{l.visitas}×</td>
 							<td class="fraco">{nf1.format(l.revisoesGerais)}×</td>
 						</tr>
 					{/each}
@@ -212,7 +212,7 @@
 						<td>{totalTemas}</td>
 						<td>{nf1.format(mediaIntervalo)} dias</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
-						<td class="destaque">{nf1.format(mediaRevisoesDiarias)}×</td>
+						<td class="destaque">{nf1.format(mediaVisitas)}×</td>
 						<td class="fraco">{nf1.format(mediaRevisoes)}×</td>
 					</tr>
 				</tfoot>

@@ -301,8 +301,8 @@ export interface LinhaBalanceamento {
 	temas: number;
 	/** Complete passes over the whole subject in the content phase. */
 	passadas: number;
-	/** Times the daily review queue goes over this whole subject. */
-	revisoes: number;
+	/** Days of the learning phase that study this subject — times you come back. */
+	visitas: number;
 	/** Complete passes over the whole subject in the reta final. */
 	revisoesGerais: number;
 	/** Average days between two days that study this discipline. */

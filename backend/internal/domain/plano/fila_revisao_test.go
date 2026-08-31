@@ -203,3 +203,51 @@ func TestRevisoesPorDisciplina(t *testing.T) {
 		}
 	})
 }
+
+func TestVisitasPorDisciplina(t *testing.T) {
+	t.Parallel()
+
+	t.Run("conta os dias em que a matéria aparece", func(t *testing.T) {
+		t.Parallel()
+
+		dias := []plano.Dia{
+			diaEstudo(1, item("POR", "p1"), item("MAT", "m1")),
+			diaEstudo(2, item("POR", "p2")),
+			diaEstudo(3, item("POR", "p3"), item("MAT", "m2")),
+		}
+
+		got := plano.VisitasPorDisciplina(dias)
+
+		if got["POR"] != 3 {
+			t.Errorf("POR = %d, quer 3", got["POR"])
+		}
+
+		if got["MAT"] != 2 {
+			t.Errorf("MAT = %d, quer 2", got["MAT"])
+		}
+	})
+
+	t.Run("duas vezes no mesmo dia contam como uma visita", func(t *testing.T) {
+		t.Parallel()
+
+		// Voltar à matéria é o que importa, não quantos blocos ela ocupa.
+		dias := []plano.Dia{diaEstudo(1, item("POR", "p1"), item("POR", "p2"))}
+
+		if got := plano.VisitasPorDisciplina(dias); got["POR"] != 1 {
+			t.Errorf("POR = %d, quer 1", got["POR"])
+		}
+	})
+
+	t.Run("a reta final não entra na conta", func(t *testing.T) {
+		t.Parallel()
+
+		dias := []plano.Dia{
+			diaEstudo(1, item("POR", "p1")),
+			{N: 2, Tipo: plano.TipoRevisaoDirigida, Fase: plano.FaseReta, Itens: []plano.ItemDia{item("POR", "p1")}},
+		}
+
+		if got := plano.VisitasPorDisciplina(dias); got["POR"] != 1 {
+			t.Errorf("POR = %d, quer 1 — a reta final é outra fase", got["POR"])
+		}
+	})
+}

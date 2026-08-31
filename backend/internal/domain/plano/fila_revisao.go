@@ -107,6 +107,39 @@ func proximaLevaRevisao(fila []ItemRevisao, cursor *int, porDia int) []ItemRevis
 	return out
 }
 
+// VisitasPorDisciplina counts how many days of the learning phase study each
+// discipline — how many times you come back to it before the reta final.
+//
+// Counted directly from the schedule rather than derived from the average gap.
+// The obvious arithmetic (study days ÷ gap in days) mixes two units — the gap
+// is measured in calendar days, which include the days off — and lands short:
+// a subject visited 7 times reads as 4.9. Counting is both simpler and exact.
+//
+// A discipline scheduled twice in one day is one visit: what matters is how
+// many times you return to it, not how many blocks it fills.
+func VisitasPorDisciplina(dias []Dia) map[string]int {
+	out := map[string]int{}
+
+	for _, d := range dias {
+		if d.Fase == FaseReta {
+			break
+		}
+
+		vistas := map[string]bool{}
+
+		for _, it := range d.Itens {
+			if it.Disciplina == "" || vistas[it.Disciplina] {
+				continue
+			}
+
+			vistas[it.Disciplina] = true
+			out[it.Disciplina]++
+		}
+	}
+
+	return out
+}
+
 // RevisoesPorDisciplina counts, per discipline, how many review passes over its
 // whole topic list the queue delivers before the reta final.
 //

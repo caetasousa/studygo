@@ -437,7 +437,7 @@ func montarBalanceamento(
 ) []LinhaBalanceamento {
 	cfg = cfg.Normalizar()
 	intervalos := intervalosDeRevisita(res.Dias)
-	revisoes := plano.RevisoesPorDisciplina(res.Dias, temasPorRevisao(cfg))
+	visitas := plano.VisitasPorDisciplina(res.Dias)
 	hBloco := cfg.HorasDia / 2
 	out := make([]LinhaBalanceamento, 0, len(c.Disciplinas))
 
@@ -476,7 +476,7 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
-			Revisoes:       round1(revisoes[d.Codigo]),
+			Visitas:        visitas[d.Codigo],
 			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
 			IntervaloDias:  intervalos[d.Codigo],
 			HorasPrevisto:  round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
