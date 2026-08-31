@@ -147,10 +147,13 @@ func (s *PlanoService) montar(
 		Marcos:        montarMarcos(c, salvo.Marcos),
 		Balanceamento: balanceamento,
 		Props:         montarProps(salvo.Config, res.Dias, stats, agora),
-		Alertas:       append(alertaOrcamento(balanceamento), montarAlertas(c, salvo.Marcos, agora)...),
-		HojeIndex:     hojeIndex,
-		Reordenados:   datasOrdenadas(salvo.Reordenacoes),
-		GeradoEm:      s.clock.Now(),
+		Alertas: append(
+			append(alertaCobertura(balanceamento), alertaOrcamento(balanceamento)...),
+			montarAlertas(c, salvo.Marcos, agora)...,
+		),
+		HojeIndex:   hojeIndex,
+		Reordenados: datasOrdenadas(salvo.Reordenacoes),
+		GeradoEm:    s.clock.Now(),
 	}
 
 	return resp, nil
@@ -485,6 +488,75 @@ func fmtCurto(t time.Time) string {
 // the edital's totals. The engine splits time strictly in proportion, so raising
 // one discipline silently takes time from every other one — this is what says so
 // out loud, and names where the excess (or the gap) is.
+// alertaCobertura warns when the plan does not have time to go through a
+// discipline even once.
+//
+// This is the failure a study plan must never hide: with a near exam date, or
+// too many topics for the days available, the engine simply runs out of slots
+// and whole subjects never appear. The schedule looked complete either way —
+// the missing subject was only absent, and absence is hard to notice.
+func alertaCobertura(linhas []LinhaBalanceamento) []AlertaResposta {
+	incompletas := make([]LinhaBalanceamento, 0, len(linhas))
+	nenhuma := 0
+
+	for _, l := range linhas {
+		if l.Temas == 0 || l.Passadas >= 1 {
+			continue
+		}
+
+		incompletas = append(incompletas, l)
+
+		if l.Passadas == 0 {
+			nenhuma++
+		}
+	}
+
+	if len(incompletas) == 0 {
+		return []AlertaResposta{}
+	}
+
+	// A subject that never appears at all is a different order of problem from
+	// one that is merely cut short.
+	nivel := "warn"
+	if nenhuma > 0 {
+		nivel = "danger"
+	}
+
+	var b strings.Builder
+
+	for i, l := range incompletas {
+		if i > 0 {
+			b.WriteString("; ")
+		}
+
+		b.WriteString(l.Nome)
+
+		if l.Passadas == 0 {
+			b.WriteString(" (não entra no plano)")
+
+			continue
+		}
+
+		b.WriteString(" (")
+		b.WriteString(strconv.Itoa(int(l.Passadas * 100)))
+		b.WriteString("% do conteúdo)")
+	}
+
+	titulo := "O plano não cobre todo o conteúdo"
+	if nenhuma > 0 {
+		titulo = "Há matéria que não entra no plano"
+	}
+
+	return []AlertaResposta{{
+		Nivel:  nivel,
+		Titulo: titulo,
+		Texto: "Não há dias suficientes até a prova para percorrer estas matérias " +
+			"inteiras uma vez: " + b.String() + ". Adiante a data de início, " +
+			"acrescente dias de estudo na semana, aumente os blocos por dia — ou " +
+			"aceite e escolha por onde cortar, sabendo do buraco.",
+	}}
+}
+
 func alertaOrcamento(linhas []LinhaBalanceamento) []AlertaResposta {
 	var (
 		total  int

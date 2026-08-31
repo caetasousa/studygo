@@ -128,6 +128,8 @@
 		<p class="page-sub" style="margin-top:0">
 			Uma passada é percorrer a matéria inteira, do primeiro ao último tópico.
 			O ciclo de conteúdo dá as primeiras; a reta final revisa por cima delas.
+			<strong>Abaixo de 1× o plano não chega ao fim daquela matéria</strong> — não há
+			dias suficientes até a prova para vê-la inteira.
 		</p>
 		<div class="tbl-wrap">
 			<table class="tbl">
@@ -142,13 +144,20 @@
 				</thead>
 				<tbody>
 					{#each cobertura as l (l.codigo)}
-						<tr>
+						<tr class:incompleta={l.temas > 0 && l.passadas < 1}>
 							<td>
 								<span class="chip-dot" style="background:var(--c{l.cor}-tx)"></span>
 								{l.nome}
 							</td>
 							<td>{l.temas || '—'}</td>
-							<td>{nf1.format(l.passadas)}×</td>
+							<td>
+								{nf1.format(l.passadas)}×
+								{#if l.temas > 0 && l.passadas < 1}
+									<span class="aviso-cob">
+										só {Math.round(l.passadas * 100)}% do conteúdo
+									</span>
+								{/if}
+							</td>
 							<td>{nf1.format(l.revisoesGerais)}×</td>
 							<td class="destaque">{nf1.format(l.totalPassadas)}×</td>
 						</tr>
@@ -261,6 +270,20 @@
 {/if}
 
 <style>
+	/* A subject the plan cannot finish is the one thing on this page that must
+	   not read as just another row. */
+	tr.incompleta td {
+		background: var(--danger-soft);
+	}
+	.aviso-cob {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: 10.5px;
+		font-weight: 600;
+		color: var(--danger);
+		white-space: nowrap;
+	}
+
 	/* The answer the table exists for, so the eye lands on it. */
 	.destaque {
 		color: var(--accent-strong);

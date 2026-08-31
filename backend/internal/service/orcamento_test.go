@@ -1,6 +1,9 @@
 package service
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAlertaOrcamento(t *testing.T) {
 	t.Parallel()
@@ -93,6 +96,81 @@ func TestAlertaOrcamento(t *testing.T) {
 
 			if c.querTexto != "" && got[0].Texto != c.querTexto {
 				t.Errorf("texto = %q, queria %q", got[0].Texto, c.querTexto)
+			}
+		})
+	}
+}
+
+// A plan that cannot cover a subject even once must say so. This is the failure
+// a schedule hides best: the missing subject is simply absent, and absence is
+// hard to notice on a screen full of days.
+func TestAlertaCobertura(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		nome        string
+		linhas      []LinhaBalanceamento
+		querAlertas int
+		querNivel   string
+	}{
+		{
+			nome: "tudo coberto ao menos uma vez",
+			linhas: []LinhaBalanceamento{
+				{Nome: "Português", Temas: 10, Passadas: 1},
+				{Nome: "Matemática", Temas: 8, Passadas: 2.5},
+			},
+			querAlertas: 0,
+		},
+		{
+			nome: "uma matéria cortada pela metade",
+			linhas: []LinhaBalanceamento{
+				{Nome: "Português", Temas: 10, Passadas: 0.5},
+				{Nome: "Matemática", Temas: 8, Passadas: 2},
+			},
+			querAlertas: 1,
+			querNivel:   "warn",
+		},
+		{
+			// Zero passes is a different order of problem: the subject never
+			// appears in the schedule at all.
+			nome: "matéria que não entra no plano",
+			linhas: []LinhaBalanceamento{
+				{Nome: "Português", Temas: 10, Passadas: 0},
+				{Nome: "Matemática", Temas: 8, Passadas: 2},
+			},
+			querAlertas: 1,
+			querNivel:   "danger",
+		},
+		{
+			// A discipline with no topics is headlined by its own name, so there
+			// is nothing to be short of.
+			nome:        "disciplina sem tópicos não gera alerta",
+			linhas:      []LinhaBalanceamento{{Nome: "Redação", Temas: 0, Passadas: 0}},
+			querAlertas: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.nome, func(t *testing.T) {
+			t.Parallel()
+
+			got := alertaCobertura(tt.linhas)
+
+			if len(got) != tt.querAlertas {
+				t.Fatalf("alertas = %d, quer %d", len(got), tt.querAlertas)
+			}
+
+			if tt.querAlertas == 0 {
+				return
+			}
+
+			if got[0].Nivel != tt.querNivel {
+				t.Errorf("nível = %q, quer %q", got[0].Nivel, tt.querNivel)
+			}
+
+			// The alert has to name the subject, or it is not actionable.
+			if !strings.Contains(got[0].Texto, "Português") {
+				t.Errorf("o alerta não nomeia a matéria: %q", got[0].Texto)
 			}
 		})
 	}
