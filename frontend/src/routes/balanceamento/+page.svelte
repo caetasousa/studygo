@@ -125,26 +125,26 @@
 
 		<!-- The question the schedule could not answer: how many times will I
 		     actually go over each subject before the exam. -->
-		<h2 class="sec">Quantas vezes percorro cada matéria até a prova</h2>
+		<h2 class="sec">Quantas vezes vejo cada matéria até a prova</h2>
 		<p class="page-sub" style="margin-top:0">
-			Uma passada é percorrer a matéria inteira, do primeiro ao último tópico.
-			O ciclo de conteúdo dá as primeiras; a reta final revisa por cima delas.
-			<strong>Abaixo de 1× o plano não chega ao fim daquela matéria</strong> — não há
-			dias suficientes até a prova para vê-la inteira. A coluna
-			<strong>volta a cada</strong> é o intervalo médio entre dois dias da mesma
-			matéria: é ele que impede o esquecimento, porque o assunto reaparece antes
-			de você perdê-lo.
+			O plano tem duas fases. No <strong>aprendizado</strong> você vê a matéria pela
+			primeira vez, tópico por tópico. Na <strong>reta final</strong> não entra
+			assunto novo: você repassa o que já viu. Cada <strong>1×</strong> abaixo é
+			percorrer a matéria inteira, do primeiro ao último tópico.
 		</p>
 		<div class="tbl-wrap">
 			<table class="tbl">
 				<thead>
 					<tr>
-						<th>Disciplina</th>
-						<th>Tópicos</th>
-						<th>Volta a cada</th>
-						<th>Passadas no conteúdo</th>
-						<th>Revisões gerais na reta</th>
-						<th>Vezes que percorro a matéria</th>
+						<th rowspan="2">Disciplina</th>
+						<th rowspan="2">Tópicos</th>
+						<th rowspan="2">Estudo a cada</th>
+						<th colspan="2" class="grupo">Vezes que vejo a matéria inteira</th>
+						<th rowspan="2">Total até a prova</th>
+					</tr>
+					<tr>
+						<th class="sub">Aprendendo</th>
+						<th class="sub">Repassando na reta final</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -283,6 +283,18 @@
 {/if}
 
 <style>
+	/* Two of the columns are the same measure in different phases, so they read
+	   as one group with a shared heading rather than four unrelated numbers. */
+	.grupo {
+		text-align: center !important;
+		border-bottom: 1px solid var(--border);
+		padding-bottom: 4px !important;
+	}
+	.sub {
+		font-weight: 500;
+		opacity: 0.85;
+	}
+
 	/* A subject the plan cannot finish is the one thing on this page that must
 	   not read as just another row. */
 	tr.incompleta td {
