@@ -304,3 +304,293 @@ func TestCompactarAtividades(t *testing.T) {
 		}
 	})
 }
+
+// The learning phase and the reta final are different kinds of work. Compacting
+// across the boundary pulled a guided review back among the content days, which
+// is the plan losing its shape rather than getting tighter.
+func TestCompactarAtividades_NaoAtravessaAFase(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 3, Data: dia(2026, 9, 3), Tipo: plano.TipoRevisaoDirigida, Fase: plano.FaseReta},
+	}
+
+	ats := []plano.Atividade{
+		{ID: "r1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "revisão"},
+	}
+
+	got := plano.CompactarAtividades(ats, dias, dia(2026, 9, 1), nadaConcluido)
+
+	if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 1 || ids[0] != "r1" {
+		t.Errorf("a revisão da reta final saiu do lugar: %v", got)
+	}
+
+	for _, d := range []time.Time{dia(2026, 9, 1), dia(2026, 9, 2)} {
+		if ids := idsDoDia(got, d); len(ids) != 0 {
+			t.Errorf("%s recebeu conteúdo da reta final: %v", d.Format(time.DateOnly), ids)
+		}
+	}
+}
+
+// A completion recorded per activity leaves the day row behind when the work
+// moves to the day it was really done on. That row used to anchor an EMPTY day,
+// so the hole it marked could never be closed again.
+func TestCompactarAtividades_DiaVazioNaoAncora(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 3, Data: dia(2026, 9, 3), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+	}
+
+	// Os dois primeiros dias estão marcados como concluídos mas não têm nada:
+	// o que era deles foi adiantado e já está registrado noutro dia.
+	ats := []plano.Atividade{
+		{ID: "c1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+		{ID: "c2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m3"},
+	}
+
+	concluido := func(d time.Time) bool {
+		return d.Equal(dia(2026, 9, 1)) || d.Equal(dia(2026, 9, 2))
+	}
+
+	got := plano.CompactarAtividades(ats, dias, dia(2026, 9, 1), concluido)
+
+	if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 {
+		t.Errorf("dia 1 = %v, o buraco devia ter sido fechado", ids)
+	}
+
+	if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 0 {
+		t.Errorf("dia 3 = %v, devia ter esvaziado no fim", ids)
+	}
+}
+
+// Um dia de revisão semanal não guarda atividades: o trabalho dele é o próprio
+// dia. Concluído, continua concluído, e não vira destino de conteúdo.
+func TestCompactarAtividades_RevisaoSemanalConcluidaAncora(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoRevisaoSemanal, Fase: plano.FaseBase},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+	}
+
+	ats := []plano.Atividade{
+		{ID: "b1", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+	}
+
+	concluido := func(d time.Time) bool { return d.Equal(dia(2026, 9, 1)) }
+
+	got := plano.CompactarAtividades(ats, dias, dia(2026, 9, 1), concluido)
+
+	if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 0 {
+		t.Errorf("a revisão semanal concluída recebeu conteúdo: %v", ids)
+	}
+}
+
+func diasComReta() []plano.Dia {
+	return []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 3, Data: dia(2026, 9, 3), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+		{N: 4, Data: dia(2026, 9, 4), Tipo: plano.TipoRevisaoDirigida, Fase: plano.FaseReta},
+	}
+}
+
+// Dois dias cheios e o terceiro vazio — o retrato de quem se adiantou e viu a
+// compactação empurrar a folga para a véspera da reta final.
+func atividadesComFolga() []plano.Atividade {
+	return []plano.Atividade{
+		{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+		{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+		{ID: "b1", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+		{ID: "b2", Data: dia(2026, 9, 2), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
+	}
+}
+
+func temasDoDia(as []plano.Atividade, dt time.Time) []string {
+	out := []string{}
+	for _, a := range plano.AtividadesDoDia(as, dt) {
+		out = append(out, a.Tema)
+	}
+
+	return out
+}
+
+func TestPreencherVazios(t *testing.T) {
+	t.Parallel()
+
+	fila := []plano.ItemRevisao{
+		{Disciplina: "MAT", Tema: "m1"},
+		{Disciplina: "POR", Tema: "p1"},
+	}
+
+	t.Run("o dia livre recebe a carga normal do plano", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
+			Fila:      fila,
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		temas := temasDoDia(got, dia(2026, 9, 3))
+		if len(temas) != 2 || temas[0] != "Reforço — m1" || temas[1] != "Reforço — p1" {
+			t.Errorf("dia livre = %v, quer os dois primeiros da fila", temas)
+		}
+	})
+
+	t.Run("não inventa trabalho na reta final", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
+			Fila:      fila,
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		if ids := idsDoDia(got, dia(2026, 9, 4)); len(ids) != 0 {
+			t.Errorf("a reta final recebeu reforço: %v", ids)
+		}
+	})
+
+	t.Run("não mexe num dia já fechado", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
+			Fila:      fila,
+			Desde:     dia(2026, 9, 1),
+			Concluido: func(d time.Time) bool { return d.Equal(dia(2026, 9, 3)) },
+		})
+
+		if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 0 {
+			t.Errorf("dia fechado = %v, devia seguir intacto", ids)
+		}
+	})
+
+	t.Run("uma fila curta não se repete dentro do dia", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
+			Fila:      fila[:1],
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		if temas := temasDoDia(got, dia(2026, 9, 3)); len(temas) != 1 {
+			t.Errorf("dia livre = %v, quer um único bloco", temas)
+		}
+	})
+
+	t.Run("sem fila, nada é inventado", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		if len(got) != len(atividadesComFolga()) {
+			t.Errorf("total = %d, quer %d", len(got), len(atividadesComFolga()))
+		}
+	})
+
+	// PreencherVazios runs again every time a new topic is finished early, each
+	// time possibly freeing a day of its own. A second call that restarted the
+	// queue at 0 would hand the SECOND free day the exact same topics as the
+	// first — the reinforcement would keep circling the same couple of subjects
+	// while everything else studied never comes back.
+	t.Run("uma segunda chamada continua a fila em vez de recomeçar", func(t *testing.T) {
+		t.Parallel()
+
+		dias := []plano.Dia{
+			{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+			{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+			{N: 3, Data: dia(2026, 9, 3), Tipo: plano.TipoEstudo, Fase: plano.FaseBase},
+			{N: 4, Data: dia(2026, 9, 4), Tipo: plano.TipoRevisaoDirigida, Fase: plano.FaseReta},
+		}
+
+		filaLonga := []plano.ItemRevisao{
+			{Disciplina: "MAT", Tema: "m1"},
+			{Disciplina: "POR", Tema: "p1"},
+			{Disciplina: "DIR", Tema: "d1"},
+			{Disciplina: "ADM", Tema: "a1"},
+		}
+
+		// Só o dia 1 tem conteúdo, na carga normal de 2 blocos: os dias 2 e 3
+		// estão livres, como se dois assuntos tivessem sido adiantados em
+		// momentos separados.
+		base := []plano.Atividade{
+			{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+		}
+
+		// Primeira chamada: preenche o dia 2 com os dois primeiros da fila.
+		primeira := plano.PreencherVazios(base, dias, plano.Reforco{
+			Fila:      filaLonga,
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		// Segunda chamada, como se fosse uma nova conclusão: parte do resultado
+		// da primeira, não da entrada original.
+		segunda := plano.PreencherVazios(primeira, dias, plano.Reforco{
+			Fila:      filaLonga,
+			Desde:     dia(2026, 9, 1),
+			Concluido: nadaConcluido,
+		})
+
+		temas2 := temasDoDia(segunda, dia(2026, 9, 2))
+		temas3 := temasDoDia(segunda, dia(2026, 9, 3))
+
+		if len(temas2) != 2 || len(temas3) != 2 {
+			t.Fatalf("dia 2 = %v, dia 3 = %v, os dois deviam ter sido preenchidos", temas2, temas3)
+		}
+
+		if temas2[0] == temas3[0] {
+			t.Errorf("dia 3 repetiu o tema do dia 2 em vez de continuar a fila: %v e %v", temas2, temas3)
+		}
+	})
+}
+
+func TestFilaDeReforco(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Fase: plano.FaseBase, Itens: []plano.ItemDia{
+			{Disciplina: "POR", Tema: "p1"},
+			{Disciplina: "MAT", Tema: "m1"},
+		}},
+		{N: 2, Data: dia(2026, 9, 2), Fase: plano.FaseBase, Itens: []plano.ItemDia{
+			{Disciplina: "POR", Tema: "p2"},
+			// Já reforçado numa passada anterior: é o mesmo tema, não um novo.
+			{Disciplina: "MAT", Tema: "Reforço — m1"},
+			// Uma revisão dirigida que a compactação trouxe para a base também
+			// nomeia o tema de baixo, não o rótulo.
+			{Disciplina: "MAT", Tema: "Revisão dirigida — m2"},
+		}},
+		{N: 3, Data: dia(2026, 9, 3), Fase: plano.FaseReta, Itens: []plano.ItemDia{
+			{Disciplina: "DIR", Tema: "d1"},
+		}},
+	}
+
+	cadernos := map[string][]plano.ItemCaderno{
+		"MAT": {{Disciplina: "MAT", Tema: "m1", Erros: 2, Questoes: 10, Acertos: 2}},
+	}
+
+	got := plano.FilaDeReforco(dias, cadernos)
+
+	quer := []string{"m1", "p1", "p2", "m2"}
+	if len(got) != len(quer) {
+		t.Fatalf("fila = %v, quer %v", got, quer)
+	}
+
+	for i, tema := range quer {
+		if got[i].Tema != tema {
+			t.Errorf("fila[%d] = %q, quer %q", i, got[i].Tema, tema)
+		}
+	}
+}

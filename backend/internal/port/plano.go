@@ -32,6 +32,11 @@ type PlanoRepository interface {
 	ReplaceAtividades(ctx context.Context, planoID uuid.UUID, as []plano.Atividade) error
 
 	UpsertRegistro(ctx context.Context, planoID uuid.UUID, r plano.Registro) error
+
+	// DeleteRegistro drops one day's log, blocks included. Used to clear a row
+	// left describing a day whose work has since moved elsewhere.
+	DeleteRegistro(ctx context.Context, planoID uuid.UUID, data time.Time) error
+
 	DeleteRegistros(ctx context.Context, planoID uuid.UUID) error
 
 	SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error

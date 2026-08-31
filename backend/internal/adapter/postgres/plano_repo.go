@@ -435,6 +435,35 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 	return nil
 }
 
+// DeleteRegistro drops one day's log. registros_bloco has no cascade from the
+// day row — the two tables are keyed independently on (plano_id, data) — so the
+// blocks are cleared explicitly, in the same transaction.
+func (r *PlanoRepo) DeleteRegistro(ctx context.Context, planoID uuid.UUID, data time.Time) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	if _, err := tx.Exec(
+		ctx, `DELETE FROM registros_bloco WHERE plano_id = $1 AND data = $2`, planoID, data,
+	); err != nil {
+		return fmt.Errorf("deleting registros_bloco: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx, `DELETE FROM registros_dia WHERE plano_id = $1 AND data = $2`, planoID, data,
+	); err != nil {
+		return fmt.Errorf("deleting registro_dia: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
 func (r *PlanoRepo) DeleteRegistros(ctx context.Context, planoID uuid.UUID) error {
 	if _, err := r.pool.Exec(ctx, `DELETE FROM registros_dia WHERE plano_id = $1`, planoID); err != nil {
 		return fmt.Errorf("deleting registros_dia: %w", err)

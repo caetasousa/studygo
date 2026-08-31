@@ -15,6 +15,10 @@ const (
 	discTema    = "Estudo de caso: prova discursiva completa e autocorreção pelos critérios do edital"
 	metaEstudo  = 20
 	metaRevD    = 24
+	// prefixoRevisaoDirigida labels a reta-final block. It names the same topic
+	// the learning phase taught, so anything reading topics back off the
+	// schedule has to look past it (see temaBase).
+	prefixoRevisaoDirigida = "Revisão dirigida — "
 )
 
 // RevCicloPadrao is the weekly-review cycle used when a concurso has none of its
@@ -148,7 +152,7 @@ func construir(
 		case d.papel == "revd":
 			base.Tipo = TipoRevisaoDirigida
 			base.Meta = metaRevD
-			base.Itens = puxaBloco(ordemR, &ori, n, filasR, ptrR, "Revisão dirigida — ")
+			base.Itens = puxaBloco(ordemR, &ori, n, filasR, ptrR, prefixoRevisaoDirigida)
 		case d.papel == "sim":
 			base.Tipo = TipoSimulado
 			base.Meta = simMeta

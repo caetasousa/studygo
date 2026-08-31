@@ -286,18 +286,160 @@ func (s *PlanoService) trazerConcluidasParaODia(
 		return nil
 	}
 
-	// Getting ahead should buy time, not leave holes. Pull the rest of the plan
-	// back over the days that emptied, so the free days pile up at the END —
-	// where they are worth something, as room for more content before the exam.
+	// Getting ahead should buy time, not leave holes.
 	//
-	// The compaction starts on the day AFTER the one just recorded: that day is
-	// where the finished topics have only now landed, and its own record has not
-	// been written yet, so it would not be recognised as an anchor and the work
-	// would be pulled straight back out of it.
-	depois := plano.DayOf(data).AddDate(0, 0, 1)
-	atividades = plano.CompactarAtividades(atividades, res.Dias, depois, concluido)
+	// The reorganisation starts on the day AFTER the one just recorded: that day
+	// is where the finished topics have only now landed, and its own record has
+	// not been written yet, so it would not be recognised as an anchor and the
+	// work would be pulled straight back out of it.
+	atividades, orfaos := s.reorganizar(salvo, replanejamento{
+		res:        res,
+		atividades: atividades,
+		desde:      plano.DayOf(data).AddDate(0, 0, 1),
+	})
 
-	return s.planos.ReplaceAtividades(ctx, salvo.ID, atividades)
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, atividades); err != nil {
+		return err
+	}
+
+	return s.descartarRegistros(ctx, salvo, orfaos)
+}
+
+// replanejamento is one rearrangement in flight: the generated plan, the
+// activity layout as it now stands, and the first day the change may touch.
+type replanejamento struct {
+	res        plano.Resultado
+	atividades []plano.Atividade
+	desde      time.Time
+}
+
+// reorganizar closes the holes a rearrangement left behind and gives the days
+// it frees something to do.
+//
+// The three parts only make sense together. A record stranded on a day whose
+// work has moved elsewhere would freeze that day as an anchor, so it is set
+// aside first; the compaction then pulls the rest of the plan back over the
+// holes, piling the free days at the END of the learning phase; and those days
+// get a reinforcement block each, because a blank day right before the reta
+// final is the same hole the compaction just closed, only moved.
+//
+// Nothing is persisted here. It returns the new layout and the orphan records
+// the caller should drop AFTER the layout is safely written: dropping them
+// first would, on a failed write, un-finish a day that still holds work.
+func (s *PlanoService) reorganizar(
+	salvo plano.Salvo,
+	r replanejamento,
+) ([]plano.Atividade, []time.Time) {
+	orfaos := registrosOrfaos(r.res.Dias, r.atividades, salvo.Registros)
+	concluido := diaConcluidoSem(salvo.Registros, orfaos)
+
+	atividades := plano.CompactarAtividades(r.atividades, r.res.Dias, r.desde, concluido)
+
+	preenchidas := plano.PreencherVazios(atividades, r.res.Dias, plano.Reforco{
+		Fila: plano.FilaDeReforco(
+			r.res.Dias,
+			plano.Caderno(resultadosDoPlano(r.res.Dias, salvo)),
+		),
+		Desde:     r.desde,
+		Concluido: concluido,
+	})
+
+	return preenchidas, orfaos
+}
+
+// registrosOrfaos lists the day records that no longer describe anything.
+//
+// A completion is recorded per ACTIVITY. When a day's activities move to the
+// day they were really finished on, the day row stays behind claiming
+// "concluído" over a day that now holds nothing and logs nothing. That leftover
+// is not harmless: a concluded day anchors a compaction, so the hole it marks
+// could never be closed, and a day later refilled under it would render as
+// already done.
+//
+// Only content days qualify — a simulado or a véspera legitimately schedules no
+// activities — and only rows carrying no data of their own: logged hours,
+// questions or a note are the student's, whatever moved away from the day.
+func registrosOrfaos(
+	dias []plano.Dia,
+	atividades []plano.Atividade,
+	registros map[time.Time]plano.Registro,
+) []time.Time {
+	ocupados := make(map[time.Time]bool, len(atividades))
+	for _, a := range atividades {
+		ocupados[plano.DayOf(a.Data)] = true
+	}
+
+	out := []time.Time{}
+
+	for _, d := range dias {
+		dt := plano.DayOf(d.Data)
+
+		if d.Tipo != plano.TipoEstudo && d.Tipo != plano.TipoRevisaoDirigida {
+			continue
+		}
+
+		r, ok := registros[dt]
+		if !ok || ocupados[dt] || !registroSemDados(r) {
+			continue
+		}
+
+		out = append(out, dt)
+	}
+
+	return out
+}
+
+// registroSemDados reports whether a day record carries nothing but its own
+// flag — no blocks, no hours, no battery, no note.
+func registroSemDados(r plano.Registro) bool {
+	return len(r.Blocos) == 0 &&
+		r.Horas == nil &&
+		r.Questoes == nil &&
+		r.Acertos == nil &&
+		r.Nota == ""
+}
+
+// diaConcluidoSem is diaConcluido with a set of days read as never recorded —
+// the orphan rows the reorganisation is about to drop. Without this the
+// compaction would still see them as anchors and leave the holes open.
+func diaConcluidoSem(
+	registros map[time.Time]plano.Registro,
+	ignorar []time.Time,
+) func(time.Time) bool {
+	fora := make(map[time.Time]bool, len(ignorar))
+	for _, dt := range ignorar {
+		fora[dt] = true
+	}
+
+	return func(d time.Time) bool {
+		dt := plano.DayOf(d)
+		if fora[dt] {
+			return false
+		}
+
+		r, ok := registros[dt]
+
+		return ok && r.Concluido
+	}
+}
+
+// descartarRegistros drops the orphan day rows and forgets them locally, so the
+// response built right after does not show a day as finished that no longer
+// holds anything.
+func (s *PlanoService) descartarRegistros(
+	ctx context.Context,
+	salvo plano.Salvo,
+	datas []time.Time,
+) error {
+	for _, dt := range datas {
+		if err := s.planos.DeleteRegistro(ctx, salvo.ID, dt); err != nil {
+			return err
+		}
+
+		delete(salvo.Registros, dt)
+	}
+
+	return nil
 }
 
 // atividadeConcluida reports whether one activity has been marked done, which
@@ -389,15 +531,6 @@ func (s *PlanoService) MarcarMarco(
 	return s.montar(ctx, c, salvo)
 }
 
-// MoverAtividade moves a single scheduled activity to (data, posicao).
-//
-// This is the fine-grained counterpart to Reordenar, which can only swap two
-// whole days. The first move seeds the activity table from the engine's output,
-// so what the user sees is exactly what they were already looking at; from then
-// on the stored layout wins for the days it covers.
-//
-// Registros are never touched: moving what is *planned* must not rewrite the
-// record of what was actually studied.
 // prepararAtividades generates the plan and makes sure every activity the
 // client can see also exists in the store.
 //
@@ -539,6 +672,15 @@ func (s *PlanoService) AntecipouAtividade(
 	return s.montar(ctx, c, salvo)
 }
 
+// MoverAtividade moves a single scheduled activity to (data, posicao).
+//
+// This is the fine-grained counterpart to Reordenar, which can only swap two
+// whole days. The first move seeds the activity table from the engine's output,
+// so what the user sees is exactly what they were already looking at; from then
+// on the stored layout wins for the days it covers.
+//
+// Registros are never touched: moving what is *planned* must not rewrite the
+// record of what was actually studied.
 func (s *PlanoService) MoverAtividade(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -670,9 +812,8 @@ func (s *PlanoService) LimparRegistros(ctx context.Context, userID uuid.UUID, sl
 	return s.montar(ctx, c, salvo)
 }
 
-// RestaurarOrdem discards every manual reordering.
 // CompactarPlano pulls the schedule back over any empty study day from today
-// onwards.
+// onwards, then fills whatever that frees at the end of the learning phase.
 //
 // Runs by itself whenever a topic is finished early, and is exposed on its own
 // so a plan that already has gaps — from before that was automatic — can be
@@ -692,17 +833,24 @@ func (s *PlanoService) CompactarPlano(
 		return PlanoResposta{}, err
 	}
 
-	hoje := plano.DayOf(s.clock.Now())
+	reorganizadas, orfaos := s.reorganizar(salvo, replanejamento{
+		res:        res,
+		atividades: atividades,
+		desde:      plano.DayOf(s.clock.Now()),
+	})
 
-	compactadas := plano.CompactarAtividades(atividades, res.Dias, hoje, s.diaConcluido(salvo))
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, reorganizadas); err != nil {
+		return PlanoResposta{}, err
+	}
 
-	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, compactadas); err != nil {
+	if err := s.descartarRegistros(ctx, salvo, orfaos); err != nil {
 		return PlanoResposta{}, err
 	}
 
 	return s.montar(ctx, c, salvo)
 }
 
+// RestaurarOrdem discards every manual reordering.
 func (s *PlanoService) RestaurarOrdem(ctx context.Context, userID uuid.UUID, slug string) (PlanoResposta, error) {
 	c, salvo, err := s.carregar(ctx, userID, slug)
 	if err != nil {

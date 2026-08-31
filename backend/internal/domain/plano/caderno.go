@@ -146,6 +146,34 @@ func ordenarCaderno(itens []ItemCaderno) {
 	})
 }
 
+// cadernoGeral flattens every discipline's notebook into one list, neediest
+// first.
+//
+// The per-discipline notebooks are what a study session drills, because a
+// session follows the day's own subjects. A whole day given over to
+// reinforcement is the other case: there, how badly a topic went matters more
+// than which subject it belongs to.
+func cadernoGeral(cadernos map[string][]ItemCaderno) []ItemCaderno {
+	out := []ItemCaderno{}
+	for _, itens := range cadernos {
+		out = append(out, itens...)
+	}
+
+	// Map iteration is unordered, so settle the order before the stable sort:
+	// otherwise two equally needy topics swap places from one run to the next.
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Disciplina != out[j].Disciplina {
+			return out[i].Disciplina < out[j].Disciplina
+		}
+
+		return out[i].Tema < out[j].Tema
+	})
+
+	ordenarCaderno(out)
+
+	return out
+}
+
 // TemasDoDia picks what the day's review block should drill.
 //
 // ONE discipline per day, not a mix: a block that jumps between subjects is
