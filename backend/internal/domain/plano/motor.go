@@ -491,13 +491,17 @@ func ordena(slots, pontos map[string]int, codes []string, soma int) []string {
 	return ordem
 }
 
-// despareia swaps entries so the n blocks of a day never repeat a discipline,
-// pulling a later distinct entry forward when a clash is found. The candidate
-// has to be absent from this day and its own day has to be free of the
-// discipline being pushed out, so a swap never trades one clash for another.
+// despareia spreads the disciplines so a day never studies the same one twice,
+// and so consecutive days do not repeat the same set.
+//
+// The engine draws from a weighted bag, which naturally clumps: with few
+// disciplines the same pair lands day after day, and the schedule reads as one
+// repeated line. This walks the sequence and swaps a clashing slot with the
+// first later one that fits — both rules checked, and the swap only taken when
+// it does not create a new clash where it lands.
 func despareia(ordem []string, n int) []string {
 	if n < 2 {
-		return ordem
+		return desrepeteDias(ordem, n)
 	}
 
 	for inicio := 0; inicio < len(ordem); inicio += n {
@@ -525,7 +529,79 @@ func despareia(ordem []string, n int) []string {
 		}
 	}
 
+	return desrepeteDias(ordem, n)
+}
+
+// desrepeteDias avoids two consecutive days holding the same set of
+// disciplines, which is what makes a short plan read as the same line over and
+// over.
+//
+// It only swaps when the swap improves both days: a plan with fewer
+// disciplines than a day holds simply cannot avoid the repeat, and forcing it
+// would break the weighting for no gain.
+func desrepeteDias(ordem []string, n int) []string {
+	if n < 1 || len(ordem) <= n {
+		return ordem
+	}
+
+	for inicio := n; inicio < len(ordem); inicio += n {
+		fim := minInt(inicio+n, len(ordem))
+		antIni, antFim := inicio-n, inicio
+
+		if !mesmoConjunto(ordem, antIni, antFim, inicio, fim) {
+			continue
+		}
+
+		// Look for a later slot that breaks the tie without creating another.
+		trocou := false
+
+		for i := inicio; i < fim && !trocou; i++ {
+			for j := fim; j < len(ordem); j++ {
+				if ordem[j] == ordem[i] || contemEntre(ordem, inicio, fim, ordem[j]) {
+					continue
+				}
+
+				// The donor day must not end up repeating its own predecessor.
+				gi := (j / n) * n
+				if contemEntre(ordem, gi, minInt(gi+n, len(ordem)), ordem[i]) {
+					continue
+				}
+
+				ordem[i], ordem[j] = ordem[j], ordem[i]
+				trocou = true
+
+				break
+			}
+		}
+	}
+
 	return ordem
+}
+
+// mesmoConjunto reports whether two day-slices hold the same disciplines,
+// regardless of order.
+func mesmoConjunto(ordem []string, aIni, aFim, bIni, bFim int) bool {
+	if aFim-aIni != bFim-bIni {
+		return false
+	}
+
+	conta := map[string]int{}
+
+	for i := aIni; i < aFim; i++ {
+		conta[ordem[i]]++
+	}
+
+	for i := bIni; i < bFim; i++ {
+		conta[ordem[i]]--
+	}
+
+	for _, v := range conta {
+		if v != 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func contemEntre(xs []string, inicio, fim int, alvo string) bool {

@@ -297,6 +297,12 @@ export interface LinhaBalanceamento {
 	pctIdeal: number;
 	blocosConteudo: number;
 	blocosReta: number;
+	/** Topics the discipline has. */
+	temas: number;
+	/** How many times the content phase covers all of them before the exam. */
+	passadas: number;
+	/** Guided-review slots in the reta final. */
+	revisoes: number;
 	horasPrevisto: number;
 	horasLancado: number;
 	desvio: number;

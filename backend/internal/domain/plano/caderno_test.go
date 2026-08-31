@@ -131,16 +131,47 @@ func TestTemasDoDia(t *testing.T) {
 		},
 	}
 
-	t.Run("alterna entre as matérias do dia", func(t *testing.T) {
+	t.Run("uma matéria por dia, não uma mistura", func(t *testing.T) {
 		t.Parallel()
 
-		got := plano.TemasDoDia(cad, []string{"POR", "MAT"}, 3)
+		got := plano.TemasDoDia(cad, []string{"POR", "MAT"}, 0, 4)
 
-		// Um de cada antes de repetir a mesma matéria.
-		quer := []string{"p1", "m1", "p2"}
-		for i := range quer {
-			if got[i].Tema != quer[i] {
-				t.Fatalf("ordem = %v, quer %v", temas(got), quer)
+		if len(got) == 0 {
+			t.Fatal("não trouxe nada")
+		}
+
+		for _, it := range got {
+			if it.Disciplina != got[0].Disciplina {
+				t.Fatalf("misturou matérias: %v", temas(got))
+			}
+		}
+	})
+
+	t.Run("gira entre as matérias do dia", func(t *testing.T) {
+		t.Parallel()
+
+		d0 := plano.TemasDoDia(cad, []string{"POR", "MAT"}, 0, 4)
+		d1 := plano.TemasDoDia(cad, []string{"POR", "MAT"}, 1, 4)
+
+		if d0[0].Disciplina == d1[0].Disciplina {
+			t.Errorf("dois dias seguidos revisaram %q", d0[0].Disciplina)
+		}
+
+		// E volta ao começo no giro seguinte.
+		d2 := plano.TemasDoDia(cad, []string{"POR", "MAT"}, 2, 4)
+		if d2[0].Disciplina != d0[0].Disciplina {
+			t.Errorf("o giro não fechou o ciclo: %q vs %q", d2[0].Disciplina, d0[0].Disciplina)
+		}
+	})
+
+	t.Run("pula matéria sem caderno", func(t *testing.T) {
+		t.Parallel()
+
+		// MAT tem caderno, "SEM" não: todo giro tem de cair em MAT.
+		for g := range 3 {
+			got := plano.TemasDoDia(cad, []string{"SEM", "MAT"}, g, 4)
+			if len(got) == 0 || got[0].Disciplina != "MAT" {
+				t.Fatalf("giro %d = %v, quer MAT", g, temas(got))
 			}
 		}
 	})
@@ -148,7 +179,7 @@ func TestTemasDoDia(t *testing.T) {
 	t.Run("não puxa matéria que não é do dia", func(t *testing.T) {
 		t.Parallel()
 
-		for _, it := range plano.TemasDoDia(cad, []string{"POR"}, 5) {
+		for _, it := range plano.TemasDoDia(cad, []string{"POR"}, 0, 5) {
 			if it.Disciplina != "POR" {
 				t.Errorf("veio %q, que não é do dia", it.Disciplina)
 			}
@@ -158,31 +189,30 @@ func TestTemasDoDia(t *testing.T) {
 	t.Run("respeita o limite", func(t *testing.T) {
 		t.Parallel()
 
-		if n := len(plano.TemasDoDia(cad, []string{"POR", "MAT"}, 2)); n != 2 {
-			t.Errorf("itens = %d, quer 2", n)
+		if n := len(plano.TemasDoDia(cad, []string{"POR"}, 0, 1)); n != 1 {
+			t.Errorf("itens = %d, quer 1", n)
 		}
 
-		if n := len(plano.TemasDoDia(cad, []string{"POR"}, 0)); n != 0 {
+		if n := len(plano.TemasDoDia(cad, []string{"POR"}, 0, 0)); n != 0 {
 			t.Errorf("limite 0 devia devolver nada, veio %d", n)
 		}
 	})
 
-	t.Run("para quando os cadernos acabam", func(t *testing.T) {
+	t.Run("sem caderno nenhum, nada a revisar", func(t *testing.T) {
 		t.Parallel()
 
-		// Pede 10, mas POR+MAT só têm 3 temas juntos.
-		if n := len(plano.TemasDoDia(cad, []string{"POR", "MAT"}, 10)); n != 3 {
-			t.Errorf("itens = %d, quer 3", n)
+		if n := len(plano.TemasDoDia(cad, []string{"SEM"}, 0, 4)); n != 0 {
+			t.Errorf("itens = %d, quer 0", n)
 		}
 	})
 
-	t.Run("disciplina repetida no dia não ganha duas vezes", func(t *testing.T) {
+	t.Run("disciplina repetida no dia conta uma vez", func(t *testing.T) {
 		t.Parallel()
 
-		got := plano.TemasDoDia(cad, []string{"POR", "POR", "MAT"}, 2)
-
-		if got[0].Disciplina != "POR" || got[1].Disciplina != "MAT" {
-			t.Errorf("ordem = %v; POR repetida devia contar uma vez", temas(got))
+		// POR duplicada não pode ocupar dois lugares no giro.
+		a := plano.TemasDoDia(cad, []string{"POR", "POR", "MAT"}, 1, 4)
+		if a[0].Disciplina != "MAT" {
+			t.Errorf("giro 1 = %q, quer MAT", a[0].Disciplina)
 		}
 	})
 }

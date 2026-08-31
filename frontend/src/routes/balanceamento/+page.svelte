@@ -6,6 +6,33 @@
 	import { debounce, parseInteger } from '$lib/debounce';
 	import type { LinhaBalanceamento } from '$lib/types';
 
+	/**
+	 * How many times the plan goes over each subject before the exam.
+	 *
+	 * `passadas` is the content phase covering the whole topic list; the reta
+	 * final adds guided review on top. `vezesPorTopico` adds the two, which is
+	 * what answers "how many times will I see this topic".
+	 */
+	const cobertura = $derived(
+		(planoStore.plano?.balanceamento ?? []).map((l) => ({
+			...l,
+			vezesPorTopico: l.temas > 0 ? l.passadas + l.revisoes / l.temas : l.passadas + l.revisoes
+		}))
+	);
+
+	const totalTemas = $derived(cobertura.reduce((t, l) => t + l.temas, 0));
+	const totalRevisoes = $derived(cobertura.reduce((t, l) => t + l.revisoes, 0));
+
+	const mediaPassadas = $derived(
+		cobertura.length > 0 ? cobertura.reduce((t, l) => t + l.passadas, 0) / cobertura.length : 0
+	);
+
+	const mediaVezes = $derived(
+		cobertura.length > 0
+			? cobertura.reduce((t, l) => t + l.vezesPorTopico, 0) / cobertura.length
+			: 0
+	);
+
 	const plano = $derived(planoStore.plano);
 	const esp = $derived(plano?.balanceamento.filter((l) => l.bloco === 'esp') ?? []);
 	const ger = $derived(plano?.balanceamento.filter((l) => l.bloco === 'ger') ?? []);
@@ -104,6 +131,50 @@
 			</div>
 		{/if}
 
+		<!-- The question the schedule could not answer: how many times will I
+		     actually go over each subject before the exam. -->
+		<h2 class="sec">Quantas vezes vejo cada matéria até a prova</h2>
+		<p class="page-sub" style="margin-top:0">
+			Uma passada é cobrir todos os tópicos da matéria uma vez. O ciclo de
+			conteúdo dá a primeira leitura; a reta final revisa por cima dela.
+		</p>
+		<div class="tbl-wrap">
+			<table class="tbl">
+				<thead>
+					<tr>
+						<th>Disciplina</th>
+						<th>Tópicos</th>
+						<th>Passadas no conteúdo</th>
+						<th>Revisões na reta final</th>
+						<th>Vezes que vejo cada tópico</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each cobertura as l (l.codigo)}
+						<tr>
+							<td>
+								<span class="chip-dot" style="background:var(--c{l.cor}-tx)"></span>
+								{l.nome}
+							</td>
+							<td>{l.temas || '—'}</td>
+							<td>{nf1.format(l.passadas)}×</td>
+							<td>{l.revisoes}</td>
+							<td class="destaque">{nf1.format(l.vezesPorTopico)}×</td>
+						</tr>
+					{/each}
+				</tbody>
+				<tfoot>
+					<tr>
+						<td>Média do plano</td>
+						<td>{totalTemas}</td>
+						<td>{nf1.format(mediaPassadas)}×</td>
+						<td>{totalRevisoes}</td>
+						<td class="destaque">{nf1.format(mediaVezes)}×</td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+
 		{#snippet tabela(linhas: LinhaBalanceamento[])}
 			<div class="tbl-wrap">
 				<table class="tbl">
@@ -199,6 +270,12 @@
 {/if}
 
 <style>
+	/* The answer the table exists for, so the eye lands on it. */
+	.destaque {
+		color: var(--accent-strong);
+		font-weight: 700;
+	}
+
 	.orc {
 		border: 1px solid var(--border);
 		border-left: 3px solid var(--good);

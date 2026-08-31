@@ -234,10 +234,16 @@ type LinhaBalanceamento struct {
 	PctIdeal       float64 `json:"pctIdeal"`
 	BlocosConteudo int     `json:"blocosConteudo"`
 	BlocosReta     int     `json:"blocosReta"`
-	HorasPrevisto  float64 `json:"horasPrevisto"`
-	HorasLancado   float64 `json:"horasLancado"`
-	Desvio         float64 `json:"desvio"`
-	AcertoPct      *int    `json:"acertoPct"`
+	// Temas is how many topics the discipline has, and Passadas how many times
+	// the plan covers all of them before the exam — the answer to "how many
+	// times will I see this before the day".
+	Temas         int     `json:"temas"`
+	Passadas      float64 `json:"passadas"`
+	Revisoes      int     `json:"revisoes"`
+	HorasPrevisto float64 `json:"horasPrevisto"`
+	HorasLancado  float64 `json:"horasLancado"`
+	Desvio        float64 `json:"desvio"`
+	AcertoPct     *int    `json:"acertoPct"`
 }
 
 type PropsResposta struct {

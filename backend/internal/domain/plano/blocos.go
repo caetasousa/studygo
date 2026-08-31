@@ -171,7 +171,9 @@ func caudaRevisao(d Dia, ctx BlocoCtx, minutos int) Bloco {
 		discs = append(discs, it.Disciplina)
 	}
 
-	itens := TemasDoDia(ctx.Cadernos, discs, maxTemasRevisao)
+	// d.N rotates which discipline this day reviews, so a week covers all of
+	// them instead of always drilling the first.
+	itens := TemasDoDia(ctx.Cadernos, discs, d.N, maxTemasRevisao)
 	if len(itens) == 0 {
 		return Bloco{
 			Minutos: minutos,

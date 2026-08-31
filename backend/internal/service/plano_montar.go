@@ -314,6 +314,23 @@ func resultadosDoPlano(dias []plano.Dia, salvo plano.Salvo) []plano.ResultadoTem
 	return out
 }
 
+// passadasDe is how many times the content phase covers a discipline's whole
+// topic list: its slots divided by its topics.
+//
+// A discipline with no topics of its own is headlined by its name (see the
+// engine), so one slot is one full pass.
+func passadasDe(slots, temas int) float64 {
+	if temas <= 0 {
+		if slots > 0 {
+			return float64(slots)
+		}
+
+		return 0
+	}
+
+	return round1(float64(slots) / float64(temas))
+}
+
 func montarBalanceamento(
 	c concurso.Concurso,
 	cfg plano.Config,
@@ -357,6 +374,9 @@ func montarBalanceamento(
 			PctIdeal:       round1(pctIdeal),
 			BlocosConteudo: res.Slots[d.Codigo],
 			BlocosReta:     res.SlotsReta[d.Codigo],
+			Temas:          len(d.Temas),
+			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
+			Revisoes:       res.SlotsReta[d.Codigo],
 			HorasPrevisto:  round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
 			HorasLancado:   round1(sd.Horas),
 			Desvio:         round1(tempoPct - pctIdeal),

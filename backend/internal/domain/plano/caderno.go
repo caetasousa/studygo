@@ -146,19 +146,26 @@ func ordenarCaderno(itens []ItemCaderno) {
 	})
 }
 
-// TemasDoDia picks what the day's review tail should drill.
+// TemasDoDia picks what the day's review block should drill.
 //
-// It draws from the notebooks of the disciplines the day itself studies, so the
-// tail stays on the same ground as the blocks above it, taking the neediest
-// topics first and spreading across the day's disciplines rather than emptying
-// one notebook before touching the next.
-func TemasDoDia(cadernos map[string][]ItemCaderno, disciplinas []string, limite int) []ItemCaderno {
+// ONE discipline per day, not a mix: a block that jumps between subjects is
+// three shallow reviews instead of one real one. Which discipline rotates with
+// the day index, so across a week every subject of the plan gets its turn
+// rather than the first one always being drilled.
+//
+// Within that discipline it takes the neediest topics first, capped by limite.
+func TemasDoDia(
+	cadernos map[string][]ItemCaderno,
+	disciplinas []string,
+	giro int,
+	limite int,
+) []ItemCaderno {
 	if limite <= 0 {
 		return nil
 	}
 
 	// Deduplicate while keeping the day's own order: a discipline scheduled
-	// twice must not get two turns at the notebook.
+	// twice must not get two turns.
 	vistas := make(map[string]bool, len(disciplinas))
 	ordem := make([]string, 0, len(disciplinas))
 
@@ -171,33 +178,29 @@ func TemasDoDia(cadernos map[string][]ItemCaderno, disciplinas []string, limite 
 		ordem = append(ordem, d)
 	}
 
-	out := make([]ItemCaderno, 0, limite)
-	pos := map[string]int{}
+	// Only the disciplines that actually have something to review.
+	comCaderno := make([]string, 0, len(ordem))
 
-	// Round-robin: one topic per discipline per pass, so a day covering two
-	// subjects reviews both.
-	for len(out) < limite {
-		avancou := false
-
-		for _, d := range ordem {
-			if len(out) >= limite {
-				break
-			}
-
-			i := pos[d]
-			if i >= len(cadernos[d]) {
-				continue
-			}
-
-			out = append(out, cadernos[d][i])
-			pos[d] = i + 1
-			avancou = true
-		}
-
-		if !avancou {
-			break
+	for _, d := range ordem {
+		if len(cadernos[d]) > 0 {
+			comCaderno = append(comCaderno, d)
 		}
 	}
 
-	return out
+	if len(comCaderno) == 0 {
+		return nil
+	}
+
+	if giro < 0 {
+		giro = 0
+	}
+
+	escolhida := comCaderno[giro%len(comCaderno)]
+
+	itens := cadernos[escolhida]
+	if len(itens) > limite {
+		itens = itens[:limite]
+	}
+
+	return append([]ItemCaderno(nil), itens...)
 }
