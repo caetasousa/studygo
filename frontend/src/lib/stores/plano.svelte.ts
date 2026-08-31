@@ -330,6 +330,7 @@ class PlanoStore {
 		}
 	};
 	restaurarOrdem = () => this.run((s) => api.restaurarOrdem(s));
+	compactarPlano = () => this.run((s) => api.compactarPlano(s));
 
 	/**
 	 * Pushes a lost day forward. Everything after it slides one study-day along,

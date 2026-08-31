@@ -286,6 +286,17 @@ func (s *PlanoService) trazerConcluidasParaODia(
 		return nil
 	}
 
+	// Getting ahead should buy time, not leave holes. Pull the rest of the plan
+	// back over the days that emptied, so the free days pile up at the END —
+	// where they are worth something, as room for more content before the exam.
+	//
+	// The compaction starts on the day AFTER the one just recorded: that day is
+	// where the finished topics have only now landed, and its own record has not
+	// been written yet, so it would not be recognised as an anchor and the work
+	// would be pulled straight back out of it.
+	depois := plano.DayOf(data).AddDate(0, 0, 1)
+	atividades = plano.CompactarAtividades(atividades, res.Dias, depois, concluido)
+
 	return s.planos.ReplaceAtividades(ctx, salvo.ID, atividades)
 }
 
@@ -660,6 +671,38 @@ func (s *PlanoService) LimparRegistros(ctx context.Context, userID uuid.UUID, sl
 }
 
 // RestaurarOrdem discards every manual reordering.
+// CompactarPlano pulls the schedule back over any empty study day from today
+// onwards.
+//
+// Runs by itself whenever a topic is finished early, and is exposed on its own
+// so a plan that already has gaps — from before that was automatic — can be
+// tidied without waiting for the next completion.
+func (s *PlanoService) CompactarPlano(
+	ctx context.Context,
+	userID uuid.UUID,
+	slug string,
+) (PlanoResposta, error) {
+	c, salvo, err := s.carregar(ctx, userID, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	hoje := plano.DayOf(s.clock.Now())
+
+	compactadas := plano.CompactarAtividades(atividades, res.Dias, hoje, s.diaConcluido(salvo))
+
+	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, compactadas); err != nil {
+		return PlanoResposta{}, err
+	}
+
+	return s.montar(ctx, c, salvo)
+}
+
 func (s *PlanoService) RestaurarOrdem(ctx context.Context, userID uuid.UUID, slug string) (PlanoResposta, error) {
 	c, salvo, err := s.carregar(ctx, userID, slug)
 	if err != nil {

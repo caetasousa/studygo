@@ -283,6 +283,25 @@ func (h *PlanoHandler) Antecipar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
+// CompactarPlano closes the gaps left by topics finished ahead of schedule.
+func (h *PlanoHandler) CompactarPlano(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	resp, err := h.planos.CompactarPlano(r.Context(), id, slug)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
 func (h *PlanoHandler) RestaurarOrdem(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.ctx(r)
 	if !ok {

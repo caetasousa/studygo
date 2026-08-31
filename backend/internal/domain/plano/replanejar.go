@@ -1,6 +1,9 @@
 package plano
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 // Rescheduling: the two ways a real week diverges from the plan.
 //
@@ -135,4 +138,159 @@ func AntecipouAtividade(
 	renumerar(saida, map[time.Time]bool{origem: true, hoje: true})
 
 	return saida, nil
+}
+
+// CompactarAtividades pulls the schedule back over the days a study day was
+// left empty.
+//
+// Getting ahead should buy time, not leave holes: when a topic is finished
+// early the day it came from can end up with nothing, and the plan then reads
+// as if the student were idle on a day they had simply moved past. Everything
+// after slides back to fill it, so the free days accumulate at the END of the
+// plan — which is where they are worth something, as room for more content
+// before the exam.
+//
+// Days already recorded are anchors: what happened on them happened on them,
+// and nothing is pulled across one.
+func CompactarAtividades(
+	atividades []Atividade,
+	dias []Dia,
+	desde time.Time,
+	concluido func(time.Time) bool,
+) []Atividade {
+	desde = day(desde)
+
+	// The days that can hold content, in order, from `desde` onwards.
+	uteis := make([]time.Time, 0, len(dias))
+
+	for _, d := range dias {
+		dt := day(d.Data)
+		if dt.Before(desde) || !DestinoValido(dias, dt) {
+			continue
+		}
+
+		uteis = append(uteis, dt)
+	}
+
+	if len(uteis) == 0 {
+		return atividades
+	}
+
+	// What each day currently holds, in order.
+	porDia := map[time.Time][]Atividade{}
+	for _, a := range atividades {
+		k := day(a.Data)
+		porDia[k] = append(porDia[k], a)
+	}
+
+	for k := range porDia {
+		lista := porDia[k]
+		sort.SliceStable(lista, func(i, j int) bool { return lista[i].Posicao < lista[j].Posicao })
+		porDia[k] = lista
+	}
+
+	// Everything from `desde` onward, in schedule order, becomes one queue. It
+	// has to be built before any day is filled: a day that is currently empty
+	// would otherwise have nothing to pull from at the moment it is its turn.
+	fila := []Atividade{}
+	ancoras := map[time.Time][]Atividade{}
+
+	for _, dt := range uteis {
+		if concluido(dt) {
+			// An anchor: what happened on it stays on it, and it feeds nothing to
+			// the queue.
+			ancoras[dt] = porDia[dt]
+
+			continue
+		}
+
+		fila = append(fila, porDia[dt]...)
+	}
+
+	carga := cargaTipica(porDia, uteis)
+
+	saida := make([]Atividade, 0, len(atividades))
+
+	// Everything before `desde` is untouched.
+	for _, a := range atividades {
+		if day(a.Data).Before(desde) {
+			saida = append(saida, a)
+		}
+	}
+
+	for _, dt := range uteis {
+		if ancorados, ok := ancoras[dt]; ok {
+			for i, a := range ancorados {
+				a.Posicao = i
+				saida = append(saida, a)
+			}
+
+			continue
+		}
+
+		if len(fila) == 0 {
+			continue
+		}
+
+		quer := carga
+		if quer > len(fila) {
+			quer = len(fila)
+		}
+
+		for i := 0; i < quer; i++ {
+			a := fila[i]
+			a.Data = dt
+			a.Posicao = i
+			saida = append(saida, a)
+		}
+
+		fila = fila[quer:]
+	}
+
+	// Anything still queued did not fit before the exam; it stays on the last
+	// useful day rather than vanishing.
+	if len(fila) > 0 {
+		ultimo := uteis[len(uteis)-1]
+		base := 0
+
+		for _, a := range saida {
+			if sameDay(a.Data, ultimo) {
+				base++
+			}
+		}
+
+		for i, a := range fila {
+			a.Data = ultimo
+			a.Posicao = base + i
+			saida = append(saida, a)
+		}
+	}
+
+	return saida
+}
+
+// cargaTipica is how many activities a day normally holds in this plan — the
+// most common non-zero count, so one unusually full day does not set the pace.
+func cargaTipica(porDia map[time.Time][]Atividade, uteis []time.Time) int {
+	freq := map[int]int{}
+
+	for _, dt := range uteis {
+		if n := len(porDia[dt]); n > 0 {
+			freq[n]++
+		}
+	}
+
+	melhor, vezes := 0, 0
+
+	for n, v := range freq {
+		if v > vezes || (v == vezes && n > melhor) {
+			melhor, vezes = n, v
+		}
+	}
+
+	if melhor == 0 {
+		return 1
+	}
+
+	return melhor
 }

@@ -98,6 +98,16 @@
 			: 'Desligado: o cronograma mostra só os blocos de matéria.'
 	);
 
+	let compactando = $state(false);
+
+	async function compactar() {
+		if (compactando) return;
+
+		compactando = true;
+		await planoStore.compactarPlano();
+		compactando = false;
+	}
+
 	const semanalDesc = $derived(
 		cfg?.revisaoSemanal
 			? 'Ligado: um dia inteiro por semana sai do conteúdo e vira revisão. São ~11 dias de matéria nova a menos num ciclo.'
@@ -581,7 +591,15 @@
 					dia inteiro não é movido — só as matérias dentro dele. Dias concluídos e
 					dias fixos não podem ser alterados.
 				</p>
+				<p class="page-sub" style="margin-top:0">
+					Adiantou assuntos e sobraram dias vazios no meio? Compactar puxa o
+					cronograma para trás, e o tempo livre passa a se acumular no fim — onde
+					cabe mais conteúdo antes da prova.
+				</p>
 				<div class="form-grid">
+					<button class="btn" onclick={compactar} disabled={compactando}>
+						{compactando ? 'Compactando…' : '⇡ Compactar dias vazios'}
+					</button>
 					<button class="btn" disabled={plano.reordenados.length === 0} onclick={restaurar}>
 						↺ Restaurar ordem automática
 					</button>

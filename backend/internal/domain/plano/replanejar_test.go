@@ -197,3 +197,110 @@ func TestAntecipouAtividade(t *testing.T) {
 		}
 	})
 }
+
+func TestCompactarAtividades(t *testing.T) {
+	t.Parallel()
+
+	t.Run("puxa tudo para trás e não deixa buraco", func(t *testing.T) {
+		t.Parallel()
+
+		// O dia 2 ficou vazio; o conteúdo dos dias 3 e 4 sobe.
+		ats := []plano.Atividade{
+			{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+			{ID: "c1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+			{ID: "c2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
+			{ID: "d1", Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+		}
+
+		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), nadaConcluido)
+
+		if ids := idsDoDia(got, dia(2026, 9, 2)); len(ids) != 2 {
+			t.Errorf("dia 2 = %v, devia ter sido preenchido", ids)
+		}
+
+		if ids := idsDoDia(got, dia(2026, 9, 4)); len(ids) != 0 {
+			t.Errorf("dia 4 = %v, devia ter esvaziado no fim", ids)
+		}
+	})
+
+	t.Run("nada se perde nem se duplica", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.CompactarAtividades(
+			atividadesReplan(), diasReplan(), dia(2026, 9, 1), nadaConcluido,
+		)
+
+		if len(got) != len(atividadesReplan()) {
+			t.Fatalf("total = %d, quer %d", len(got), len(atividadesReplan()))
+		}
+
+		vistos := map[string]bool{}
+		for _, a := range got {
+			if vistos[a.ID] {
+				t.Fatalf("id duplicado: %s", a.ID)
+			}
+
+			vistos[a.ID] = true
+		}
+	})
+
+	t.Run("a ordem do conteúdo é preservada", func(t *testing.T) {
+		t.Parallel()
+
+		ats := []plano.Atividade{
+			{ID: "x1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: "x2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+			{ID: "x3", Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "DIR", Tema: "d1"},
+		}
+
+		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), nadaConcluido)
+
+		// Sobem para o dia 1 na mesma sequência em que estavam.
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) < 2 || ids[0] != "x1" || ids[1] != "x2" {
+			t.Errorf("dia 1 = %v, quer x1 antes de x2", ids)
+		}
+	})
+
+	t.Run("um dia já registrado é âncora e não se mexe", func(t *testing.T) {
+		t.Parallel()
+
+		concluido := func(d time.Time) bool { return d.Equal(dia(2026, 9, 1)) }
+
+		got := plano.CompactarAtividades(
+			atividadesReplan(), diasReplan(), dia(2026, 9, 1), concluido,
+		)
+
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != "a1" {
+			t.Errorf("dia registrado = %v, devia seguir intacto", ids)
+		}
+	})
+
+	t.Run("posições ficam densas", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.CompactarAtividades(
+			atividadesReplan(), diasReplan(), dia(2026, 9, 1), nadaConcluido,
+		)
+
+		for _, dt := range []time.Time{dia(2026, 9, 1), dia(2026, 9, 2), dia(2026, 9, 3)} {
+			for i, a := range plano.AtividadesDoDia(got, dt) {
+				if a.Posicao != i {
+					t.Errorf("%s posição %d = %d, quer %d", dt.Format(time.DateOnly), i, a.Posicao, i)
+				}
+			}
+		}
+	})
+
+	t.Run("não mexe no que veio antes do corte", func(t *testing.T) {
+		t.Parallel()
+
+		got := plano.CompactarAtividades(
+			atividadesReplan(), diasReplan(), dia(2026, 9, 2), nadaConcluido,
+		)
+
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != "a1" {
+			t.Errorf("dia anterior ao corte = %v, não devia mudar", ids)
+		}
+	})
+}

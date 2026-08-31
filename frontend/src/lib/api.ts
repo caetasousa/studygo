@@ -212,6 +212,10 @@ export const api = {
 			body: JSON.stringify({ id, data })
 		}),
 
+	/** Closes the gaps left by topics finished ahead of schedule. */
+	compactarPlano: (slug: string) =>
+		request<PlanoResposta>(`${planoBase(slug)}/compactar`, { method: 'POST' }),
+
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 
