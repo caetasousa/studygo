@@ -242,6 +242,33 @@ func (h *PlanoHandler) Reordenar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
+// MoverAtividade moves one activity. It carries only the change — the activity
+// id and where it lands — rather than the whole schedule.
+func (h *PlanoHandler) MoverAtividade(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	var req service.MoverAtividadeInput
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	resp, err := h.planos.MoverAtividade(r.Context(), id, slug, req)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
 func (h *PlanoHandler) RestaurarOrdem(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.ctx(r)
 	if !ok {

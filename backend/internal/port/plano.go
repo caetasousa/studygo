@@ -22,6 +22,15 @@ type PlanoRepository interface {
 	// the given set.
 	ReplaceReordenacoes(ctx context.Context, planoID uuid.UUID, r map[time.Time]plano.Reordenacao) error
 
+	// ListAtividades returns the plan's manually arranged activities, ordered by
+	// date and position. Empty when the user has never moved anything.
+	ListAtividades(ctx context.Context, planoID uuid.UUID) ([]plano.Atividade, error)
+
+	// ReplaceAtividades stores the full activity layout in one transaction, so a
+	// move that renumbers several days can never leave duplicate positions
+	// behind. It also marks the plan as manually arranged.
+	ReplaceAtividades(ctx context.Context, planoID uuid.UUID, as []plano.Atividade) error
+
 	UpsertRegistro(ctx context.Context, planoID uuid.UUID, r plano.Registro) error
 	DeleteRegistros(ctx context.Context, planoID uuid.UUID) error
 
