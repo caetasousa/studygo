@@ -1,13 +1,15 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
+import { chave, lerMigrando } from '$lib/storageKey';
 import type { ConcursoInput, ConcursoResumo } from '$lib/types';
 
-const ATIVO_KEY = 'annygo.concurso.ativo.v1';
+const SUFIXO = '.concurso.ativo.v1';
+const ATIVO_KEY = chave(SUFIXO);
 
 function readAtivo(): string | null {
 	if (!browser) return null;
 	try {
-		return localStorage.getItem(ATIVO_KEY);
+		return lerMigrando(SUFIXO);
 	} catch {
 		return null;
 	}

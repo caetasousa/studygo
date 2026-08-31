@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/port"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/port"
 )
 
 // Wire contract for the concurso endpoints. The same shape is used to create,

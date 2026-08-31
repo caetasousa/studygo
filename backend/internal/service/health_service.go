@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"annygo/internal/port"
+	"studygo/internal/port"
 )
 
 var _ port.HealthChecker = (*HealthService)(nil)

@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { chave, lerMigrando } from '$lib/storageKey';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore, applyTheme, ehTema } from '$lib/stores/plano.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -30,8 +31,9 @@
 		botaoMenu?.focus(); // focus returns to the control that opened it
 	}
 
-	const RAIL_KEY = 'annygo:rail';
-	let railOnly = $state(browser && localStorage.getItem(RAIL_KEY) === '1');
+	const RAIL_SUFIXO = ':rail';
+	const RAIL_KEY = chave(RAIL_SUFIXO);
+	let railOnly = $state(browser && lerMigrando(RAIL_SUFIXO) === '1');
 
 	$effect(() => {
 		if (browser) localStorage.setItem(RAIL_KEY, railOnly ? '1' : '0');

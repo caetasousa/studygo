@@ -14,9 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/port"
-	"annygo/internal/service"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/port"
+	"studygo/internal/service"
 
 	"github.com/google/uuid"
 )

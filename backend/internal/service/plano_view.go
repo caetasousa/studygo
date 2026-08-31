@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/plano"
 
 	"github.com/google/uuid"
 )

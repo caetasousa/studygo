@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"annygo/internal/domain/plano"
-	"annygo/internal/port"
+	"studygo/internal/domain/plano"
+	"studygo/internal/port"
 )
 
 // NotificacaoService computes and dispatches each user's spaced-review reminder

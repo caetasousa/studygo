@@ -1,7 +1,7 @@
 # edital-processor
 
 Internal service that turns a concurso **edital PDF** into a reviewable,
-structured preview for annyGo. **Not public**: the Go backend is the only caller,
+structured preview for studygo. **Not public**: the Go backend is the only caller,
 over the compose network, authenticated with a shared token.
 
 The Go backend keeps everything else — the public `/api`, JWT auth, ownership,

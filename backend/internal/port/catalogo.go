@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"annygo/internal/domain/concurso"
+	"studygo/internal/domain/concurso"
 
 	"github.com/google/uuid"
 )

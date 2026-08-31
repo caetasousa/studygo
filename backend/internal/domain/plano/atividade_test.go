@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/plano"
 )
 
 // `dia` lives in revisao_test.go — same package, same helper.

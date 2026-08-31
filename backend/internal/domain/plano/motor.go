@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/domain/concurso"
+	"studygo/internal/domain/concurso"
 )
 
 const (

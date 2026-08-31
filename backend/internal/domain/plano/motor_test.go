@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
 )
 
 // fixtureConcurso mirrors the JS constants dumped by scratchpad/gen_golden.mjs.

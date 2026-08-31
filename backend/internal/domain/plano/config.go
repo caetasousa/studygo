@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/domain/concurso"
+	"studygo/internal/domain/concurso"
 )
 
 // Config is the user's plan settings: the dates and rhythm plus the study method

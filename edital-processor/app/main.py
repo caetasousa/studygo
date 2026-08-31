@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="annyGo edital-processor",
+        title="studygo edital-processor",
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None,

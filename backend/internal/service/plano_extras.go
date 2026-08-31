@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
 
 	"github.com/google/uuid"
 )

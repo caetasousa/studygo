@@ -1,6 +1,6 @@
 """The structured extraction (spec §8).
 
-Models what annyGo consumes plus what a reviewer needs to check the extraction.
+Models what studygo consumes plus what a reviewer needs to check the extraction.
 Absent data is ``None`` — never ``0``, never an empty list standing in for
 "unknown". "Conhecimentos Gerais/Específicos" are groups, never disciplines.
 """

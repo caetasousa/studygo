@@ -8,7 +8,7 @@ package plano
 import (
 	"time"
 
-	"annygo/internal/domain/concurso"
+	"studygo/internal/domain/concurso"
 )
 
 // Tipo is the kind of a plan day.

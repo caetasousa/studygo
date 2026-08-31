@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/platform/middleware"
-	"annygo/internal/port"
+	"studygo/internal/platform/middleware"
+	"studygo/internal/port"
 )
 
 var _ port.EditalProcessor = (*Client)(nil)

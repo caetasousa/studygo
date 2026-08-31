@@ -3,7 +3,7 @@ package editalproc
 import (
 	"context"
 
-	"annygo/internal/port"
+	"studygo/internal/port"
 )
 
 var _ port.EditalProcessor = Indisponivel{}

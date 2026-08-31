@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/port"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

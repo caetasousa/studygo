@@ -15,7 +15,10 @@
     path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
   register: nginx_cert_check
 
-- name: Deploy annyGo vhost
+# The vhost file is still annygo.conf, from the project's old name: renaming it
+# would leave the old file enabled in sites-enabled alongside the new one, and
+# nginx would serve whichever it read first. Rename both together, or not at all.
+- name: Deploy studygo vhost
   template:
     src: "{{ playbook_dir }}/templates/app.conf.j2"
     dest: /etc/nginx/sites-available/annygo.conf
@@ -24,7 +27,7 @@
     letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
   notify: reload nginx
 
-- name: Enable annyGo vhost
+- name: Enable studygo vhost
   file:
     src: /etc/nginx/sites-available/annygo.conf
     dest: /etc/nginx/sites-enabled/annygo.conf

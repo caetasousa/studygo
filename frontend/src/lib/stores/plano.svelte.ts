@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
 import { aplicarMovimento, blocosComAtividade, diaConcluido, siglas } from '$lib/estudo';
+import { chave, lerMigrando } from '$lib/storageKey';
 import type {
 	AnotacaoInput,
 	Caderno,
@@ -60,12 +61,13 @@ function moverLocalmente(
 	return { ...p, dias: aplicarMovimento(p.dias, id, data, posicao, trocar) };
 }
 
-const cacheKey = (slug: string) => `annygo.plano.${slug}.v1`;
+const cacheSufixo = (slug: string) => `.plano.${slug}.v1`;
+const cacheKey = (slug: string) => chave(cacheSufixo(slug));
 
 function readCache(slug: string | null): PlanoResposta | null {
 	if (!browser || !slug) return null;
 	try {
-		const raw = localStorage.getItem(cacheKey(slug));
+		const raw = lerMigrando(cacheSufixo(slug));
 		return raw ? (JSON.parse(raw) as PlanoResposta) : null;
 	} catch {
 		return null;

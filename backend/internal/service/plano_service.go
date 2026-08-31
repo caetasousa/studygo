@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/domain/plano"
-	"annygo/internal/port"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )

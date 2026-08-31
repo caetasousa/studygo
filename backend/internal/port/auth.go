@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"annygo/internal/domain/user"
+	"studygo/internal/domain/user"
 
 	"github.com/google/uuid"
 )

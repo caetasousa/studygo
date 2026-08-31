@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"annygo/internal/port"
+	"studygo/internal/port"
 )
 
 type HealthHandler struct {

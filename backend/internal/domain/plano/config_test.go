@@ -3,7 +3,7 @@ package plano_test
 import (
 	"testing"
 
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/plano"
 )
 
 // A saved blocosPorDia must survive Normalizar even on a plan whose study

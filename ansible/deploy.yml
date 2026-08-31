@@ -1,17 +1,21 @@
 ---
-- name: Deploy annyGo (backend + worker + frontend)
+- name: Deploy studygo (backend + worker + frontend)
   hosts: vps
   become: true
   gather_facts: false
 
   vars:
-    backend_image: "annygo-backend:latest"
-    frontend_image: "annygo-frontend:latest"
-    edital_processor_image: "annygo-edital-processor:latest"
+    backend_image: "studygo-backend:latest"
+    frontend_image: "studygo-frontend:latest"
+    edital_processor_image: "studygo-edital-processor:latest"
+    # Deliberately still /opt/annygo: this is where the running stack and its
+    # Postgres volume live on the VPS. Renaming it here would deploy into a new
+    # empty directory and leave the old one running with the data. To move it,
+    # stop the stack, mv the directory and change this in the same window.
     remote_app_dir: /opt/annygo
-    backend_tarball: /tmp/annygo-backend.tar
-    frontend_tarball: /tmp/annygo-frontend.tar
-    edital_processor_tarball: /tmp/annygo-edital-processor.tar
+    backend_tarball: /tmp/studygo-backend.tar
+    frontend_tarball: /tmp/studygo-frontend.tar
+    edital_processor_tarball: /tmp/studygo-edital-processor.tar
 
   tasks:
     - name: Build images locally

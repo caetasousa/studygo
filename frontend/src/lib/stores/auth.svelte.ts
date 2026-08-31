@@ -1,8 +1,10 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { chave, lerMigrando } from '$lib/storageKey';
 import type { AuthResponse, Usuario } from '$lib/types';
 
-const STORAGE_KEY = 'annygo.auth.v1';
+const SUFIXO = '.auth.v1';
+const STORAGE_KEY = chave(SUFIXO);
 
 interface Persisted {
 	accessToken: string;
@@ -13,7 +15,7 @@ interface Persisted {
 function load(): Persisted | null {
 	if (!browser) return null;
 	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
+		const raw = lerMigrando(SUFIXO);
 		return raw ? (JSON.parse(raw) as Persisted) : null;
 	} catch {
 		return null;

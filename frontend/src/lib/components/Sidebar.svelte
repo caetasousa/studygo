@@ -81,7 +81,7 @@
 	<!-- 1) app identity + the collapse control; 2) the active plan; 3) navigation -->
 	<div class="nav-head" class:compacto={compacto}>
 		{#if !compacto}
-			<span class="marca">annyGo</span>
+			<span class="marca">studygo</span>
 		{/if}
 		<IconButton
 			icon={railOnly ? 'expandir' : 'recolher'}

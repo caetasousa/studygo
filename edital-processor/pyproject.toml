@@ -1,7 +1,7 @@
 [project]
 name = "edital-processor"
 version = "0.1.0"
-description = "annyGo internal service: turns a concurso edital PDF into a reviewable structured preview"
+description = "studygo internal service: turns a concurso edital PDF into a reviewable structured preview"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi==0.141.1",

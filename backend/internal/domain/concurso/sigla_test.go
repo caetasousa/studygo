@@ -3,7 +3,7 @@ package concurso_test
 import (
 	"testing"
 
-	"annygo/internal/domain/concurso"
+	"studygo/internal/domain/concurso"
 )
 
 func TestSigla(t *testing.T) {

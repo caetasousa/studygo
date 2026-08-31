@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"annygo/internal/port"
-	"annygo/internal/service"
+	"studygo/internal/port"
+	"studygo/internal/service"
 )
 
 const maxEditalPDF = 20 << 20 // 20 MiB

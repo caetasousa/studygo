@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { alvoNoPonto } from '$lib/arrastarToque';
+import { chave, migrar } from '$lib/storageKey';
 import {
 	PESO_PADRAO,
 	agruparPorBloco,
@@ -512,5 +513,58 @@ describe('alvoNoPonto', () => {
 	it('rejeita uma posição não numérica em vez de mover para NaN', () => {
 		vi.stubGlobal('document', { elementFromPoint: () => fakeElement('2026-09-02', 'abc') });
 		expect(alvoNoPonto(10, 10)).toBeNull();
+	});
+});
+
+describe('migração das chaves de armazenamento', () => {
+	// Renaming the project must not sign anyone out: the value stored under the
+	// old annygo.* key is adopted once, then the stale key is dropped.
+	function fakeStorage(inicial: Record<string, string> = {}) {
+		const dados = { ...inicial };
+		return {
+			dados,
+			getItem: (k: string) => (k in dados ? dados[k] : null),
+			setItem: (k: string, v: string) => {
+				dados[k] = v;
+			},
+			removeItem: (k: string) => {
+				delete dados[k];
+			}
+		};
+	}
+
+	it('adota o valor da chave antiga e remove a antiga', () => {
+		const st = fakeStorage({ 'annygo.auth.v1': 'token-antigo' });
+
+		expect(migrar(st, '.auth.v1')).toBe('token-antigo');
+		expect(st.dados['studygo.auth.v1']).toBe('token-antigo');
+		expect('annygo.auth.v1' in st.dados).toBe(false);
+	});
+
+	it('prefere a chave nova quando as duas existem', () => {
+		const st = fakeStorage({ 'annygo.auth.v1': 'antigo', 'studygo.auth.v1': 'novo' });
+
+		expect(migrar(st, '.auth.v1')).toBe('novo');
+	});
+
+	it('devolve null quando não há nada guardado', () => {
+		expect(migrar(fakeStorage(), '.auth.v1')).toBeNull();
+	});
+
+	it('não quebra quando o armazenamento lança', () => {
+		const quebrado = {
+			getItem: () => {
+				throw new Error('bloqueado');
+			},
+			setItem: () => {},
+			removeItem: () => {}
+		};
+
+		expect(migrar(quebrado, '.auth.v1')).toBeNull();
+	});
+
+	it('monta a chave com o prefixo atual', () => {
+		expect(chave('.plano.tce.v1')).toBe('studygo.plano.tce.v1');
+		expect(chave(':rail')).toBe('studygo:rail');
 	});
 });

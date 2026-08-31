@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/port"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/port"
 )
 
 func ptrInt(n int) *int { return &n }

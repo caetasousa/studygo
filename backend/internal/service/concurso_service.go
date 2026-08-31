@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/port"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )

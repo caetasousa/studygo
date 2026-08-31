@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/service"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/service"
 )
 
 func concursoTEC() concurso.Concurso {

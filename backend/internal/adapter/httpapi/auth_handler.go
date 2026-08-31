@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"annygo/internal/domain/user"
-	"annygo/internal/service"
+	"studygo/internal/domain/user"
+	"studygo/internal/service"
 )
 
 // AuthHandler serves registration, login, refresh and the current-user lookup.

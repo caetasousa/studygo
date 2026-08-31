@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
-	"annygo/internal/platform/config"
-	"annygo/internal/port"
+	"studygo/internal/platform/config"
+	"studygo/internal/port"
 
 	"golang.org/x/crypto/argon2"
 )

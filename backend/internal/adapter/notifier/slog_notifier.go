@@ -7,7 +7,7 @@ import (
 	"context"
 	"log/slog"
 
-	"annygo/internal/port"
+	"studygo/internal/port"
 )
 
 var _ port.Notifier = (*SlogNotifier)(nil)

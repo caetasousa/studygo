@@ -1,7 +1,8 @@
 [vps]
-annygo-vps ansible_host=YOUR_VPS_IP
+studygo-vps ansible_host=YOUR_VPS_IP
 
 [vps:vars]
+# The Linux user and key keep the project's old name; see bootstrap.yml.
 ansible_user=annyGo
 ansible_ssh_private_key_file=~/.ssh/annygo_deploy
 ansible_python_interpreter=/usr/bin/python3

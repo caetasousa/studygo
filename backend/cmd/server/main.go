@@ -9,17 +9,17 @@ import (
 	"syscall"
 	"time"
 
-	"annygo/internal/adapter/crypto"
-	"annygo/internal/adapter/editalproc"
-	"annygo/internal/adapter/httpapi"
-	"annygo/internal/adapter/postgres"
-	"annygo/internal/platform/config"
-	"annygo/internal/platform/db"
-	"annygo/internal/platform/httpserver"
-	"annygo/internal/platform/middleware"
-	"annygo/internal/port"
-	"annygo/internal/service"
-	"annygo/migrations"
+	"studygo/internal/adapter/crypto"
+	"studygo/internal/adapter/editalproc"
+	"studygo/internal/adapter/httpapi"
+	"studygo/internal/adapter/postgres"
+	"studygo/internal/platform/config"
+	"studygo/internal/platform/db"
+	"studygo/internal/platform/httpserver"
+	"studygo/internal/platform/middleware"
+	"studygo/internal/port"
+	"studygo/internal/service"
+	"studygo/migrations"
 )
 
 func main() {

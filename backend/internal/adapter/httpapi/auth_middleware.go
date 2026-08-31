@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"annygo/internal/domain/user"
-	"annygo/internal/port"
+	"studygo/internal/domain/user"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )

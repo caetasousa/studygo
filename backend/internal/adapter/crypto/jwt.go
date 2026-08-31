@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"annygo/internal/port"
+	"studygo/internal/port"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

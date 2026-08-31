@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/domain/plano"
-	"annygo/internal/domain/user"
-	"annygo/internal/port"
-	"annygo/internal/service"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
+	"studygo/internal/domain/user"
+	"studygo/internal/port"
+	"studygo/internal/service"
 )
 
 // writeJSON serializes v with the given status. Encoding errors are logged, not

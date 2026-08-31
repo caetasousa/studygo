@@ -40,7 +40,9 @@
     enabled: true
     state: started
 
-- name: Add annyGo user to docker group
+# `annyGo` is the VPS's existing Linux user, from the project's old name; see
+# bootstrap.yml for why it was not renamed.
+- name: Add the deploy user to docker group
   user:
     name: annyGo
     groups: docker

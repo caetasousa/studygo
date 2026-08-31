@@ -1,4 +1,9 @@
 ---
+# The Linux user is deliberately still `annyGo`, from the project's old name:
+# it is the SSH login the deploy key is authorised for, and root SSH is
+# permanently disabled (see lockdown.yml). Renaming it here would lock every
+# playbook out of the live VPS, recoverable only through the hosting provider's
+# browser console. Rename it only alongside a deliberate re-provision.
 - name: Bootstrap VPS - create sudo user for automation
   hosts: vps
   gather_facts: true

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/plano"
 )
 
 func TestTrocarEAplicarReordenacoes(t *testing.T) {

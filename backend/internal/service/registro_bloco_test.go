@@ -3,8 +3,8 @@ package service
 import (
 	"testing"
 
-	"annygo/internal/domain/concurso"
-	"annygo/internal/domain/plano"
+	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
 )
 
 func ptrF(v float64) *float64 { return &v }

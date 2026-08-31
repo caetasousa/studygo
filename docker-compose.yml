@@ -13,7 +13,7 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       SERVER_ADDR: ":8080"
-      DATABASE_URL: "postgres://${POSTGRES_USER:-annygo}:${POSTGRES_PASSWORD:-annygo}@postgres:5432/${POSTGRES_DB:-annygo}?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
       EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
@@ -43,7 +43,7 @@ services:
     build: ./backend
     entrypoint: ["/worker"]
     environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-annygo}:${POSTGRES_PASSWORD:-annygo}@postgres:5432/${POSTGRES_DB:-annygo}?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       LEMBRETE_INTERVALO: "${LEMBRETE_INTERVALO:-24h}"
     depends_on:
@@ -54,15 +54,15 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-annygo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-annygo}
-      POSTGRES_DB: ${POSTGRES_DB:-annygo}
+      POSTGRES_USER: ${POSTGRES_USER:-studygo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studygo}
+      POSTGRES_DB: ${POSTGRES_DB:-studygo}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-annygo}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studygo}"]
       interval: 5s
       timeout: 5s
       retries: 5

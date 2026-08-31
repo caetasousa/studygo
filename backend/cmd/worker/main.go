@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"annygo/internal/adapter/notifier"
-	"annygo/internal/adapter/postgres"
-	"annygo/internal/platform/config"
-	"annygo/internal/platform/db"
-	"annygo/internal/port"
-	"annygo/internal/service"
-	"annygo/migrations"
+	"studygo/internal/adapter/notifier"
+	"studygo/internal/adapter/postgres"
+	"studygo/internal/platform/config"
+	"studygo/internal/platform/db"
+	"studygo/internal/port"
+	"studygo/internal/service"
+	"studygo/migrations"
 )
 
 func main() {

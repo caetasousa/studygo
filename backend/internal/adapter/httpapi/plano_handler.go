@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"annygo/internal/service"
+	"studygo/internal/service"
 
 	"github.com/google/uuid"
 )
