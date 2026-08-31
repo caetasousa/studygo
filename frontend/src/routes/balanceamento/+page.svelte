@@ -22,7 +22,7 @@
 
 	const mediaPassadas = $derived(media((l) => l.passadas));
 	const mediaIntervalo = $derived(media((l) => l.intervaloDias));
-	const mediaReforcos = $derived(media((l) => l.reforcos));
+	const voltas = $derived(planoStore.plano?.props.voltasRevisao ?? 0);
 	const mediaRevisoes = $derived(media((l) => l.revisoesGerais));
 	const mediaTotal = $derived(media((l) => l.totalPassadas));
 
@@ -131,14 +131,26 @@
 			<strong>1×</strong> quer dizer percorrer a matéria inteira, do primeiro ao
 			último tópico.
 		</p>
+
+		<!-- The one number the whole page is about: the review block walks
+		     everything already studied, in order, so this is how many complete
+		     laps it gets through before the reta final. -->
+		<div class="voltas" class:pouco={voltas < 1}>
+			<span class="voltas-n">{nf1.format(voltas)}×</span>
+			<span class="voltas-tx">
+				<strong>é quanto eu reviso tudo que estudei</strong>, até entrar na reta final.
+				{#if voltas < 1}
+					Abaixo de 1× o plano não chega a revisar uma vez tudo o que ensinou —
+					aumente o bloco de revisão ou os dias de estudo.
+				{:else}
+					A revisão de cada dia volta ao que já foi estudado, do mais antigo para o
+					mais novo, e recomeça ao chegar no fim.
+				{/if}
+			</span>
+		</div>
 		<ul class="legenda">
 			<li><b>Volta a cada</b> — de quantos em quantos dias esta matéria reaparece.</li>
 			<li><b>Aprendo</b> — quantas vezes vejo a matéria enquanto aprendo o conteúdo.</li>
-			<li>
-				<b>Reforço</b> — quantas vezes eu volto à matéria <em>ainda no aprendizado</em>,
-				depois da primeira leitura. É o número que importa: é aí que ainda dá tempo
-				de consertar o que ficou fraco.
-			</li>
 			<li>
 				<b>Reta final</b> — a última fase repassa cada matéria inteira uma vez, sempre.
 				Ali cada bloco cobre vários tópicos de uma vez.
@@ -156,9 +168,6 @@
 						</th>
 						<th title="Vezes que vejo a matéria inteira aprendendo o conteúdo">
 							Aprendo
-						</th>
-						<th title="Vezes que volto à matéria ainda no aprendizado, depois da primeira leitura">
-							Reforço
 						</th>
 						<th title="A reta final repassa cada matéria inteira uma vez">Reta final</th>
 						<th title="Tudo somado: o que de fato vejo antes da prova">Total</th>
@@ -187,15 +196,6 @@
 									</span>
 								{/if}
 							</td>
-							<td class="destaque">
-								{#if l.reforcos > 0}
-									{nf1.format(l.reforcos)}×
-								{:else}
-									<span class="sem-reforco" title="Só dá tempo da primeira leitura">
-										nenhum
-									</span>
-								{/if}
-							</td>
 							<td class="fraco">{nf1.format(l.revisoesGerais)}×</td>
 							<td>{nf1.format(l.totalPassadas)}×</td>
 						</tr>
@@ -207,7 +207,6 @@
 						<td>{totalTemas}</td>
 						<td>{nf1.format(mediaIntervalo)} dias</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
-						<td class="destaque">{nf1.format(mediaReforcos)}×</td>
 						<td class="fraco">{nf1.format(mediaRevisoes)}×</td>
 						<td>{nf1.format(mediaTotal)}×</td>
 					</tr>
@@ -310,6 +309,42 @@
 {/if}
 
 <style>
+	/* The headline figure of the page. */
+	.voltas {
+		display: flex;
+		align-items: baseline;
+		gap: 14px;
+		margin: 14px 0 4px;
+		padding: 14px 16px;
+		background: var(--accent-soft);
+		border: 1px solid var(--accent);
+		border-radius: 10px;
+	}
+	.voltas.pouco {
+		background: var(--danger-soft);
+		border-color: var(--danger);
+	}
+	.voltas-n {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 30px;
+		font-weight: 700;
+		color: var(--accent-strong);
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+	}
+	.voltas.pouco .voltas-n {
+		color: var(--danger);
+	}
+	.voltas-tx {
+		font-size: 13px;
+		line-height: 1.55;
+		color: var(--text-muted);
+	}
+	.voltas-tx strong {
+		color: var(--text);
+	}
+
 	/* The reta final is one sweep by design, so it recedes; the reinforcement
 	   before it is what varies and what the student can still act on. */
 	.fraco {

@@ -301,8 +301,6 @@ export interface LinhaBalanceamento {
 	temas: number;
 	/** Complete passes over the whole subject in the content phase. */
 	passadas: number;
-	/** Revisits during the learning phase, after the first read. */
-	reforcos: number;
 	/** Complete passes over the whole subject in the reta final. */
 	revisoesGerais: number;
 	/** The two added up: every complete pass before the exam. */
@@ -323,6 +321,8 @@ export interface Props {
 	acertoPct: number | null;
 	totalDias: number;
 	diasConcluidos: number;
+	/** Complete laps over everything studied, before the reta final. */
+	voltasRevisao: number;
 }
 
 export interface Alerta {

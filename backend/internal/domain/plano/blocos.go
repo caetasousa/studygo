@@ -18,10 +18,14 @@ type BlocoCtx struct {
 	Cfg      Config            // the user's plan settings (dates, rhythm, method)
 	Nomes    map[string]string // discipline codigo -> display name
 	Simulado Composicao        // question split of a full mock exam
-	// Cadernos is the error notebook per discipline codigo. When present, the
-	// day's review tail drills what the student got wrong in the subjects that
-	// day covers, instead of the plain spaced-review queue.
+	// Cadernos is the error notebook per discipline codigo. What went wrong
+	// outranks the queue's normal order: a topic in the notebook comes back
+	// first.
 	Cadernos map[string][]ItemCaderno
+	// Revisao is what each day's review block should cover, keyed by plan-day
+	// number — the rolling queue over everything studied so far (see
+	// FilaRevisao).
+	Revisao map[int][]ItemRevisao
 }
 
 // Composicao is how many questions of each bloco a full exam has.
@@ -166,58 +170,71 @@ func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
 // rather than inventing work: the time is there to go back over the day's own
 // subjects.
 func caudaRevisao(d Dia, ctx BlocoCtx, minutos int) Bloco {
-	discs := make([]string, 0, len(d.Itens))
-	for _, it := range d.Itens {
-		discs = append(discs, it.Disciplina)
-	}
-
-	// d.N rotates which discipline this day reviews, so a week covers all of
-	// them instead of always drilling the first.
-	itens := TemasDoDia(ctx.Cadernos, discs, d.N, maxTemasRevisao)
+	itens := ctx.Revisao[d.N]
 	if len(itens) == 0 {
 		return Bloco{
 			Minutos: minutos,
 			Titulo:  "Revisão",
-			Detalhe: "sem erros pendentes destas matérias — revise os assuntos de hoje",
+			Detalhe: "ainda não há matéria estudada para revisar — siga o conteúdo de hoje",
 		}
+	}
+
+	// A topic already answered badly outranks the queue's own order: the
+	// notebook is the reason to come back sooner.
+	nome := ctx.Nomes[itens[0].Disciplina]
+	if nome == "" {
+		nome = itens[0].Disciplina
 	}
 
 	return Bloco{
 		Minutos: minutos,
-		Titulo:  "Caderno de erros — " + strconv.Itoa(len(itens)) + " temas",
-		Detalhe: cadernoDetalhe(itens, ctx.Nomes),
+		Titulo:  "Revisão — " + nome,
+		Detalhe: revisaoDetalhe(itens, ctx.Cadernos),
 	}
 }
 
-// maxTemasRevisao caps how many topics one review block names. Past a handful
-// the block stops being a plan and becomes a list nobody works through.
-const maxTemasRevisao = 4
-
-// cadernoDetalhe says what to do with the notebook topics, naming them so the
-// block is actionable without opening another screen.
-func cadernoDetalhe(itens []ItemCaderno, nomes map[string]string) string {
+// revisaoDetalhe names the topics coming back today, marking the ones the
+// student has already got wrong so the time goes to them first.
+func revisaoDetalhe(itens []ItemRevisao, cadernos map[string][]ItemCaderno) string {
 	var b strings.Builder
 
-	b.WriteString("questões dos assuntos que você errou, sem consultar antes: ")
+	b.WriteString("volte a estes assuntos, sem consultar antes: ")
 
 	for i, it := range itens {
 		if i > 0 {
 			b.WriteString("  ·  ")
 		}
 
-		if n := nomes[it.Disciplina]; n != "" {
-			b.WriteString(n)
-			b.WriteString(" — ")
-		}
-
 		b.WriteString(it.Tema)
-		b.WriteString(" (")
-		b.WriteString(strconv.Itoa(it.Aproveitamento()))
-		b.WriteString("%)")
+
+		if pct, errou := aproveitamentoNoCaderno(cadernos, it); errou {
+			b.WriteString(" (você foi a ")
+			b.WriteString(strconv.Itoa(pct))
+			b.WriteString("% aqui)")
+		}
 	}
 
 	return b.String()
 }
+
+// aproveitamentoNoCaderno reports the topic's hit rate when it is in the error
+// notebook, so the block can say which ones actually went wrong.
+func aproveitamentoNoCaderno(
+	cadernos map[string][]ItemCaderno,
+	it ItemRevisao,
+) (int, bool) {
+	for _, c := range cadernos[it.Disciplina] {
+		if c.Tema == it.Tema {
+			return c.Aproveitamento(), true
+		}
+	}
+
+	return 0, false
+}
+
+// maxTemasRevisao caps how many topics one review block names. Past a handful
+// the block stops being a plan and becomes a list nobody works through.
+const maxTemasRevisao = 4
 
 // ordinais names the study blocks of a day; past the sixth the number is used.
 var ordinais = []string{"1º bloco", "2º bloco", "3º bloco", "4º bloco", "5º bloco", "6º bloco"}

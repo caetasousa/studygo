@@ -74,6 +74,7 @@ func (s *PlanoService) montar(
 		Nomes:    nomes,
 		Simulado: res.Simulado,
 		Cadernos: plano.Caderno(resultadosDoPlano(res.Dias, salvo)),
+		Revisao:  plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config)),
 	}
 
 	dias := make([]DiaResposta, 0, len(res.Dias))
@@ -271,6 +272,30 @@ func montarMarcos(c concurso.Concurso, checks map[uuid.UUID]bool) []MarcoRespost
 	return out
 }
 
+// temasPorRevisao is how many topics one review block covers.
+//
+// Derived from the block's own length rather than configured separately: a
+// 20-minute block cannot honestly ask for six topics. Roughly ten minutes each,
+// with at least one whenever there is a block at all.
+func temasPorRevisao(cfg plano.Config) int {
+	cfg = cfg.Normalizar()
+
+	if cfg.MinutosRevisao <= 0 {
+		return 0
+	}
+
+	n := cfg.MinutosRevisao / 10
+	if n < 1 {
+		return 1
+	}
+
+	if n > 6 {
+		return 6
+	}
+
+	return n
+}
+
 // resultadosDoPlano collects every answered battery in the plan, which is what
 // the error notebook is built from.
 //
@@ -358,20 +383,6 @@ func intervalosDeRevisita(dias []plano.Dia) map[string]float64 {
 	}
 
 	return out
-}
-
-// reforcosDe is how many times the learning phase revisits a subject after the
-// first read.
-//
-// One pass is the first read, not a revisit; everything past it is repetition
-// while there is still time to act on what went badly. A subject the plan
-// cannot even finish once has no reinforcement at all.
-func reforcosDe(passadas float64) float64 {
-	if passadas <= 1 {
-		return 0
-	}
-
-	return round1(passadas - 1)
 }
 
 // revisoesRetaDe is how many times the reta final goes over a discipline.
@@ -464,7 +475,6 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
-			Reforcos:       reforcosDe(passadasDe(res.Slots[d.Codigo], len(d.Temas))),
 			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
 			TotalPassadas: round1(
 				passadasDe(res.Slots[d.Codigo], len(d.Temas)) +
@@ -508,6 +518,7 @@ func montarProps(cfg plano.Config, dias []plano.Dia, stats plano.Stats, agora ti
 		AcertoPct:      acerto,
 		TotalDias:      total,
 		DiasConcluidos: stats.Feitos,
+		VoltasRevisao:  round1(plano.VoltasRevisao(dias, temasPorRevisao(cfg))),
 	}
 }
 
