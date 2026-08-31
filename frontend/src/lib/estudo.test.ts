@@ -468,6 +468,24 @@ describe('registro por atividade', () => {
 
 		expect(out.find((b) => b.atividadeId === 'atv-2')).toMatchObject({ horas: 3, concluido: true });
 	});
+
+	it('não duplica um registro legado quando a disciplina aparece duas vezes', () => {
+		const legado = [
+			{
+				disciplina: 'D01',
+				horas: 3,
+				questoes: 20,
+				acertos: 15,
+				concluido: true,
+				nota: 'registro antigo'
+			}
+		];
+		const out = blocosComAtividade(itens, legado, 'atv-2', VAZIO);
+
+		expect(out.find((b) => b.atividadeId === 'atv-1')).toMatchObject(VAZIO);
+		expect(out.find((b) => b.atividadeId === 'atv-3')).toMatchObject(VAZIO);
+		expect(out.reduce((total, b) => total + (b.horas ?? 0), 0)).toBe(0);
+	});
 });
 
 afterEach(() => vi.unstubAllGlobals());

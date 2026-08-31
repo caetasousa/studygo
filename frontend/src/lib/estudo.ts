@@ -463,10 +463,22 @@ export function blocosComAtividade<
 	atividadeId: string,
 	v: ValoresAtividade
 ): (ValoresAtividade & { disciplina: string; atividadeId: string })[] {
+	const ocorrencias = new Map<string, number>();
+	for (const it of itens) {
+		ocorrencias.set(it.disciplina, (ocorrencias.get(it.disciplina) ?? 0) + 1);
+	}
+
 	return itens.map((it) => {
-		const atual =
-			blocosAtuais.find((b) => b.atividadeId && b.atividadeId === it.id) ??
-			blocosAtuais.find((b) => !b.atividadeId && b.disciplina === it.disciplina);
+		const porID = blocosAtuais.find((b) => b.atividadeId && b.atividadeId === it.id);
+		// A legacy block only says "discipline X on this date". It is safe to
+		// adopt when X occurs once; with two occurrences there is no honest way to
+		// decide which activity owns it. Reusing it for both would double the
+		// recorded hours and make one check complete two activities.
+		const legado =
+			(ocorrencias.get(it.disciplina) ?? 0) === 1
+				? blocosAtuais.find((b) => !b.atividadeId && b.disciplina === it.disciplina)
+				: undefined;
+		const atual = porID ?? legado;
 
 		const base = it.id === atividadeId ? v : valoresIniciais(atual);
 

@@ -26,7 +26,8 @@ import type {
  */
 export function blocoDaAtividade(
 	reg: Registro | null | undefined,
-	item: Pick<ItemDia, 'id' | 'disciplina'>
+	item: Pick<ItemDia, 'id' | 'disciplina'>,
+	itensDoDia?: readonly Pick<ItemDia, 'id' | 'disciplina'>[]
 ): RegistroBloco | null {
 	const blocos = reg?.blocos ?? [];
 
@@ -35,7 +36,15 @@ export function blocoDaAtividade(
 		if (porID) return porID;
 	}
 
-	const legado = blocos.find((b) => !b.atividadeId && b.disciplina === item.disciplina);
+	// A legacy block can only be attributed without guessing when the discipline
+	// occurs once on that day. Otherwise showing it in both editors would double
+	// hours and make a single historical check look like two completed sessions.
+	const ocorrencias =
+		itensDoDia?.filter((it) => it.disciplina === item.disciplina).length ?? 1;
+	const legado =
+		ocorrencias === 1
+			? blocos.find((b) => !b.atividadeId && b.disciplina === item.disciplina)
+			: undefined;
 
 	return legado ?? null;
 }
@@ -65,6 +74,7 @@ function readCache(slug: string | null): PlanoResposta | null {
 
 interface DiscInfo {
 	nome: string;
+	sigla: string;
 	cor: number;
 	bloco: 'esp' | 'ger';
 }
@@ -72,6 +82,7 @@ interface DiscInfo {
 class PlanoStore {
 	plano = $state<PlanoResposta | null>(readCache(concursoStore.ativoSlug));
 	carregando = $state(false);
+	movendo = $state(false);
 	erro = $state<string | null>(null);
 	salvo = $state(false);
 
@@ -81,7 +92,7 @@ class PlanoStore {
 	discIndex = $derived.by<Record<string, DiscInfo>>(() => {
 		const m: Record<string, DiscInfo> = {};
 		for (const d of this.plano?.concurso.disciplinas ?? []) {
-			m[d.codigo] = { nome: d.nome, cor: d.cor, bloco: d.bloco };
+			m[d.codigo] = { nome: d.nome, sigla: d.sigla, cor: d.cor, bloco: d.bloco };
 		}
 		return m;
 	});
@@ -90,9 +101,19 @@ class PlanoStore {
 	 * Display siglas by codigo — RL, LP, BD. Derived from the names, never
 	 * stored: the codigo stays the technical key everything else is joined on.
 	 */
-	siglaIndex = $derived.by<Record<string, string>>(() =>
-		siglas(this.plano?.concurso.disciplinas ?? [])
-	);
+	siglaIndex = $derived.by<Record<string, string>>(() => {
+		const disciplinas = this.plano?.concurso.disciplinas ?? [];
+		const fallback = siglas(disciplinas);
+		const m: Record<string, string> = {};
+
+		for (const d of disciplinas) {
+			// New responses own this presentation value. The generated fallback keeps
+			// an old localStorage cache readable during the deployment transition.
+			m[d.codigo] = d.sigla?.trim() || fallback[d.codigo] || d.codigo;
+		}
+
+		return m;
+	});
 
 	private get slug(): string {
 		const s = concursoStore.ativoSlug;
@@ -195,12 +216,34 @@ class PlanoStore {
 		// Rebuild the day's block set: this activity from the form, every other
 		// from what is already stored. Addressed by atividadeId so two occurrences
 		// of the same discipline in a day stay independent.
-		const blocos: RegistroBlocoInput[] = blocosComAtividade(
+		const blocosAtividades: RegistroBlocoInput[] = blocosComAtividade(
 			d.itens,
 			reg?.blocos ?? [],
 			atividadeId,
 			v
 		).map((b) => ({ ...b, nota: b.nota }));
+
+		// An old row without atividadeId is deliberately left ambiguous when the
+		// same discipline occurs more than once. Keep that historical row exactly
+		// once while editing a new activity; UpsertRegistro replaces the whole day.
+		const contagem = new Map<string, number>();
+		for (const it of d.itens) {
+			contagem.set(it.disciplina, (contagem.get(it.disciplina) ?? 0) + 1);
+		}
+		const legadosAmbiguos: RegistroBlocoInput[] = (reg?.blocos ?? [])
+			.filter(
+				(b) => !b.atividadeId && (contagem.get(b.disciplina) ?? 0) > 1
+			)
+			.map((b) => ({
+				disciplina: b.disciplina,
+				atividadeId: '',
+				horas: b.horas,
+				questoes: b.questoes,
+				acertos: b.acertos,
+				nota: b.nota,
+				concluido: b.concluido
+			}));
+		const blocos = [...blocosAtividades, ...legadosAmbiguos];
 
 		const soma = (f: (b: RegistroBlocoInput) => number | null): number | null => {
 			let t: number | null = null;
@@ -217,7 +260,7 @@ class PlanoStore {
 					horas: soma((b) => b.horas),
 					questoes: soma((b) => b.questoes),
 					acertos: soma((b) => b.acertos),
-					concluido: diaConcluido(blocos),
+					concluido: diaConcluido(blocosAtividades),
 					nota: reg?.nota ?? '',
 					blocos: blocos.filter(
 						(b) =>
@@ -246,6 +289,9 @@ class PlanoStore {
 		posicao: number,
 		trocar = false
 	): Promise<boolean> => {
+		if (this.movendo) return false;
+		this.movendo = true;
+
 		// Snapshot for rollback. A structural clone keeps the optimistic edit from
 		// aliasing the object we intend to restore.
 		const anterior = this.plano ? structuredClone($state.snapshot(this.plano)) : null;
@@ -262,6 +308,8 @@ class PlanoStore {
 			this.erro = e instanceof Error ? e.message : 'Não foi possível mover a atividade';
 
 			return false;
+		} finally {
+			this.movendo = false;
 		}
 	};
 	restaurarOrdem = () => this.run((s) => api.restaurarOrdem(s));

@@ -152,6 +152,8 @@ export interface ConteudoEditalResposta {
 
 export interface Disciplina {
 	codigo: string;
+	/** Short mnemonic for display (RL, LP, BD); codigo remains the technical id. */
+	sigla: string;
 	nome: string;
 	bloco: 'esp' | 'ger';
 	peso: number;
@@ -215,8 +217,8 @@ export type Tipo = 'est' | 'revd' | 'sim' | 'disc' | 'vespera' | 'rev';
 export type Fase = 'base' | 'reta';
 
 export interface ItemDia {
-	/** Addresses this activity for a move. Empty until the plan has been arranged
-	 *  by hand — the backend seeds ids on the first move. */
+	/** Addresses this scheduled activity. Generated plans receive a stable
+	 *  synthetic id; the backend materialises it transparently on the first write. */
 	id: string;
 	disciplina: string;
 	tema: string;
