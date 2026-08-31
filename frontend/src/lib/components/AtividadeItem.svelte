@@ -27,6 +27,7 @@
 		sobrevoado = false,
 		onSoltar,
 		concluida = false,
+		minutos = null,
 		onRegistrar
 	}: {
 		item: ItemDia;
@@ -47,6 +48,8 @@
 		onSoltar?: (posicao: number) => void;
 		/** this activity finished, shown as a quiet mark (edited in its form) */
 		concluida?: boolean;
+		/** planned length of this activity's block, in minutes */
+		minutos?: number | null;
 		/** Opens this activity's form. Receives the trigger so focus can return. */
 		onRegistrar?: (gatilho: HTMLElement) => void;
 	} = $props();
@@ -193,6 +196,10 @@
 		<span class="alca vazia" aria-hidden="true"></span>
 	{/if}
 
+	{#if minutos}
+		<span class="min">{minutos} min</span>
+	{/if}
+
 	<!-- The name is reachable three ways, since `title` alone is invisible to
 	     touch and unreliable with a keyboard: a focusable chip that reveals the
 	     name on hover AND focus, plus the always-present accessible name. -->
@@ -318,7 +325,8 @@
 	   its own left edge, so every line of every activity stays aligned. */
 	.atv {
 		display: grid;
-		grid-template-columns: 18px auto minmax(0, 1fr) auto;
+		/* handle | minutes | code | topic | actions */
+		grid-template-columns: 18px auto auto minmax(0, 1fr) auto;
 		align-items: baseline;
 		gap: 6px 10px;
 		padding: 7px 8px;
@@ -447,6 +455,16 @@
 	   that is what lets every topic on the card start at the same x. Codes are
 	   3–4 characters by convention; a longer one grows the badge rather than
 	   being clipped. */
+	/* Same treatment as the review block's duration, so a day reads as one
+	   sequence of timed blocks rather than a list with one odd member. */
+	.min {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
 	.chip {
 		flex: none;
 		border: 0;
@@ -589,7 +607,7 @@
 		/* Narrow: code and actions share the top line, the topic gets the full
 		   width beneath them rather than a squeezed third column. */
 		.atv {
-			grid-template-columns: auto minmax(0, 1fr);
+			grid-template-columns: auto auto minmax(0, 1fr);
 		}
 		.txt {
 			grid-column: 1 / -1;

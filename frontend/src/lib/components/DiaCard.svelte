@@ -141,9 +141,20 @@
 	 * The engine returns every block of the day; the subjects are already drawn
 	 * as activities above, so only the review one is left to show here.
 	 */
-	const blocoRevisao = $derived(
-		dia.blocos.find((b) => b.titulo === 'Revisão' || b.titulo.startsWith('Caderno de erros')) ?? null
-	);
+	/** True for the block that closes the day, whatever it is currently called. */
+	const ehRevisao = (titulo: string) =>
+		titulo === 'Revisão' || titulo.startsWith('Caderno de erros');
+
+	const blocoRevisao = $derived(dia.blocos.find((b) => ehRevisao(b.titulo)) ?? null);
+
+	/**
+	 * Minutes per activity, by position.
+	 *
+	 * The engine emits one content block per item of the day, in the same order,
+	 * then the review block. Pairing by index is how the two line up — the blocks
+	 * carry no activity id of their own.
+	 */
+	const minutosPorItem = $derived(dia.blocos.filter((b) => !ehRevisao(b.titulo)).map((b) => b.minutos));
 
 	// The header band says what the day holds, so the count is worth stating.
 	const resumoItens = $derived(
@@ -207,6 +218,7 @@
 								onSobrevoar={onSobrevoar}
 								sobrevoado={sobrevoo?.data === dia.data && sobrevoo?.posicao === i}
 								onSoltar={onSoltarAtv}
+								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
 								onRegistrar={(el) => {
 									gatilho = el;
