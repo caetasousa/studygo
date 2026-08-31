@@ -1,5 +1,6 @@
 <script lang="ts">
 	import IconButton from '$lib/components/IconButton.svelte';
+	import { semNumeroInicial } from '$lib/estudo';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DossieModal from '$lib/components/DossieModal.svelte';
@@ -157,6 +158,47 @@
 			</div>
 		</div>
 
+		<!-- The notebook proper: what went wrong, per subject, accumulating. This is
+		     exactly what the daily review tail drills, so the screen and the
+		     schedule are showing the same thing. -->
+		<h2 class="sec">Caderno por matéria</h2>
+		{#if dados.porDisciplina.length === 0}
+			<p class="page-sub" style="margin-top:0">
+				Ainda sem erros registrados. Assim que uma bateria ficar abaixo de {planoStore.plano?.config.limiarFraco ?? 70}%,
+				o assunto entra aqui e passa a voltar na revisão diária.
+			</p>
+		{:else}
+			<p class="page-sub" style="margin-top:0">
+				Os assuntos em que você foi mal, acumulados. A revisão no fim de cada dia
+				puxa daqui, começando pelos que você mais errou.
+			</p>
+			<div class="cad-grid">
+				{#each dados.porDisciplina as d (d.disciplina)}
+					<div class="card cad-disc">
+						<div class="card-top">
+							<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
+							<b>{d.nome}</b>
+							<span class="cad-n">{d.temas.length} {d.temas.length === 1 ? 'assunto' : 'assuntos'}</span>
+						</div>
+						<div class="card-body cad-body">
+							{#each d.temas as t (t.tema)}
+								<div class="cad-item">
+									<span class="cad-tema">{semNumeroInicial(t.tema)}</span>
+									<span class="cad-pct" class:critico={t.aproveitamento < 50}>
+										{t.aproveitamento}%
+									</span>
+									<span class="cad-meta">
+										{t.acertos}/{t.questoes}
+										{#if t.erros > 1}· {t.erros} vezes{/if}
+									</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
 		<h2 class="sec">Anotações ({dados.anotacoes.length})</h2>
 		{#if dados.anotacoes.length === 0}
 			<p class="page-sub" style="margin-top:0">Nenhuma anotação ainda.</p>
@@ -236,6 +278,61 @@
 {/if}
 
 <style>
+	.cad-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+		gap: 12px;
+	}
+	.cad-disc .card-top {
+		gap: 8px;
+	}
+	.cad-n {
+		margin-left: auto;
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
+	}
+	.cad-body {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 8px 10px;
+	}
+	/* Topic | hit rate | attempts — the rate is the point, so it gets the
+	   fixed column and the mono figures. */
+	.cad-item {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto auto;
+		align-items: baseline;
+		gap: 10px;
+		padding: 6px 4px;
+		border-bottom: 1px dotted var(--border);
+	}
+	.cad-item:last-child {
+		border-bottom: 0;
+	}
+	.cad-tema {
+		font-size: 13px;
+		line-height: 1.4;
+		min-width: 0;
+	}
+	.cad-pct {
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		font-weight: 600;
+		color: var(--warn);
+		font-variant-numeric: tabular-nums;
+	}
+	.cad-pct.critico {
+		color: var(--danger);
+	}
+	.cad-meta {
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--text-faint);
+		white-space: nowrap;
+	}
+
 	.tema {
 		font-weight: 600;
 		margin-right: 6px;

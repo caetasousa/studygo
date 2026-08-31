@@ -206,6 +206,9 @@ export interface Config {
 	questoesPorRevisao: number;
 	intervalos: number[];
 	cicloRevisao: CicloItem[];
+	/** Reserve a whole day of the week for review. Off by default: review is a
+	 *  daily slice fed by the error notebook. */
+	revisaoSemanal: boolean;
 	simulados: Simulados;
 	discursiva: boolean;
 	modos: Record<string, Modo>;
@@ -363,6 +366,7 @@ export interface ConfigInput {
 	questoesPorRevisao?: number;
 	intervalos?: number[];
 	cicloRevisao?: CicloItem[];
+	revisaoSemanal?: boolean;
 	simulados?: Simulados;
 	discursiva?: boolean;
 	modos?: Record<string, Modo>;
@@ -445,11 +449,29 @@ export interface DiaFraco {
 	pct: number;
 }
 
+export interface ItemCaderno {
+	tema: string;
+	erros: number;
+	questoes: number;
+	acertos: number;
+	aproveitamento: number;
+	ultimaData: string;
+}
+
+/** One discipline's error notebook — what the daily review tail drills. */
+export interface CadernoDisciplina {
+	disciplina: string;
+	nome: string;
+	cor: number;
+	temas: ItemCaderno[];
+}
+
 export interface Caderno {
 	anotacoes: AnotacaoView[];
 	diasComNota: DiaNota[];
 	diasFracos: DiaFraco[];
 	vencendoHoje: RevisaoDia[];
+	porDisciplina: CadernoDisciplina[];
 }
 
 export interface AnotacaoInput {

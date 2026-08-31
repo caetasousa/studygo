@@ -92,6 +92,63 @@
 
 	let intervalosErro = $state<string | null>(null);
 
+	const metodoDesc = $derived(
+		cfg?.revisaoPorQuestoes
+			? 'Questões: a revisão é uma bateria do assunto, sem consultar antes — você só confere o resumo no que errar.'
+			: 'Releitura: você reconstrói o assunto de memória e confere o resumo depois.'
+	);
+
+	const pctDesc = $derived(
+		cfg ? `${Math.round(cfg.pctRevisao * 100)}% do dia` : ''
+	);
+
+	const semanalDesc = $derived(
+		cfg?.revisaoSemanal
+			? 'Ligado: um dia inteiro por semana sai do conteúdo e vira revisão. São ~11 dias de matéria nova a menos num ciclo.'
+			: 'Desligado: a semana inteira é conteúdo, e a revisão acontece na fatia diária acima.'
+	);
+
+	/**
+	 * The day the current settings actually produce, in proportion.
+	 *
+	 * The settings page used to describe the schedule in prose while the schedule
+	 * itself was a screen away — so a slider moved with no visible consequence.
+	 * This mirrors the engine's own split: content blocks take (1 - pctRevisao)
+	 * of the day, the review tail takes the rest.
+	 */
+	const previaBlocos = $derived.by(() => {
+		if (!cfg) return [];
+
+		const totalMin = Math.round(cfg.horasDia * 60);
+		const revMin = Math.round((totalMin * cfg.pctRevisao) / 5) * 5;
+		const conteudoMin = totalMin - revMin;
+		const porBloco = cfg.blocosPorDia > 0 ? Math.round(conteudoMin / cfg.blocosPorDia / 5) * 5 : 0;
+
+		const out = [];
+		for (let i = 0; i < cfg.blocosPorDia; i++) {
+			out.push({ rotulo: `${i + 1}º bloco`, minutos: porBloco, revisao: false });
+		}
+
+		if (revMin > 0) out.push({ rotulo: 'Revisão', minutos: revMin, revisao: true });
+
+		return out;
+	});
+
+	const previaTexto = $derived.by(() => {
+		if (!cfg) return '';
+
+		const rev = previaBlocos.find((b) => b.revisao);
+		if (!rev) {
+			return 'Sem fatia de revisão: o dia inteiro é conteúdo novo.';
+		}
+
+		const como = cfg.revisaoPorQuestoes
+			? `${cfg.questoesPorRevisao} questões de cada assunto que voltar`
+			: 'releitura ativa de cada assunto que voltar';
+
+		return `${rev.minutos} min no fim do dia — ${como}, puxados do caderno de erros das matérias daquele dia.`;
+	});
+
 	// Worked example of what the current intervals actually do, so the effect on
 	// the schedule is visible without having to generate it.
 	const intervalosDesc = $derived.by(() => {
@@ -240,7 +297,7 @@
 							{#each ORDEM_DIAS as wd (wd)}
 								<button
 									type="button"
-									class:rev={wd === cfg.diaRevisao}
+									class:rev={cfg.revisaoSemanal && wd === cfg.diaRevisao}
 									aria-pressed={cfg.diasEstudo.includes(wd)}
 									title={DIAS_SEMANA[wd]}
 									onclick={() => toggleDia(wd)}
@@ -249,23 +306,6 @@
 								</button>
 							{/each}
 						</div>
-					</div>
-					<div class="field">
-						<label for="diarev">Dia da revisão</label>
-						<select
-							id="diarev"
-							value={cfg.diaRevisao}
-							onchange={(e) =>
-								salvar({ diaRevisao: parseInt((e.target as HTMLSelectElement).value, 10) })}
-						>
-							<option value={1}>segunda</option>
-							<option value={2}>terça</option>
-							<option value={3}>quarta</option>
-							<option value={4}>quinta</option>
-							<option value={5}>sexta</option>
-							<option value={6}>sábado</option>
-							<option value={0}>domingo</option>
-						</select>
 					</div>
 					<div class="field">
 						<label for="reta">Reta final (dias)</label>
@@ -397,10 +437,100 @@
 
 		<div class="card">
 			<div class="card-body">
-				<h2 class="sec" style="margin-top:0">Revisão espaçada</h2>
+				<h2 class="sec" style="margin-top:0">Revisão</h2>
 				<p class="page-sub" style="margin:0 0 4px">
-					Ao marcar um tópico como estudado, o sistema agenda revisões dele depois
-					dos intervalos abaixo.
+					A revisão é diária: uma fatia no fim de cada dia de estudo, depois dos
+					blocos de conteúdo. O que ela cobra depende do método abaixo.
+				</p>
+
+				<Ajuste
+					titulo="Método de revisão"
+					descricao={metodoDesc}
+				>
+					{#snippet controle()}
+						<div class="metodo-sel">
+							<button
+								type="button"
+								aria-pressed={cfg.revisaoPorQuestoes}
+								onclick={() => salvar({ revisaoPorQuestoes: true })}
+							>
+								Questões
+							</button>
+							<button
+								type="button"
+								aria-pressed={!cfg.revisaoPorQuestoes}
+								onclick={() => salvar({ revisaoPorQuestoes: false })}
+							>
+								Releitura
+							</button>
+						</div>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Tempo reservado para revisão"
+					descricao="Fatia do fim de cada dia. O resto vai para o conteúdo novo."
+					para="pf-prev"
+					valor={pctDesc}
+				>
+					{#snippet controle()}
+						<input
+							id="pf-prev"
+							type="range"
+							min="0"
+							max="40"
+							step="4"
+							value={Math.round(cfg.pctRevisao * 100)}
+							onchange={(e) =>
+								salvar({ pctRevisao: parseInt((e.target as HTMLInputElement).value, 10) / 100 })}
+						/>
+					{/snippet}
+				</Ajuste>
+
+				<Ajuste
+					titulo="Questões por tema revisado"
+					descricao="Quantas questões a revisão pede de cada assunto que volta."
+					para="pf-qrev"
+					unidade="questões"
+				>
+					{#snippet controle()}
+						<input
+							id="pf-qrev"
+							type="number"
+							min="1"
+							max="50"
+							value={cfg.questoesPorRevisao}
+							onchange={(e) =>
+								salvar({ questoesPorRevisao: parseInt((e.target as HTMLInputElement).value, 10) })}
+							style="width:90px"
+						/>
+					{/snippet}
+				</Ajuste>
+
+				<!-- What the setting actually produces, so the effect is visible here
+				     instead of only after opening the schedule. -->
+				<div class="previa">
+					<span class="previa-tit">No cronograma, um dia fica assim:</span>
+					<div class="previa-barra">
+						{#each previaBlocos as b (b.rotulo)}
+							<span
+								class="previa-fatia"
+								class:rev={b.revisao}
+								style="flex:{b.minutos}"
+								title="{b.rotulo} — {b.minutos} min"
+							>
+								{b.minutos}min
+							</span>
+						{/each}
+					</div>
+					<span class="previa-leg">{previaTexto}</span>
+				</div>
+
+				<h2 class="sec">Quando um assunto volta</h2>
+				<p class="page-sub" style="margin:0 0 4px">
+					A revisão puxa primeiro o seu <b>caderno de erros</b> — os assuntos em que
+					você foi mal, acumulados por matéria. Sem erros pendentes daquela matéria,
+					ela cai nos intervalos abaixo.
 				</p>
 
 				<Ajuste
@@ -431,40 +561,37 @@
 				{/if}
 
 				<Ajuste
-					titulo="Tempo reservado para revisão"
-					descricao="Fatia do dia dedicada às revisões pendentes, antes do conteúdo novo."
-					para="pf-prev"
-					valor="{Math.round(cfg.pctRevisao * 100)}% do dia"
+					titulo="Reservar um dia da semana só para revisão"
+					descricao={semanalDesc}
+					para="pf-revsem"
 				>
 					{#snippet controle()}
 						<input
-							id="pf-prev"
-							type="range"
-							min="0"
-							max="40"
-							step="4"
-							value={Math.round(cfg.pctRevisao * 100)}
-							onchange={(e) =>
-								salvar({ pctRevisao: parseInt((e.target as HTMLInputElement).value, 10) / 100 })}
+							id="pf-revsem"
+							type="checkbox"
+							class="checkbox"
+							checked={cfg.revisaoSemanal}
+							onchange={(e) => salvar({ revisaoSemanal: e.currentTarget.checked })}
 						/>
 					{/snippet}
 				</Ajuste>
 
-				<Ajuste
-					titulo="Revisar resolvendo questões"
-					descricao="Quando ligado, a revisão vira uma bateria de questões em vez de releitura."
-					para="pf-revq"
-				>
-					{#snippet controle()}
-						<input
-							id="pf-revq"
-							type="checkbox"
-							class="checkbox"
-							checked={cfg.revisaoPorQuestoes}
-							onchange={(e) => salvar({ revisaoPorQuestoes: e.currentTarget.checked })}
-						/>
-					{/snippet}
-				</Ajuste>
+				{#if cfg.revisaoSemanal}
+					<Ajuste titulo="Dia da revisão" descricao="Qual dia da semana deixa de ser conteúdo." para="pf-diarev">
+						{#snippet controle()}
+							<select
+								id="pf-diarev"
+								value={cfg.diaRevisao}
+								onchange={(e) =>
+									salvar({ diaRevisao: parseInt((e.target as HTMLSelectElement).value, 10) })}
+							>
+								{#each ORDEM_DIAS as wd (wd)}
+									<option value={wd}>{DIAS_SEMANA[wd]}</option>
+								{/each}
+							</select>
+						{/snippet}
+					</Ajuste>
+				{/if}
 			</div>
 		</div>
 
@@ -654,6 +781,75 @@
 {/if}
 
 <style>
+	/* Two exclusive choices read better as a pair of buttons than as a checkbox
+	   whose off-state has to be inferred from the label. */
+	.metodo-sel {
+		display: flex;
+		gap: 4px;
+	}
+	.metodo-sel button {
+		font-size: 12.5px;
+		padding: 7px 14px;
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+	.metodo-sel button[aria-pressed='true'] {
+		background: var(--accent-soft);
+		border-color: var(--accent);
+		color: var(--accent-strong);
+		font-weight: 600;
+	}
+
+	/* The settings only mattered once you opened the schedule; this shows the day
+	   they produce, here, in proportion. */
+	.previa {
+		margin: 14px 0 4px;
+		padding: 12px 14px;
+		background: var(--bg-soft);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+	}
+	.previa-tit {
+		display: block;
+		font-size: 11px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		font-weight: 600;
+		color: var(--text-faint);
+		margin-bottom: 8px;
+	}
+	.previa-barra {
+		display: flex;
+		gap: 3px;
+		height: 30px;
+	}
+	.previa-fatia {
+		display: grid;
+		place-items: center;
+		border-radius: 5px;
+		background: var(--accent-soft);
+		color: var(--accent-strong);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+	}
+	.previa-fatia.rev {
+		background: var(--warn-soft);
+		color: var(--warn);
+	}
+	.previa-leg {
+		display: block;
+		margin-top: 8px;
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
 	.ajuste-erro {
 		margin: -6px 0 10px;
 		font-size: 12px;
