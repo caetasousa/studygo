@@ -97,8 +97,22 @@
 		if (adiando) return;
 
 		adiando = true;
-		await planoStore.adiarDia(dia.data);
+		// A refusal (dia já concluído, nada para onde empurrar…) used to be
+		// discarded here — the button just did nothing, with no explanation.
+		const erro = await planoStore.adiarDia(dia.data);
+		if (erro) planoStore.erro = erro;
 		adiando = false;
+	}
+
+	/**
+	 * Brings a future activity forward to today. A refusal used to be
+	 * discarded silently — the icon just did nothing, most often because today
+	 * had already been fully checked off and the day itself was still (wrongly)
+	 * treated as locked against new arrivals.
+	 */
+	async function antecipar(id: string) {
+		const erro = await planoStore.anteciparAtividade(id, hojeISO());
+		if (erro) planoStore.erro = erro;
 	}
 
 	// Highlight state for the day's tail drop zone.
@@ -219,7 +233,12 @@
 {#if descanso}
 	<div class="folga">
 		<span class="folga-dt">{weekdayShort(dia.data)} {String(diaNum).padStart(2, '0')}/{dia.data.slice(5, 7)}</span>
-		<span class="folga-tx"><TemaTexto tema={dia.tema} /></span>
+		<!-- A day the engine gave a theme says what it is. One left empty by a
+		     rearrangement has none, and used to render as a bare dashed line with
+		     nothing in it, which reads as a bug rather than as free time. -->
+		<span class="folga-tx">
+			{#if dia.tema}<TemaTexto tema={dia.tema} />{:else}nada agendado neste dia{/if}
+		</span>
 	</div>
 {:else}
 	<div class="dia" class:hoje class:revisao class:concluido={dia.registro?.concluido}>
@@ -274,7 +293,7 @@
 								onSoltar={onSoltarAtv}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
-								onAntecipar={(id) => void planoStore.anteciparAtividade(id, hojeISO())}
+								onAntecipar={(id) => void antecipar(id)}
 								onRegistrar={(el) => {
 									gatilho = el;
 									erroForm = null;
