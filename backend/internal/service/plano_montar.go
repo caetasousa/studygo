@@ -317,6 +317,49 @@ func resultadosDoPlano(dias []plano.Dia, salvo plano.Salvo) []plano.ResultadoTem
 	return out
 }
 
+// intervalosDeRevisita measures how many days pass, on average, between two
+// days that study the same discipline.
+//
+// Measured from the generated schedule rather than derived from a formula, so
+// it reflects what the plan actually does — reinforcement, rest days and the
+// reta final all bend the spacing, and a formula would quietly disagree with
+// the calendar the student is looking at.
+func intervalosDeRevisita(dias []plano.Dia) map[string]float64 {
+	ultimo := map[string]time.Time{}
+	soma := map[string]float64{}
+	vaos := map[string]int{}
+
+	for _, d := range dias {
+		// A discipline scheduled twice in one day is still one visit.
+		vistas := map[string]bool{}
+
+		for _, it := range d.Itens {
+			if it.Disciplina == "" || vistas[it.Disciplina] {
+				continue
+			}
+
+			vistas[it.Disciplina] = true
+
+			if ant, ok := ultimo[it.Disciplina]; ok {
+				soma[it.Disciplina] += float64(plano.DiffDays(ant, d.Data))
+				vaos[it.Disciplina]++
+			}
+
+			ultimo[it.Disciplina] = d.Data
+		}
+	}
+
+	out := make(map[string]float64, len(soma))
+
+	for cod, total := range soma {
+		if vaos[cod] > 0 {
+			out[cod] = round1(total / float64(vaos[cod]))
+		}
+	}
+
+	return out
+}
+
 // passadasDe is how many times a set of slots covers a discipline's whole topic
 // list — one complete pass over the subject, not per topic.
 //
@@ -341,6 +384,7 @@ func montarBalanceamento(
 	stats plano.Stats,
 ) []LinhaBalanceamento {
 	cfg = cfg.Normalizar()
+	intervalos := intervalosDeRevisita(res.Dias)
 	hBloco := cfg.HorasDia / 2
 	out := make([]LinhaBalanceamento, 0, len(c.Disciplinas))
 
@@ -383,6 +427,7 @@ func montarBalanceamento(
 			TotalPassadas: passadasDe(
 				res.Slots[d.Codigo]+res.SlotsReta[d.Codigo], len(d.Temas),
 			),
+			IntervaloDias: intervalos[d.Codigo],
 			HorasPrevisto: round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
 			HorasLancado:  round1(sd.Horas),
 			Desvio:        round1(tempoPct - pctIdeal),

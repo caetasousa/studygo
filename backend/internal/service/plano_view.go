@@ -246,6 +246,11 @@ type LinhaBalanceamento struct {
 	RevisoesGerais float64 `json:"revisoesGerais"`
 	// TotalPassadas is the two added up: every complete pass over the subject.
 	TotalPassadas float64 `json:"totalPassadas"`
+	// IntervaloDias is how many days pass, on average, between two days that
+	// study this discipline. It is what makes the cycle legible: "Português
+	// comes back every 7 days" says more about not forgetting it than any
+	// count of blocks does. 0 when the discipline appears at most once.
+	IntervaloDias float64 `json:"intervaloDias"`
 	HorasPrevisto float64 `json:"horasPrevisto"`
 	HorasLancado  float64 `json:"horasLancado"`
 	Desvio        float64 `json:"desvio"`

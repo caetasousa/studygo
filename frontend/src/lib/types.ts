@@ -305,6 +305,8 @@ export interface LinhaBalanceamento {
 	revisoesGerais: number;
 	/** The two added up: every complete pass before the exam. */
 	totalPassadas: number;
+	/** Average days between two days that study this discipline. */
+	intervaloDias: number;
 	horasPrevisto: number;
 	horasLancado: number;
 	desvio: number;

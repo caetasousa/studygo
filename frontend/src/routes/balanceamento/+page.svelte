@@ -21,6 +21,7 @@
 		cobertura.length > 0 ? cobertura.reduce((t, l) => t + f(l), 0) / cobertura.length : 0;
 
 	const mediaPassadas = $derived(media((l) => l.passadas));
+	const mediaIntervalo = $derived(media((l) => l.intervaloDias));
 	const mediaRevisoes = $derived(media((l) => l.revisoesGerais));
 	const mediaTotal = $derived(media((l) => l.totalPassadas));
 
@@ -129,7 +130,10 @@
 			Uma passada é percorrer a matéria inteira, do primeiro ao último tópico.
 			O ciclo de conteúdo dá as primeiras; a reta final revisa por cima delas.
 			<strong>Abaixo de 1× o plano não chega ao fim daquela matéria</strong> — não há
-			dias suficientes até a prova para vê-la inteira.
+			dias suficientes até a prova para vê-la inteira. A coluna
+			<strong>volta a cada</strong> é o intervalo médio entre dois dias da mesma
+			matéria: é ele que impede o esquecimento, porque o assunto reaparece antes
+			de você perdê-lo.
 		</p>
 		<div class="tbl-wrap">
 			<table class="tbl">
@@ -137,6 +141,7 @@
 					<tr>
 						<th>Disciplina</th>
 						<th>Tópicos</th>
+						<th>Volta a cada</th>
 						<th>Passadas no conteúdo</th>
 						<th>Revisões gerais na reta</th>
 						<th>Vezes que percorro a matéria</th>
@@ -150,6 +155,13 @@
 								{l.nome}
 							</td>
 							<td>{l.temas || '—'}</td>
+							<td>
+								{#if l.intervaloDias > 0}
+									{nf1.format(l.intervaloDias)} dias
+								{:else}
+									—
+								{/if}
+							</td>
 							<td>
 								{nf1.format(l.passadas)}×
 								{#if l.temas > 0 && l.passadas < 1}
@@ -167,6 +179,7 @@
 					<tr>
 						<td>Média do plano</td>
 						<td>{totalTemas}</td>
+						<td>{nf1.format(mediaIntervalo)} dias</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
 						<td>{nf1.format(mediaRevisoes)}×</td>
 						<td class="destaque">{nf1.format(mediaTotal)}×</td>
