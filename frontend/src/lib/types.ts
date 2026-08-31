@@ -299,10 +299,12 @@ export interface LinhaBalanceamento {
 	blocosReta: number;
 	/** Topics the discipline has. */
 	temas: number;
-	/** How many times the content phase covers all of them before the exam. */
+	/** Complete passes over the whole subject in the content phase. */
 	passadas: number;
-	/** Guided-review slots in the reta final. */
-	revisoes: number;
+	/** Complete passes over the whole subject in the reta final. */
+	revisoesGerais: number;
+	/** The two added up: every complete pass before the exam. */
+	totalPassadas: number;
 	horasPrevisto: number;
 	horasLancado: number;
 	desvio: number;

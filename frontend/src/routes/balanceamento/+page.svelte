@@ -7,31 +7,22 @@
 	import type { LinhaBalanceamento } from '$lib/types';
 
 	/**
-	 * How many times the plan goes over each subject before the exam.
+	 * How many times the plan goes through each SUBJECT before the exam.
 	 *
-	 * `passadas` is the content phase covering the whole topic list; the reta
-	 * final adds guided review on top. `vezesPorTopico` adds the two, which is
-	 * what answers "how many times will I see this topic".
+	 * Not per topic: a pass is covering the discipline's whole topic list once.
+	 * "I go through Português 3.5 times" is the question a student asks; "I see
+	 * each Português topic 4.2 times" is a different, less useful number.
 	 */
-	const cobertura = $derived(
-		(planoStore.plano?.balanceamento ?? []).map((l) => ({
-			...l,
-			vezesPorTopico: l.temas > 0 ? l.passadas + l.revisoes / l.temas : l.passadas + l.revisoes
-		}))
-	);
+	const cobertura = $derived(planoStore.plano?.balanceamento ?? []);
 
 	const totalTemas = $derived(cobertura.reduce((t, l) => t + l.temas, 0));
-	const totalRevisoes = $derived(cobertura.reduce((t, l) => t + l.revisoes, 0));
 
-	const mediaPassadas = $derived(
-		cobertura.length > 0 ? cobertura.reduce((t, l) => t + l.passadas, 0) / cobertura.length : 0
-	);
+	const media = (f: (l: LinhaBalanceamento) => number) =>
+		cobertura.length > 0 ? cobertura.reduce((t, l) => t + f(l), 0) / cobertura.length : 0;
 
-	const mediaVezes = $derived(
-		cobertura.length > 0
-			? cobertura.reduce((t, l) => t + l.vezesPorTopico, 0) / cobertura.length
-			: 0
-	);
+	const mediaPassadas = $derived(media((l) => l.passadas));
+	const mediaRevisoes = $derived(media((l) => l.revisoesGerais));
+	const mediaTotal = $derived(media((l) => l.totalPassadas));
 
 	const plano = $derived(planoStore.plano);
 	const esp = $derived(plano?.balanceamento.filter((l) => l.bloco === 'esp') ?? []);
@@ -133,10 +124,10 @@
 
 		<!-- The question the schedule could not answer: how many times will I
 		     actually go over each subject before the exam. -->
-		<h2 class="sec">Quantas vezes vejo cada matéria até a prova</h2>
+		<h2 class="sec">Quantas vezes percorro cada matéria até a prova</h2>
 		<p class="page-sub" style="margin-top:0">
-			Uma passada é cobrir todos os tópicos da matéria uma vez. O ciclo de
-			conteúdo dá a primeira leitura; a reta final revisa por cima dela.
+			Uma passada é percorrer a matéria inteira, do primeiro ao último tópico.
+			O ciclo de conteúdo dá as primeiras; a reta final revisa por cima delas.
 		</p>
 		<div class="tbl-wrap">
 			<table class="tbl">
@@ -145,8 +136,8 @@
 						<th>Disciplina</th>
 						<th>Tópicos</th>
 						<th>Passadas no conteúdo</th>
-						<th>Revisões na reta final</th>
-						<th>Vezes que vejo cada tópico</th>
+						<th>Revisões gerais na reta</th>
+						<th>Vezes que percorro a matéria</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -158,8 +149,8 @@
 							</td>
 							<td>{l.temas || '—'}</td>
 							<td>{nf1.format(l.passadas)}×</td>
-							<td>{l.revisoes}</td>
-							<td class="destaque">{nf1.format(l.vezesPorTopico)}×</td>
+							<td>{nf1.format(l.revisoesGerais)}×</td>
+							<td class="destaque">{nf1.format(l.totalPassadas)}×</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -168,8 +159,8 @@
 						<td>Média do plano</td>
 						<td>{totalTemas}</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
-						<td>{totalRevisoes}</td>
-						<td class="destaque">{nf1.format(mediaVezes)}×</td>
+						<td>{nf1.format(mediaRevisoes)}×</td>
+						<td class="destaque">{nf1.format(mediaTotal)}×</td>
 					</tr>
 				</tfoot>
 			</table>

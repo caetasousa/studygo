@@ -314,8 +314,8 @@ func resultadosDoPlano(dias []plano.Dia, salvo plano.Salvo) []plano.ResultadoTem
 	return out
 }
 
-// passadasDe is how many times the content phase covers a discipline's whole
-// topic list: its slots divided by its topics.
+// passadasDe is how many times a set of slots covers a discipline's whole topic
+// list — one complete pass over the subject, not per topic.
 //
 // A discipline with no topics of its own is headlined by its name (see the
 // engine), so one slot is one full pass.
@@ -376,11 +376,14 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
-			Revisoes:       res.SlotsReta[d.Codigo],
-			HorasPrevisto:  round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
-			HorasLancado:   round1(sd.Horas),
-			Desvio:         round1(tempoPct - pctIdeal),
-			AcertoPct:      acerto,
+			RevisoesGerais: passadasDe(res.SlotsReta[d.Codigo], len(d.Temas)),
+			TotalPassadas: passadasDe(
+				res.Slots[d.Codigo]+res.SlotsReta[d.Codigo], len(d.Temas),
+			),
+			HorasPrevisto: round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
+			HorasLancado:  round1(sd.Horas),
+			Desvio:        round1(tempoPct - pctIdeal),
+			AcertoPct:     acerto,
 		})
 	}
 

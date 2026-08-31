@@ -234,12 +234,18 @@ type LinhaBalanceamento struct {
 	PctIdeal       float64 `json:"pctIdeal"`
 	BlocosConteudo int     `json:"blocosConteudo"`
 	BlocosReta     int     `json:"blocosReta"`
-	// Temas is how many topics the discipline has, and Passadas how many times
-	// the plan covers all of them before the exam — the answer to "how many
-	// times will I see this before the day".
-	Temas         int     `json:"temas"`
-	Passadas      float64 `json:"passadas"`
-	Revisoes      int     `json:"revisoes"`
+	// Temas is how many topics the discipline has.
+	//
+	// Passadas is how many times the CONTENT phase goes through the whole
+	// discipline, and RevisoesGerais how many times the reta final does. Both
+	// count complete passes over the SUBJECT, not per topic: "I go through
+	// Português 3.5 times before the exam", which is the question a student
+	// actually asks.
+	Temas          int     `json:"temas"`
+	Passadas       float64 `json:"passadas"`
+	RevisoesGerais float64 `json:"revisoesGerais"`
+	// TotalPassadas is the two added up: every complete pass over the subject.
+	TotalPassadas float64 `json:"totalPassadas"`
 	HorasPrevisto float64 `json:"horasPrevisto"`
 	HorasLancado  float64 `json:"horasLancado"`
 	Desvio        float64 `json:"desvio"`
