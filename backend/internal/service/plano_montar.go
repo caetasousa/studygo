@@ -360,6 +360,47 @@ func intervalosDeRevisita(dias []plano.Dia) map[string]float64 {
 	return out
 }
 
+// reforcosDe is how many times the learning phase revisits a subject after the
+// first read.
+//
+// One pass is the first read, not a revisit; everything past it is repetition
+// while there is still time to act on what went badly. A subject the plan
+// cannot even finish once has no reinforcement at all.
+func reforcosDe(passadas float64) float64 {
+	if passadas <= 1 {
+		return 0
+	}
+
+	return round1(passadas - 1)
+}
+
+// revisoesRetaDe is how many times the reta final goes over a discipline.
+//
+// The reta works differently from the content phase, which is what made the
+// naive slots/topics wrong: when a discipline gets fewer blocks than it has
+// topics, `reparte` PARTITIONS the topic list across those blocks — one block
+// covering "T1 · T2 · T3 · T4" — instead of dropping the rest. So any block at
+// all means the whole subject is covered once, and extra blocks are extra full
+// passes.
+//
+// The old figure said 0.1x for a subject the reta actually reviews completely.
+func revisoesRetaDe(slots, temas int) float64 {
+	if slots <= 0 {
+		return 0
+	}
+
+	if temas <= 0 {
+		return float64(slots)
+	}
+
+	if slots <= temas {
+		// The blocks partition the whole list: exactly one complete pass.
+		return 1
+	}
+
+	return round1(float64(slots) / float64(temas))
+}
+
 // passadasDe is how many times a set of slots covers a discipline's whole topic
 // list — one complete pass over the subject, not per topic.
 //
@@ -423,9 +464,11 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
-			RevisoesGerais: passadasDe(res.SlotsReta[d.Codigo], len(d.Temas)),
-			TotalPassadas: passadasDe(
-				res.Slots[d.Codigo]+res.SlotsReta[d.Codigo], len(d.Temas),
+			Reforcos:       reforcosDe(passadasDe(res.Slots[d.Codigo], len(d.Temas))),
+			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
+			TotalPassadas: round1(
+				passadasDe(res.Slots[d.Codigo], len(d.Temas)) +
+					revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
 			),
 			IntervaloDias: intervalos[d.Codigo],
 			HorasPrevisto: round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),

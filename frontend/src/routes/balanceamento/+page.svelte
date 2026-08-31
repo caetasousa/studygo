@@ -22,6 +22,7 @@
 
 	const mediaPassadas = $derived(media((l) => l.passadas));
 	const mediaIntervalo = $derived(media((l) => l.intervaloDias));
+	const mediaReforcos = $derived(media((l) => l.reforcos));
 	const mediaRevisoes = $derived(media((l) => l.revisoesGerais));
 	const mediaTotal = $derived(media((l) => l.totalPassadas));
 
@@ -127,24 +128,40 @@
 		     actually go over each subject before the exam. -->
 		<h2 class="sec">Quantas vezes vejo cada matéria até a prova</h2>
 		<p class="page-sub" style="margin-top:0">
-			O plano tem duas fases. No <strong>aprendizado</strong> você vê a matéria pela
-			primeira vez, tópico por tópico. Na <strong>reta final</strong> não entra
-			assunto novo: você repassa o que já viu. Cada <strong>1×</strong> abaixo é
-			percorrer a matéria inteira, do primeiro ao último tópico.
+			<strong>1×</strong> quer dizer percorrer a matéria inteira, do primeiro ao
+			último tópico.
 		</p>
+		<ul class="legenda">
+			<li><b>Volta a cada</b> — de quantos em quantos dias esta matéria reaparece.</li>
+			<li><b>Aprendo</b> — quantas vezes vejo a matéria enquanto aprendo o conteúdo.</li>
+			<li>
+				<b>Reforço</b> — quantas vezes eu volto à matéria <em>ainda no aprendizado</em>,
+				depois da primeira leitura. É o número que importa: é aí que ainda dá tempo
+				de consertar o que ficou fraco.
+			</li>
+			<li>
+				<b>Reta final</b> — a última fase repassa cada matéria inteira uma vez, sempre.
+				Ali cada bloco cobre vários tópicos de uma vez.
+			</li>
+			<li><b>Total</b> — as duas somadas: o que eu de fato vejo antes da prova.</li>
+		</ul>
 		<div class="tbl-wrap">
 			<table class="tbl">
 				<thead>
 					<tr>
-						<th rowspan="2">Disciplina</th>
-						<th rowspan="2">Tópicos</th>
-						<th rowspan="2">Estudo a cada</th>
-						<th colspan="2" class="grupo">Vezes que vejo a matéria inteira</th>
-						<th rowspan="2">Total até a prova</th>
-					</tr>
-					<tr>
-						<th class="sub">Aprendendo</th>
-						<th class="sub">Repassando na reta final</th>
+						<th>Disciplina</th>
+						<th title="Quantos tópicos a matéria tem no edital">Tópicos</th>
+						<th title="Intervalo médio entre dois dias que estudam esta matéria">
+							Volta a cada
+						</th>
+						<th title="Vezes que vejo a matéria inteira aprendendo o conteúdo">
+							Aprendo
+						</th>
+						<th title="Vezes que volto à matéria ainda no aprendizado, depois da primeira leitura">
+							Reforço
+						</th>
+						<th title="A reta final repassa cada matéria inteira uma vez">Reta final</th>
+						<th title="Tudo somado: o que de fato vejo antes da prova">Total</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -165,13 +182,22 @@
 							<td>
 								{nf1.format(l.passadas)}×
 								{#if l.temas > 0 && l.passadas < 1}
-									<span class="aviso-cob">
-										só {Math.round(l.passadas * 100)}% do conteúdo
+									<span class="aviso-cob" title="O plano não chega ao fim desta matéria">
+										{Math.round(l.passadas * 100)}% dela
 									</span>
 								{/if}
 							</td>
-							<td>{nf1.format(l.revisoesGerais)}×</td>
-							<td class="destaque">{nf1.format(l.totalPassadas)}×</td>
+							<td class="destaque">
+								{#if l.reforcos > 0}
+									{nf1.format(l.reforcos)}×
+								{:else}
+									<span class="sem-reforco" title="Só dá tempo da primeira leitura">
+										nenhum
+									</span>
+								{/if}
+							</td>
+							<td class="fraco">{nf1.format(l.revisoesGerais)}×</td>
+							<td>{nf1.format(l.totalPassadas)}×</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -181,8 +207,9 @@
 						<td>{totalTemas}</td>
 						<td>{nf1.format(mediaIntervalo)} dias</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
-						<td>{nf1.format(mediaRevisoes)}×</td>
-						<td class="destaque">{nf1.format(mediaTotal)}×</td>
+						<td class="destaque">{nf1.format(mediaReforcos)}×</td>
+						<td class="fraco">{nf1.format(mediaRevisoes)}×</td>
+						<td>{nf1.format(mediaTotal)}×</td>
 					</tr>
 				</tfoot>
 			</table>
@@ -283,17 +310,34 @@
 {/if}
 
 <style>
-	/* Two of the columns are the same measure in different phases, so they read
-	   as one group with a shared heading rather than four unrelated numbers. */
-	.grupo {
-		text-align: center !important;
-		border-bottom: 1px solid var(--border);
-		padding-bottom: 4px !important;
+	/* The reta final is one sweep by design, so it recedes; the reinforcement
+	   before it is what varies and what the student can still act on. */
+	.fraco {
+		color: var(--text-faint);
 	}
-	.sub {
-		font-weight: 500;
-		opacity: 0.85;
+	.sem-reforco {
+		color: var(--danger);
+		font-weight: 600;
 	}
+
+	/* What each column means, spelled out once — the headers stay short so the
+	   table reads, and the meaning lives here instead of in the header. */
+	.legenda {
+		list-style: none;
+		margin: 8px 0 14px;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		font-size: 12.5px;
+		color: var(--text-muted);
+		max-width: 72ch;
+	}
+	.legenda b {
+		color: var(--text);
+		font-weight: 600;
+	}
+
 
 	/* A subject the plan cannot finish is the one thing on this page that must
 	   not read as just another row. */

@@ -241,8 +241,14 @@ type LinhaBalanceamento struct {
 	// count complete passes over the SUBJECT, not per topic: "I go through
 	// Português 3.5 times before the exam", which is the question a student
 	// actually asks.
-	Temas          int     `json:"temas"`
-	Passadas       float64 `json:"passadas"`
+	Temas    int     `json:"temas"`
+	Passadas float64 `json:"passadas"`
+	// Reforcos is how many times the LEARNING phase goes back over the subject
+	// after the first read — the repetition that happens while there is still
+	// time to fix what is weak. The reta final is a single sweep by design, so
+	// it says little; this is the number that varies and that a student can act
+	// on.
+	Reforcos       float64 `json:"reforcos"`
 	RevisoesGerais float64 `json:"revisoesGerais"`
 	// TotalPassadas is the two added up: every complete pass over the subject.
 	TotalPassadas float64 `json:"totalPassadas"`
