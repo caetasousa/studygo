@@ -256,6 +256,32 @@
 							/>
 						{/each}
 
+						<!-- The review row lives inside the same list as the subjects: a
+						     sibling grid with its own margins never lines up, however
+						     carefully its columns are copied. -->
+						{#if blocoRevisao}
+							<div class="atv revisao-bloco">
+								<span class="alca vazia" aria-hidden="true"></span>
+								<span class="min">{blocoRevisao.minutos} min</span>
+								<span class="chip rev-selo">REV</span>
+								<span class="txt">
+									<span class="tema">{materiaRevisada || 'Revisão'}</span>
+								</span>
+								<span class="acoes">
+									{#if materiaRevisada}
+										<a
+											class="rev-link"
+											href="/caderno#{disciplinaRevisada}"
+											title="Abrir o caderno de erros de {materiaRevisada}"
+											aria-label="Abrir o caderno de erros de {materiaRevisada}"
+										>
+											<NavIcon name="registrar" size="sm" />
+										</a>
+									{/if}
+								</span>
+							</div>
+						{/if}
+
 						{#if arrastandoAlgo}
 							<!-- Dropping past the last activity MOVES it here (no occupant to
 							     swap with), which the label states rather than implies. -->
@@ -281,29 +307,6 @@
 					</div>
 				{/if}
 
-				<!-- The review block. It is part of the day the engine planned, but the
-				     schedule only ever showed the subjects — so a block configured in
-				     Settings was invisible exactly where it is meant to be followed. -->
-				{#if blocoRevisao}
-					<div class="revisao-bloco">
-						<span class="rev-alca" aria-hidden="true"></span>
-						<span class="rev-min">{blocoRevisao.minutos} min</span>
-						<span class="rev-selo">REV</span>
-						<span class="rev-nome">{materiaRevisada || 'Revisão'}</span>
-						{#if materiaRevisada}
-							<a
-								class="rev-link"
-								href="/caderno#{disciplinaRevisada}"
-								title="Abrir o caderno de erros de {materiaRevisada}"
-								aria-label="Abrir o caderno de erros de {materiaRevisada}"
-							>
-								<NavIcon name="registrar" size="sm" />
-							</a>
-						{:else}
-							<span></span>
-						{/if}
-					</div>
-				{/if}
 			</div>
 		</div>
 	</div>
@@ -444,27 +447,33 @@
 	/* Same column structure as an activity row — handle | minutes | code |
 	   subject | action — so the review lines up with the subjects above it
 	   instead of reading as a footnote. */
+	/* The activity row's styles are scoped to AtividadeItem, so they cannot be
+	   inherited here — the grid is restated with the same values. Any change to
+	   AtividadeItem's own grid has to be mirrored, which is the cost of the two
+	   rows living in different components. */
 	.revisao-bloco {
 		display: grid;
 		grid-template-columns: 18px auto auto minmax(0, 1fr) auto;
 		align-items: baseline;
 		gap: 6px 10px;
-		margin: 2px 6px;
 		padding: 7px 8px;
+		border-radius: 8px;
 		border-top: 1px dashed var(--border);
+		margin-top: 2px;
 	}
-	.rev-alca {
+	.revisao-bloco .alca {
 		width: 18px;
+		height: 18px;
 	}
-	.rev-min {
+	.revisao-bloco .min {
 		font-family: var(--font-mono);
 		font-size: 11px;
 		color: var(--text-faint);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	/* Stands in for a discipline chip, in the review colour. */
-	.rev-selo {
+	/* Stands in for the discipline chip, in the review colour. */
+	.revisao-bloco .chip {
 		min-width: 52px;
 		box-sizing: border-box;
 		text-align: center;
@@ -478,18 +487,24 @@
 		color: var(--warn);
 		white-space: nowrap;
 	}
-	.rev-nome {
+	.revisao-bloco .txt {
+		min-width: 0;
+	}
+	.revisao-bloco .tema {
 		font-size: 14px;
 		line-height: 1.5;
 		color: var(--text);
-		min-width: 0;
+	}
+	.revisao-bloco .acoes {
+		display: flex;
+		align-items: center;
+		align-self: center;
 	}
 	.rev-link {
 		display: grid;
 		place-items: center;
 		width: var(--icon-hit);
 		height: var(--icon-hit);
-		align-self: center;
 		border-radius: 8px;
 		color: var(--text-muted);
 	}
