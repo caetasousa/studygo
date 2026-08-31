@@ -241,11 +241,13 @@ type LinhaBalanceamento struct {
 	// count complete passes over the SUBJECT, not per topic: "I go through
 	// Português 3.5 times before the exam", which is the question a student
 	// actually asks.
-	Temas          int     `json:"temas"`
-	Passadas       float64 `json:"passadas"`
+	Temas    int     `json:"temas"`
+	Passadas float64 `json:"passadas"`
+	// Revisoes is how many times the daily review queue goes over this
+	// discipline's whole topic list before the reta final — the answer to "how
+	// many times do I review Português".
+	Revisoes       float64 `json:"revisoes"`
 	RevisoesGerais float64 `json:"revisoesGerais"`
-	// TotalPassadas is the two added up: every complete pass over the subject.
-	TotalPassadas float64 `json:"totalPassadas"`
 	// IntervaloDias is how many days pass, on average, between two days that
 	// study this discipline. It is what makes the cycle legible: "Português
 	// comes back every 7 days" says more about not forgetting it than any

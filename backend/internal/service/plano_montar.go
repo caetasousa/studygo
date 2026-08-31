@@ -437,6 +437,7 @@ func montarBalanceamento(
 ) []LinhaBalanceamento {
 	cfg = cfg.Normalizar()
 	intervalos := intervalosDeRevisita(res.Dias)
+	revisoes := plano.RevisoesPorDisciplina(res.Dias, temasPorRevisao(cfg))
 	hBloco := cfg.HorasDia / 2
 	out := make([]LinhaBalanceamento, 0, len(c.Disciplinas))
 
@@ -475,16 +476,13 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
+			Revisoes:       round1(revisoes[d.Codigo]),
 			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
-			TotalPassadas: round1(
-				passadasDe(res.Slots[d.Codigo], len(d.Temas)) +
-					revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
-			),
-			IntervaloDias: intervalos[d.Codigo],
-			HorasPrevisto: round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
-			HorasLancado:  round1(sd.Horas),
-			Desvio:        round1(tempoPct - pctIdeal),
-			AcertoPct:     acerto,
+			IntervaloDias:  intervalos[d.Codigo],
+			HorasPrevisto:  round1(float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * hBloco),
+			HorasLancado:   round1(sd.Horas),
+			Desvio:         round1(tempoPct - pctIdeal),
+			AcertoPct:      acerto,
 		})
 	}
 

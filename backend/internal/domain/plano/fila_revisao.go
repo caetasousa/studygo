@@ -107,6 +107,60 @@ func proximaLevaRevisao(fila []ItemRevisao, cursor *int, porDia int) []ItemRevis
 	return out
 }
 
+// RevisoesPorDisciplina counts, per discipline, how many review passes over its
+// whole topic list the queue delivers before the reta final.
+//
+// A pass is the queue coming back to every topic of that subject once. It is
+// what answers "how many times do I review Português", which the plan-wide lap
+// count cannot: a subject studied early is revisited far more than one studied
+// late, and the average hides that.
+func RevisoesPorDisciplina(dias []Dia, porDia int) map[string]float64 {
+	revisados := map[string]int{}
+	temas := map[string]map[string]bool{}
+
+	for n, itens := range FilaRevisao(dias, porDia) {
+		_ = n
+
+		for _, it := range itens {
+			revisados[it.Disciplina]++
+		}
+	}
+
+	// The denominator is the discipline's own topic count as the plan schedules
+	// it, not the catalogue's: a subject the plan never finishes teaching has
+	// fewer topics in the queue to review.
+	for _, d := range dias {
+		if d.Fase == FaseReta {
+			break
+		}
+
+		for _, it := range d.Itens {
+			if it.Disciplina == "" || it.Tema == "" {
+				continue
+			}
+
+			if temas[it.Disciplina] == nil {
+				temas[it.Disciplina] = map[string]bool{}
+			}
+
+			temas[it.Disciplina][it.Tema] = true
+		}
+	}
+
+	out := make(map[string]float64, len(revisados))
+
+	for cod, n := range revisados {
+		t := len(temas[cod])
+		if t == 0 {
+			continue
+		}
+
+		out[cod] = float64(n) / float64(t)
+	}
+
+	return out
+}
+
 // VoltasRevisao is how many complete laps over everything studied the plan gets
 // through before the reta final.
 //

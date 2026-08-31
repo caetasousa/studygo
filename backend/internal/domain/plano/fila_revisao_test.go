@@ -155,3 +155,51 @@ func TestVoltasRevisao(t *testing.T) {
 		}
 	})
 }
+
+func TestRevisoesPorDisciplina(t *testing.T) {
+	t.Parallel()
+
+	t.Run("conta as voltas sobre cada matéria", func(t *testing.T) {
+		t.Parallel()
+
+		// POR tem 1 tópico e é revisado nos dias 2, 3 e 4: 3 voltas sobre ele.
+		dias := []plano.Dia{
+			diaEstudo(1, item("POR", "p1")),
+			diaEstudo(2), diaEstudo(3), diaEstudo(4),
+		}
+
+		got := plano.RevisoesPorDisciplina(dias, 1)
+
+		if got["POR"] != 3 {
+			t.Errorf("POR = %v, quer 3", got["POR"])
+		}
+	})
+
+	t.Run("matéria estudada cedo é revisada mais que a estudada tarde", func(t *testing.T) {
+		t.Parallel()
+
+		// POR entra no dia 1, MAT só no dia 4: POR roda mais vezes na fila.
+		dias := []plano.Dia{
+			diaEstudo(1, item("POR", "p1")),
+			diaEstudo(2), diaEstudo(3),
+			diaEstudo(4, item("MAT", "m1")),
+			diaEstudo(5), diaEstudo(6),
+		}
+
+		got := plano.RevisoesPorDisciplina(dias, 1)
+
+		if !(got["POR"] > got["MAT"]) {
+			t.Errorf("POR = %v, MAT = %v; a estudada cedo devia liderar", got["POR"], got["MAT"])
+		}
+	})
+
+	t.Run("matéria nunca estudada não aparece", func(t *testing.T) {
+		t.Parallel()
+
+		dias := []plano.Dia{diaEstudo(1, item("POR", "p1")), diaEstudo(2)}
+
+		if _, ok := plano.RevisoesPorDisciplina(dias, 1)["MAT"]; ok {
+			t.Error("MAT apareceu sem nunca ter sido estudada")
+		}
+	})
+}
