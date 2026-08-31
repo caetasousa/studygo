@@ -215,6 +215,19 @@ CONTEUDO_INSTRUCTION = (
     "Você recebe também uma lista de disciplinas e um cargo. Para CADA disciplina "
     "da lista, extraia do conteúdo programático os tópicos correspondentes ÀQUELE "
     "cargo, um tópico por item, mantendo a redação do edital.\n"
+    "IMPORTANTE — muitas ementas (sobretudo as de Conhecimentos Gerais) vêm como "
+    "um PARÁGRAFO CORRIDO, com os assuntos separados por ponto final, e não como "
+    "uma lista. Nesse caso DIVIDA o parágrafo: cada assunto vira um item de "
+    '"topicos". NUNCA devolva a ementa inteira de uma disciplina como um único '
+    "tópico — isso faz a matéria virar um bloco só no cronograma.\n"
+    'Exemplo: "Redação Oficial. Ortografia e acentuação. Emprego do sinal '
+    'indicativo de crase." vira três tópicos: ["Redação Oficial", "Ortografia e '
+    'acentuação", "Emprego do sinal indicativo de crase"].\n'
+    "Cuidado para NÃO cortar no ponto de abreviações, números de lei ou datas "
+    '("Lei nº 8.666/93", "Resolução nº 22, de 04/09/2008") — esses pontos não '
+    "separam assuntos.\n"
+    "Mantenha junto o que o edital apresenta como um assunto só, mesmo que tenha "
+    "subdivisões internas com ponto e vírgula ou dois-pontos.\n"
     "NÃO resuma nem modernize leis, versões ou tecnologias.\n"
     "NÃO misture o conteúdo de cargos diferentes.\n"
     "Retorne itens: [{ disciplina (exatamente como na lista), topicos: [string], "
