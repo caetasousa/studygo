@@ -215,11 +215,26 @@ class PlanoStore {
 
 		const reg = d.registro;
 
+		// The activity being recorded may still be scheduled for a later day — a
+		// topic finished ahead of time is recorded on the day it was studied, and
+		// the backend then moves it here. Include it, or rebuilding the day's
+		// blocks from this day's items alone would drop the very record being
+		// saved.
+		const daqui = d.itens.some((it) => it.id === atividadeId);
+		const itens = daqui
+			? d.itens
+			: [
+					...d.itens,
+					...(this.plano?.dias
+						.flatMap((x) => x.itens)
+						.filter((it) => it.id === atividadeId) ?? [])
+				];
+
 		// Rebuild the day's block set: this activity from the form, every other
 		// from what is already stored. Addressed by atividadeId so two occurrences
 		// of the same discipline in a day stay independent.
 		const blocosAtividades: RegistroBlocoInput[] = blocosComAtividade(
-			d.itens,
+			itens,
 			reg?.blocos ?? [],
 			atividadeId,
 			v
@@ -229,7 +244,7 @@ class PlanoStore {
 		// same discipline occurs more than once. Keep that historical row exactly
 		// once while editing a new activity; UpsertRegistro replaces the whole day.
 		const contagem = new Map<string, number>();
-		for (const it of d.itens) {
+		for (const it of itens) {
 			contagem.set(it.disciplina, (contagem.get(it.disciplina) ?? 0) + 1);
 		}
 		const legadosAmbiguos: RegistroBlocoInput[] = (reg?.blocos ?? [])

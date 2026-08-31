@@ -133,7 +133,14 @@
 		salvando = true;
 		erroForm = null;
 
-		const msg = await planoStore.salvarAtividade(dia.data, it.id, it.disciplina, v);
+		// Finishing a topic scheduled for a later day records it on TODAY — the day
+		// it was actually studied — and the backend then brings the activity here.
+		// Recording it on the day it was planned for would say the study happened
+		// in the future and leave nothing to move.
+		const hoje = hojeISO();
+		const quando = v.concluido && dia.data > hoje ? hoje : dia.data;
+
+		const msg = await planoStore.salvarAtividade(quando, it.id, it.disciplina, v);
 
 		salvando = false;
 
