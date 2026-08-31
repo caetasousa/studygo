@@ -141,9 +141,16 @@
 	 * The engine returns every block of the day; the subjects are already drawn
 	 * as activities above, so only the review one is left to show here.
 	 */
-	/** True for the block that closes the day, whatever it is currently called. */
-	const ehRevisao = (titulo: string) =>
-		titulo === 'Revisão' || titulo.startsWith('Caderno de erros');
+	/**
+	 * True for the block that closes the day.
+	 *
+	 * Matched by prefix, not by exact title: the block names the subject it
+	 * revises ("Revisão — Banco de Dados"), and an exact match silently dropped
+	 * every day but the first — where it happens to read just "Revisão" because
+	 * there is nothing studied yet to revise. It also shifted the content
+	 * durations, since the review block was then counted as a subject block.
+	 */
+	const ehRevisao = (titulo: string) => titulo.startsWith('Revisão');
 
 	const blocoRevisao = $derived(dia.blocos.find((b) => ehRevisao(b.titulo)) ?? null);
 
