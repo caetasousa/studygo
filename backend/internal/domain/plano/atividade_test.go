@@ -190,11 +190,17 @@ func TestMoverAtividade_Recusas(t *testing.T) {
 			querErro:  nil,
 		},
 		{
-			nome:      "não move para dentro de um dia concluído",
+			// A content day's own "concluído" only describes the items it happened
+			// to hold a moment ago — a stale snapshot, not a lock. This is exactly
+			// the case antecipar exists for: today already fully done, and one more
+			// subject finished early still has to land on it. See
+			// TestMoverAtividade_NaoMoveParaDentroDeRevisaoConcluida for the day
+			// type that DOES stay locked.
+			nome:      "move para dentro de um dia de conteúdo concluído",
 			id:        "a",
 			destino:   dia(2026, 9, 2),
 			concluido: func(t time.Time) bool { return t.Equal(dia(2026, 9, 2)) },
-			querErro:  plano.ErrDiaConcluido,
+			querErro:  nil,
 		},
 	}
 
@@ -209,6 +215,25 @@ func TestMoverAtividade_Recusas(t *testing.T) {
 				t.Fatalf("erro = %v, quer %v", err, tt.querErro)
 			}
 		})
+	}
+}
+
+// A weekly-review day is never given items by the engine, so a "concluído"
+// there is the student's own word for the whole day, not a derived snapshot —
+// and that word is exactly what a move into it would silently contradict.
+func TestMoverAtividade_NaoMoveParaDentroDeRevisaoConcluida(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoRevisaoSemanal},
+	}
+
+	concluido := func(t time.Time) bool { return t.Equal(dia(2026, 9, 2)) }
+
+	_, err := plano.MoverAtividade(atividadesBase(), dias, "a", dia(2026, 9, 2), 0, concluido)
+	if !errors.Is(err, plano.ErrDiaConcluido) {
+		t.Fatalf("erro = %v, quer ErrDiaConcluido", err)
 	}
 }
 
@@ -373,7 +398,9 @@ func TestTrocarAtividades(t *testing.T) {
 	}
 }
 
-func TestTrocarAtividades_RecusaDiaConcluido(t *testing.T) {
+// See TestMoverAtividade_Recusas: a content day's own "concluído" is a stale
+// snapshot, not a lock, so a swap into one is allowed.
+func TestTrocarAtividades_PermiteDiaDeConteudoConcluido(t *testing.T) {
 	t.Parallel()
 
 	concluido := func(dt time.Time) bool { return dt.Equal(dia(2026, 9, 2)) }
@@ -381,6 +408,24 @@ func TestTrocarAtividades_RecusaDiaConcluido(t *testing.T) {
 	_, err := plano.TrocarAtividades(
 		atividadesBase(), diasBase(), "a", dia(2026, 9, 2), 0, concluido,
 	)
+	if err != nil {
+		t.Fatalf("TrocarAtividades: %v", err)
+	}
+}
+
+// A weekly-review day's "concluído" is the student's own word for the whole
+// day, not a derived snapshot, and stays a lock.
+func TestTrocarAtividades_RecusaRevisaoConcluida(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo},
+		{N: 2, Data: dia(2026, 9, 2), Tipo: plano.TipoRevisaoSemanal},
+	}
+
+	concluido := func(dt time.Time) bool { return dt.Equal(dia(2026, 9, 2)) }
+
+	_, err := plano.TrocarAtividades(atividadesBase(), dias, "a", dia(2026, 9, 2), 0, concluido)
 	if !errors.Is(err, plano.ErrDiaConcluido) {
 		t.Fatalf("erro = %v, quer ErrDiaConcluido", err)
 	}

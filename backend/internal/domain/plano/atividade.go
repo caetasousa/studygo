@@ -125,8 +125,10 @@ func TrocarAtividades(
 	// Only the destination is guarded here: whether the activity ITSELF is
 	// finished is decided by the caller, which can see the records. Refusing
 	// every move out of a day that holds finished work would freeze that day's
-	// other subjects too.
-	if concluido(destino) {
+	// other subjects too. See DestinoBloqueado: a content day's own flag does
+	// not lock it either, since it is derived from a snapshot that is about to
+	// change anyway.
+	if DestinoBloqueado(dias, destino, concluido) {
 		return nil, ErrDiaConcluido
 	}
 
@@ -313,10 +315,13 @@ func MoverAtividade(
 		return nil, ErrDestinoInvalido
 	}
 
-	// A concluded day is history on both ends: moving into or out of one would
-	// silently contradict what the student recorded.
-	// See TrocarAtividades: the origin is not guarded, only the destination.
-	if concluido(destino) {
+	// See TrocarAtividades: the origin is not guarded, only the destination —
+	// and see DestinoBloqueado for what actually locks it. A day whose
+	// "concluído" only describes the items it happened to hold a moment ago
+	// (any content day) does not lock; one whose "concluído" is the student's
+	// own word for the whole day (a weekly review with nothing to point at)
+	// does.
+	if DestinoBloqueado(dias, destino, concluido) {
 		return nil, ErrDiaConcluido
 	}
 
