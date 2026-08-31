@@ -397,6 +397,8 @@ func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
 	cfg.DiaRevisao = 5
 	cfg.RetaFinalDias = 28
 	cfg.Questoes = map[string]int{"D01": 10}
+	// This is about the weekly-review DAY's content, which is opt-in now.
+	cfg.RevisaoSemanal = true
 	cfg.CicloRevisao = []concurso.RevItem{
 		{Ordem: 0, Titulo: "Minha revisão semanal", Questoes: 42},
 		{Ordem: 1, Titulo: "", Questoes: 10}, // sem título: descartado

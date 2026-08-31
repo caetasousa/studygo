@@ -38,6 +38,7 @@ type ConfigInput struct {
 	QuestoesPorRevisao *int               `json:"questoesPorRevisao"`
 	Intervalos         *[]int             `json:"intervalos"`
 	CicloRevisao       *[]CicloItemInput  `json:"cicloRevisao"`
+	RevisaoSemanal     *bool              `json:"revisaoSemanal"`
 	Simulados          *string            `json:"simulados"`
 	Discursiva         *bool              `json:"discursiva"`
 	Modos              map[string]string  `json:"modos"`
@@ -152,6 +153,7 @@ type ConfigResposta struct {
 	QuestoesPorRevisao int                `json:"questoesPorRevisao"`
 	Intervalos         []int              `json:"intervalos"`
 	CicloRevisao       []CicloItemInput   `json:"cicloRevisao"`
+	RevisaoSemanal     bool               `json:"revisaoSemanal"`
 	Simulados          string             `json:"simulados"`
 	Discursiva         bool               `json:"discursiva"`
 	Modos              map[string]string  `json:"modos"`
@@ -306,6 +308,26 @@ type CadernoResposta struct {
 	DiasComNota  []DiaNota          `json:"diasComNota"`
 	DiasFracos   []DiaFraco         `json:"diasFracos"`
 	VencendoHoje []RevisaoResposta  `json:"vencendoHoje"`
+	// PorDisciplina is the error notebook itself: what went wrong, per subject,
+	// accumulating over the cycle. It is what the daily review tail drills.
+	PorDisciplina []CadernoDisciplina `json:"porDisciplina"`
+}
+
+// CadernoDisciplina is one discipline's notebook.
+type CadernoDisciplina struct {
+	Disciplina string                `json:"disciplina"`
+	Nome       string                `json:"nome"`
+	Cor        int                   `json:"cor"`
+	Temas      []ItemCadernoResposta `json:"temas"`
+}
+
+type ItemCadernoResposta struct {
+	Tema           string `json:"tema"`
+	Erros          int    `json:"erros"`
+	Questoes       int    `json:"questoes"`
+	Acertos        int    `json:"acertos"`
+	Aproveitamento int    `json:"aproveitamento"`
+	UltimaData     string `json:"ultimaData"`
 }
 
 type AnotacaoResposta struct {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
@@ -147,5 +148,37 @@ func TestBlocosDoInput_DesmarcarPreservaNumeros(t *testing.T) {
 	if b.Horas == nil || *b.Horas != 2 || b.Questoes == nil || *b.Questoes != 20 ||
 		b.Acertos == nil || *b.Acertos != 15 || b.Nota != "revisar crase" {
 		t.Errorf("desmarcar apagou dados: %+v", b)
+	}
+}
+
+// A synthetic slot id is not a uuid, so letting it reach the column made the
+// whole INSERT fail and the record vanish with no visible error. It must be
+// dropped, keeping the record keyed by discipline.
+func TestBlocosDoInput_DescartaIDDerivado(t *testing.T) {
+	t.Parallel()
+
+	c := concurso.Concurso{
+		Disciplinas: []concurso.Disciplina{{Codigo: "POR", Nome: "Português"}},
+	}
+
+	got := blocosDoInput(c, []RegistroBlocoInput{
+		{
+			Disciplina:  "POR",
+			AtividadeID: plano.IDDerivado(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC), 0),
+			Questoes:    ptrI(10),
+			Acertos:     ptrI(2),
+		},
+	})
+
+	if len(got) != 1 {
+		t.Fatalf("blocos = %d, quer 1 — o registro não pode sumir", len(got))
+	}
+
+	if got[0].AtividadeID != "" {
+		t.Errorf("AtividadeID = %q, quer vazio (id sintético não é uuid)", got[0].AtividadeID)
+	}
+
+	if got[0].Questoes == nil || *got[0].Questoes != 10 {
+		t.Error("os números do registro se perderam")
 	}
 }

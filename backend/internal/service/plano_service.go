@@ -781,6 +781,10 @@ func aplicarMetodoInput(cfg *plano.Config, c concurso.Concurso, in ConfigInput) 
 		cfg.PctRevisao = *in.PctRevisao
 	}
 
+	if in.RevisaoSemanal != nil {
+		cfg.RevisaoSemanal = *in.RevisaoSemanal
+	}
+
 	if in.CicloRevisao != nil {
 		cfg.CicloRevisao = cicloDoInput(*in.CicloRevisao)
 	}
@@ -942,6 +946,16 @@ func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.Registr
 
 		visto[chave] = true
 
+		// A synthetic slot id ("gen:<date>:<pos>") addresses an activity that was
+		// never stored, so it is not a uuid and must not reach the column. The
+		// record still lands, keyed by discipline, exactly as before activities
+		// were addressable — the next move materialises the activity and later
+		// records carry the real id.
+		atividadeID := strings.TrimSpace(b.AtividadeID)
+		if plano.EhIDDerivado(atividadeID) {
+			atividadeID = ""
+		}
+
 		out = append(out, plano.RegistroBloco{
 			Disciplina:  codigo,
 			Horas:       b.Horas,
@@ -949,7 +963,7 @@ func blocosDoInput(c concurso.Concurso, in []RegistroBlocoInput) []plano.Registr
 			Acertos:     naoMaiorQue(b.Acertos, b.Questoes),
 			Nota:        strings.TrimSpace(b.Nota),
 			Concluido:   b.Concluido,
-			AtividadeID: strings.TrimSpace(b.AtividadeID),
+			AtividadeID: atividadeID,
 		})
 	}
 

@@ -132,6 +132,7 @@ func (s *PlanoService) Caderno(ctx context.Context, userID uuid.UUID, slug strin
 	}
 
 	caderno := montarCaderno(c, salvo, res.Dias, anots)
+	caderno.PorDisciplina = montarCadernoPorDisciplina(c, res.Dias, salvo)
 
 	hoje := plano.DayOf(s.clock.Now())
 	caderno.VencendoHoje = revisoesDoDia(plano.VencidasAte(salvo.Revisoes, hoje), salvo.Config, hoje)
@@ -239,6 +240,52 @@ func anotacaoFromInput(c concurso.Concurso, base plano.Anotacao, in AnotacaoInpu
 	}
 
 	return base, nil
+}
+
+// montarCadernoPorDisciplina turns the accumulated wrong answers into one
+// notebook per discipline — the same structure the daily review tail drills, so
+// the screen shows exactly what will come back.
+func montarCadernoPorDisciplina(
+	c concurso.Concurso,
+	dias []plano.Dia,
+	salvo plano.Salvo,
+) []CadernoDisciplina {
+	cadernos := plano.Caderno(resultadosDoPlano(dias, salvo))
+	if len(cadernos) == 0 {
+		return []CadernoDisciplina{}
+	}
+
+	out := make([]CadernoDisciplina, 0, len(cadernos))
+
+	// Follow the concurso's own discipline order, so the screen is stable
+	// instead of following map iteration.
+	for i, d := range c.Disciplinas {
+		itens, ok := cadernos[d.Codigo]
+		if !ok || len(itens) == 0 {
+			continue
+		}
+
+		temas := make([]ItemCadernoResposta, 0, len(itens))
+		for _, it := range itens {
+			temas = append(temas, ItemCadernoResposta{
+				Tema:           it.Tema,
+				Erros:          it.Erros,
+				Questoes:       it.Questoes,
+				Acertos:        it.Acertos,
+				Aproveitamento: it.Aproveitamento(),
+				UltimaData:     it.UltimaData,
+			})
+		}
+
+		out = append(out, CadernoDisciplina{
+			Disciplina: d.Codigo,
+			Nome:       d.Nome,
+			Cor:        i % 13,
+			Temas:      temas,
+		})
+	}
+
+	return out
 }
 
 func montarCaderno(

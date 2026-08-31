@@ -224,7 +224,21 @@ func atribuiFases(cfg Config, estudo []*diaTmp) map[int]Fase {
 	return fase
 }
 
+// atribuiBase lays out one content week.
+//
+// Review is a DAILY tail of every study day (see Blocos and PctRevisao), fed by
+// the error notebook, so by default no day is surrendered to it and the whole
+// week is content. `RevisaoSemanal` brings the old fixed day back for the study
+// methods that want it.
 func atribuiBase(cfg Config, conteudo []*diaTmp) {
+	for _, d := range conteudo {
+		d.papel = "est"
+	}
+
+	if !cfg.RevisaoSemanal {
+		return
+	}
+
 	rev := conteudo[len(conteudo)-1]
 
 	for _, d := range conteudo {
@@ -234,12 +248,7 @@ func atribuiBase(cfg Config, conteudo []*diaTmp) {
 		}
 	}
 
-	for _, d := range conteudo {
-		d.papel = "est"
-		if d == rev {
-			d.papel = "rev"
-		}
-	}
+	rev.papel = "rev"
 }
 
 // atribuiReta lays out one reta-final week. By default the last day is a full

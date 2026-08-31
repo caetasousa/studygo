@@ -3,6 +3,7 @@ package plano
 import (
 	"math"
 	"strconv"
+	"strings"
 )
 
 // Bloco is one time slice of a day's routine: minutes, a label, and what to do.
@@ -17,6 +18,10 @@ type BlocoCtx struct {
 	Cfg      Config            // the user's plan settings (dates, rhythm, method)
 	Nomes    map[string]string // discipline codigo -> display name
 	Simulado Composicao        // question split of a full mock exam
+	// Cadernos is the error notebook per discipline codigo. When present, the
+	// day's review tail drills what the student got wrong in the subjects that
+	// day covers, instead of the plain spaced-review queue.
+	Cadernos map[string][]ItemCaderno
 }
 
 // Composicao is how many questions of each bloco a full exam has.
@@ -64,11 +69,7 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 			return out
 		}
 
-		out = append(out, Bloco{
-			Minutos: m5(h * pctRevisao),
-			Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
-			Detalhe: revisaoDetalhe(cfg, d.Revisoes),
-		})
+		out = append(out, caudaRevisao(cfg, d, ctx, m5(h*pctRevisao)))
 
 		return out
 	}
@@ -150,6 +151,71 @@ func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
 	default:
 		return "teoria com resumo de própria autoria e " + q + " questões do tema, corrigidas uma a uma"
 	}
+}
+
+// caudaRevisao is the review slice that closes a study day.
+//
+// It drills the ERROR NOTEBOOK of the day's own disciplines: the topics that
+// went badly, accumulated, which is the method's whole point — by the end of
+// the cycle the notebook holds the part of the edital that resisted you. It
+// falls back to the spaced-review queue when nothing is in the notebook yet,
+// which is exactly the start of a plan, so the tail is never empty time.
+func caudaRevisao(cfg Config, d Dia, ctx BlocoCtx, minutos int) Bloco {
+	discs := make([]string, 0, len(d.Itens))
+	for _, it := range d.Itens {
+		discs = append(discs, it.Disciplina)
+	}
+
+	// One topic per pending review keeps the tail the same size as before.
+	if itens := TemasDoDia(ctx.Cadernos, discs, len(d.Revisoes)); len(itens) > 0 {
+		return Bloco{
+			Minutos: minutos,
+			Titulo:  "Caderno de erros — " + strconv.Itoa(len(itens)) + " temas",
+			Detalhe: cadernoDetalhe(cfg, itens, ctx.Nomes),
+		}
+	}
+
+	return Bloco{
+		Minutos: minutos,
+		Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
+		Detalhe: revisaoDetalhe(cfg, d.Revisoes),
+	}
+}
+
+// cadernoDetalhe says what to do with the notebook topics, naming them so the
+// block is actionable without opening another screen.
+func cadernoDetalhe(cfg Config, itens []ItemCaderno, nomes map[string]string) string {
+	por := cfg.QuestoesPorRevisao
+
+	var b strings.Builder
+
+	b.WriteString("questões dos assuntos que você errou")
+
+	if cfg.RevisaoPorQuestoes {
+		b.WriteString(" — ")
+		b.WriteString(strconv.Itoa(por))
+		b.WriteString(" de cada, sem consultar antes")
+	}
+
+	b.WriteString(": ")
+
+	for i, it := range itens {
+		if i > 0 {
+			b.WriteString("  ·  ")
+		}
+
+		if n := nomes[it.Disciplina]; n != "" {
+			b.WriteString(n)
+			b.WriteString(" — ")
+		}
+
+		b.WriteString(it.Tema)
+		b.WriteString(" (")
+		b.WriteString(strconv.Itoa(it.Aproveitamento()))
+		b.WriteString("%)")
+	}
+
+	return b.String()
 }
 
 // revisaoDetalhe says what is actually due today. Retrieval beats re-reading, so

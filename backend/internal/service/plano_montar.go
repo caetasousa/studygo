@@ -75,6 +75,7 @@ func (s *PlanoService) montar(
 		Cfg:      salvo.Config,
 		Nomes:    nomes,
 		Simulado: res.Simulado,
+		Cadernos: plano.Caderno(resultadosDoPlano(res.Dias, salvo)),
 	}
 
 	dias := make([]DiaResposta, 0, len(res.Dias))
@@ -242,6 +243,7 @@ func montarConfig(salvo plano.Salvo) ConfigResposta {
 		QuestoesPorRevisao: cfg.QuestoesPorRevisao,
 		Intervalos:         cfg.Intervalos,
 		CicloRevisao:       ciclo,
+		RevisaoSemanal:     cfg.RevisaoSemanal,
 		Simulados:          string(cfg.Simulados),
 		Discursiva:         cfg.Discursiva,
 		Modos:              modos,
@@ -269,6 +271,71 @@ func montarMarcos(c concurso.Concurso, checks map[uuid.UUID]bool) []MarcoRespost
 			ExigeAcao:  m.ExigeAcao,
 			EProva:     m.EProva,
 			Cumprido:   checks[m.ID],
+		})
+	}
+
+	return out
+}
+
+// resultadosDoPlano collects every answered battery in the plan, which is what
+// the error notebook is built from.
+//
+// Two sources, because a topic can be answered in either: the day records
+// (what was studied that day) and the spaced-review queue (what came back).
+// Day records only name the discipline, so the topics come from the day the
+// engine generated — that is the same pairing the schedule shows.
+func resultadosDoPlano(dias []plano.Dia, salvo plano.Salvo) []plano.ResultadoTema {
+	out := []plano.ResultadoTema{}
+
+	for _, d := range dias {
+		reg, ok := salvo.Registros[plano.DayOf(d.Data)]
+		if !ok {
+			continue
+		}
+
+		for _, b := range reg.Blocos {
+			if b.Questoes == nil || *b.Questoes <= 0 {
+				continue
+			}
+
+			acertos := 0
+			if b.Acertos != nil {
+				acertos = *b.Acertos
+			}
+
+			// The battery covers whatever that discipline studied that day.
+			for _, it := range d.Itens {
+				if it.Disciplina != b.Disciplina {
+					continue
+				}
+
+				out = append(out, plano.ResultadoTema{
+					Disciplina: b.Disciplina,
+					Tema:       it.Tema,
+					Data:       d.Data.Format(isoDate),
+					Questoes:   *b.Questoes,
+					Acertos:    acertos,
+				})
+			}
+		}
+	}
+
+	for _, r := range salvo.Revisoes {
+		if r.Questoes == nil || *r.Questoes <= 0 || r.FeitaEm == nil {
+			continue
+		}
+
+		acertos := 0
+		if r.Acertos != nil {
+			acertos = *r.Acertos
+		}
+
+		out = append(out, plano.ResultadoTema{
+			Disciplina: r.Disciplina,
+			Tema:       r.Tema,
+			Data:       r.FeitaEm.Format(isoDate),
+			Questoes:   *r.Questoes,
+			Acertos:    acertos,
 		})
 	}
 

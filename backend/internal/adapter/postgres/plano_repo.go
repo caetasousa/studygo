@@ -45,7 +45,7 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		        dias_estudo, dia_revisao, reta_final_dias, tema_ui, criado_em, atualizado_em,
 		        simulados, discursiva, intervalos_revisao, pct_questoes::float8,
 		        revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		        blocos_por_dia, pct_revisao::float8, minutos_bloco
+		        blocos_por_dia, pct_revisao::float8, minutos_bloco, revisao_semanal
 		 FROM planos WHERE user_id = $1 AND concurso_id = $2`,
 		userID,
 		concursoID,
@@ -56,6 +56,7 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		&simulados, &s.Config.Discursiva, &intervalos, &pctQuest,
 		&s.Config.RevisaoPorQuestoes, &s.Config.QuestoesPorRevisao,
 		&s.Config.LimiarFraco, &s.Config.BlocosPorDia, &pctRevisao, &s.Config.MinutosBloco,
+		&s.Config.RevisaoSemanal,
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -284,8 +285,8 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		   (user_id, concurso_id, inicio, prova, horas_dia, dias_estudo, dia_revisao, reta_final_dias,
 		    tema_ui, simulados, discursiva, intervalos_revisao, pct_questoes,
 		    revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		    blocos_por_dia, pct_revisao, minutos_bloco)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+		    blocos_por_dia, pct_revisao, minutos_bloco, revisao_semanal)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		 ON CONFLICT (user_id, concurso_id) DO UPDATE SET
 		   inicio = EXCLUDED.inicio, prova = EXCLUDED.prova, horas_dia = EXCLUDED.horas_dia,
 		   dias_estudo = EXCLUDED.dias_estudo, dia_revisao = EXCLUDED.dia_revisao,
@@ -297,13 +298,14 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		   limiar_fraco = EXCLUDED.limiar_fraco,
 		   blocos_por_dia = EXCLUDED.blocos_por_dia, pct_revisao = EXCLUDED.pct_revisao,
 		   minutos_bloco = EXCLUDED.minutos_bloco,
+		   revisao_semanal = EXCLUDED.revisao_semanal,
 		   atualizado_em = now()
 		 RETURNING id, criado_em, atualizado_em`,
 		s.UserID, s.ConcursoID, cfg.Inicio, cfg.Prova, cfg.HorasDia,
 		toInt32Slice(cfg.DiasEstudo), cfg.DiaRevisao, cfg.RetaFinalDias, s.TemaUI,
 		string(cfg.Simulados), cfg.Discursiva, toInt32Slice(cfg.Intervalos),
 		cfg.PctQuestoes, cfg.RevisaoPorQuestoes, cfg.QuestoesPorRevisao, cfg.LimiarFraco,
-		cfg.BlocosPorDia, cfg.PctRevisao, cfg.MinutosBloco,
+		cfg.BlocosPorDia, cfg.PctRevisao, cfg.MinutosBloco, cfg.RevisaoSemanal,
 	).Scan(&s.ID, &s.CriadoEm, &s.AtualizadoEm)
 	if err != nil {
 		return plano.Salvo{}, fmt.Errorf("upserting plano: %w", err)

@@ -35,11 +35,16 @@ type Config struct {
 	QuestoesPorRevisao int                // questions per topic on a spaced-review block
 	Intervalos         []int              // spaced-review spacing in days: 1 / 7 / 30 by default
 	CicloRevisao       []concurso.RevItem // weekly-review rotation; empty = concurso's own, or RevCicloPadrao
-	Simulados          Frequencia         // how often a full mock exam shows up in the reta final
-	Discursiva         bool               // reserve an essay day in the reta final
-	Modos              map[string]Modo    // how each discipline is studied
-	PctQuestoes        float64            // slice of a study block spent on questions
-	LimiarFraco        int                // % below which a battery counts as weak
+	// RevisaoSemanal reserves a whole day of the week for review. Off by
+	// default: review is a daily tail (see PctRevisao), fed by the error
+	// notebook, so surrendering a full day to it costs content for no gain.
+	// Kept as a switch because some study methods really do want the day.
+	RevisaoSemanal bool
+	Simulados      Frequencia      // how often a full mock exam shows up in the reta final
+	Discursiva     bool            // reserve an essay day in the reta final
+	Modos          map[string]Modo // how each discipline is studied
+	PctQuestoes    float64         // slice of a study block spent on questions
+	LimiarFraco    int             // % below which a battery counts as weak
 }
 
 // Frequencia is how often a full mock exam shows up in the reta final.
@@ -82,6 +87,7 @@ func ConfigPadrao() Config {
 		RevisaoPorQuestoes: true,
 		QuestoesPorRevisao: 10,
 		Intervalos:         []int{1, 7, 30},
+		RevisaoSemanal:     false,
 		Simulados:          SimuladoSemanal,
 		Discursiva:         true,
 		Modos:              map[string]Modo{},

@@ -108,6 +108,10 @@ func defaultConfig(c concurso.Concurso) plano.Config {
 		DiaRevisao:    5,
 		RetaFinalDias: 28,
 		Questoes:      q,
+		// The artifact reserved a whole day of each week for review. That is no
+		// longer the default — review is a daily tail now — so the golden test
+		// asks for it explicitly, which is what keeps it a faithful comparison.
+		RevisaoSemanal: true,
 	}
 }
 
@@ -262,13 +266,14 @@ func TestGerar_ConcursoMinimo(t *testing.T) {
 	}
 
 	cfg := plano.Config{
-		Inicio:        date(2026, 2, 2),
-		Prova:         date(2026, 6, 1),
-		HorasDia:      2,
-		DiasEstudo:    []int{1, 2, 3, 4, 5},
-		DiaRevisao:    5,
-		RetaFinalDias: 28,
-		Questoes:      map[string]int{"D01": 15, "D02": 10},
+		Inicio:         date(2026, 2, 2),
+		Prova:          date(2026, 6, 1),
+		HorasDia:       2,
+		DiasEstudo:     []int{1, 2, 3, 4, 5},
+		DiaRevisao:     5,
+		RevisaoSemanal: true,
+		RetaFinalDias:  28,
+		Questoes:       map[string]int{"D01": 15, "D02": 10},
 	}
 
 	res := plano.Gerar(cfg, &c)
