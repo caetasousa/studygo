@@ -110,7 +110,7 @@ Go module deps are kept minimal (`pgx`, `golang-jwt`, `golang.org/x/crypto`, `go
 ## Git workflow
 
 - Commits use the repository's already-configured git identity (`caetasousa`) — never change `user.name`/`user.email`, local or global.
-- Claude MAY commit autonomously, without asking first, once a feature or fix is finished and verified (builds, passes the checks that apply). This overrides the general default of asking before every commit.
+- **Claude MUST ASK before every commit — no exceptions.** Not after finishing a feature, not after the checks pass, not for a small fix. Describe what would go in the commit and wait for an explicit go-ahead. This replaces an earlier rule that allowed committing autonomously: it produced a run of commits over work that was still wrong, and a wrong commit is harder to undo than an unmade one.
 - Claude MUST NEVER run `git push` (or any variant — `--force`, pushing tags, etc.), under any circumstance. Pushing to the remote is done exclusively by caetasousa.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): short description`, imperative mood, lowercase, no trailing period.
   - Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `style`, `perf`.
