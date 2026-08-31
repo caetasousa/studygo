@@ -27,16 +27,16 @@ type Config struct {
 	Questoes      map[string]int // discipline codigo -> estimated questions
 
 	// Study method (was the separate Perfil).
-	BlocosPorDia       int                // how many disciplines a study day covers
-	MinutosBloco       int                // length of one normal block; 0 = derive from HorasDia
-	PctRevisao         float64            // slice of the day the spaced-review tail takes
-	Reforcos           map[string]float64 // extra weight per discipline codigo (1 = normal)
-	RevisaoPorQuestoes bool               // spaced review asks for questions before consulting
-	QuestoesPorRevisao int                // questions per topic on a spaced-review block
-	Intervalos         []int              // spaced-review spacing in days: 1 / 7 / 30 by default
-	CicloRevisao       []concurso.RevItem // weekly-review rotation; empty = concurso's own, or RevCicloPadrao
+	BlocosPorDia int // how many disciplines a study day covers
+	MinutosBloco int // length of one normal block; 0 = derive from HorasDia
+	// MinutosRevisao is how long the day's review block lasts. It sits beside
+	// the content blocks with a length of its own, rather than eating a
+	// percentage of them; 0 means the day has no review block at all.
+	MinutosRevisao int
+	Reforcos       map[string]float64 // extra weight per discipline codigo (1 = normal)
+	CicloRevisao   []concurso.RevItem // weekly-review rotation; empty = concurso's own, or RevCicloPadrao
 	// RevisaoSemanal reserves a whole day of the week for review. Off by
-	// default: review is a daily tail (see PctRevisao), fed by the error
+	// default: review is a daily block (see MinutosRevisao), fed by the error
 	// notebook, so surrendering a full day to it costs content for no gain.
 	// Kept as a switch because some study methods really do want the day.
 	RevisaoSemanal bool
@@ -81,18 +81,15 @@ const (
 // and question counts are left zero for the caller to fill in.
 func ConfigPadrao() Config {
 	return Config{
-		BlocosPorDia:       2,
-		PctRevisao:         0.16,
-		Reforcos:           map[string]float64{},
-		RevisaoPorQuestoes: true,
-		QuestoesPorRevisao: 10,
-		Intervalos:         []int{1, 7, 30},
-		RevisaoSemanal:     false,
-		Simulados:          SimuladoSemanal,
-		Discursiva:         true,
-		Modos:              map[string]Modo{},
-		PctQuestoes:        0.5,
-		LimiarFraco:        70,
+		BlocosPorDia:   2,
+		MinutosRevisao: 20,
+		Reforcos:       map[string]float64{},
+		RevisaoSemanal: false,
+		Simulados:      SimuladoSemanal,
+		Discursiva:     true,
+		Modos:          map[string]Modo{},
+		PctQuestoes:    0.5,
+		LimiarFraco:    70,
 	}
 }
 
@@ -117,10 +114,7 @@ func (c Config) Normalizar() Config {
 		blocos := c.BlocosPorDia
 
 		c.BlocosPorDia = d.BlocosPorDia
-		c.PctRevisao = d.PctRevisao
-		c.RevisaoPorQuestoes = d.RevisaoPorQuestoes
-		c.QuestoesPorRevisao = d.QuestoesPorRevisao
-		c.Intervalos = d.Intervalos
+		c.MinutosRevisao = d.MinutosRevisao
 		c.Simulados = d.Simulados
 		c.Discursiva = d.Discursiva
 		c.PctQuestoes = d.PctQuestoes
@@ -145,17 +139,8 @@ func (c Config) Normalizar() Config {
 		c.Simulados = d.Simulados
 	}
 
-	c.Intervalos = intervalosValidos(c.Intervalos)
-	if len(c.Intervalos) == 0 {
-		c.Intervalos = d.Intervalos
-	}
-
 	if c.PctQuestoes < 0.1 || c.PctQuestoes > 0.9 {
 		c.PctQuestoes = d.PctQuestoes
-	}
-
-	if c.QuestoesPorRevisao < 1 || c.QuestoesPorRevisao > 200 {
-		c.QuestoesPorRevisao = d.QuestoesPorRevisao
 	}
 
 	if c.LimiarFraco < 1 || c.LimiarFraco > 100 {
@@ -166,9 +151,7 @@ func (c Config) Normalizar() Config {
 		c.BlocosPorDia = d.BlocosPorDia
 	}
 
-	if c.PctRevisao < 0 || c.PctRevisao > 0.4 {
-		c.PctRevisao = d.PctRevisao
-	}
+	c.MinutosRevisao = minutosRevisaoValido(c.MinutosRevisao)
 
 	c.Modos = nonNilModos(c.Modos)
 	c.Reforcos = nonNilReforcos(c.Reforcos)
@@ -203,6 +186,19 @@ func (c Config) ReforcoDe(codigo string) float64 {
 	return min(max(r, ReforcoMin), ReforcoMax)
 }
 
+// minutosRevisaoValido clamps the review block. Zero is legitimate — a day with
+// no review block at all — so only a negative or absurd value is corrected.
+func minutosRevisaoValido(m int) int {
+	switch {
+	case m <= 0:
+		return 0
+	case m > MinutosBlocoMax:
+		return MinutosBlocoMax
+	default:
+		return m
+	}
+}
+
 // horasDiaEfetiva keeps HorasDia in step with MinutosBloco: when the user set a
 // block length, that plus BlocosPorDia and the review tail is what a day lasts.
 // MinutosBloco == 0 means "no explicit length" and HorasDia is used as given.
@@ -211,14 +207,10 @@ func horasDiaEfetiva(c Config) float64 {
 		return c.HorasDia
 	}
 
-	conteudo := float64(c.BlocosPorDia * c.MinutosBloco)
-
-	total := conteudo
-	if c.PctRevisao > 0 && c.PctRevisao < 1 {
-		total = conteudo / (1 - c.PctRevisao)
-	}
-
-	return total / 60
+	// The day is simply what it holds: the content blocks plus the review block.
+	// It used to be content divided by (1 - pctRevisao), which meant the review
+	// slice moved every block's length as a side effect.
+	return float64(c.BlocosPorDia*c.MinutosBloco+c.MinutosRevisao) / 60
 }
 
 func minutosBlocoValido(m int) int {

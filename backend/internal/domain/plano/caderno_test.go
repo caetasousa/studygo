@@ -2,9 +2,16 @@ package plano_test
 
 import (
 	"testing"
+	"time"
 
 	"studygo/internal/domain/plano"
 )
+
+// dia builds a UTC date. It lived in revisao_test.go, which went away with the
+// spaced-review queue; the schedule tests still need it.
+func dia(a int, m time.Month, d int) time.Time {
+	return time.Date(a, m, d, 0, 0, 0, 0, time.UTC)
+}
 
 func res(disc, tema, data string, q, a int) plano.ResultadoTema {
 	return plano.ResultadoTema{Disciplina: disc, Tema: tema, Data: data, Questoes: q, Acertos: a}

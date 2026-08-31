@@ -84,45 +84,17 @@
 	];
 
 	// Intervalos de revisão editados como rascunho local, enviados ao sair do campo.
-	let intervalosTexto = $state('');
-	let editandoIntervalos = $state(false);
-	const intervalosView = $derived(
-		editandoIntervalos ? intervalosTexto : (cfg?.intervalos ?? []).join(', ')
-	);
-
-	let intervalosErro = $state<string | null>(null);
-
-	const metodoDesc = $derived(
-		cfg?.revisaoPorQuestoes
-			? 'Questões: a revisão é uma bateria do assunto, sem consultar antes — você só confere o resumo no que errar.'
-			: 'Releitura: você reconstrói o assunto de memória e confere o resumo depois.'
-	);
-
-	const pctDesc = $derived(
-		cfg ? `${Math.round(cfg.pctRevisao * 100)}% do dia` : ''
-	);
-
 	const semanalDesc = $derived(
 		cfg?.revisaoSemanal
 			? 'Ligado: um dia inteiro por semana sai do conteúdo e vira revisão. São ~11 dias de matéria nova a menos num ciclo.'
-			: 'Desligado: a semana inteira é conteúdo, e a revisão acontece na fatia diária acima.'
+			: 'Desligado: a semana inteira é conteúdo, e a revisão acontece no bloco diário acima.'
 	);
 
-	/**
-	 * The day the current settings actually produce, in proportion.
-	 *
-	 * The settings page used to describe the schedule in prose while the schedule
-	 * itself was a screen away — so a slider moved with no visible consequence.
-	 * This mirrors the engine's own split: content blocks take (1 - pctRevisao)
-	 * of the day, the review tail takes the rest.
-	 */
 	const previaBlocos = $derived.by(() => {
 		if (!cfg) return [];
 
-		const totalMin = Math.round(cfg.horasDia * 60);
-		const revMin = Math.round((totalMin * cfg.pctRevisao) / 5) * 5;
-		const conteudoMin = totalMin - revMin;
-		const porBloco = cfg.blocosPorDia > 0 ? Math.round(conteudoMin / cfg.blocosPorDia / 5) * 5 : 0;
+		const revMin = cfg.minutosRevisao;
+		const porBloco = cfg.minutosBloco;
 
 		const out = [];
 		for (let i = 0; i < cfg.blocosPorDia; i++) {
@@ -142,40 +114,11 @@
 			return 'Sem fatia de revisão: o dia inteiro é conteúdo novo.';
 		}
 
-		const como = cfg.revisaoPorQuestoes
-			? `${cfg.questoesPorRevisao} questões de cada assunto que voltar`
-			: 'releitura ativa de cada assunto que voltar';
-
-		return `${rev.minutos} min no fim do dia — ${como}, puxados do caderno de erros das matérias daquele dia.`;
+		return `${rev.minutos} min no fim do dia, com questões dos assuntos que você errou nas matérias daquele dia.`;
 	});
 
-	// Worked example of what the current intervals actually do, so the effect on
-	// the schedule is visible without having to generate it.
-	const intervalosDesc = $derived.by(() => {
-		const dias = cfg?.intervalos ?? [];
-		if (dias.length === 0) return 'Sem revisões automáticas.';
-		const lista = dias.join(', ');
-		return `Estudou hoje? O tópico volta ${dias.length === 1 ? 'uma vez' : dias.length + ' vezes'}: ${lista} ${dias.length === 1 ? 'dia' : 'dias'} depois.`;
-	});
 
-	function commitIntervalos() {
-		editandoIntervalos = false;
-		const bruto = intervalosTexto.trim();
-		if (!bruto) {
-			intervalosErro = null;
-			return;
-		}
-		const pedacos = bruto.split(/[,\s]+/).filter(Boolean);
-		const nums = pedacos.map((x) => parseInt(x, 10));
-		if (nums.some((n) => !Number.isFinite(n) || n <= 0)) {
-			intervalosErro = 'Use apenas números de dias maiores que zero, separados por vírgula.';
-			return;
-		}
-		intervalosErro = null;
-		// Ascending and de-duplicated: "7, 1, 7" is the same schedule as "1, 7".
-		const limpo = [...new Set(nums)].sort((a, b) => a - b);
-		if (limpo.length > 0) salvar({ intervalos: limpo });
-	}
+
 
 	// Ciclo semanal como rascunho local — enviado ao sair do campo, para não
 	// regerar o plano a cada tecla.
@@ -439,75 +382,32 @@
 			<div class="card-body">
 				<h2 class="sec" style="margin-top:0">Revisão</h2>
 				<p class="page-sub" style="margin:0 0 4px">
-					A revisão é diária: uma fatia no fim de cada dia de estudo, depois dos
-					blocos de conteúdo. O que ela cobra depende do método abaixo.
+					Todo dia de estudo termina com um bloco de revisão, que cobra questões
+					dos assuntos que você errou — o seu caderno de erros, por matéria.
 				</p>
 
 				<Ajuste
-					titulo="Método de revisão"
-					descricao={metodoDesc}
-				>
-					{#snippet controle()}
-						<div class="metodo-sel">
-							<button
-								type="button"
-								aria-pressed={cfg.revisaoPorQuestoes}
-								onclick={() => salvar({ revisaoPorQuestoes: true })}
-							>
-								Questões
-							</button>
-							<button
-								type="button"
-								aria-pressed={!cfg.revisaoPorQuestoes}
-								onclick={() => salvar({ revisaoPorQuestoes: false })}
-							>
-								Releitura
-							</button>
-						</div>
-					{/snippet}
-				</Ajuste>
-
-				<Ajuste
-					titulo="Tempo reservado para revisão"
-					descricao="Fatia do fim de cada dia. O resto vai para o conteúdo novo."
-					para="pf-prev"
-					valor={pctDesc}
+					titulo="Duração do bloco de revisão"
+					descricao="Zero remove o bloco: o dia passa a ser só conteúdo."
+					para="pf-rev"
+					unidade="minutos"
 				>
 					{#snippet controle()}
 						<input
-							id="pf-prev"
-							type="range"
-							min="0"
-							max="40"
-							step="4"
-							value={Math.round(cfg.pctRevisao * 100)}
-							onchange={(e) =>
-								salvar({ pctRevisao: parseInt((e.target as HTMLInputElement).value, 10) / 100 })}
-						/>
-					{/snippet}
-				</Ajuste>
-
-				<Ajuste
-					titulo="Questões por tema revisado"
-					descricao="Quantas questões a revisão pede de cada assunto que volta."
-					para="pf-qrev"
-					unidade="questões"
-				>
-					{#snippet controle()}
-						<input
-							id="pf-qrev"
+							id="pf-rev"
 							type="number"
-							min="1"
-							max="50"
-							value={cfg.questoesPorRevisao}
+							min="0"
+							max="120"
+							step="5"
+							value={cfg.minutosRevisao}
 							onchange={(e) =>
-								salvar({ questoesPorRevisao: parseInt((e.target as HTMLInputElement).value, 10) })}
-							style="width:90px"
+								salvar({ minutosRevisao: parseInt((e.target as HTMLInputElement).value, 10) })}
+							style="width:100px"
 						/>
 					{/snippet}
 				</Ajuste>
 
-				<!-- What the setting actually produces, so the effect is visible here
+				<!-- What the settings actually produce, so the effect is visible here
 				     instead of only after opening the schedule. -->
 				<div class="previa">
 					<span class="previa-tit">No cronograma, um dia fica assim:</span>
@@ -525,40 +425,6 @@
 					</div>
 					<span class="previa-leg">{previaTexto}</span>
 				</div>
-
-				<h2 class="sec">Quando um assunto volta</h2>
-				<p class="page-sub" style="margin:0 0 4px">
-					A revisão puxa primeiro o seu <b>caderno de erros</b> — os assuntos em que
-					você foi mal, acumulados por matéria. Sem erros pendentes daquela matéria,
-					ela cai nos intervalos abaixo.
-				</p>
-
-				<Ajuste
-					titulo="Criar revisões após"
-					descricao={intervalosDesc}
-					para="pf-int"
-					unidade="dias"
-				>
-					{#snippet controle()}
-						<input
-							id="pf-int"
-							type="text"
-							inputmode="numeric"
-							placeholder="1, 7, 30"
-							aria-describedby="pf-int-erro"
-							value={intervalosView}
-							oninput={(e) => {
-								editandoIntervalos = true;
-								intervalosTexto = e.currentTarget.value;
-							}}
-							onblur={commitIntervalos}
-							style="width:150px"
-						/>
-					{/snippet}
-				</Ajuste>
-				{#if intervalosErro}
-					<p id="pf-int-erro" class="ajuste-erro" role="alert">{intervalosErro}</p>
-				{/if}
 
 				<Ajuste
 					titulo="Reservar um dia da semana só para revisão"
@@ -599,24 +465,6 @@
 			<div class="card-body">
 				<h2 class="sec" style="margin-top:0">Questões</h2>
 
-				<Ajuste
-					titulo="Questões por revisão"
-					descricao="Quantidade usada ao criar automaticamente uma atividade de revisão por questões. Você pode alterar em cada atividade."
-					para="pf-qrev"
-					unidade="questões"
-				>
-					{#snippet controle()}
-						<input
-							id="pf-qrev"
-							type="number"
-							min="1"
-							max="200"
-							value={cfg.questoesPorRevisao}
-							onchange={(e) =>
-								salvar({ questoesPorRevisao: parseInt(e.currentTarget.value, 10) })}
-						/>
-					{/snippet}
-				</Ajuste>
 
 				<Ajuste
 					titulo="Parte do bloco dedicada a questões"
@@ -781,28 +629,6 @@
 {/if}
 
 <style>
-	/* Two exclusive choices read better as a pair of buttons than as a checkbox
-	   whose off-state has to be inferred from the label. */
-	.metodo-sel {
-		display: flex;
-		gap: 4px;
-	}
-	.metodo-sel button {
-		font-size: 12.5px;
-		padding: 7px 14px;
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		background: transparent;
-		color: var(--text-muted);
-		cursor: pointer;
-	}
-	.metodo-sel button[aria-pressed='true'] {
-		background: var(--accent-soft);
-		border-color: var(--accent);
-		color: var(--accent-strong);
-		font-weight: 600;
-	}
-
 	/* The settings only mattered once you opened the schedule; this shows the day
 	   they produce, here, in proportion. */
 	.previa {
@@ -848,12 +674,6 @@
 		font-size: 12px;
 		line-height: 1.5;
 		color: var(--text-muted);
-	}
-
-	.ajuste-erro {
-		margin: -6px 0 10px;
-		font-size: 12px;
-		color: var(--danger);
 	}
 	.modos-t {
 		font-size: 13px;

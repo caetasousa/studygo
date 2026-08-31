@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -144,13 +143,6 @@ func (s *PlanoService) RegistrarDia(
 
 	salvo.Registros[data] = reg
 
-	// Concluir um dia enfileira a revisão dos temas que ele cobriu.
-	if reg.Concluido {
-		if err := s.enfileirarDoDia(ctx, c, &salvo, data); err != nil {
-			return PlanoResposta{}, err
-		}
-	}
-
 	return s.montar(ctx, c, salvo)
 }
 
@@ -215,128 +207,6 @@ func (s *PlanoService) atividadesAgendadas(
 	}
 
 	return 0
-}
-
-// enfileirarDoDia queues the spaced review for every topic the given day
-// covered. It is idempotent: the repository ignores a topic already queued at
-// the same stage, so re-saving a day never duplicates its entries.
-func (s *PlanoService) enfileirarDoDia(
-	ctx context.Context,
-	c concurso.Concurso,
-	salvo *plano.Salvo,
-	data time.Time,
-) error {
-	res := plano.Gerar(salvo.Config, &c)
-	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
-
-	for _, d := range res.Dias {
-		if !plano.DayOf(d.Data).Equal(plano.DayOf(data)) {
-			continue
-		}
-
-		novas := plano.Enfileirar(salvo.Config, d)
-		if len(novas) == 0 {
-			return nil
-		}
-
-		if err := s.planos.EnfileirarRevisoes(ctx, salvo.ID, novas); err != nil {
-			return err
-		}
-
-		revisoes, err := s.planos.ListRevisoes(ctx, salvo.ID)
-		if err != nil {
-			return err
-		}
-
-		salvo.Revisoes = revisoes
-
-		return nil
-	}
-
-	return nil
-}
-
-// RegistrarRevisao records how a queued review went. The hit rate decides where
-// the topic goes next — up an interval when it is solid, back down when it is
-// not — and a bad result also opens an entry in the error notebook.
-func (s *PlanoService) RegistrarRevisao(
-	ctx context.Context,
-	userID uuid.UUID,
-	slug string,
-	in RevisaoInput,
-) (PlanoResposta, error) {
-	c, salvo, err := s.carregar(ctx, userID, slug)
-	if err != nil {
-		return PlanoResposta{}, err
-	}
-
-	rev, err := s.planos.RevisaoByID(ctx, salvo.ID, in.ID)
-	if err != nil {
-		return PlanoResposta{}, err
-	}
-
-	if in.Questoes < 0 || in.Acertos < 0 || in.Acertos > in.Questoes {
-		return PlanoResposta{}, ErrValidacao{Msg: "acertos precisa estar entre 0 e o total de questões"}
-	}
-
-	hoje := plano.DayOf(s.clock.Now())
-
-	feita := rev
-	feita.FeitaEm = &hoje
-	feita.Questoes = &in.Questoes
-	feita.Acertos = &in.Acertos
-
-	var proxima *plano.Revisao
-	if p, ok := rev.Resultado(salvo.Config, hoje, in.Questoes, in.Acertos); ok {
-		proxima = &p
-	}
-
-	if err := s.planos.ConcluirRevisao(ctx, salvo.ID, feita, proxima); err != nil {
-		return PlanoResposta{}, err
-	}
-
-	if plano.Fraca(in.Questoes, in.Acertos) {
-		if err := s.anotarErro(ctx, c, salvo, feita); err != nil {
-			return PlanoResposta{}, err
-		}
-	}
-
-	_, salvo, err = s.carregar(ctx, userID, slug)
-	if err != nil {
-		return PlanoResposta{}, err
-	}
-
-	return s.montar(ctx, c, salvo)
-}
-
-// anotarErro opens a notebook entry for a topic that went badly, already tagged
-// with its discipline and topic — the user only has to write down *why*.
-func (s *PlanoService) anotarErro(
-	ctx context.Context,
-	c concurso.Concurso,
-	salvo plano.Salvo,
-	rev plano.Revisao,
-) error {
-	pct := plano.Aproveitamento(derefInt(rev.Questoes), derefInt(rev.Acertos))
-
-	a := plano.Anotacao{
-		Data:   rev.FeitaEm,
-		Tema:   rev.Tema,
-		Origem: plano.OrigemRevisao,
-		Texto: fmt.Sprintf(
-			"%d%% na revisão de %q (%d de %d) — anote por que errou, não só a resposta.",
-			pct, rev.Tema, derefInt(rev.Acertos), derefInt(rev.Questoes),
-		),
-	}
-
-	if d := c.DisciplinaByCodigo(rev.Disciplina); d != nil {
-		id := d.ID
-		a.DisciplinaID = &id
-	}
-
-	_, err := s.planos.CreateAnotacao(ctx, salvo.ID, a)
-
-	return err
 }
 
 // MarcarMarco toggles an edital milestone checkbox.
@@ -650,7 +520,7 @@ func minutosDe(cfg plano.Config) int {
 		return 0
 	}
 
-	m := cfg.HorasDia * 60 * (1 - cfg.PctRevisao) / float64(cfg.BlocosPorDia)
+	m := (cfg.HorasDia*60 - float64(cfg.MinutosRevisao)) / float64(cfg.BlocosPorDia)
 
 	return int(math.Round(m/5)) * 5
 }
@@ -749,20 +619,8 @@ func aplicarMetodoInput(cfg *plano.Config, c concurso.Concurso, in ConfigInput) 
 		cfg.Discursiva = *in.Discursiva
 	}
 
-	if in.Intervalos != nil {
-		cfg.Intervalos = *in.Intervalos
-	}
-
 	if in.PctQuestoes != nil {
 		cfg.PctQuestoes = *in.PctQuestoes
-	}
-
-	if in.RevisaoPorQuestoes != nil {
-		cfg.RevisaoPorQuestoes = *in.RevisaoPorQuestoes
-	}
-
-	if in.QuestoesPorRevisao != nil {
-		cfg.QuestoesPorRevisao = *in.QuestoesPorRevisao
 	}
 
 	if in.LimiarFraco != nil {
@@ -773,12 +631,12 @@ func aplicarMetodoInput(cfg *plano.Config, c concurso.Concurso, in ConfigInput) 
 		cfg.BlocosPorDia = *in.BlocosPorDia
 	}
 
-	if in.MinutosBloco != nil {
-		cfg.MinutosBloco = *in.MinutosBloco
+	if in.MinutosRevisao != nil {
+		cfg.MinutosRevisao = *in.MinutosRevisao
 	}
 
-	if in.PctRevisao != nil {
-		cfg.PctRevisao = *in.PctRevisao
+	if in.MinutosBloco != nil {
+		cfg.MinutosBloco = *in.MinutosBloco
 	}
 
 	if in.RevisaoSemanal != nil {

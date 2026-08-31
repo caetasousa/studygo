@@ -63,7 +63,7 @@ func TestBlocos_repartePorNumeroDeBlocos(t *testing.T) {
 			temRevisao: true, querBlocos: 2, querTotal: 120,
 		},
 		{
-			nome:  "sem revisão vencendo, o tempo volta para o conteúdo",
+			nome:  "sem bloco de revisão, o dia é só conteúdo",
 			itens: itens("D01", "D02"), horas: 2, temRevisao: false,
 			querBlocos: 2, querTotal: 120,
 		},
@@ -74,14 +74,15 @@ func TestBlocos_repartePorNumeroDeBlocos(t *testing.T) {
 			t.Parallel()
 
 			d := plano.Dia{Tipo: plano.TipoEstudo, Meta: 20, Itens: c.itens}
-			if c.temRevisao {
-				d.Revisoes = []plano.Revisao{{Tema: "x"}}
+
+			// The review block exists when it has a length, not when something is
+			// queued: it is a block of the day like the others now.
+			cfg := cfgBlocos(c.horas)
+			if !c.temRevisao {
+				cfg.MinutosRevisao = 0
 			}
 
-			got := plano.Blocos(d, plano.BlocoCtx{
-				Cfg:   cfgBlocos(c.horas),
-				Nomes: nomesTeste(),
-			})
+			got := plano.Blocos(d, plano.BlocoCtx{Cfg: cfg, Nomes: nomesTeste()})
 
 			if len(got) != c.querBlocos {
 				t.Fatalf("gerou %d blocos, queria %d", len(got), c.querBlocos)
@@ -101,10 +102,9 @@ func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 	cfg.Reforcos = map[string]float64{"D02": 2}
 
 	d := plano.Dia{
-		Tipo:     plano.TipoEstudo,
-		Meta:     30,
-		Itens:    itens("D01", "D02"),
-		Revisoes: []plano.Revisao{{Tema: "x"}},
+		Tipo:  plano.TipoEstudo,
+		Meta:  30,
+		Itens: itens("D01", "D02"),
 	}
 
 	got := plano.Blocos(d, plano.BlocoCtx{Cfg: cfg, Nomes: nomesTeste()})

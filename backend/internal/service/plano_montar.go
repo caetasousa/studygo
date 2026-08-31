@@ -69,8 +69,6 @@ func (s *PlanoService) montar(
 
 	// A fila é datada; cada dia do plano recebe o que vence nele. As atrasadas
 	// caem todas no primeiro dia não-passado, para não sumirem da tela.
-	vencendo := distribuirRevisoes(res.Dias, salvo.Revisoes, agora)
-
 	ctxBlocos := plano.BlocoCtx{
 		Cfg:      salvo.Config,
 		Nomes:    nomes,
@@ -118,8 +116,6 @@ func (s *PlanoService) montar(
 			dr.Itens = append(dr.Itens, item)
 		}
 
-		d.Revisoes = vencendo[plano.DayOf(d.Data)]
-
 		for _, b := range plano.Blocos(d, ctxBlocos) {
 			dr.Blocos = append(dr.Blocos, BlocoResposta{
 				Minutos: b.Minutos,
@@ -131,8 +127,6 @@ func (s *PlanoService) montar(
 		if r, ok := salvo.Registros[plano.DayOf(d.Data)]; ok {
 			dr.Registro = registroToResposta(r)
 		}
-
-		dr.Revisoes = revisoesDoDia(vencendo[plano.DayOf(d.Data)], salvo.Config, agora)
 
 		if _, ok := salvo.Reordenacoes[plano.DayOf(d.Data)]; ok {
 			dr.Reordenado = true
@@ -235,20 +229,17 @@ func montarConfig(salvo plano.Salvo) ConfigResposta {
 		TemaUI:        salvo.TemaUI,
 		Questoes:      cfg.Questoes,
 
-		BlocosPorDia:       cfg.BlocosPorDia,
-		MinutosBloco:       minutos,
-		PctRevisao:         cfg.PctRevisao,
-		Reforcos:           reforcos,
-		RevisaoPorQuestoes: cfg.RevisaoPorQuestoes,
-		QuestoesPorRevisao: cfg.QuestoesPorRevisao,
-		Intervalos:         cfg.Intervalos,
-		CicloRevisao:       ciclo,
-		RevisaoSemanal:     cfg.RevisaoSemanal,
-		Simulados:          string(cfg.Simulados),
-		Discursiva:         cfg.Discursiva,
-		Modos:              modos,
-		PctQuestoes:        cfg.PctQuestoes,
-		LimiarFraco:        cfg.LimiarFraco,
+		BlocosPorDia:   cfg.BlocosPorDia,
+		MinutosBloco:   minutos,
+		Reforcos:       reforcos,
+		MinutosRevisao: cfg.MinutosRevisao,
+		CicloRevisao:   ciclo,
+		RevisaoSemanal: cfg.RevisaoSemanal,
+		Simulados:      string(cfg.Simulados),
+		Discursiva:     cfg.Discursiva,
+		Modos:          modos,
+		PctQuestoes:    cfg.PctQuestoes,
+		LimiarFraco:    cfg.LimiarFraco,
 	}
 }
 
@@ -318,25 +309,6 @@ func resultadosDoPlano(dias []plano.Dia, salvo plano.Salvo) []plano.ResultadoTem
 				})
 			}
 		}
-	}
-
-	for _, r := range salvo.Revisoes {
-		if r.Questoes == nil || *r.Questoes <= 0 || r.FeitaEm == nil {
-			continue
-		}
-
-		acertos := 0
-		if r.Acertos != nil {
-			acertos = *r.Acertos
-		}
-
-		out = append(out, plano.ResultadoTema{
-			Disciplina: r.Disciplina,
-			Tema:       r.Tema,
-			Data:       r.FeitaEm.Format(isoDate),
-			Questoes:   *r.Questoes,
-			Acertos:    acertos,
-		})
 	}
 
 	return out
@@ -565,81 +537,4 @@ func abs(x int) int {
 	}
 
 	return x
-}
-
-// distribuirRevisoes buckets the open queue by the plan day it falls on.
-// Anything already overdue lands on the first day that is not in the past, so a
-// missed review resurfaces instead of disappearing behind the calendar.
-func distribuirRevisoes(
-	dias []plano.Dia,
-	fila []plano.Revisao,
-	agora time.Time,
-) map[time.Time][]plano.Revisao {
-	out := map[time.Time][]plano.Revisao{}
-
-	diasComTema := map[time.Time]bool{}
-	primeiroAberto := time.Time{}
-
-	for _, d := range dias {
-		if len(d.Itens) == 0 {
-			continue
-		}
-
-		dia := plano.DayOf(d.Data)
-		diasComTema[dia] = true
-
-		if primeiroAberto.IsZero() && !dia.Before(agora) {
-			primeiroAberto = dia
-		}
-	}
-
-	for _, r := range fila {
-		if r.FeitaEm != nil {
-			continue
-		}
-
-		alvo := plano.DayOf(r.VenceEm)
-
-		if alvo.Before(agora) || !diasComTema[alvo] {
-			if primeiroAberto.IsZero() {
-				continue
-			}
-
-			alvo = primeiroAberto
-		}
-
-		out[alvo] = append(out[alvo], r)
-	}
-
-	return out
-}
-
-func revisoesDoDia(rs []plano.Revisao, cfg plano.Config, agora time.Time) []RevisaoResposta {
-	cfg = cfg.Normalizar()
-	out := make([]RevisaoResposta, 0, len(rs))
-
-	for _, r := range rs {
-		intervalo := 0
-		if r.Etapa < len(cfg.Intervalos) {
-			intervalo = cfg.Intervalos[r.Etapa]
-		}
-
-		atraso := plano.DiffDays(plano.DayOf(r.VenceEm), agora)
-		if atraso < 0 {
-			atraso = 0
-		}
-
-		out = append(out, RevisaoResposta{
-			ID:         r.ID,
-			Disciplina: r.Disciplina,
-			Tema:       r.Tema,
-			Etapa:      r.Etapa,
-			Intervalo:  intervalo,
-			VenceEm:    r.VenceEm.Format(isoDate),
-			Atraso:     atraso,
-			Questoes:   cfg.QuestoesPorRevisao,
-		})
-	}
-
-	return out
 }

@@ -400,10 +400,6 @@ func (s *PlanoService) ImportarTEC(
 		}
 	}
 
-	if err := s.liquidarRevisoesTEC(ctx, salvo, data, prev); err != nil {
-		return PreviewTEC{}, err
-	}
-
 	return prev, nil
 }
 
@@ -469,54 +465,6 @@ func (s *PlanoService) anotarErroTEC(
 	_, err := s.planos.CreateAnotacao(ctx, salvo.ID, a)
 
 	return err
-}
-
-// liquidarRevisoesTEC settles any queued review whose topic the spreadsheet
-// covers — solving it on the TEC is solving the review.
-func (s *PlanoService) liquidarRevisoesTEC(
-	ctx context.Context,
-	salvo plano.Salvo,
-	data time.Time,
-	prev PreviewTEC,
-) error {
-	for _, rev := range plano.VencidasAte(salvo.Revisoes, data) {
-		cas, ok := acharCasamento(prev.Casados, rev)
-		if !ok {
-			continue
-		}
-
-		feita := rev
-		feita.FeitaEm = &data
-		feita.Questoes = &cas.Questoes
-		feita.Acertos = &cas.Acertos
-
-		var proxima *plano.Revisao
-		if p, segue := rev.Resultado(salvo.Config, data, cas.Questoes, cas.Acertos); segue {
-			proxima = &p
-		}
-
-		if err := s.planos.ConcluirRevisao(ctx, salvo.ID, feita, proxima); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func acharCasamento(casados []CasamentoTEC, rev plano.Revisao) (CasamentoTEC, bool) {
-	alvo := normalizar(rev.Tema)
-
-	for _, cas := range casados {
-		if cas.Disciplina != rev.Disciplina {
-			continue
-		}
-
-		if cas.Tema != "" && casaTexto(normalizar(cas.Tema), alvo) {
-			return cas, true
-		}
-	}
-
-	return CasamentoTEC{}, false
 }
 
 // urlQuestoes builds the discipline's question-bank link, substituting {tema}

@@ -26,7 +26,6 @@ type Salvo struct {
 	Registros    map[time.Time]Registro
 	Marcos       map[uuid.UUID]bool
 	Reordenacoes map[time.Time]Reordenacao
-	Revisoes     []Revisao // the open spaced-review queue
 }
 
 // Origem says where a notebook entry came from. Anything but OrigemManual was
@@ -61,6 +60,5 @@ func NewSalvo() Salvo {
 		Registros:    map[time.Time]Registro{},
 		Marcos:       map[uuid.UUID]bool{},
 		Reordenacoes: map[time.Time]Reordenacao{},
-		Revisoes:     []Revisao{},
 	}
 }

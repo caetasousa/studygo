@@ -200,11 +200,9 @@ export interface Config {
 
 	blocosPorDia: number;
 	minutosBloco: number; // duração de um bloco normal; define o dia
-	pctRevisao: number;
+	/** Length of the day's review block, in minutes. 0 = no review block. */
+	minutosRevisao: number;
 	reforcos: Record<string, number>;
-	revisaoPorQuestoes: boolean;
-	questoesPorRevisao: number;
-	intervalos: number[];
 	cicloRevisao: CicloItem[];
 	/** Reserve a whole day of the week for review. Off by default: review is a
 	 *  daily slice fed by the error notebook. */
@@ -259,16 +257,6 @@ export interface Registro {
 	blocos: RegistroBloco[];
 }
 
-export interface RevisaoDia {
-	id: string;
-	disciplina: string;
-	tema: string;
-	etapa: number;
-	intervalo: number;
-	venceEm: string;
-	atraso: number;
-	questoes: number;
-}
 
 export interface Dia {
 	n: number;
@@ -281,7 +269,6 @@ export interface Dia {
 	meta: number;
 	blocos: Bloco[];
 	registro: Registro | null;
-	revisoes: RevisaoDia[];
 	reordenado: boolean;
 }
 
@@ -360,11 +347,8 @@ export interface ConfigInput {
 
 	blocosPorDia?: number;
 	minutosBloco?: number;
-	pctRevisao?: number;
+	minutosRevisao?: number;
 	reforcos?: Record<string, number>;
-	revisaoPorQuestoes?: boolean;
-	questoesPorRevisao?: number;
-	intervalos?: number[];
 	cicloRevisao?: CicloItem[];
 	revisaoSemanal?: boolean;
 	simulados?: Simulados;
@@ -470,7 +454,6 @@ export interface Caderno {
 	anotacoes: AnotacaoView[];
 	diasComNota: DiaNota[];
 	diasFracos: DiaFraco[];
-	vencendoHoje: RevisaoDia[];
 	porDisciplina: CadernoDisciplina[];
 }
 

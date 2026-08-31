@@ -137,37 +137,6 @@ func (h *PlanoHandler) MarcarMarco(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
-// RegistrarRevisao records the result of one queued spaced review.
-func (h *PlanoHandler) RegistrarRevisao(w http.ResponseWriter, r *http.Request) {
-	id, slug, ok := h.ctx(r)
-	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
-		return
-	}
-
-	revisaoID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		writeError(w, r, h.logger, errBadRequest)
-		return
-	}
-
-	var req service.RevisaoInput
-	if err := decode(r, &req); err != nil {
-		writeError(w, r, h.logger, err)
-		return
-	}
-
-	req.ID = revisaoID
-
-	resp, err := h.planos.RegistrarRevisao(r.Context(), id, slug, req)
-	if err != nil {
-		writeError(w, r, h.logger, err)
-		return
-	}
-
-	writeJSON(w, h.logger, http.StatusOK, resp)
-}
-
 // PreviewTEC parses an uploaded TEC spreadsheet and reports what would be
 // imported, without writing anything.
 func (h *PlanoHandler) PreviewTEC(w http.ResponseWriter, r *http.Request) {

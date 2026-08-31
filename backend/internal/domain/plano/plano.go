@@ -54,8 +54,6 @@ type Dia struct {
 	Meta   int       `json:"meta"` // target number of questions
 
 	// Revisoes is filled in by the service from the persisted queue — the engine
-	// itself is pure and leaves it empty.
-	Revisoes []Revisao `json:"revisoes"`
 }
 
 // Config is defined in config.go: the dates and rhythm plus the study method.

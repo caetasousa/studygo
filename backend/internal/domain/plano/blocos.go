@@ -40,22 +40,25 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 	if len(d.Itens) > 0 {
 		rev := d.Tipo == TipoRevisaoDirigida
 
-		// Sem nada vencendo, o tempo da revisão volta para o conteúdo em vez de
-		// mandar revisar o vazio.
-		pctRevisao := cfg.PctRevisao
-		if len(d.Revisoes) == 0 {
-			pctRevisao = 0
+		// Content blocks have a length of their own; the review block sits beside
+		// them with its own. Nothing is a percentage of anything else, so moving
+		// one does not silently resize the other.
+		revMin := cfg.MinutosRevisao
+		conteudoMin := h - float64(revMin)
+
+		if conteudoMin < 0 {
+			conteudoMin = 0
 		}
 
-		minutos := repartirMinutos(h*(1-pctRevisao), d.Itens, cfg)
+		minutos := repartirMinutos(conteudoMin, d.Itens, cfg)
 		out := make([]Bloco, 0, len(d.Itens)+1)
 
 		for idx, it := range d.Itens {
 			// As questões do dia seguem o mesmo peso dos minutos: a matéria
 			// reforçada leva um bloco maior e uma bateria maior junto.
 			porBloco := 0
-			if h > 0 {
-				porBloco = int(math.Round(float64(d.Meta) * float64(minutos[idx]) / (h * (1 - pctRevisao))))
+			if conteudoMin > 0 {
+				porBloco = int(math.Round(float64(d.Meta) * float64(minutos[idx]) / conteudoMin))
 			}
 
 			out = append(out, Bloco{
@@ -65,11 +68,11 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 			})
 		}
 
-		if pctRevisao == 0 {
+		if revMin <= 0 {
 			return out
 		}
 
-		out = append(out, caudaRevisao(cfg, d, ctx, m5(h*pctRevisao)))
+		out = append(out, caudaRevisao(d, ctx, revMin))
 
 		return out
 	}
@@ -153,51 +156,47 @@ func detalheDoBloco(modo Modo, revisaoDirigida bool, questoes int) string {
 	}
 }
 
-// caudaRevisao is the review slice that closes a study day.
+// caudaRevisao is the review block that closes a study day.
 //
 // It drills the ERROR NOTEBOOK of the day's own disciplines: the topics that
 // went badly, accumulated, which is the method's whole point — by the end of
-// the cycle the notebook holds the part of the edital that resisted you. It
-// falls back to the spaced-review queue when nothing is in the notebook yet,
-// which is exactly the start of a plan, so the tail is never empty time.
-func caudaRevisao(cfg Config, d Dia, ctx BlocoCtx, minutos int) Bloco {
+// the cycle the notebook holds the part of the edital that resisted you.
+//
+// Before anything has gone wrong the notebook is empty, and the block says so
+// rather than inventing work: the time is there to go back over the day's own
+// subjects.
+func caudaRevisao(d Dia, ctx BlocoCtx, minutos int) Bloco {
 	discs := make([]string, 0, len(d.Itens))
 	for _, it := range d.Itens {
 		discs = append(discs, it.Disciplina)
 	}
 
-	// One topic per pending review keeps the tail the same size as before.
-	if itens := TemasDoDia(ctx.Cadernos, discs, len(d.Revisoes)); len(itens) > 0 {
+	itens := TemasDoDia(ctx.Cadernos, discs, maxTemasRevisao)
+	if len(itens) == 0 {
 		return Bloco{
 			Minutos: minutos,
-			Titulo:  "Caderno de erros — " + strconv.Itoa(len(itens)) + " temas",
-			Detalhe: cadernoDetalhe(cfg, itens, ctx.Nomes),
+			Titulo:  "Revisão",
+			Detalhe: "sem erros pendentes destas matérias — revise os assuntos de hoje",
 		}
 	}
 
 	return Bloco{
 		Minutos: minutos,
-		Titulo:  "Revisão espaçada — " + strconv.Itoa(len(d.Revisoes)) + " temas",
-		Detalhe: revisaoDetalhe(cfg, d.Revisoes),
+		Titulo:  "Caderno de erros — " + strconv.Itoa(len(itens)) + " temas",
+		Detalhe: cadernoDetalhe(itens, ctx.Nomes),
 	}
 }
 
+// maxTemasRevisao caps how many topics one review block names. Past a handful
+// the block stops being a plan and becomes a list nobody works through.
+const maxTemasRevisao = 4
+
 // cadernoDetalhe says what to do with the notebook topics, naming them so the
 // block is actionable without opening another screen.
-func cadernoDetalhe(cfg Config, itens []ItemCaderno, nomes map[string]string) string {
-	por := cfg.QuestoesPorRevisao
-
+func cadernoDetalhe(itens []ItemCaderno, nomes map[string]string) string {
 	var b strings.Builder
 
-	b.WriteString("questões dos assuntos que você errou")
-
-	if cfg.RevisaoPorQuestoes {
-		b.WriteString(" — ")
-		b.WriteString(strconv.Itoa(por))
-		b.WriteString(" de cada, sem consultar antes")
-	}
-
-	b.WriteString(": ")
+	b.WriteString("questões dos assuntos que você errou, sem consultar antes: ")
 
 	for i, it := range itens {
 		if i > 0 {
@@ -216,20 +215,6 @@ func cadernoDetalhe(cfg Config, itens []ItemCaderno, nomes map[string]string) st
 	}
 
 	return b.String()
-}
-
-// revisaoDetalhe says what is actually due today. Retrieval beats re-reading, so
-// by default it asks for questions on each topic before any consulting.
-func revisaoDetalhe(cfg Config, vencendo []Revisao) string {
-	if cfg.RevisaoPorQuestoes {
-		por := cfg.QuestoesPorRevisao
-
-		return "resolva " + strconv.Itoa(por) + " questões de cada tema ao lado sem consultar antes, " +
-			"e só depois confira o resumo no que errar (" +
-			strconv.Itoa(por*len(vencendo)) + " questões no total)"
-	}
-
-	return "reconstrua de memória cada tema ao lado e confira o resumo depois"
 }
 
 // ordinais names the study blocks of a day; past the sixth the number is used.

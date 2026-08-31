@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"studygo/internal/domain/plano"
@@ -44,14 +45,18 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	enviados := 0
 
 	for _, pce := range planos {
-		itens := lembreteItens(pce.Plano, hoje)
-		if len(itens) == 0 {
-			continue
-		}
-
+		// The notebook is built from what the plan scheduled, so the concurso has
+		// to be loaded before there is anything to remind about.
 		c, err := s.concursos.ConcursoByID(ctx, pce.ConcursoID)
 		if err != nil {
 			return enviados, fmt.Errorf("loading concurso %s: %w", pce.ConcursoID, err)
+		}
+
+		res := plano.Gerar(pce.Plano.Config, &c)
+
+		itens := lembreteItens(pce.Plano, res.Dias, hoje)
+		if len(itens) == 0 {
+			continue
 		}
 
 		dica := ""
@@ -78,18 +83,48 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	return enviados, nil
 }
 
-// lembreteItens collects what the spaced-review queue owes today — overdue
-// entries included, since a missed review is exactly the one worth chasing.
-func lembreteItens(salvo plano.Salvo, hoje time.Time) []port.LembreteItem {
+// lembreteItens is what the reminder chases: the error notebook.
+//
+// It used to be the spaced-review queue, which no longer exists — review is a
+// block of every study day now, drilling what went wrong. The reminder follows
+// the same rule, naming the topics the student has actually been missing.
+func lembreteItens(salvo plano.Salvo, dias []plano.Dia, hoje time.Time) []port.LembreteItem {
 	itens := []port.LembreteItem{}
 
-	for _, r := range plano.VencidasAte(salvo.Revisoes, hoje) {
-		itens = append(itens, port.LembreteItem{
-			Distancia:  plano.DiffDays(r.OrigemData, hoje),
-			Disciplina: r.Disciplina,
-			Tema:       r.Tema,
-		})
+	cadernos := plano.Caderno(resultadosDoPlano(dias, salvo))
+
+	for _, disc := range ordenarChaves(cadernos) {
+		for _, it := range cadernos[disc] {
+			itens = append(itens, port.LembreteItem{
+				Distancia:  distanciaDe(it.UltimaData, hoje),
+				Disciplina: it.Disciplina,
+				Tema:       it.Tema,
+			})
+		}
 	}
 
 	return itens
+}
+
+// ordenarChaves keeps the reminder's order stable across runs, which map
+// iteration would not.
+func ordenarChaves(m map[string][]plano.ItemCaderno) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+
+	sort.Strings(out)
+
+	return out
+}
+
+// distanciaDe is how many days ago the topic was last answered.
+func distanciaDe(ultima string, hoje time.Time) int {
+	d, err := time.Parse(isoDate, ultima)
+	if err != nil {
+		return 0
+	}
+
+	return plano.DiffDays(d, hoje)
 }

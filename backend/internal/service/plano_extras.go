@@ -134,9 +134,6 @@ func (s *PlanoService) Caderno(ctx context.Context, userID uuid.UUID, slug strin
 	caderno := montarCaderno(c, salvo, res.Dias, anots)
 	caderno.PorDisciplina = montarCadernoPorDisciplina(c, res.Dias, salvo)
 
-	hoje := plano.DayOf(s.clock.Now())
-	caderno.VencendoHoje = revisoesDoDia(plano.VencidasAte(salvo.Revisoes, hoje), salvo.Config, hoje)
-
 	return caderno, nil
 }
 
@@ -369,10 +366,9 @@ func montarCaderno(
 	}
 
 	return CadernoResposta{
-		Anotacoes:    anotResp,
-		DiasComNota:  comNota,
-		DiasFracos:   fracos,
-		VencendoHoje: []RevisaoResposta{},
+		Anotacoes:   anotResp,
+		DiasComNota: comNota,
+		DiasFracos:  fracos,
 	}
 }
 

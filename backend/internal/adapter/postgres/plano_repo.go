@@ -32,10 +32,8 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 
 	var (
 		diasEstudo []int32
-		intervalos []int32
 		horasDia   float64
 		pctQuest   float64
-		pctRevisao float64
 		simulados  string
 	)
 
@@ -43,9 +41,8 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		ctx,
 		`SELECT id, user_id, concurso_id, inicio, prova, horas_dia::float8,
 		        dias_estudo, dia_revisao, reta_final_dias, tema_ui, criado_em, atualizado_em,
-		        simulados, discursiva, intervalos_revisao, pct_questoes::float8,
-		        revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		        blocos_por_dia, pct_revisao::float8, minutos_bloco, revisao_semanal
+		        simulados, discursiva, pct_questoes::float8,
+		        limiar_fraco, blocos_por_dia, minutos_revisao, minutos_bloco, revisao_semanal
 		 FROM planos WHERE user_id = $1 AND concurso_id = $2`,
 		userID,
 		concursoID,
@@ -53,10 +50,9 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		&s.ID, &s.UserID, &s.ConcursoID, &s.Config.Inicio, &s.Config.Prova, &horasDia,
 		&diasEstudo, &s.Config.DiaRevisao, &s.Config.RetaFinalDias, &s.TemaUI,
 		&s.CriadoEm, &s.AtualizadoEm,
-		&simulados, &s.Config.Discursiva, &intervalos, &pctQuest,
-		&s.Config.RevisaoPorQuestoes, &s.Config.QuestoesPorRevisao,
-		&s.Config.LimiarFraco, &s.Config.BlocosPorDia, &pctRevisao, &s.Config.MinutosBloco,
-		&s.Config.RevisaoSemanal,
+		&simulados, &s.Config.Discursiva, &pctQuest,
+		&s.Config.LimiarFraco, &s.Config.BlocosPorDia, &s.Config.MinutosRevisao,
+		&s.Config.MinutosBloco, &s.Config.RevisaoSemanal,
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -72,9 +68,7 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 	s.Config.Questoes = map[string]int{}
 
 	s.Config.Simulados = plano.Frequencia(simulados)
-	s.Config.Intervalos = toIntSlice(intervalos)
 	s.Config.PctQuestoes = pctQuest
-	s.Config.PctRevisao = pctRevisao
 	s.Config.Modos = map[string]plano.Modo{}
 	s.Config.Reforcos = map[string]float64{}
 
@@ -97,13 +91,6 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 	if err := r.loadReordenacoes(ctx, s.ID, &s); err != nil {
 		return plano.Salvo{}, err
 	}
-
-	revisoes, err := r.ListRevisoes(ctx, s.ID)
-	if err != nil {
-		return plano.Salvo{}, err
-	}
-
-	s.Revisoes = revisoes
 
 	return s, nil
 }
@@ -283,29 +270,27 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		ctx,
 		`INSERT INTO planos
 		   (user_id, concurso_id, inicio, prova, horas_dia, dias_estudo, dia_revisao, reta_final_dias,
-		    tema_ui, simulados, discursiva, intervalos_revisao, pct_questoes,
-		    revisao_por_questoes, questoes_por_revisao, limiar_fraco,
-		    blocos_por_dia, pct_revisao, minutos_bloco, revisao_semanal)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		    tema_ui, simulados, discursiva, pct_questoes, limiar_fraco,
+		    blocos_por_dia, minutos_revisao, minutos_bloco, revisao_semanal)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		 ON CONFLICT (user_id, concurso_id) DO UPDATE SET
 		   inicio = EXCLUDED.inicio, prova = EXCLUDED.prova, horas_dia = EXCLUDED.horas_dia,
 		   dias_estudo = EXCLUDED.dias_estudo, dia_revisao = EXCLUDED.dia_revisao,
 		   reta_final_dias = EXCLUDED.reta_final_dias, tema_ui = EXCLUDED.tema_ui,
 		   simulados = EXCLUDED.simulados, discursiva = EXCLUDED.discursiva,
-		   intervalos_revisao = EXCLUDED.intervalos_revisao, pct_questoes = EXCLUDED.pct_questoes,
-		   revisao_por_questoes = EXCLUDED.revisao_por_questoes,
-		   questoes_por_revisao = EXCLUDED.questoes_por_revisao,
+		   pct_questoes = EXCLUDED.pct_questoes,
 		   limiar_fraco = EXCLUDED.limiar_fraco,
-		   blocos_por_dia = EXCLUDED.blocos_por_dia, pct_revisao = EXCLUDED.pct_revisao,
+		   blocos_por_dia = EXCLUDED.blocos_por_dia,
+		   minutos_revisao = EXCLUDED.minutos_revisao,
 		   minutos_bloco = EXCLUDED.minutos_bloco,
 		   revisao_semanal = EXCLUDED.revisao_semanal,
 		   atualizado_em = now()
 		 RETURNING id, criado_em, atualizado_em`,
 		s.UserID, s.ConcursoID, cfg.Inicio, cfg.Prova, cfg.HorasDia,
 		toInt32Slice(cfg.DiasEstudo), cfg.DiaRevisao, cfg.RetaFinalDias, s.TemaUI,
-		string(cfg.Simulados), cfg.Discursiva, toInt32Slice(cfg.Intervalos),
-		cfg.PctQuestoes, cfg.RevisaoPorQuestoes, cfg.QuestoesPorRevisao, cfg.LimiarFraco,
-		cfg.BlocosPorDia, cfg.PctRevisao, cfg.MinutosBloco, cfg.RevisaoSemanal,
+		string(cfg.Simulados), cfg.Discursiva,
+		cfg.PctQuestoes, cfg.LimiarFraco,
+		cfg.BlocosPorDia, cfg.MinutosRevisao, cfg.MinutosBloco, cfg.RevisaoSemanal,
 	).Scan(&s.ID, &s.CriadoEm, &s.AtualizadoEm)
 	if err != nil {
 		return plano.Salvo{}, fmt.Errorf("upserting plano: %w", err)
@@ -463,7 +448,7 @@ func (r *PlanoRepo) DeleteRegistros(ctx context.Context, planoID uuid.UUID) erro
 		return fmt.Errorf("deleting marco_checks: %w", err)
 	}
 
-	return r.DeleteRevisoes(ctx, planoID)
+	return nil
 }
 
 func (r *PlanoRepo) SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error {
@@ -663,140 +648,6 @@ func origemDe(o plano.Origem) plano.Origem {
 	default:
 		return plano.OrigemManual
 	}
-}
-
-func (r *PlanoRepo) ListRevisoes(ctx context.Context, planoID uuid.UUID) ([]plano.Revisao, error) {
-	rows, err := r.pool.Query(
-		ctx,
-		`SELECT id, disciplina, tema, origem_data, etapa, vence_em, feita_em, questoes, acertos
-		 FROM revisoes WHERE plano_id = $1 AND feita_em IS NULL ORDER BY vence_em, disciplina`,
-		planoID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("querying revisoes: %w", err)
-	}
-	defer rows.Close()
-
-	out := []plano.Revisao{}
-
-	for rows.Next() {
-		var rev plano.Revisao
-		if err := rows.Scan(
-			&rev.ID, &rev.Disciplina, &rev.Tema, &rev.OrigemData, &rev.Etapa,
-			&rev.VenceEm, &rev.FeitaEm, &rev.Questoes, &rev.Acertos,
-		); err != nil {
-			return nil, fmt.Errorf("scanning revisao: %w", err)
-		}
-
-		out = append(out, rev)
-	}
-
-	return out, rows.Err()
-}
-
-func (r *PlanoRepo) EnfileirarRevisoes(
-	ctx context.Context,
-	planoID uuid.UUID,
-	rs []plano.Revisao,
-) error {
-	for _, rev := range rs {
-		if _, err := r.pool.Exec(
-			ctx,
-			`INSERT INTO revisoes (plano_id, disciplina, tema, origem_data, etapa, vence_em)
-			 VALUES ($1, $2, $3, $4, $5, $6)
-			 ON CONFLICT (plano_id, disciplina, tema, etapa) DO NOTHING`,
-			planoID, rev.Disciplina, rev.Tema, rev.OrigemData, rev.Etapa, rev.VenceEm,
-		); err != nil {
-			return fmt.Errorf("enqueueing revisao: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (r *PlanoRepo) RevisaoByID(
-	ctx context.Context,
-	planoID, revisaoID uuid.UUID,
-) (plano.Revisao, error) {
-	var rev plano.Revisao
-
-	err := r.pool.QueryRow(
-		ctx,
-		`SELECT id, disciplina, tema, origem_data, etapa, vence_em, feita_em, questoes, acertos
-		 FROM revisoes WHERE id = $1 AND plano_id = $2`,
-		revisaoID, planoID,
-	).Scan(
-		&rev.ID, &rev.Disciplina, &rev.Tema, &rev.OrigemData, &rev.Etapa,
-		&rev.VenceEm, &rev.FeitaEm, &rev.Questoes, &rev.Acertos,
-	)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return plano.Revisao{}, plano.ErrNotFound
-	}
-
-	if err != nil {
-		return plano.Revisao{}, fmt.Errorf("querying revisao: %w", err)
-	}
-
-	return rev, nil
-}
-
-// ConcluirRevisao closes one review and opens the next stage in one transaction,
-// so the queue can never lose a topic halfway through.
-func (r *PlanoRepo) ConcluirRevisao(
-	ctx context.Context,
-	planoID uuid.UUID,
-	feita plano.Revisao,
-	proxima *plano.Revisao,
-) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	ct, err := tx.Exec(
-		ctx,
-		`UPDATE revisoes SET feita_em = $3, questoes = $4, acertos = $5
-		 WHERE id = $1 AND plano_id = $2`,
-		feita.ID, planoID, feita.FeitaEm, feita.Questoes, feita.Acertos,
-	)
-	if err != nil {
-		return fmt.Errorf("closing revisao: %w", err)
-	}
-
-	if ct.RowsAffected() == 0 {
-		return plano.ErrNotFound
-	}
-
-	if proxima != nil {
-		if _, err := tx.Exec(
-			ctx,
-			`INSERT INTO revisoes (plano_id, disciplina, tema, origem_data, etapa, vence_em)
-			 VALUES ($1, $2, $3, $4, $5, $6)
-			 ON CONFLICT (plano_id, disciplina, tema, etapa)
-			 DO UPDATE SET vence_em = EXCLUDED.vence_em, feita_em = NULL,
-			               questoes = NULL, acertos = NULL`,
-			planoID, proxima.Disciplina, proxima.Tema, proxima.OrigemData,
-			proxima.Etapa, proxima.VenceEm,
-		); err != nil {
-			return fmt.Errorf("enqueueing next revisao: %w", err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
-}
-
-func (r *PlanoRepo) DeleteRevisoes(ctx context.Context, planoID uuid.UUID) error {
-	if _, err := r.pool.Exec(ctx, `DELETE FROM revisoes WHERE plano_id = $1`, planoID); err != nil {
-		return fmt.Errorf("deleting revisoes: %w", err)
-	}
-
-	return nil
 }
 
 func (r *PlanoRepo) loadCiclo(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {

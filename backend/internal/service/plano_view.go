@@ -30,20 +30,17 @@ type ConfigInput struct {
 	Questoes      map[string]int `json:"questoes"`
 
 	// Study method — was the nested `perfil` object, now flat.
-	BlocosPorDia       *int               `json:"blocosPorDia"`
-	MinutosBloco       *int               `json:"minutosBloco"`
-	PctRevisao         *float64           `json:"pctRevisao"`
-	Reforcos           map[string]float64 `json:"reforcos"`
-	RevisaoPorQuestoes *bool              `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao *int               `json:"questoesPorRevisao"`
-	Intervalos         *[]int             `json:"intervalos"`
-	CicloRevisao       *[]CicloItemInput  `json:"cicloRevisao"`
-	RevisaoSemanal     *bool              `json:"revisaoSemanal"`
-	Simulados          *string            `json:"simulados"`
-	Discursiva         *bool              `json:"discursiva"`
-	Modos              map[string]string  `json:"modos"`
-	PctQuestoes        *float64           `json:"pctQuestoes"`
-	LimiarFraco        *int               `json:"limiarFraco"`
+	BlocosPorDia   *int               `json:"blocosPorDia"`
+	MinutosBloco   *int               `json:"minutosBloco"`
+	MinutosRevisao *int               `json:"minutosRevisao"`
+	Reforcos       map[string]float64 `json:"reforcos"`
+	CicloRevisao   *[]CicloItemInput  `json:"cicloRevisao"`
+	RevisaoSemanal *bool              `json:"revisaoSemanal"`
+	Simulados      *string            `json:"simulados"`
+	Discursiva     *bool              `json:"discursiva"`
+	Modos          map[string]string  `json:"modos"`
+	PctQuestoes    *float64           `json:"pctQuestoes"`
+	LimiarFraco    *int               `json:"limiarFraco"`
 }
 
 // CicloItemInput is one week of the base-phase review rotation.
@@ -145,20 +142,17 @@ type ConfigResposta struct {
 	Questoes      map[string]int `json:"questoes"`
 
 	// Study method — flat.
-	BlocosPorDia       int                `json:"blocosPorDia"`
-	MinutosBloco       int                `json:"minutosBloco"` // duração de um bloco normal; define o dia
-	PctRevisao         float64            `json:"pctRevisao"`
-	Reforcos           map[string]float64 `json:"reforcos"`
-	RevisaoPorQuestoes bool               `json:"revisaoPorQuestoes"`
-	QuestoesPorRevisao int                `json:"questoesPorRevisao"`
-	Intervalos         []int              `json:"intervalos"`
-	CicloRevisao       []CicloItemInput   `json:"cicloRevisao"`
-	RevisaoSemanal     bool               `json:"revisaoSemanal"`
-	Simulados          string             `json:"simulados"`
-	Discursiva         bool               `json:"discursiva"`
-	Modos              map[string]string  `json:"modos"`
-	PctQuestoes        float64            `json:"pctQuestoes"`
-	LimiarFraco        int                `json:"limiarFraco"`
+	BlocosPorDia   int                `json:"blocosPorDia"`
+	MinutosBloco   int                `json:"minutosBloco"` // duração de um bloco normal; define o dia
+	MinutosRevisao int                `json:"minutosRevisao"`
+	Reforcos       map[string]float64 `json:"reforcos"`
+	CicloRevisao   []CicloItemInput   `json:"cicloRevisao"`
+	RevisaoSemanal bool               `json:"revisaoSemanal"`
+	Simulados      string             `json:"simulados"`
+	Discursiva     bool               `json:"discursiva"`
+	Modos          map[string]string  `json:"modos"`
+	PctQuestoes    float64            `json:"pctQuestoes"`
+	LimiarFraco    int                `json:"limiarFraco"`
 }
 
 // DiaResposta is one plan day plus the user's record and timed breakdown.
@@ -173,20 +167,7 @@ type DiaResposta struct {
 	Meta       int               `json:"meta"`
 	Blocos     []BlocoResposta   `json:"blocos"`
 	Registro   *RegistroResposta `json:"registro"`
-	Revisoes   []RevisaoResposta `json:"revisoes"`
 	Reordenado bool              `json:"reordenado"`
-}
-
-// RevisaoResposta is one topic due for spaced review on a day.
-type RevisaoResposta struct {
-	ID         uuid.UUID `json:"id"`
-	Disciplina string    `json:"disciplina"`
-	Tema       string    `json:"tema"`
-	Etapa      int       `json:"etapa"`
-	Intervalo  int       `json:"intervalo"` // days this stage waits
-	VenceEm    string    `json:"venceEm"`
-	Atraso     int       `json:"atraso"` // days late, 0 when due today
-	Questoes   int       `json:"questoes"`
 }
 
 type ItemResposta struct {
@@ -304,10 +285,9 @@ type ResumoSemana struct {
 
 // CadernoResposta is GET /api/plano/caderno.
 type CadernoResposta struct {
-	Anotacoes    []AnotacaoResposta `json:"anotacoes"`
-	DiasComNota  []DiaNota          `json:"diasComNota"`
-	DiasFracos   []DiaFraco         `json:"diasFracos"`
-	VencendoHoje []RevisaoResposta  `json:"vencendoHoje"`
+	Anotacoes   []AnotacaoResposta `json:"anotacoes"`
+	DiasComNota []DiaNota          `json:"diasComNota"`
+	DiasFracos  []DiaFraco         `json:"diasFracos"`
 	// PorDisciplina is the error notebook itself: what went wrong, per subject,
 	// accumulating over the cycle. It is what the daily review tail drills.
 	PorDisciplina []CadernoDisciplina `json:"porDisciplina"`

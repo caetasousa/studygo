@@ -88,16 +88,6 @@
 
 {#if dados}
 	<div class="page">
-		{#if dados.vencendoHoje.length > 0}
-			<div class="callout">
-				<span class="em"><NavIcon name="info" /></span>
-				<div>
-					<b>{dados.vencendoHoje.length} temas vencendo hoje</b> na revisão espaçada. Lance o
-					resultado em <a href="/">Hoje</a> — o que ficar abaixo de
-					{planoStore.plano?.config.limiarFraco ?? 70}% entra aqui sozinho.
-				</div>
-			</div>
-		{/if}
 
 		<ImportarTEC onimportado={carregar} />
 

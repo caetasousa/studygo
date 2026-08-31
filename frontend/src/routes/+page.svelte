@@ -1,7 +1,6 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import DiaLog from '$lib/components/DiaLog.svelte';
-	import RevisoesDoDia from '$lib/components/RevisoesDoDia.svelte';
 	import TemaTexto from '$lib/components/TemaTexto.svelte';
 	import { linkQuestoes } from '$lib/tec';
 	import { planoStore } from '$lib/stores/plano.svelte';
@@ -120,7 +119,6 @@
 		</div>
 
 		<div class="side-cards">
-			<RevisoesDoDia revisoes={diaAtual?.revisoes ?? []} />
 
 			<div class="card">
 				<div class="card-top">Próximos dias</div>

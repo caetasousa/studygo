@@ -1,6 +1,28 @@
 package plano
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
+
+// Faixa below which a battery counts as a miss and puts its topic in the
+// notebook. It was part of the spaced-review machinery; the notebook is what
+// still needs it.
+const FaixaFraca = 60
+
+// Fraca reports whether a result is bad enough to become a notebook entry.
+func Fraca(questoes, acertos int) bool {
+	return questoes > 0 && Aproveitamento(questoes, acertos) < FaixaFraca
+}
+
+// Aproveitamento is the hit rate as a whole percentage; 0 questions means 0.
+func Aproveitamento(questoes, acertos int) int {
+	if questoes <= 0 {
+		return 0
+	}
+
+	return int(math.Round(float64(acertos) / float64(questoes) * 100))
+}
 
 // The error notebook, as a study method.
 //
