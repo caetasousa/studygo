@@ -36,6 +36,10 @@ type ItemDia struct {
 	Disciplina string `json:"disciplina"` // discipline codigo
 	Tema       string `json:"tema"`
 	Passada    int    `json:"passada"` // 1 = first pass, 2 = second pass
+	// AtividadeID is filled when the generated schedule is reconciled with the
+	// persisted activity layout. It is runtime metadata, not part of the engine's
+	// golden JSON contract.
+	AtividadeID string `json:"-"`
 }
 
 // Dia is a single day of the plan.

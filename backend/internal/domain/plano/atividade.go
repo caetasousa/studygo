@@ -122,7 +122,11 @@ func TrocarAtividades(
 		return nil, ErrDestinoInvalido
 	}
 
-	if concluido(origem) || concluido(destino) {
+	// Only the destination is guarded here: whether the activity ITSELF is
+	// finished is decided by the caller, which can see the records. Refusing
+	// every move out of a day that holds finished work would freeze that day's
+	// other subjects too.
+	if concluido(destino) {
 		return nil, ErrDiaConcluido
 	}
 
@@ -195,6 +199,68 @@ func itoa(n int) string {
 	return string(b)
 }
 
+// AtividadesFaltantes returns activities for the items of a reconciled plan that
+// have no stored counterpart yet — the ones still carrying a synthetic slot id.
+//
+// This is what lets a plan be materialised incrementally: the whole schedule on
+// the first move, and afterwards just the blocks a raised blocosPorDia added,
+// without disturbing the activities the user has already arranged.
+//
+// `dias` must have been through AplicarAtividades, so every item carries the id
+// it was reconciled to.
+func AtividadesFaltantes(dias []Dia, existentes []Atividade) []Atividade {
+	ocupadas := map[string]map[int]bool{}
+
+	for _, a := range existentes {
+		k := day(a.Data).Format("2006-01-02")
+		if ocupadas[k] == nil {
+			ocupadas[k] = map[int]bool{}
+		}
+
+		ocupadas[k][a.Posicao] = true
+	}
+
+	out := []Atividade{}
+
+	for _, d := range dias {
+		data := day(d.Data)
+		chave := data.Format("2006-01-02")
+
+		for pos, it := range d.Itens {
+			if !EhIDDerivado(it.AtividadeID) {
+				continue
+			}
+
+			// Position must not collide with an activity already stored for that
+			// day: the unique (plano, data, posicao) index would reject it.
+			livre := pos
+			for ocupadas[chave][livre] {
+				livre++
+			}
+
+			if ocupadas[chave] == nil {
+				ocupadas[chave] = map[int]bool{}
+			}
+
+			ocupadas[chave][livre] = true
+
+			origemDia, origemPos := data, pos
+			out = append(out, Atividade{
+				Data:       data,
+				Posicao:    livre,
+				Disciplina: it.Disciplina,
+				Tema:       it.Tema,
+				Passada:    it.Passada,
+				Tipo:       tipoDaAtividade(d.Tipo),
+				OrigemDia:  &origemDia,
+				OrigemPos:  &origemPos,
+			})
+		}
+	}
+
+	return out
+}
+
 // ResolverIDDerivado maps a synthetic slot id back to the stored activity that
 // now occupies that slot, which is how the first move of a never-arranged plan
 // finds its target.
@@ -249,7 +315,8 @@ func MoverAtividade(
 
 	// A concluded day is history on both ends: moving into or out of one would
 	// silently contradict what the student recorded.
-	if concluido(day(origem)) || concluido(destino) {
+	// See TrocarAtividades: the origin is not guarded, only the destination.
+	if concluido(destino) {
 		return nil, ErrDiaConcluido
 	}
 
@@ -370,6 +437,64 @@ func DerivarAtividades(dias []Dia) []Atividade {
 	return out
 }
 
+// MesclarAtividadesGeradas adds slots introduced by a later configuration
+// change to an already materialised layout. A stored activity claims its
+// original slot even after it has moved elsewhere, which is what prevents the
+// engine from recreating it in the source day.
+func MesclarAtividadesGeradas(dias []Dia, armazenadas []Atividade) []Atividade {
+	saida := append([]Atividade(nil), armazenadas...)
+	reivindicadas := origensReivindicadas(armazenadas)
+	quantidadePorDia := map[time.Time]int{}
+
+	for _, a := range armazenadas {
+		quantidadePorDia[day(a.Data)]++
+	}
+
+	for _, d := range dias {
+		data := day(d.Data)
+		for pos, it := range d.Itens {
+			chave := chaveOrigem(data, pos)
+			if reivindicadas[chave] {
+				continue
+			}
+
+			origemDia, origemPos := data, pos
+			saida = append(saida, Atividade{
+				ID:         IDDerivado(data, pos),
+				Data:       data,
+				Posicao:    quantidadePorDia[data],
+				Disciplina: it.Disciplina,
+				Tema:       it.Tema,
+				Passada:    it.Passada,
+				Tipo:       tipoDaAtividade(d.Tipo),
+				OrigemDia:  &origemDia,
+				OrigemPos:  &origemPos,
+			})
+			quantidadePorDia[data]++
+			reivindicadas[chave] = true
+		}
+	}
+
+	return saida
+}
+
+// RestaurarAtividades returns every materialised activity to its engine slot.
+// IDs stay unchanged, so study records linked to an activity remain intact.
+func RestaurarAtividades(atividades []Atividade) []Atividade {
+	saida := append([]Atividade(nil), atividades...)
+
+	for i := range saida {
+		if saida[i].OrigemDia == nil || saida[i].OrigemPos == nil {
+			continue
+		}
+
+		saida[i].Data = day(*saida[i].OrigemDia)
+		saida[i].Posicao = *saida[i].OrigemPos
+	}
+
+	return saida
+}
+
 func tipoDaAtividade(t Tipo) TipoAtividade {
 	switch t {
 	case TipoRevisaoSemanal, TipoRevisaoDirigida:
@@ -383,9 +508,10 @@ func tipoDaAtividade(t Tipo) TipoAtividade {
 	}
 }
 
-// AplicarAtividades overwrites the generated days with the persisted activity
-// layout, for the days the user has arranged by hand. Days with no stored
-// activity keep whatever the engine produced.
+// AplicarAtividades reconciles the generated days with the persisted activity
+// layout. Stored activities win. A generated slot is appended only when no
+// stored activity claims that original slot, even if its activity currently
+// lives on another day.
 func AplicarAtividades(dias []Dia, atividades []Atividade) {
 	porDia := map[time.Time][]Atividade{}
 	for _, a := range atividades {
@@ -393,23 +519,52 @@ func AplicarAtividades(dias []Dia, atividades []Atividade) {
 		porDia[k] = append(porDia[k], a)
 	}
 
+	reivindicadas := origensReivindicadas(atividades)
+
 	for i := range dias {
-		lista, ok := porDia[day(dias[i].Data)]
-		if !ok {
-			continue
-		}
+		data := day(dias[i].Data)
+		lista := porDia[data]
 
 		sort.SliceStable(lista, func(x, y int) bool { return lista[x].Posicao < lista[y].Posicao })
 
-		itens := make([]ItemDia, 0, len(lista))
+		itensGerados := dias[i].Itens
+		itens := make([]ItemDia, 0, len(lista)+len(itensGerados))
 		for _, a := range lista {
 			itens = append(itens, ItemDia{
-				Disciplina: a.Disciplina,
-				Tema:       a.Tema,
-				Passada:    a.Passada,
+				Disciplina:  a.Disciplina,
+				Tema:        a.Tema,
+				Passada:     a.Passada,
+				AtividadeID: a.ID,
 			})
+		}
+
+		for pos, it := range itensGerados {
+			if reivindicadas[chaveOrigem(data, pos)] {
+				continue
+			}
+
+			it.AtividadeID = IDDerivado(data, pos)
+			itens = append(itens, it)
 		}
 
 		dias[i].Itens = itens
 	}
+}
+
+func origensReivindicadas(atividades []Atividade) map[string]bool {
+	out := make(map[string]bool, len(atividades))
+
+	for _, a := range atividades {
+		if a.OrigemDia == nil || a.OrigemPos == nil {
+			continue
+		}
+
+		out[chaveOrigem(day(*a.OrigemDia), *a.OrigemPos)] = true
+	}
+
+	return out
+}
+
+func chaveOrigem(data time.Time, posicao int) string {
+	return data.Format(time.DateOnly) + ":" + itoa(posicao)
 }

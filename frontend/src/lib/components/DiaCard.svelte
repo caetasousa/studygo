@@ -160,9 +160,6 @@
 			<div class="faixa">
 				<span class="faixa-n">
 					dia {dia.n}{#if dia.itens.length > 0} · {resumoItens}{/if}
-					{#if dia.reordenado}
-						<span class="reord" title="Reorganizado manualmente">•</span>
-					{/if}
 				</span>
 				{#if dia.itens.length === 0}
 					<!-- Special days (simulado, revisão geral) have no subjects to split
@@ -332,11 +329,6 @@
 		font-size: 11px;
 		letter-spacing: 0.04em;
 		color: var(--text-faint);
-	}
-	.reord {
-		color: var(--accent);
-		font-size: 14px;
-		line-height: 1;
 	}
 	.acoes {
 		display: flex;

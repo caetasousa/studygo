@@ -154,6 +154,31 @@ func (s *PlanoService) RegistrarDia(
 	return s.montar(ctx, c, salvo)
 }
 
+// atividadeConcluida reports whether one activity has been marked done, which
+// is the only thing that makes it immovable.
+func atividadeConcluida(salvo plano.Salvo, atividades []plano.Atividade, id string) bool {
+	for _, a := range atividades {
+		if a.ID != id {
+			continue
+		}
+
+		r, ok := salvo.Registros[plano.DayOf(a.Data)]
+		if !ok {
+			return false
+		}
+
+		if b := r.BlocoDeAtividade(a.ID); b != nil {
+			return b.Concluido
+		}
+
+		// No per-activity record: fall back to the day's own flag, which is what
+		// records written before activities were addressable carry.
+		return r.Concluido
+	}
+
+	return false
+}
+
 // concluidasNoDia counts the recorded activities that are marked done.
 func concluidasNoDia(bs []plano.RegistroBloco) int {
 	n := 0
@@ -373,11 +398,19 @@ func (s *PlanoService) MoverAtividade(
 		return PlanoResposta{}, err
 	}
 
-	// First move on this plan: materialise what the engine generated, so ids
-	// exist to move around.
-	if len(atividades) == 0 {
-		derivadas := plano.DerivarAtividades(res.Dias)
-		if err := s.planos.ReplaceAtividades(ctx, salvo.ID, derivadas); err != nil {
+	// Materialise whatever the client can see but the store does not hold yet.
+	//
+	// That is the whole plan on the first move, and just the extra blocks after
+	// blocosPorDia is raised: those are served with the engine's slot ids, so
+	// without this a drag on the newly added subject failed "não encontrada".
+	// AplicarAtividades has already reconciled res.Dias, so its items carry
+	// exactly the ids the client was given.
+	plano.AplicarAtividades(res.Dias, atividades)
+
+	if faltantes := plano.AtividadesFaltantes(res.Dias, atividades); len(faltantes) > 0 {
+		if err := s.planos.ReplaceAtividades(
+			ctx, salvo.ID, append(append([]plano.Atividade{}, atividades...), faltantes...),
+		); err != nil {
 			return PlanoResposta{}, err
 		}
 
@@ -387,8 +420,8 @@ func (s *PlanoService) MoverAtividade(
 	}
 
 	// The client may address an activity by the deterministic slot id it was
-	// served before anything was stored. Resolve it against what now exists,
-	// so the very first drag works instead of failing "não encontrada".
+	// served before that activity was stored. Resolve it against what now
+	// exists, so the drag works instead of failing "não encontrada".
 	if plano.EhIDDerivado(mov.ID) {
 		resolvido, ok := plano.ResolverIDDerivado(atividades, mov.ID)
 		if !ok {
@@ -398,10 +431,23 @@ func (s *PlanoService) MoverAtividade(
 		mov.ID = resolvido
 	}
 
+	// Only a CONCLUDED ACTIVITY is locked — moving one would rewrite what was
+	// actually studied. A day is not locked merely for holding some finished
+	// work: its other subjects stay rearrangeable.
+	//
+	// The day-level guard is kept for the destination, where an activity-level
+	// one has nothing to point at: dropping into a day that is entirely done
+	// would still contradict its record.
 	concluido := func(d time.Time) bool {
 		r, ok := salvo.Registros[plano.DayOf(d)]
 
 		return ok && r.Concluido
+	}
+
+	if atividadeConcluida(salvo, atividades, mov.ID) {
+		return PlanoResposta{}, ErrValidacao{
+			Msg: "uma matéria já concluída não pode ser movida",
+		}
 	}
 
 	mover := plano.MoverAtividade

@@ -40,6 +40,29 @@ func (s *PlanoService) montar(
 	res := plano.Gerar(salvo.Config, &c)
 	plano.AplicarReordenacoes(res.Dias, salvo.Reordenacoes)
 
+	// Individually moved activities win over the generated layout, for the days
+	// they cover. A plan the user never rearranged reads exactly as before.
+	atividades, err := s.planos.ListAtividades(ctx, salvo.ID)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	plano.AplicarAtividades(res.Dias, atividades)
+
+	// A plan the user never rearranged has no stored activities. Rather than
+	// materialising them here (which would make a GET write), fall back to the
+	// engine's deterministic slot ids, so the very first drag has something to
+	// address. The first move replaces these with real uuids.
+	if len(atividades) == 0 {
+		atividades = plano.DerivarAtividades(res.Dias)
+	}
+
+	porDia := map[time.Time][]plano.Atividade{}
+	for _, a := range atividades {
+		k := plano.DayOf(a.Data)
+		porDia[k] = append(porDia[k], a)
+	}
+
 	stats := plano.CalcularStats(res.Dias, codes, salvo.Registros)
 
 	balanceamento := montarBalanceamento(c, salvo.Config, res, stats)
@@ -69,12 +92,29 @@ func (s *PlanoService) montar(
 			Itens:  make([]ItemResposta, 0, len(d.Itens)),
 		}
 
+		// Every item already carries the id it was reconciled to — a stored
+		// activity's uuid, or the engine's slot id for one that has never been
+		// arranged. Pairing by index instead would mis-address a day whose item
+		// count no longer matches what was stored (raising blocosPorDia does
+		// exactly that), leaving the extra subject with no id to move.
+		porID := map[string]plano.Atividade{}
+		for _, a := range porDia[plano.DayOf(d.Data)] {
+			porID[a.ID] = a
+		}
+
 		for _, it := range d.Itens {
-			dr.Itens = append(dr.Itens, ItemResposta{
+			item := ItemResposta{
+				ID:         it.AtividadeID,
 				Disciplina: it.Disciplina,
 				Tema:       it.Tema,
 				Passada:    it.Passada,
-			})
+			}
+
+			if a, ok := porID[it.AtividadeID]; ok {
+				item.Movida = a.Movida()
+			}
+
+			dr.Itens = append(dr.Itens, item)
 		}
 
 		d.Revisoes = vencendo[plano.DayOf(d.Data)]

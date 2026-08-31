@@ -71,8 +71,9 @@
 	const cor = $derived(disc[item.disciplina]?.cor ?? 0);
 	const tema = $derived(semNumeroInicial(item.tema));
 
-	// An activity the backend has not given an id to cannot be addressed yet.
-	const movivel = $derived(podeMover && !!item.id);
+	// An activity the backend has not given an id to cannot be addressed yet, and
+	// one already marked done must not move: that would rewrite what was studied.
+	const movivel = $derived(podeMover && !!item.id && !concluida);
 
 	function mover(destino: string, posicao: number) {
 		menuAberto = false;
@@ -210,7 +211,6 @@
 	<span class="txt">
 		<span class="tema">{tema}</span>
 		{#if item.passada === 2}<span class="meta">2ª passada</span>{/if}
-		{#if item.movida}<span class="meta movida-tag">movida por você</span>{/if}
 	</span>
 
 	<span class="acoes">
@@ -405,7 +405,9 @@
 		background: var(--accent);
 		color: var(--bg);
 	}
-	/* Confirms the landing without animating the whole list. */
+	/* Confirms the landing without animating the whole list. `.movida` marks an
+	   activity the user placed; it is used only for this brief settle, never as a
+	   permanent badge. */
 	@keyframes assentar {
 		from {
 			background: var(--accent-soft);
@@ -506,9 +508,6 @@
 	.meta {
 		font-size: 11px;
 		color: var(--text-faint);
-	}
-	.movida-tag {
-		color: var(--accent);
 	}
 	.acoes {
 		display: flex;

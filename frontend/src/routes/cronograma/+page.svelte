@@ -36,8 +36,12 @@
 		return { h, alvo: s.dias.length * (plano?.config.horasDia ?? 0) };
 	}
 
+	/**
+	 * The only thing that blocks a move is having been marked done — moving a
+	 * concluded activity would rewrite history. Everything else is movable.
+	 */
 	function diaMovivel(d: Dia): boolean {
-		return d.itens.length > 0 && !d.registro?.concluido;
+		return d.itens.length > 0;
 	}
 
 	// Rearranging is per-activity: a whole day is never swapped with another, so

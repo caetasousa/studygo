@@ -179,11 +179,15 @@ func TestMoverAtividade_Recusas(t *testing.T) {
 			querErro:  plano.ErrDestinoInvalido,
 		},
 		{
-			nome:      "não move para fora de um dia concluído",
+			// A day holding finished work does not freeze its other subjects: what
+			// blocks a move is the ACTIVITY being done, which the service checks
+			// against the records. Here the origin is concluded and the move is
+			// still allowed.
+			nome:      "move para fora de um dia concluído",
 			id:        "a",
 			destino:   dia(2026, 9, 2),
 			concluido: func(t time.Time) bool { return t.Equal(dia(2026, 9, 1)) },
-			querErro:  plano.ErrDiaConcluido,
+			querErro:  nil,
 		},
 		{
 			nome:      "não move para dentro de um dia concluído",
@@ -460,5 +464,154 @@ func TestMoverAtividade_EntreMeses(t *testing.T) {
 	// Nothing may be duplicated or dropped by a swap.
 	if len(out) != len(atividades) {
 		t.Errorf("total = %d, quer %d", len(out), len(atividades))
+	}
+}
+
+// Raising blocosPorDia after a day was arranged by hand must show the extra
+// subject: the stored layout says WHAT sits in the day, not how many fit.
+func TestAplicarAtividades_MostraBlocoNovo(t *testing.T) {
+	t.Parallel()
+
+	// The engine now generates three items for the day...
+	dias := []plano.Dia{
+		{
+			N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo,
+			Itens: []plano.ItemDia{
+				{Disciplina: "POR", Tema: "Crase"},
+				{Disciplina: "MAT", Tema: "Frações"},
+				{Disciplina: "DIR", Tema: "Atos"},
+			},
+		},
+	}
+
+	// ...but only two were materialised, back when the day held two blocks. Each
+	// records the generated slot it came from, so reconciliation knows those two
+	// are already represented and only the third is new.
+	d0, p0, p1 := dia(2026, 9, 1), 0, 1
+	armazenadas := []plano.Atividade{
+		{
+			ID: "b", Data: d0, Posicao: 0, Disciplina: "MAT", Tema: "Frações",
+			OrigemDia: &d0, OrigemPos: &p1,
+		},
+		{
+			ID: "a", Data: d0, Posicao: 1, Disciplina: "POR", Tema: "Crase",
+			OrigemDia: &d0, OrigemPos: &p0,
+		},
+	}
+
+	plano.AplicarAtividades(dias, armazenadas)
+
+	if len(dias[0].Itens) != 3 {
+		t.Fatalf("itens = %d, quer 3 (os dois arranjados + o bloco novo)", len(dias[0].Itens))
+	}
+
+	// The user's arrangement is preserved, and the new block lands after it.
+	if dias[0].Itens[0].Disciplina != "MAT" || dias[0].Itens[1].Disciplina != "POR" {
+		t.Errorf("a ordem arranjada foi perdida: %v", dias[0].Itens)
+	}
+
+	if dias[0].Itens[2].Disciplina != "DIR" {
+		t.Errorf("bloco novo = %q, quer DIR", dias[0].Itens[2].Disciplina)
+	}
+
+	// Every item must be addressable: the arranged ones by their stored id, the
+	// newly generated one by its slot id.
+	for _, it := range dias[0].Itens {
+		if it.AtividadeID == "" {
+			t.Errorf("item sem id: %+v", it)
+		}
+	}
+}
+
+// Lowering the count (or leaving it alone) must not invent items.
+func TestAplicarAtividades_NaoInventaItens(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{
+			N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo,
+			Itens: []plano.ItemDia{{Disciplina: "POR", Tema: "Crase"}},
+		},
+	}
+
+	d0, p0 := dia(2026, 9, 1), 0
+	armazenadas := []plano.Atividade{
+		{
+			ID: "a", Data: d0, Posicao: 0, Disciplina: "POR", Tema: "Crase",
+			OrigemDia: &d0, OrigemPos: &p0,
+		},
+		// Moved in from another day: it claims no slot here, and must not be
+		// mistaken for a generated one.
+		{ID: "b", Data: d0, Posicao: 1, Disciplina: "MAT", Tema: "Frações"},
+	}
+
+	plano.AplicarAtividades(dias, armazenadas)
+
+	if len(dias[0].Itens) != 2 {
+		t.Fatalf("itens = %d, quer 2 (o que está guardado manda)", len(dias[0].Itens))
+	}
+}
+
+// Raising blocosPorDia adds blocks the store has never seen. Those must become
+// real activities on the next move, or dragging the new subject fails — while
+// the ones already arranged are left exactly as they are.
+func TestAtividadesFaltantes(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{
+			N: 1, Data: dia(2026, 9, 1), Tipo: plano.TipoEstudo,
+			Itens: []plano.ItemDia{
+				{Disciplina: "POR", Tema: "Crase"},
+				{Disciplina: "MAT", Tema: "Frações"},
+				{Disciplina: "DIR", Tema: "Atos"},
+			},
+		},
+	}
+
+	d0, p0, p1 := dia(2026, 9, 1), 0, 1
+	existentes := []plano.Atividade{
+		{
+			ID: "a", Data: d0, Posicao: 0, Disciplina: "POR", Tema: "Crase",
+			OrigemDia: &d0, OrigemPos: &p0,
+		},
+		{
+			ID: "b", Data: d0, Posicao: 1, Disciplina: "MAT", Tema: "Frações",
+			OrigemDia: &d0, OrigemPos: &p1,
+		},
+	}
+
+	plano.AplicarAtividades(dias, existentes)
+
+	faltantes := plano.AtividadesFaltantes(dias, existentes)
+
+	if len(faltantes) != 1 {
+		t.Fatalf("faltantes = %d, quer 1 (só o bloco novo)", len(faltantes))
+	}
+
+	if faltantes[0].Disciplina != "DIR" {
+		t.Errorf("faltante = %q, quer DIR", faltantes[0].Disciplina)
+	}
+
+	// Its position must not collide with what is already stored for that day.
+	for _, e := range existentes {
+		if faltantes[0].Posicao == e.Posicao {
+			t.Errorf("posição %d colide com atividade existente", faltantes[0].Posicao)
+		}
+	}
+
+	// Nothing is missing once everything is stored. A materialised activity
+	// records the generated slot it came from — that is what marks the slot as
+	// already represented.
+	p2 := 2
+	todas := append(append([]plano.Atividade{}, existentes...), plano.Atividade{
+		ID: "c", Data: d0, Posicao: 2, Disciplina: "DIR", Tema: "Atos",
+		OrigemDia: &d0, OrigemPos: &p2,
+	})
+
+	plano.AplicarAtividades(dias, todas)
+
+	if n := len(plano.AtividadesFaltantes(dias, todas)); n != 0 {
+		t.Errorf("faltantes = %d, quer 0 quando tudo já está guardado", n)
 	}
 }
