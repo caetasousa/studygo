@@ -1,4 +1,4 @@
-# 🐹 annyGo
+# 🐹 studygo
 
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
 ![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)
@@ -27,8 +27,14 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   pontos, gerais vale 1; essa proporção define quantos dias cada disciplina
   recebe. Fases de **ciclo de conteúdo** (1ª passada no edital + revisão semanal)
   e **reta final** (revisão dirigida, discursiva, simulados).
-- **Registro diário** — horas, questões, acertos e anotações por dia; edição
-  inline e reordenação (setas / arrastar) das matérias.
+- **Registro por matéria** — horas, questões, acertos, conclusão e anotação de
+  **cada matéria**, não do dia inteiro: um dia pode estar meio feito, e a mesma
+  disciplina agendada duas vezes no mesmo dia tem registros independentes. O dia
+  conclui sozinho quando todas as suas matérias concluem.
+- **Reorganizar arrastando** — arraste uma matéria para outro dia; se o destino
+  já estiver ocupado as duas trocam de lugar, se estiver vazio ela só se move.
+  No celular vale segurar e arrastar. Só uma matéria já concluída não se move —
+  isso reescreveria o que foi estudado.
 - **Balanceamento** — quanto do seu tempo foi para cada disciplina _vs_ o ideal.
 - **Estatísticas** — série de horas/acertos, streak de dias, evolução por
   disciplina.
@@ -54,7 +60,7 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
 | 🔐 | **argon2id + JWT** | hash de senha (PHC) e auth com refresh rotativo |
 | 🤖 | **Gemini API** | importação opcional do concurso a partir do edital (`GEMINI_API_KEY`) |
 | 🔔 | **worker** | `cmd/worker` — lembretes diários de revisão espaçada |
-| 🐳 | **Docker Compose** | `postgres + backend + worker + frontend` |
+| 🐳 | **Docker Compose** | `postgres + backend + worker + frontend`, com **hot reload** no desenvolvimento |
 | 🌐 | **nginx + Let's Encrypt** | reverse proxy de borda + HTTPS na VPS |
 | 📕 | **Ansible** | provisiona a VPS e faz o deploy (imagens buildadas localmente e enviadas prontas) |
 
@@ -80,11 +86,16 @@ código, camadas e regras do projeto: **[CLAUDE.md](CLAUDE.md)**.
 ## 🚀 Começar
 
 ```bash
-git clone <url-do-repo> && cd annyGo
+git clone <url-do-repo> && cd studygo
 cp .env.example .env          # defina JWT_SECRET
 docker compose up -d --build
 open http://localhost:5173
 ```
+
+Salvou um arquivo, a mudança chega ao navegador (ou reinicia a API em ~5s) sem
+rebuild — o `docker-compose.override.yml` é carregado sozinho pelo Compose e
+aponta frontend e backend para os estágios `dev`. `--build` só quando mudar
+dependência.
 
 - **[docs/rodar-local.md](docs/rodar-local.md)** — rodar e desenvolver localmente, variáveis do `.env`, hot-reload, checagens
 - **[docs/deploy.md](docs/deploy.md)** — provisionar e atualizar a VPS com Ansible

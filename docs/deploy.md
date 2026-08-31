@@ -34,6 +34,8 @@ Tudo mora em `ansible/`. Detalhes de cada playbook e role estão em
 cd ansible
 
 # 1. chave SSH dedicada ao deploy (pule se já existir — NÃO sobrescreva)
+# O nome do arquivo é anterior ao rename do projeto e é o que a VPS já
+# autoriza — não troque para studygo_deploy sem reprovisionar o servidor.
 ssh-keygen -t ed25519 -f ~/.ssh/annygo_deploy -N "" -C "annygo-deploy"
 
 # 2. inventário e segredos (arquivos .example → reais; os reais são gitignored)

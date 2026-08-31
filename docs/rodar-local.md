@@ -41,7 +41,7 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | Variável | Obrigatória | Default | Para quê |
 |---|---|---|---|
 | `JWT_SECRET` | ✅ | — | assina os tokens de acesso |
-| `POSTGRES_USER` / `_PASSWORD` / `_DB` / `_PORT` | | `annygo` / `annygo` / `annygo` / `5432` | credenciais do Postgres |
+| `POSTGRES_USER` / `_PASSWORD` / `_DB` / `_PORT` | | `studygo` / `studygo` / `studygo` / `5432` | credenciais do Postgres. Um `.env` anterior ao nome novo aponta para `annygo` — mantenha assim, ou o app sobe contra um banco vazio |
 | `SERVER_PORT` / `FRONTEND_PORT` | | `8080` / `5173` | portas expostas no host |
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | de quanto em quanto tempo o worker roda |
@@ -66,7 +66,7 @@ Para mexer no **backend** fora do Docker (precisa do Postgres do Compose de pé)
 
 ```bash
 cd backend
-DATABASE_URL="postgres://annygo:annygo@localhost:5432/annygo?sslmode=disable" \
+DATABASE_URL="postgres://studygo:studygo@localhost:5432/studygo?sslmode=disable" \
 JWT_SECRET="dev" \
 go run ./cmd/server
 ```
