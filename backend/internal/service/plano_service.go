@@ -169,6 +169,34 @@ func (s *PlanoService) RegistrarDia(
 	return s.montar(ctx, c, salvo)
 }
 
+// proximaAtividadeDe finds the earliest activity of a discipline still
+// scheduled on or after a date — what an id-less completion of that subject was
+// most likely referring to.
+func proximaAtividadeDe(
+	atividades []plano.Atividade,
+	disciplina string,
+	desde time.Time,
+) (string, bool) {
+	if disciplina == "" {
+		return "", false
+	}
+
+	melhor := ""
+	var quando time.Time
+
+	for _, a := range atividades {
+		if a.Disciplina != disciplina || a.Data.Before(plano.DayOf(desde)) {
+			continue
+		}
+
+		if melhor == "" || a.Data.Before(quando) {
+			melhor, quando = a.ID, a.Data
+		}
+	}
+
+	return melhor, melhor != ""
+}
+
 // resolverIDsDosBlocos turns the synthetic slot ids the client may be holding
 // into the real ids of the now-stored activities.
 func resolverIDsDosBlocos(
@@ -206,21 +234,35 @@ func (s *PlanoService) trazerConcluidasParaODia(
 	data time.Time,
 	reg plano.Registro,
 ) error {
+	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
+	if err != nil {
+		return err
+	}
+
 	feitas := make([]string, 0, len(reg.Blocos))
 
 	for _, b := range reg.Blocos {
-		if b.Concluido && b.AtividadeID != "" {
+		if !b.Concluido {
+			continue
+		}
+
+		if b.AtividadeID != "" {
 			feitas = append(feitas, b.AtividadeID)
+
+			continue
+		}
+
+		// A record written before activities were addressable carries no id. The
+		// discipline plus the day it was recorded on is enough to find what it
+		// meant: the next activity of that subject still scheduled ahead. Without
+		// this, a completion made before the fix stays stranded forever.
+		if id, ok := proximaAtividadeDe(atividades, b.Disciplina, data); ok {
+			feitas = append(feitas, id)
 		}
 	}
 
 	if len(feitas) == 0 {
 		return nil
-	}
-
-	res, atividades, err := s.prepararAtividades(ctx, c, salvo)
-	if err != nil {
-		return err
 	}
 
 	concluido := s.diaConcluido(salvo)
