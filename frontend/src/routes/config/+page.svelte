@@ -508,7 +508,8 @@
 				<p class="page-sub" style="margin:0 0 10px;font-size:12px">
 					Matérias de peso maior (as <b>específicas</b> valem 2, as básicas 1) já aparecem mais vezes
 					no cronograma. O <b>reforço</b> multiplica ainda mais uma matéria em que você está com
-					dificuldade — ela aparece mais e ganha um bloco mais longo.
+					dificuldade — ela aparece em mais dias. O tamanho do bloco continua o que você definiu
+					em “Minutos por bloco”.
 				</p>
 				<div class="modos">
 					{#each disciplinas as d (d.codigo)}

@@ -168,7 +168,11 @@ func TestMesclarItensIguais_PreservaPrimeiroID(t *testing.T) {
 	}
 }
 
-func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
+// O reforço faz a matéria aparecer em MAIS dias (ver TestGerar_reforcoDaMaisBlocos),
+// não estica um bloco. A tela de config chama minutosBloco de "tamanho de cada
+// atividade", então dois blocos no mesmo dia têm a mesma duração, com ou sem
+// reforço.
+func TestBlocos_blocosDoDiaTemDuracaoIgual(t *testing.T) {
 	t.Parallel()
 
 	cfg := cfgBlocos(3)
@@ -186,19 +190,18 @@ func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 		t.Fatalf("gerou %d blocos, queria 3", len(got))
 	}
 
-	// 3h = 180min; 16% de revisão ≈ 30min; sobram ~150 divididos 1:2.
-	if got[1].Minutos <= got[0].Minutos {
-		t.Errorf("bloco reforçado tem %d min e o normal %d — o reforço não aumentou o tempo",
-			got[1].Minutos, got[0].Minutos)
+	if got[0].Minutos != got[1].Minutos {
+		t.Errorf("blocos com %d e %d min — deviam ser iguais apesar do reforço",
+			got[0].Minutos, got[1].Minutos)
 	}
 
 	if total := somaMinutos(got); total != 180 {
 		t.Errorf("total = %d min, queria 180", total)
 	}
 
-	// A bateria de questões acompanha o tempo.
-	if !strings.Contains(got[1].Detalhe, "20 questões") {
-		t.Errorf("detalhe do bloco reforçado = %q, queria 2/3 das 30 questões", got[1].Detalhe)
+	// Baterias iguais, já que os minutos são iguais.
+	if !strings.Contains(got[0].Detalhe, "15 questões") || !strings.Contains(got[1].Detalhe, "15 questões") {
+		t.Errorf("baterias = %q / %q, queria 15 questões em cada", got[0].Detalhe, got[1].Detalhe)
 	}
 }
 

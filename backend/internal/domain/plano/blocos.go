@@ -97,8 +97,8 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 		out := make([]Bloco, 0, len(d.Itens)+1)
 
 		for idx, it := range d.Itens {
-			// As questões do dia seguem o mesmo peso dos minutos: a matéria
-			// reforçada leva um bloco maior e uma bateria maior junto.
+			// As questões do dia acompanham os minutos do bloco: blocos de tamanho
+			// igual, baterias de tamanho igual.
 			porBloco := 0
 			if conteudoMin > 0 {
 				porBloco = int(math.Round(float64(d.Meta) * float64(minutos[idx]) / conteudoMin))
@@ -287,37 +287,33 @@ func rotuloBloco(idx int) string {
 	return strconv.Itoa(idx+1) + "º bloco"
 }
 
-// repartirMinutos splits the content time across the day's blocks in proportion
-// to each discipline's reforço, rounding to 5 minutes and giving the leftover to
-// the heaviest block so the day still adds up.
-func repartirMinutos(total float64, itens []ItemDia, cfg Config) []int {
-	pesos := make([]float64, len(itens))
-	soma := 0.0
-
-	for i, it := range itens {
-		pesos[i] = cfg.ReforcoDe(it.Disciplina)
-		soma += pesos[i]
+// repartirMinutos splits the content time equally across the day's blocks,
+// rounding to 5 minutes and giving the leftover to the first block so the day
+// still adds up.
+//
+// Equal, not weighted by reforço: the config screen calls MinutosBloco "the size
+// of each activity", so a day of N blocks and a budget of N×MinutosBloco shows
+// MinutosBloco on every one. Reforço still makes a heavier discipline appear on
+// MORE days (see pesosDistribuicao) — it just no longer stretches a single
+// block, which was the surprise of setting "30 min" and seeing 35.
+func repartirMinutos(total float64, itens []ItemDia, _ Config) []int {
+	n := len(itens)
+	if n == 0 {
+		return []int{}
 	}
 
-	if soma == 0 {
-		soma = float64(len(itens))
-		for i := range pesos {
-			pesos[i] = 1
-		}
-	}
-
-	out := make([]int, len(itens))
+	out := make([]int, n)
 	usado := 0
 
 	for i := range itens {
-		out[i] = m5(total * pesos[i] / soma)
+		out[i] = m5(total / float64(n))
 		usado += out[i]
 	}
 
 	if sobra := m5(total) - usado; sobra != 0 {
 		maior := 0
-		for i := range pesos {
-			if pesos[i] > pesos[maior] {
+		for i := range out {
+			if out[i] > out[maior] {
 				maior = i
 			}
 		}
