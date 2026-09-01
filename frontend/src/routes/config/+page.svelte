@@ -515,7 +515,8 @@
 						{@const rel = frequenciaRelativa(d.codigo)}
 						<div class="modo-linha">
 							<span class="modo-nome">
-								<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>{d.nome}
+								<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
+								<span class="modo-nome-txt">{d.nome}</span>
 								<em class="peso-tag">
 									peso {d.peso}{#if rel !== 1} · ~{nf1.format(rel)}× as básicas{/if}
 								</em>
@@ -650,23 +651,44 @@
 		flex-wrap: wrap;
 	}
 	.modo-nome {
+		display: flex;
+		align-items: baseline;
+		gap: 4px;
 		flex: 1 1 200px;
 		min-width: 0;
 		font-size: 13.5px;
+	}
+	/* Only the discipline NAME truncates. Before this it shared one ellipsis
+	   with the peso tag, so a long name (common in "específicas") could clip
+	   the tag down to nothing rather than the name — the number that matters
+	   was the one that disappeared. */
+	.modo-nome-txt {
+		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.peso-tag {
+		flex: none;
 		font-style: normal;
 		font-family: var(--font-mono);
 		font-size: 10.5px;
 		color: var(--text-faint);
-		margin-left: 6px;
 	}
 	.reforco button[aria-pressed='true'] {
 		background: var(--warn-soft);
 		color: var(--warn);
+	}
+	/* The método/reforço button groups sit on their own line once the row
+	   wraps (narrow screens): without this, a squeezed .day-sel shrank its
+	   BUTTONS instead, and "teoria + questões" broke onto two lines while its
+	   neighbours stayed on one — the uneven row heights that read as
+	   misaligned. Wrapping lets a whole button drop to the next line instead. */
+	.modo-linha .day-sel {
+		flex-wrap: wrap;
+	}
+	.modo-linha .day-sel button {
+		white-space: nowrap;
 	}
 	.ciclo {
 		display: flex;
