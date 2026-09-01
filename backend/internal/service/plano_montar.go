@@ -89,6 +89,12 @@ func (s *PlanoService) montar(
 	var hojeIndex *int
 
 	for i, d := range res.Dias {
+		// A discipline with few topics but many daily blocks lands the same topic
+		// on a day several times in a row (see reparte's leftover repeats). Show it
+		// once, with the minutes summed — Blocos already splits by item, so a
+		// merged item simply carries the combined time.
+		d.Itens = plano.MesclarItensIguais(d.Itens)
+
 		dr := DiaResposta{
 			N:      d.N,
 			Data:   d.Data.Format(isoDate),

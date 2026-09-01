@@ -95,6 +95,79 @@ func TestBlocos_repartePorNumeroDeBlocos(t *testing.T) {
 	}
 }
 
+func TestMesclarItensIguais(t *testing.T) {
+	t.Parallel()
+
+	item := func(disc, tema string) plano.ItemDia {
+		return plano.ItemDia{Disciplina: disc, Tema: tema}
+	}
+
+	casos := []struct {
+		nome    string
+		entrada []plano.ItemDia
+		quer    []plano.ItemDia
+	}{
+		{
+			nome: "run do mesmo tópico colapsa num só",
+			entrada: []plano.ItemDia{
+				item("IA", "Fundamentos"), item("IA", "Fundamentos"),
+				item("IA", "Fundamentos"), item("DS", "Algoritmos"),
+			},
+			quer: []plano.ItemDia{item("IA", "Fundamentos"), item("DS", "Algoritmos")},
+		},
+		{
+			nome:    "mesma disciplina, tópicos diferentes ficam",
+			entrada: []plano.ItemDia{item("IA", "Fundamentos"), item("IA", "Redes")},
+			quer:    []plano.ItemDia{item("IA", "Fundamentos"), item("IA", "Redes")},
+		},
+		{
+			nome: "repetição não consecutiva não colapsa",
+			entrada: []plano.ItemDia{
+				item("IA", "F"), item("DS", "A"), item("IA", "F"),
+			},
+			quer: []plano.ItemDia{item("IA", "F"), item("DS", "A"), item("IA", "F")},
+		},
+		{
+			nome:    "lista de um item passa intacta",
+			entrada: []plano.ItemDia{item("IA", "F")},
+			quer:    []plano.ItemDia{item("IA", "F")},
+		},
+	}
+
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			t.Parallel()
+
+			got := plano.MesclarItensIguais(c.entrada)
+
+			if len(got) != len(c.quer) {
+				t.Fatalf("got %d itens, quer %d: %+v", len(got), len(c.quer), got)
+			}
+
+			for i := range got {
+				if got[i].Disciplina != c.quer[i].Disciplina || got[i].Tema != c.quer[i].Tema {
+					t.Errorf("item %d = %+v, quer %+v", i, got[i], c.quer[i])
+				}
+			}
+		})
+	}
+}
+
+// The first item wins the merge, so its stored id survives and the block stays
+// movable.
+func TestMesclarItensIguais_PreservaPrimeiroID(t *testing.T) {
+	t.Parallel()
+
+	got := plano.MesclarItensIguais([]plano.ItemDia{
+		{Disciplina: "IA", Tema: "F", AtividadeID: "primeiro"},
+		{Disciplina: "IA", Tema: "F", AtividadeID: "segundo"},
+	})
+
+	if len(got) != 1 || got[0].AtividadeID != "primeiro" {
+		t.Fatalf("got %+v, quer um item com id 'primeiro'", got)
+	}
+}
+
 func TestBlocos_reforcoAumentaOBloco(t *testing.T) {
 	t.Parallel()
 

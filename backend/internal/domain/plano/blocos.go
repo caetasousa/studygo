@@ -39,6 +39,40 @@ type Composicao struct {
 	Especificas int
 }
 
+// MesclarItensIguais collapses a run of consecutive items on a day that name the
+// same discipline AND the same topic into a single item.
+//
+// This is what a discipline with few topics but many daily blocks produces: the
+// engine's reparte fills the leftover slots with repeats of the same topic, so
+// a day ends up scheduling "Fundamentos da IA" six times in a row, and the day's
+// fixed time budget is then split six ways into 10-minute slivers. Merged, the
+// day shows one "Fundamentos da IA" block whose minutes are the sum — which is
+// what Blocos computes anyway, since it splits by item.
+//
+// The first item's fields win, so its AtividadeID survives and the block stays
+// addressable. Only an exact (discipline, topic) match merges: two different
+// topics of one discipline, or a genuine second pass with a different label,
+// stay separate.
+func MesclarItensIguais(itens []ItemDia) []ItemDia {
+	if len(itens) < 2 {
+		return itens
+	}
+
+	out := make([]ItemDia, 0, len(itens))
+
+	for _, it := range itens {
+		if n := len(out); n > 0 &&
+			out[n-1].Disciplina == it.Disciplina &&
+			out[n-1].Tema == it.Tema {
+			continue
+		}
+
+		out = append(out, it)
+	}
+
+	return out
+}
+
 // Blocos returns the timed breakdown for a day, mirroring the artifact's
 // blocos(): content days get two study blocks plus a spaced-review tail; the
 // special days get their own fixed splits.
