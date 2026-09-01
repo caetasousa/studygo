@@ -605,6 +605,17 @@ func (s *PlanoService) prepararAtividades(
 		return plano.Resultado{}, nil, err
 	}
 
+	// Heal a table seeded from a reparte pile — a one-topic discipline the engine
+	// gave many slots on one day, each stored as its own row. Done before
+	// anything reads the layout, and persisted so it does not recur.
+	if limpas := plano.DeduplicarAtividades(atividades); len(limpas) != len(atividades) {
+		if err := s.planos.ReplaceAtividades(ctx, salvo.ID, limpas); err != nil {
+			return plano.Resultado{}, nil, err
+		}
+
+		atividades = limpas
+	}
+
 	plano.AplicarAtividades(res.Dias, atividades)
 
 	if faltantes := plano.AtividadesFaltantes(res.Dias, atividades); len(faltantes) > 0 {

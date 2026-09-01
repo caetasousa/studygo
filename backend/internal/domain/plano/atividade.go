@@ -594,8 +594,60 @@ func AplicarAtividades(dias []Dia, atividades []Atividade) {
 			itens = append(itens, it)
 		}
 
-		dias[i].Itens = itens
+		// A discipline with few topics but many daily slots has the same topic
+		// repeated by reparte; collapse the run so the day reads once and, just
+		// as important, AtividadesFaltantes never materialises the pile.
+		dias[i].Itens = MesclarItensIguais(itens)
 	}
+}
+
+// DeduplicarAtividades drops stored activities that trace back to the same
+// engine-generated day and repeat the same discipline and topic there, keeping
+// only the earliest slot.
+//
+// This heals a plan whose activity table was seeded from a reparte pile: a
+// one-topic discipline the engine gave a dozen slots on a single day, each
+// materialised as its own row. A later reorganisation (compacting empty days,
+// spreading finished-early topics forward) can scatter those rows across many
+// later days — each still pointing at the SAME origin day and topic, which is
+// what marks them as one pile rather than legitimate separate visits. Keying on
+// the CURRENT day would miss this, since the copies no longer share one.
+//
+// A row the student individually rearranged away from where reorganisation put
+// it — its own OrigemDia/OrigemPos no longer describing the pile — is never
+// touched: only rows still carrying the same original slot are duplicates of
+// each other.
+func DeduplicarAtividades(atividades []Atividade) []Atividade {
+	// The earliest (by OrigemPos) activity seen so far for each pile key.
+	sobrevivente := map[string]int{} // pile key -> index into `atividades`
+
+	for i, a := range atividades {
+		if a.OrigemDia == nil || a.OrigemPos == nil {
+			continue
+		}
+
+		chave := day(*a.OrigemDia).Format(time.DateOnly) + "\x00" + a.Disciplina + "\x00" + a.Tema
+
+		atual, ok := sobrevivente[chave]
+		if !ok || *a.OrigemPos < *atividades[atual].OrigemPos {
+			sobrevivente[chave] = i
+		}
+	}
+
+	mantido := make(map[int]bool, len(sobrevivente))
+	for _, i := range sobrevivente {
+		mantido[i] = true
+	}
+
+	out := make([]Atividade, 0, len(atividades))
+
+	for i, a := range atividades {
+		if a.OrigemDia == nil || a.OrigemPos == nil || mantido[i] {
+			out = append(out, a)
+		}
+	}
+
+	return out
 }
 
 func origensReivindicadas(atividades []Atividade) map[string]bool {

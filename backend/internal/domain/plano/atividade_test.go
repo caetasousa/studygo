@@ -706,3 +706,74 @@ func TestReterAoMudarRitmo(t *testing.T) {
 		}
 	}
 }
+
+// A discipline with one topic but many slots on the same engine day (reparte's
+// leftover repeats) materialises one row per slot. A later compaction can
+// scatter them across many later days without breaking their shared origin —
+// that shared origin is what marks them as one pile.
+func TestDeduplicarAtividades_PilhaEspalhada(t *testing.T) {
+	t.Parallel()
+
+	dOrigem := dia(2026, 9, 2)
+	d3, d4, d7 := dia(2026, 9, 3), dia(2026, 9, 4), dia(2026, 9, 7)
+	p1, p2, p3 := 1, 2, 3
+
+	atividades := []plano.Atividade{
+		// Still on its original day and slot.
+		{ID: "a", Data: dOrigem, Posicao: 1, Disciplina: "INTAR", Tema: "Fundamentos",
+			OrigemDia: &dOrigem, OrigemPos: &p1},
+		// Scattered by a compaction: different DATA, but same OrigemDia/topic.
+		{ID: "b", Data: d3, Posicao: 0, Disciplina: "INTAR", Tema: "Fundamentos",
+			OrigemDia: &dOrigem, OrigemPos: &p2},
+		{ID: "c", Data: d4, Posicao: 0, Disciplina: "INTAR", Tema: "Fundamentos",
+			OrigemDia: &dOrigem, OrigemPos: &p3},
+		// A different subject on d7 — untouched.
+		{ID: "d", Data: d7, Posicao: 0, Disciplina: "DESSI", Tema: "Algoritmos",
+			OrigemDia: &d7, OrigemPos: new(int)},
+	}
+
+	got := plano.DeduplicarAtividades(atividades)
+
+	if len(got) != 2 {
+		t.Fatalf("got %d atividades, quer 2 (a pilha INTAR colapsada + DESSI): %+v", len(got), got)
+	}
+
+	ids := map[string]bool{}
+	for _, a := range got {
+		ids[a.ID] = true
+	}
+
+	if !ids["a"] {
+		t.Error("a (menor OrigemPos da pilha) deveria ter sido mantida")
+	}
+
+	if ids["b"] || ids["c"] {
+		t.Error("b e c são a mesma pilha de a — deveriam ter sido descartadas")
+	}
+
+	if !ids["d"] {
+		t.Error("d é de outra disciplina/origem — não deveria ter sido tocada")
+	}
+}
+
+// Two genuinely separate visits to the same topic — a spaced second pass
+// generated on a different day — are not a pile, and must survive.
+func TestDeduplicarAtividades_SegundaPassadaEmOutroDiaSobrevive(t *testing.T) {
+	t.Parallel()
+
+	d1, d2 := dia(2026, 9, 1), dia(2026, 9, 20)
+	p0 := 0
+
+	atividades := []plano.Atividade{
+		{ID: "a", Data: d1, Posicao: 0, Disciplina: "INTAR", Tema: "Fundamentos",
+			OrigemDia: &d1, OrigemPos: &p0},
+		{ID: "b", Data: d2, Posicao: 0, Disciplina: "INTAR", Tema: "Fundamentos",
+			OrigemDia: &d2, OrigemPos: &p0},
+	}
+
+	got := plano.DeduplicarAtividades(atividades)
+
+	if len(got) != 2 {
+		t.Fatalf("got %d atividades, quer 2 (origens diferentes, não é pilha)", len(got))
+	}
+}
