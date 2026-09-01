@@ -777,3 +777,23 @@ func TestDeduplicarAtividades_SegundaPassadaEmOutroDiaSobrevive(t *testing.T) {
 		t.Fatalf("got %d atividades, quer 2 (origens diferentes, não é pilha)", len(got))
 	}
 }
+
+// Reordenada DENTRO do mesmo dia: Movida() é true, mas o dia bate com a origem.
+// É o único caso que a cláusula a.Movida() cobre sozinha.
+func TestReterAoMudarRitmo_ReordenadaNoMesmoDia(t *testing.T) {
+	t.Parallel()
+
+	d := dia(2026, 9, 12)
+	p0 := 0
+
+	// origem pos=0, agora está na pos=2 do MESMO dia: o aluno reordenou à mão.
+	atividades := []plano.Atividade{
+		{ID: "reordenada", Data: d, Posicao: 2, Disciplina: "POR", OrigemDia: &d, OrigemPos: &p0},
+	}
+
+	got := plano.ReterAoMudarRitmo(atividades, dia(2026, 9, 1), func(time.Time) bool { return false })
+
+	if len(got) != 1 {
+		t.Fatalf("got %d, quer 1 — uma reordenação manual no mesmo dia não pode ser descartada", len(got))
+	}
+}

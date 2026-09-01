@@ -88,13 +88,11 @@ func (s *PlanoService) montar(
 	dias := make([]DiaResposta, 0, len(res.Dias))
 	var hojeIndex *int
 
+	// The days arrive already merged: AplicarAtividades collapses a repeated
+	// topic before anything reads the items, so the pile can never reach either
+	// the response or AtividadesFaltantes. Merging again here would be a second
+	// copy of that rule, free to drift out of step with the one that matters.
 	for i, d := range res.Dias {
-		// A discipline with few topics but many daily blocks lands the same topic
-		// on a day several times in a row (see reparte's leftover repeats). Show it
-		// once, with the minutes summed — Blocos already splits by item, so a
-		// merged item simply carries the combined time.
-		d.Itens = plano.MesclarItensIguais(d.Itens)
-
 		dr := DiaResposta{
 			N:      d.N,
 			Data:   d.Data.Format(isoDate),

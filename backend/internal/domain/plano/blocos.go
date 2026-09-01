@@ -53,20 +53,28 @@ type Composicao struct {
 // addressable. Only an exact (discipline, topic) match merges: two different
 // topics of one discipline, or a genuine second pass with a different label,
 // stay separate.
+//
+// The match is over the WHOLE day, not just consecutive items. Repeats do not
+// always land side by side: reconciliation appends the activities the student
+// moved after the generated ones, and bringing a topic forward onto a day that
+// already teaches it puts another subject in between. Comparing only with the
+// previous item let exactly that pair through — the day showed the same topic
+// twice with something else wedged between them.
 func MesclarItensIguais(itens []ItemDia) []ItemDia {
 	if len(itens) < 2 {
 		return itens
 	}
 
+	visto := make(map[string]bool, len(itens))
 	out := make([]ItemDia, 0, len(itens))
 
 	for _, it := range itens {
-		if n := len(out); n > 0 &&
-			out[n-1].Disciplina == it.Disciplina &&
-			out[n-1].Tema == it.Tema {
+		chave := it.Disciplina + "\x00" + it.Tema
+		if visto[chave] {
 			continue
 		}
 
+		visto[chave] = true
 		out = append(out, it)
 	}
 

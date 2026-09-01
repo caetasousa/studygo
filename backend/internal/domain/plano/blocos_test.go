@@ -121,11 +121,15 @@ func TestMesclarItensIguais(t *testing.T) {
 			quer:    []plano.ItemDia{item("IA", "Fundamentos"), item("IA", "Redes")},
 		},
 		{
-			nome: "repetição não consecutiva não colapsa",
+			// Repetições NÃO adjacentes também colapsam: a reconciliação anexa as
+			// atividades movidas depois das geradas, então trazer um tema para um
+			// dia que já o ensina deixa outra matéria no meio do par. Comparar só
+			// com o item anterior deixava exatamente esse caso passar.
+			nome: "repetição não consecutiva também colapsa",
 			entrada: []plano.ItemDia{
 				item("IA", "F"), item("DS", "A"), item("IA", "F"),
 			},
-			quer: []plano.ItemDia{item("IA", "F"), item("DS", "A"), item("IA", "F")},
+			quer: []plano.ItemDia{item("IA", "F"), item("DS", "A")},
 		},
 		{
 			nome:    "lista de um item passa intacta",

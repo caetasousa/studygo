@@ -220,19 +220,33 @@ func CompactarAtividades(
 			continue
 		}
 
-		quer := carga
-		if quer > len(fila) {
-			quer = len(fila)
-		}
+		// Take the next `carga` items the day does not already teach. A
+		// discipline with few topics has the same one queued several times over
+		// (reparte fills its extra slots with repeats), and packing blindly put
+		// that topic on the day twice — the same subject listed back to back,
+		// which is the pile the student sees. Skipped items stay in the queue for
+		// a later day, so nothing is dropped.
+		noDia := map[string]bool{}
+		posicao := 0
+		restante := make([]Atividade, 0, len(fila))
 
-		for i := 0; i < quer; i++ {
-			a := fila[i]
+		for _, a := range fila {
+			chave := a.Disciplina + "\x00" + a.Tema
+
+			if posicao >= carga || noDia[chave] {
+				restante = append(restante, a)
+
+				continue
+			}
+
+			noDia[chave] = true
 			a.Data = dt
-			a.Posicao = i
+			a.Posicao = posicao
+			posicao++
 			saida = append(saida, a)
 		}
 
-		fila = fila[quer:]
+		fila = restante
 	}
 
 	// Anything still queued did not fit before the exam; it stays on the last
