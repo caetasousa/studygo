@@ -18,8 +18,11 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from app.core.config import Settings
-from app.core.errors import OCRTimeout, OCRUnavailable
+from app.core.errors import OCRUnavailable
+from app.core.logging import get_logger
 from app.services.normalize import normalize_text
+
+_log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -106,7 +109,10 @@ def _ocr_one(png: bytes, physical_page: int, settings: Settings, tess: object) -
 
 def run_ocr(data: bytes, page_numbers: list[int], settings: Settings) -> list[OCRPage]:
     """OCR the given physical pages. Raises OCRUnavailable if Tesseract is
-    missing; per-page timeouts raise OCRTimeout for that page only."""
+    missing; a page that times out is simply left out of the result — the
+    caller already falls back to that page's native text (see
+    pipeline._apply_ocr), so one slow page must not cost every other page its
+    OCR just because they happened to share a batch."""
     if not page_numbers:
         return []
 
@@ -126,9 +132,12 @@ def run_ocr(data: bytes, page_numbers: list[int], settings: Settings) -> list[OC
             try:
                 results.append(future.result())
             except RuntimeError as exc:  # pytesseract raises RuntimeError on timeout
-                if "timeout" in str(exc).lower():
-                    raise OCRTimeout(f"OCR timed out on page {page_number}") from exc
-                raise
+                if "timeout" not in str(exc).lower():
+                    raise
+                _log.warning(
+                    "OCR timed out on one page, keeping the rest of the batch",
+                    extra={"stage": "ocr", "physical_page": page_number},
+                )
 
     results.sort(key=lambda r: r.physical_page)
     return results

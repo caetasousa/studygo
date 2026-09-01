@@ -34,6 +34,33 @@ def test_missing_tesseract_raises_unavailable(monkeypatch: pytest.MonkeyPatch) -
         ocr._import_tesseract()
 
 
+def test_one_page_timeout_does_not_discard_the_rest(
+    monkeypatch: pytest.MonkeyPatch, scanned_pdf: bytes
+) -> None:
+    """A single slow page used to take the whole batch down with it: run_ocr
+    raised out of the whole function on the first per-page timeout, so the
+    caller discarded every result — including pages that had already
+    finished fine. _ocr_one is the seam that actually raises and the only one
+    that knows which physical page it is running, so it is patched directly
+    rather than pytesseract itself."""
+    fake = types.ModuleType("pytesseract")
+    fake.get_tesseract_version = lambda: "5.5.0"  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pytesseract", fake)
+
+    def flaky(png: bytes, physical_page: int, settings: Settings, tess: object) -> ocr.OCRPage:
+        if physical_page == 2:
+            raise RuntimeError("Tesseract process timeout")
+        return ocr.OCRPage(physical_page=physical_page, text="ok")
+
+    monkeypatch.setattr(ocr, "_ocr_one", flaky)
+
+    # scanned_pdf has 3 pages; page 2 always times out, 1 and 3 succeed.
+    pages = ocr.run_ocr(scanned_pdf, [1, 2, 3], Settings())
+
+    got_pages = sorted(p.physical_page for p in pages)
+    assert got_pages == [1, 3], "a página que travou não devia levar as outras junto"
+
+
 def test_word_boxes_convert_px_to_points(
     monkeypatch: pytest.MonkeyPatch, scanned_pdf: bytes
 ) -> None:
