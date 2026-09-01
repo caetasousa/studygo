@@ -357,10 +357,19 @@
 	}
 	.atv[draggable='true'] {
 		cursor: grab;
-		/* Let the browser scroll vertically as usual; the hold gesture calls
-		   preventDefault itself once it decides a drag has begun, so the page
-		   does not move under the finger mid-drag. */
-		touch-action: pan-y;
+		/* `pan-y` used to sit here on the theory that the hold gesture's own
+		   preventDefault() would suppress the native pan once a drag begins.
+		   Measured on a real touch sequence, it does not: touch-action is
+		   decided once, for the touch's whole lifetime, from the value in
+		   effect at the first contact — a later preventDefault() cannot claw
+		   it back. The page kept scrolling out from under the finger mid-drag
+		   (confirmed via window.scrollY moving during the gesture), landing
+		   the drop on whatever row scrolled into place rather than the one
+		   under the thumb. `none` costs a swipe-to-scroll that starts exactly
+		   on a row — scrolling from anywhere else on the card still works —
+		   in exchange for the drop actually landing where it was released.
+		   See arrastarToque.ts for the hold/cancel timing this still uses. */
+		touch-action: none;
 		/* A long press must not raise the text-selection or callout UI. */
 		-webkit-touch-callout: none;
 		user-select: none;
