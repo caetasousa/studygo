@@ -225,6 +225,12 @@ export const api = {
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 
+	atualizarCadernoDisciplina: (slug: string, codigo: string, cadernoUrl: string) =>
+		request<PlanoResposta>(
+			`${planoBase(slug)}/disciplinas/${encodeURIComponent(codigo)}/caderno`,
+			{ method: 'PATCH', body: JSON.stringify({ cadernoUrl }) }
+		),
+
 	estatisticas: (slug: string) => request<Estatisticas>(`${planoBase(slug)}/estatisticas`),
 
 	caderno: (slug: string) => request<Caderno>(`${planoBase(slug)}/caderno`),

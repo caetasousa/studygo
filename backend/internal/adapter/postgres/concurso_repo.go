@@ -200,6 +200,27 @@ func (r *ConcursoRepo) DeleteConcurso(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (r *ConcursoRepo) SetCadernoURL(
+	ctx context.Context,
+	concursoID uuid.UUID,
+	codigo, url string,
+) error {
+	ct, err := r.pool.Exec(
+		ctx,
+		`UPDATE disciplinas SET caderno_url = $3 WHERE concurso_id = $1 AND codigo = $2`,
+		concursoID, codigo, url,
+	)
+	if err != nil {
+		return fmt.Errorf("updating caderno_url: %w", err)
+	}
+
+	if ct.RowsAffected() == 0 {
+		return concurso.ErrNotFound
+	}
+
+	return nil
+}
+
 // inserirConteudoDoConcurso inserts disciplinas (+ temas + fontes), marcos and
 // conteudo for c.ID. Codigos are mnemonics derived from each name (see
 // concurso.Siglas) because they are what the schedule shows on every activity

@@ -21,9 +21,11 @@
 		data,
 		nome,
 		registro,
+		cadernoUrl = '',
 		salvando = false,
 		erro = null,
 		onSalvar,
+		onSalvarCaderno,
 		onCancelar
 	}: {
 		item: ItemDia;
@@ -33,6 +35,8 @@
 		nome: string;
 		/** what is already recorded for THIS activity, if anything */
 		registro: RegistroBloco | null;
+		/** the discipline's current error-notebook link (discipline-wide, not per-activity) */
+		cadernoUrl?: string;
 		salvando?: boolean;
 		erro?: string | null;
 		onSalvar: (v: {
@@ -42,6 +46,8 @@
 			concluido: boolean;
 			nota: string;
 		}) => void;
+		/** persists a changed caderno link for the whole discipline; returns an error message or null */
+		onSalvarCaderno?: (url: string) => Promise<string | null>;
 		onCancelar: () => void;
 	} = $props();
 
@@ -52,6 +58,12 @@
 	const original = untrack(() => valoresIniciais(registro));
 
 	let form = $state({ ...original });
+
+	// The caderno link is the discipline's, not this activity's — snapshotted the
+	// same way, saved separately (different endpoint) only when it actually changed.
+	const cadernoOriginal = untrack(() => cadernoUrl);
+	let cadernoForm = $state(cadernoOriginal);
+	let erroCaderno = $state<string | null>(null);
 
 	const erros = $derived(
 		form.questoes !== null && form.acertos !== null
@@ -74,8 +86,21 @@
 		return v === null ? null : Math.round(v);
 	}
 
-	function salvar() {
-		if (salvando || invalido) return;
+	let salvandoCaderno = $state(false);
+
+	async function salvar() {
+		if (salvando || salvandoCaderno || invalido) return;
+
+		// The discipline-wide caderno link first, so a failure there is shown
+		// before the activity record closes the dialog.
+		const url = cadernoForm.trim();
+		if (onSalvarCaderno && url !== cadernoOriginal.trim()) {
+			salvandoCaderno = true;
+			erroCaderno = await onSalvarCaderno(url);
+			salvandoCaderno = false;
+			if (erroCaderno) return;
+		}
+
 		onSalvar({ ...form, nota: form.nota.trim() });
 	}
 
@@ -207,14 +232,40 @@
 			/>
 		</label>
 
+		{#if onSalvarCaderno}
+			<label class="campo nota">
+				<span>Caderno de erros — link</span>
+				<input
+					type="url"
+					inputmode="url"
+					placeholder="https://www.tecconcursos.com.br/questoes/caderno/…"
+					bind:value={cadernoForm}
+				/>
+			</label>
+			<p class="dica-caderno">
+				Vale para {nome} em todo o cronograma. Aparece como atalho no bloco de revisão do dia.
+			</p>
+		{/if}
+
+		{#if erroCaderno}
+			<p class="aviso erro" role="alert">{erroCaderno}</p>
+		{/if}
+
 		{#if erro}
 			<p class="aviso erro" role="alert">{erro}</p>
 		{/if}
 
 		<div class="dlg-acoes">
-			<button type="button" class="btn" onclick={onCancelar} disabled={salvando}>Cancelar</button>
-			<button type="button" class="btn primario" onclick={salvar} disabled={salvando || invalido}>
-				{salvando ? 'Salvando…' : 'Salvar'}
+			<button type="button" class="btn" onclick={onCancelar} disabled={salvando || salvandoCaderno}>
+				Cancelar
+			</button>
+			<button
+				type="button"
+				class="btn primario"
+				onclick={salvar}
+				disabled={salvando || salvandoCaderno || invalido}
+			>
+				{salvando || salvandoCaderno ? 'Salvando…' : 'Salvar'}
 			</button>
 		</div>
 	</div>
@@ -280,6 +331,11 @@
 	}
 	.nota {
 		margin-top: 12px;
+	}
+	.dica-caderno {
+		margin: 4px 0 0;
+		font-size: 11.5px;
+		color: var(--text-faint);
 	}
 	.ok-lbl {
 		display: flex;

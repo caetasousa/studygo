@@ -358,6 +358,21 @@ class PlanoStore {
 	compactarPlano = () => this.run((s) => api.compactarPlano(s));
 
 	/**
+	 * Sets one discipline's error-notebook link, from the schedule. Discipline-
+	 * wide, not per-activity. Returns an error message on failure so the form can
+	 * show it and stay open.
+	 */
+	atualizarCadernoDisciplina = async (codigo: string, url: string): Promise<string | null> => {
+		try {
+			this.commit(await api.atualizarCadernoDisciplina(this.slug, codigo, url), false);
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível salvar o link';
+		}
+	};
+
+	/**
 	 * Pushes a lost day forward. Everything after it slides one study-day along,
 	 * so nothing is dropped — the plan just gets tighter at the end, which the
 	 * coverage warning already reports.

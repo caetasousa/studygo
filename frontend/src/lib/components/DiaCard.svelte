@@ -425,9 +425,11 @@
 				data={dia.data}
 				nome={nomeDe(it.disciplina)}
 				registro={blocoDaAtividade(dia.registro, it)}
+				cadernoUrl={planoStore.discIndex[it.disciplina]?.cadernoUrl ?? ''}
 				{salvando}
 				erro={erroForm}
 				onSalvar={(v) => void salvarAtividade(it, v)}
+				onSalvarCaderno={(url) => planoStore.atualizarCadernoDisciplina(it.disciplina, url)}
 				onCancelar={fecharForm}
 			/>
 		{/if}

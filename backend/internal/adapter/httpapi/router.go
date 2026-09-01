@@ -57,6 +57,7 @@ func NewRouter(
 	guard("PUT /api/concursos/{slug}/plano/marcos/{id}", h.Plano.MarcarMarco)
 	guard("POST /api/concursos/{slug}/plano/tec/preview", h.Plano.PreviewTEC)
 	guard("POST /api/concursos/{slug}/plano/tec", h.Plano.ImportarTEC)
+	guard("PATCH /api/concursos/{slug}/plano/disciplinas/{codigo}/caderno", h.Plano.AtualizarCadernoDisciplina)
 	guard("POST /api/concursos/{slug}/plano/reordenar", h.Plano.Reordenar)
 	guard("POST /api/concursos/{slug}/plano/atividades/mover", h.Plano.MoverAtividade)
 	guard("POST /api/concursos/{slug}/plano/atividades/antecipar", h.Plano.Antecipar)

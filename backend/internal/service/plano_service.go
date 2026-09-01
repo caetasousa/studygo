@@ -904,6 +904,35 @@ func (s *PlanoService) CompactarPlano(
 	return s.montar(ctx, c, salvo)
 }
 
+// AtualizarCadernoDisciplina sets one discipline's error-notebook link and
+// returns the refreshed plan, so the schedule's review block can pick up the
+// new shortcut without a full concurso edit.
+func (s *PlanoService) AtualizarCadernoDisciplina(
+	ctx context.Context,
+	userID uuid.UUID,
+	slug, codigo, url string,
+) (PlanoResposta, error) {
+	c, salvo, err := s.carregar(ctx, userID, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	if c.DisciplinaByCodigo(codigo) == nil {
+		return PlanoResposta{}, ErrValidacao{Msg: "matéria não encontrada"}
+	}
+
+	if err := s.concursos.SetCadernoURL(ctx, c.ID, codigo, strings.TrimSpace(url)); err != nil {
+		return PlanoResposta{}, err
+	}
+
+	c, err = s.concursos.ConcursoBySlug(ctx, slug)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
+	return s.montar(ctx, c, salvo)
+}
+
 // RestaurarOrdem discards every manual reordering.
 func (s *PlanoService) RestaurarOrdem(ctx context.Context, userID uuid.UUID, slug string) (PlanoResposta, error) {
 	c, salvo, err := s.carregar(ctx, userID, slug)

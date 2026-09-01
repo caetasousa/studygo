@@ -21,4 +21,9 @@ type ConcursoRepository interface {
 	CreateConcurso(ctx context.Context, c concurso.Concurso) (concurso.Concurso, error)
 	UpdateConcurso(ctx context.Context, c concurso.Concurso) (concurso.Concurso, error)
 	DeleteConcurso(ctx context.Context, id uuid.UUID) error
+
+	// SetCadernoURL updates just one discipline's error-notebook link, addressed
+	// by its codigo within the concurso. Used by the schedule's inline editor, so
+	// the whole concurso does not have to be re-submitted to change a link.
+	SetCadernoURL(ctx context.Context, concursoID uuid.UUID, codigo, url string) error
 }

@@ -137,6 +137,39 @@ func (h *PlanoHandler) MarcarMarco(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
+type cadernoDisciplinaRequest struct {
+	CadernoURL string `json:"cadernoUrl"`
+}
+
+// AtualizarCadernoDisciplina sets one discipline's error-notebook link from the
+// schedule, without a full concurso edit.
+func (h *PlanoHandler) AtualizarCadernoDisciplina(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	var req cadernoDisciplinaRequest
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	resp, err := h.planos.AtualizarCadernoDisciplina(
+		r.Context(), id, slug, r.PathValue("codigo"), req.CadernoURL,
+	)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
 // PreviewTEC parses an uploaded TEC spreadsheet and reports what would be
 // imported, without writing anything.
 func (h *PlanoHandler) PreviewTEC(w http.ResponseWriter, r *http.Request) {
