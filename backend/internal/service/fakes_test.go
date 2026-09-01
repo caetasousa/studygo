@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"studygo/internal/domain/concurso"
@@ -139,10 +141,22 @@ func (f *fakePlanos) ReplaceAtividades(_ context.Context, _ uuid.UUID, as []plan
 		}
 	}
 
-	// The real repository does DELETE-then-INSERT, and registros_bloco.atividade_id
-	// is ON DELETE SET NULL — so every record pointing at an activity that does not
-	// come back under the SAME id loses its link. Reproducing that here is the
-	// whole point of the fake: without it the tests were greener than production.
+	// atividades_plano_data_posicao_key UNIQUE (plano_id, data, posicao): the real
+	// table rejects a layout with two rows on the same day and slot.
+	slots := make(map[string]bool, len(novas))
+	for _, a := range novas {
+		k := plano.DayOf(a.Data).Format(time.DateOnly) + ":" + strconv.Itoa(a.Posicao)
+		if slots[k] {
+			return fmt.Errorf("atividades_plano_data_posicao_key: duplicate (data, posicao) %s", k)
+		}
+		slots[k] = true
+	}
+
+	// The real repository keeps the surviving rows in place (UPSERT ON CONFLICT
+	// (id)) and DELETEs only the ids absent from the new layout. Deletes cascade
+	// to registros_bloco.atividade_id as ON DELETE SET NULL, so a record whose
+	// activity really disappeared falls back to the legacy (data, disciplina)
+	// key; a record whose activity survives keeps its link.
 	sobrevive := make(map[string]bool, len(novas))
 	for _, a := range novas {
 		sobrevive[a.ID] = true
@@ -163,6 +177,28 @@ func (f *fakePlanos) ReplaceAtividades(_ context.Context, _ uuid.UUID, as []plan
 		}
 	}
 
+	// registros_bloco_legado_key UNIQUE (plano_id, data, disciplina) WHERE
+	// atividade_id IS NULL: the cascade above must never collapse two records
+	// onto the same legacy key. A blanket DELETE FROM atividades used to do
+	// exactly that — nulling two same-discipline rows in one day — and wedged
+	// the plan against every later write.
+	for data, reg := range f.salvo.Registros {
+		legado := map[string]bool{}
+		for _, b := range reg.Blocos {
+			if b.AtividadeID != "" {
+				continue
+			}
+			k := plano.DayOf(data).Format(time.DateOnly) + "\x00" + b.Disciplina
+			if legado[k] {
+				return fmt.Errorf(
+					"registros_bloco_legado_key: cascade collapsed two records onto (%s, %s)",
+					plano.DayOf(data).Format(time.DateOnly), b.Disciplina,
+				)
+			}
+			legado[k] = true
+		}
+	}
+
 	f.atividades = novas
 
 	return nil
@@ -171,6 +207,44 @@ func (f *fakePlanos) ReplaceAtividades(_ context.Context, _ uuid.UUID, as []plan
 func (f *fakePlanos) UpsertRegistro(_ context.Context, _ uuid.UUID, r plano.Registro) error {
 	if f.salvo.Registros == nil {
 		f.salvo.Registros = map[time.Time]plano.Registro{}
+	}
+
+	// The two partial unique indexes on registros_bloco:
+	//   registros_bloco_atividade_key  UNIQUE (atividade_id) WHERE atividade_id IS NOT NULL
+	//   registros_bloco_legado_key     UNIQUE (plano_id, data, disciplina) WHERE atividade_id IS NULL
+	// UpsertRegistro replaces only THIS day's blocks, so a clash with another
+	// day's rows is a real INSERT failure the service must not cause.
+	porAtividade := map[string]bool{}
+	porLegado := map[string]bool{}
+
+	for data, reg := range f.salvo.Registros {
+		if plano.DayOf(data).Equal(plano.DayOf(r.Data)) {
+			continue // this day's rows are about to be deleted and re-inserted
+		}
+		for _, b := range reg.Blocos {
+			if b.AtividadeID != "" {
+				porAtividade[b.AtividadeID] = true
+			} else {
+				porLegado[plano.DayOf(data).Format(time.DateOnly)+"\x00"+b.Disciplina] = true
+			}
+		}
+	}
+
+	vistoAtividade := map[string]bool{}
+	vistoLegado := map[string]bool{}
+	for _, b := range r.Blocos {
+		if b.AtividadeID != "" {
+			if porAtividade[b.AtividadeID] || vistoAtividade[b.AtividadeID] {
+				return fmt.Errorf("registros_bloco_atividade_key: atividade_id %s já tem registro", b.AtividadeID)
+			}
+			vistoAtividade[b.AtividadeID] = true
+		} else {
+			k := plano.DayOf(r.Data).Format(time.DateOnly) + "\x00" + b.Disciplina
+			if vistoLegado[k] {
+				return fmt.Errorf("registros_bloco_legado_key: (data, disciplina) %s duplicado", k)
+			}
+			vistoLegado[k] = true
+		}
 	}
 
 	f.salvo.Registros[plano.DayOf(r.Data)] = r

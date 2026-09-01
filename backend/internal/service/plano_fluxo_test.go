@@ -1202,3 +1202,181 @@ func TestFluxo_AdiantarComUmTopicoNaoEsvaziaODia(t *testing.T) {
 		}
 	}
 }
+
+// blocoRegistrado acha o bloco de uma atividade no registro de um dia.
+func blocoRegistrado(d DiaResposta, atividadeID string) *RegistroBlocoResposta {
+	if d.Registro == nil {
+		return nil
+	}
+
+	for i := range d.Registro.Blocos {
+		if d.Registro.Blocos[i].AtividadeID == atividadeID {
+			return &d.Registro.Blocos[i]
+		}
+	}
+
+	return nil
+}
+
+// Concluir uma matéria e DEPOIS mover/adiantar qualquer coisa não pode apagar o
+// "concluído" já gravado. Era o efeito de ReplaceAtividades fazer DELETE FROM
+// atividades: o FK ON DELETE SET NULL tirava o atividade_id de TODO registro do
+// plano, e a matéria voltava a aparecer sem o risquinho.
+func TestFluxo_ConclusaoSobreviveAMovimento(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("Obter: %v", err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje, amanha := est[0], est[1]
+	feita := hoje.Itens[0]
+	horas := 2.0
+
+	// Conclui a primeira matéria de hoje.
+	depois, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{
+		Blocos: []RegistroBlocoInput{{
+			AtividadeID: feita.ID,
+			Disciplina:  feita.Disciplina,
+			Horas:       &horas,
+			Concluido:   true,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("RegistrarDia: %v", err)
+	}
+
+	if b := blocoRegistrado(diasDeEstudo(depois)[0], feita.ID); b == nil || !b.Concluido {
+		t.Fatalf("conclusão não gravou")
+	}
+
+	// Adianta uma matéria de amanhã — o que dispara ReplaceAtividades.
+	depois, err = ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+		ID:   amanha.Itens[0].ID,
+		Data: hoje.Data,
+	})
+	if err != nil {
+		t.Fatalf("AntecipouAtividade: %v", err)
+	}
+
+	// O risquinho da matéria concluída tem de continuar lá.
+	b := blocoRegistrado(diasDeEstudo(depois)[0], feita.ID)
+	if b == nil {
+		t.Fatalf("a matéria concluída perdeu o vínculo com o registro após o adiantamento")
+	}
+
+	if !b.Concluido {
+		t.Errorf("a matéria voltou a aparecer sem o 'concluído' após o adiantamento")
+	}
+}
+
+// O relato do usuário: concluir matérias de hoje, adiantar 3 assuntos, e a
+// partir daí NENHUM registro salva mais (500 — o FK ON DELETE SET NULL colapsava
+// dois registros da mesma disciplina no mesmo dia sobre a chave legada, travando
+// todo ReplaceAtividades seguinte).
+func TestFluxo_SalvarContinuaFuncionandoAposAdiantarVarias(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenarioRealista(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	horas := 2.0
+
+	// Conclui tudo o que hoje agenda.
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("Obter: %v", err)
+	}
+
+	hoje := diasDeEstudo(inicial)[0]
+	blocos := make([]RegistroBlocoInput, 0, len(hoje.Itens))
+	for _, it := range hoje.Itens {
+		blocos = append(blocos, RegistroBlocoInput{
+			AtividadeID: it.ID, Disciplina: it.Disciplina, Horas: &horas, Concluido: true,
+		})
+	}
+
+	if _, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{Blocos: blocos}); err != nil {
+		t.Fatalf("RegistrarDia inicial: %v", err)
+	}
+
+	// Adianta 3 assuntos de dias à frente, um a um.
+	for i := 0; i < 3; i++ {
+		atual, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+		if err != nil {
+			t.Fatalf("Obter rodada %d: %v", i, err)
+		}
+
+		est := diasDeEstudo(atual)
+		diaHoje := est[0]
+
+		var alvo *ItemResposta
+		for _, d := range est[1:] {
+			for j := range d.Itens {
+				if blocoRegistrado(diaHoje, d.Itens[j].ID) == nil {
+					alvo = &d.Itens[j]
+
+					break
+				}
+			}
+
+			if alvo != nil {
+				break
+			}
+		}
+
+		if alvo == nil {
+			t.Fatalf("rodada %d: sem matéria futura para adiantar", i)
+		}
+
+		if _, err := ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+			ID:   alvo.ID,
+			Data: diaHoje.Data,
+		}); err != nil {
+			t.Fatalf("AntecipouAtividade rodada %d: %v", i, err)
+		}
+	}
+
+	// A partir daqui: salvar QUALQUER matéria de hoje tem de continuar funcionando.
+	atual, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("Obter final: %v", err)
+	}
+
+	diaHoje := diasDeEstudo(atual)[0]
+
+	for _, it := range diaHoje.Itens {
+		reenvio := make([]RegistroBlocoInput, 0, len(diaHoje.Itens))
+		for _, x := range diaHoje.Itens {
+			b := blocoRegistrado(diaHoje, x.ID)
+			entry := RegistroBlocoInput{AtividadeID: x.ID, Disciplina: x.Disciplina}
+			if b != nil {
+				entry.Horas = b.Horas
+				entry.Concluido = b.Concluido
+			}
+
+			if x.ID == it.ID {
+				entry.Horas = &horas
+				entry.Concluido = true
+			}
+
+			reenvio = append(reenvio, entry)
+		}
+
+		resp, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, diaHoje.Data, RegistroInput{Blocos: reenvio})
+		if err != nil {
+			t.Fatalf("RegistrarDia para %s/%s após adiantar 3: %v", it.Disciplina, it.Tema, err)
+		}
+
+		if b := blocoRegistrado(diasDeEstudo(resp)[0], it.ID); b == nil || !b.Concluido {
+			t.Errorf("a conclusão de %s/%s não persistiu", it.Disciplina, it.Tema)
+		}
+	}
+}

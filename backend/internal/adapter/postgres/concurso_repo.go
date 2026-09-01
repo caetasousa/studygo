@@ -233,6 +233,10 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 
 	codigos := concurso.Siglas(nomes)
 
+	// Disciplinas are inserted one by one — RETURNING id feeds every tema and
+	// fonte below. Batching disciplinas would still leave that dependency to
+	// resolve, and the number of disciplinas is small (rarely past ~10), so this
+	// stays the boundary between per-row work and batched work.
 	for i := range c.Disciplinas {
 		d := &c.Disciplinas[i]
 		d.Codigo = codigos[i]
@@ -248,29 +252,40 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		).Scan(&d.ID); err != nil {
 			return fmt.Errorf("inserting disciplina %s: %w", d.Nome, err)
 		}
+	}
 
+	// Temas and fontes go in ONE batch across every discipline: a real edital
+	// carries dozens of temas per subject, so one round-trip beats one per row.
+	temasBatch := &pgx.Batch{}
+	fontesBatch := &pgx.Batch{}
+	for i := range c.Disciplinas {
+		d := &c.Disciplinas[i]
 		for j, tema := range d.Temas {
-			if _, err := tx.Exec(
-				ctx,
+			temasBatch.Queue(
 				`INSERT INTO temas (disciplina_id, ordem, texto) VALUES ($1, $2, $3)`,
 				d.ID, j, tema,
-			); err != nil {
-				return fmt.Errorf("inserting tema: %w", err)
-			}
+			)
 		}
-
 		for j := range d.Fontes {
 			f := d.Fontes[j]
-			if _, err := tx.Exec(
-				ctx,
+			fontesBatch.Queue(
 				`INSERT INTO fontes (disciplina_id, ordem, titulo, url, tipo) VALUES ($1, $2, $3, $4, $5)`,
 				d.ID, j, f.Titulo, f.URL, tipoFonte(f.Tipo),
-			); err != nil {
-				return fmt.Errorf("inserting fonte: %w", err)
-			}
+			)
+		}
+	}
+	if temasBatch.Len() > 0 {
+		if err := tx.SendBatch(ctx, temasBatch).Close(); err != nil {
+			return fmt.Errorf("inserting temas: %w", err)
+		}
+	}
+	if fontesBatch.Len() > 0 {
+		if err := tx.SendBatch(ctx, fontesBatch).Close(); err != nil {
+			return fmt.Errorf("inserting fontes: %w", err)
 		}
 	}
 
+	// Marcos also carry a RETURNING id we need, so they stay per-row.
 	for i := range c.Marcos {
 		m := &c.Marcos[i]
 		m.Ordem = i
@@ -300,12 +315,15 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		return fmt.Errorf("trimming marcos: %w", err)
 	}
 
-	for i, item := range c.Conteudo {
-		if _, err := tx.Exec(
-			ctx,
-			`INSERT INTO conteudo_programatico (concurso_id, ordem, tipo, texto) VALUES ($1, $2, $3, $4)`,
-			c.ID, i, item.Tipo, item.Texto,
-		); err != nil {
+	if len(c.Conteudo) > 0 {
+		conteudoBatch := &pgx.Batch{}
+		for i, item := range c.Conteudo {
+			conteudoBatch.Queue(
+				`INSERT INTO conteudo_programatico (concurso_id, ordem, tipo, texto) VALUES ($1, $2, $3, $4)`,
+				c.ID, i, item.Tipo, item.Texto,
+			)
+		}
+		if err := tx.SendBatch(ctx, conteudoBatch).Close(); err != nil {
 			return fmt.Errorf("inserting conteudo: %w", err)
 		}
 	}

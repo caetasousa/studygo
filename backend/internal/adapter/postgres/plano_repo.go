@@ -347,14 +347,19 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		return plano.Salvo{}, fmt.Errorf("clearing plano_disciplinas: %w", err)
 	}
 
-	for codigo, q := range s.Config.Questoes {
-		if _, err := tx.Exec(
-			ctx,
-			`INSERT INTO plano_disciplinas (plano_id, disciplina, questoes, modo, reforco)
-			 VALUES ($1, $2, $3, $4, $5)`,
-			s.ID, codigo, q, string(cfg.ModoDe(codigo)), cfg.ReforcoDe(codigo),
-		); err != nil {
-			return plano.Salvo{}, fmt.Errorf("inserting plano_disciplina %s: %w", codigo, err)
+	// Batch the N inserts into a single round-trip. The alternative was N Execs,
+	// which on a plan with 10 disciplinas is 10 network round-trips per save.
+	if len(s.Config.Questoes) > 0 {
+		batch := &pgx.Batch{}
+		for codigo, q := range s.Config.Questoes {
+			batch.Queue(
+				`INSERT INTO plano_disciplinas (plano_id, disciplina, questoes, modo, reforco)
+				 VALUES ($1, $2, $3, $4, $5)`,
+				s.ID, codigo, q, string(cfg.ModoDe(codigo)), cfg.ReforcoDe(codigo),
+			)
+		}
+		if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+			return plano.Salvo{}, fmt.Errorf("inserting plano_disciplinas: %w", err)
 		}
 	}
 
@@ -362,12 +367,15 @@ func (r *PlanoRepo) UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo
 		return plano.Salvo{}, fmt.Errorf("clearing plano_ciclo: %w", err)
 	}
 
-	for i, it := range cfg.CicloRevisao {
-		if _, err := tx.Exec(
-			ctx,
-			`INSERT INTO plano_ciclo (plano_id, ordem, titulo, questoes) VALUES ($1, $2, $3, $4)`,
-			s.ID, i, it.Titulo, it.Questoes,
-		); err != nil {
+	if len(cfg.CicloRevisao) > 0 {
+		batch := &pgx.Batch{}
+		for i, it := range cfg.CicloRevisao {
+			batch.Queue(
+				`INSERT INTO plano_ciclo (plano_id, ordem, titulo, questoes) VALUES ($1, $2, $3, $4)`,
+				s.ID, i, it.Titulo, it.Questoes,
+			)
+		}
+		if err := tx.SendBatch(ctx, batch).Close(); err != nil {
 			return plano.Salvo{}, fmt.Errorf("inserting plano_ciclo: %w", err)
 		}
 	}
@@ -415,19 +423,26 @@ func replaceReordenacoesTx(
 		return fmt.Errorf("clearing reordenacoes: %w", err)
 	}
 
+	if len(reord) == 0 {
+		return nil
+	}
+
+	batch := &pgx.Batch{}
+
 	for data, ov := range reord {
 		itensJSON, err := json.Marshal(ov.Itens)
 		if err != nil {
 			return fmt.Errorf("encoding reordenacao itens: %w", err)
 		}
 
-		if _, err := tx.Exec(
-			ctx,
+		batch.Queue(
 			`INSERT INTO reordenacoes (plano_id, data, tipo, itens, meta) VALUES ($1, $2, $3, $4, $5)`,
 			planoID, data, string(ov.Tipo), itensJSON, ov.Meta,
-		); err != nil {
-			return fmt.Errorf("inserting reordenacao: %w", err)
-		}
+		)
+	}
+
+	if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+		return fmt.Errorf("inserting reordenacoes: %w", err)
 	}
 
 	return nil
@@ -462,16 +477,19 @@ func (r *PlanoRepo) UpsertRegistro(ctx context.Context, planoID uuid.UUID, reg p
 		return fmt.Errorf("clearing registros_bloco: %w", err)
 	}
 
-	for _, b := range reg.Blocos {
-		if _, err := tx.Exec(
-			ctx,
-			`INSERT INTO registros_bloco
-			   (plano_id, data, disciplina, horas, questoes, acertos, nota, concluido, atividade_id)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid)`,
-			planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota, b.Concluido,
-			b.AtividadeID,
-		); err != nil {
-			return fmt.Errorf("inserting registro_bloco: %w", err)
+	if len(reg.Blocos) > 0 {
+		batch := &pgx.Batch{}
+		for _, b := range reg.Blocos {
+			batch.Queue(
+				`INSERT INTO registros_bloco
+				   (plano_id, data, disciplina, horas, questoes, acertos, nota, concluido, atividade_id)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')::uuid)`,
+				planoID, reg.Data, b.Disciplina, b.Horas, b.Questoes, b.Acertos, b.Nota, b.Concluido,
+				b.AtividadeID,
+			)
+		}
+		if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+			return fmt.Errorf("inserting registros_bloco: %w", err)
 		}
 	}
 
@@ -511,17 +529,25 @@ func (r *PlanoRepo) DeleteRegistro(ctx context.Context, planoID uuid.UUID, data 
 	return nil
 }
 
+// DeleteRegistros wipes every daily log and milestone check for one plano.
+// All three deletes share a transaction so a mid-flight failure never leaves
+// the plan in a half-cleared state (block rows without their day row, or the
+// other way round).
 func (r *PlanoRepo) DeleteRegistros(ctx context.Context, planoID uuid.UUID) error {
-	if _, err := r.pool.Exec(ctx, `DELETE FROM registros_dia WHERE plano_id = $1`, planoID); err != nil {
-		return fmt.Errorf("deleting registros_dia: %w", err)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	for _, table := range []string{"registros_bloco", "registros_dia", "marco_checks"} {
+		if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE plano_id = $1`, planoID); err != nil {
+			return fmt.Errorf("deleting %s: %w", table, err)
+		}
 	}
 
-	if _, err := r.pool.Exec(ctx, `DELETE FROM registros_bloco WHERE plano_id = $1`, planoID); err != nil {
-		return fmt.Errorf("deleting registros_bloco: %w", err)
-	}
-
-	if _, err := r.pool.Exec(ctx, `DELETE FROM marco_checks WHERE plano_id = $1`, planoID); err != nil {
-		return fmt.Errorf("deleting marco_checks: %w", err)
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
@@ -631,10 +657,29 @@ func (r *PlanoRepo) DeleteAnotacao(ctx context.Context, planoID, anotacaoID uuid
 	return nil
 }
 
+// ListPlanosParaLembrete loads every plan the reminder worker needs, in a
+// bounded number of queries independent of how many plans exist.
+//
+// The reminder only reads Config and the day/block records — Reordenacoes,
+// Marcos, Revisoes and Anotacoes go unread by lembreteItens — so this loads
+// exactly those, with WHERE plano_id = ANY($1) so N plans still cost 5
+// round-trips. The previous version ran the full PlanoByUser per plan (~7
+// queries each), which grew linearly with the user base.
 func (r *PlanoRepo) ListPlanosParaLembrete(ctx context.Context) ([]port.PlanoComEmail, error) {
+	type meta struct {
+		email      string
+		nome       string
+		concursoID uuid.UUID
+	}
+
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT p.id, p.concurso_id, u.email, u.nome
+		`SELECT p.id, p.concurso_id, u.email, u.nome,
+		        p.inicio, p.prova, p.horas_dia::float8,
+		        p.dias_estudo, p.dia_revisao, p.reta_final_dias,
+		        p.simulados, p.discursiva, p.pct_questoes::float8,
+		        p.limiar_fraco, p.blocos_por_dia, p.minutos_revisao,
+		        p.minutos_bloco, p.revisao_semanal
 		 FROM planos p JOIN users u ON u.id = p.user_id`,
 	)
 	if err != nil {
@@ -642,60 +687,211 @@ func (r *PlanoRepo) ListPlanosParaLembrete(ctx context.Context) ([]port.PlanoCom
 	}
 	defer rows.Close()
 
-	type ref struct {
-		id         uuid.UUID
-		concursoID uuid.UUID
-		email      string
-		nome       string
-	}
-
-	refs := []ref{}
+	metas := map[uuid.UUID]meta{}
+	byID := map[uuid.UUID]*plano.Salvo{}
+	ids := []uuid.UUID{}
 
 	for rows.Next() {
-		var x ref
-		if err := rows.Scan(&x.id, &x.concursoID, &x.email, &x.nome); err != nil {
-			return nil, fmt.Errorf("scanning plano ref: %w", err)
+		s := plano.NewSalvo()
+
+		var (
+			m          meta
+			diasEstudo []int32
+			horasDia   float64
+			pctQuest   float64
+			simulados  string
+		)
+
+		if err := rows.Scan(
+			&s.ID, &m.concursoID, &m.email, &m.nome,
+			&s.Config.Inicio, &s.Config.Prova, &horasDia,
+			&diasEstudo, &s.Config.DiaRevisao, &s.Config.RetaFinalDias,
+			&simulados, &s.Config.Discursiva, &pctQuest,
+			&s.Config.LimiarFraco, &s.Config.BlocosPorDia, &s.Config.MinutosRevisao,
+			&s.Config.MinutosBloco, &s.Config.RevisaoSemanal,
+		); err != nil {
+			return nil, fmt.Errorf("scanning plano row: %w", err)
 		}
 
-		refs = append(refs, x)
-	}
+		s.Config.HorasDia = horasDia
+		s.Config.DiasEstudo = toIntSlice(diasEstudo)
+		s.Config.Questoes = map[string]int{}
+		s.Config.Simulados = plano.Frequencia(simulados)
+		s.Config.PctQuestoes = pctQuest
+		s.Config.Modos = map[string]plano.Modo{}
+		s.Config.Reforcos = map[string]float64{}
 
+		byID[s.ID] = &s
+		metas[s.ID] = m
+		ids = append(ids, s.ID)
+	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating plano refs: %w", err)
+		return nil, fmt.Errorf("iterating planos: %w", err)
 	}
 
-	out := make([]port.PlanoComEmail, 0, len(refs))
+	if len(ids) == 0 {
+		return []port.PlanoComEmail{}, nil
+	}
 
-	for _, x := range refs {
-		s, err := r.loadByID(ctx, x.id)
-		if err != nil {
-			return nil, err
-		}
+	// plano_disciplinas, plano_ciclo and the two registros tables in one shot
+	// each, keyed on plano_id — the loop below only dispatches rows to the right
+	// Salvo, never touches the DB.
+	if err := r.spreadDisciplinas(ctx, ids, byID); err != nil {
+		return nil, err
+	}
+	if err := r.spreadCiclo(ctx, ids, byID); err != nil {
+		return nil, err
+	}
+	if err := r.spreadRegistros(ctx, ids, byID); err != nil {
+		return nil, err
+	}
+	if err := r.spreadRegistrosBloco(ctx, ids, byID); err != nil {
+		return nil, err
+	}
 
+	out := make([]port.PlanoComEmail, 0, len(ids))
+	for _, id := range ids {
+		m := metas[id]
 		out = append(out, port.PlanoComEmail{
-			Plano:      s,
-			ConcursoID: x.concursoID,
-			Email:      x.email,
-			Nome:       x.nome,
+			Plano:      *byID[id],
+			ConcursoID: m.concursoID,
+			Email:      m.email,
+			Nome:       m.nome,
 		})
 	}
 
 	return out, nil
 }
 
-func (r *PlanoRepo) loadByID(ctx context.Context, planoID uuid.UUID) (plano.Salvo, error) {
-	var userID, concursoID uuid.UUID
-
-	err := r.pool.QueryRow(
+func (r *PlanoRepo) spreadDisciplinas(ctx context.Context, ids []uuid.UUID, byID map[uuid.UUID]*plano.Salvo) error {
+	rows, err := r.pool.Query(
 		ctx,
-		`SELECT user_id, concurso_id FROM planos WHERE id = $1`,
-		planoID,
-	).Scan(&userID, &concursoID)
+		`SELECT plano_id, disciplina, questoes, modo, reforco::float8
+		 FROM plano_disciplinas WHERE plano_id = ANY($1)`,
+		ids,
+	)
 	if err != nil {
-		return plano.Salvo{}, fmt.Errorf("resolving plano owner: %w", err)
+		return fmt.Errorf("querying plano_disciplinas: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			pid     uuid.UUID
+			codigo  string
+			q       int
+			modo    string
+			reforco float64
+		)
+		if err := rows.Scan(&pid, &codigo, &q, &modo, &reforco); err != nil {
+			return fmt.Errorf("scanning plano_disciplina: %w", err)
+		}
+		s := byID[pid]
+		if s == nil {
+			continue
+		}
+		s.Config.Questoes[codigo] = q
+		s.Config.Modos[codigo] = plano.Modo(modo)
+		s.Config.Reforcos[codigo] = reforco
 	}
 
-	return r.PlanoByUser(ctx, userID, concursoID)
+	return rows.Err()
+}
+
+func (r *PlanoRepo) spreadCiclo(ctx context.Context, ids []uuid.UUID, byID map[uuid.UUID]*plano.Salvo) error {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT plano_id, ordem, titulo, questoes
+		 FROM plano_ciclo WHERE plano_id = ANY($1) ORDER BY plano_id, ordem`,
+		ids,
+	)
+	if err != nil {
+		return fmt.Errorf("querying plano_ciclo: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pid uuid.UUID
+		var it concurso.RevItem
+		if err := rows.Scan(&pid, &it.Ordem, &it.Titulo, &it.Questoes); err != nil {
+			return fmt.Errorf("scanning plano_ciclo: %w", err)
+		}
+		if s := byID[pid]; s != nil {
+			s.Config.CicloRevisao = append(s.Config.CicloRevisao, it)
+		}
+	}
+
+	return rows.Err()
+}
+
+func (r *PlanoRepo) spreadRegistros(ctx context.Context, ids []uuid.UUID, byID map[uuid.UUID]*plano.Salvo) error {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT plano_id, data, horas::float8, concluido, questoes, acertos, nota
+		 FROM registros_dia WHERE plano_id = ANY($1)`,
+		ids,
+	)
+	if err != nil {
+		return fmt.Errorf("querying registros_dia: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			pid uuid.UUID
+			reg plano.Registro
+		)
+		if err := rows.Scan(
+			&pid, &reg.Data, &reg.Horas, &reg.Concluido, &reg.Questoes, &reg.Acertos, &reg.Nota,
+		); err != nil {
+			return fmt.Errorf("scanning registro_dia: %w", err)
+		}
+		if s := byID[pid]; s != nil {
+			s.Registros[reg.Data.UTC()] = reg
+		}
+	}
+
+	return rows.Err()
+}
+
+func (r *PlanoRepo) spreadRegistrosBloco(ctx context.Context, ids []uuid.UUID, byID map[uuid.UUID]*plano.Salvo) error {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT plano_id, data, disciplina, horas::float8, questoes, acertos, nota, concluido,
+		        COALESCE(atividade_id::text, '')
+		 FROM registros_bloco WHERE plano_id = ANY($1)`,
+		ids,
+	)
+	if err != nil {
+		return fmt.Errorf("querying registros_bloco: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			pid  uuid.UUID
+			data time.Time
+			b    plano.RegistroBloco
+		)
+		if err := rows.Scan(
+			&pid, &data, &b.Disciplina, &b.Horas, &b.Questoes, &b.Acertos, &b.Nota, &b.Concluido,
+			&b.AtividadeID,
+		); err != nil {
+			return fmt.Errorf("scanning registro_bloco: %w", err)
+		}
+		s := byID[pid]
+		if s == nil {
+			continue
+		}
+		reg, ok := s.Registros[data.UTC()]
+		if !ok {
+			continue
+		}
+		reg.Blocos = append(reg.Blocos, b)
+		s.Registros[data.UTC()] = reg
+	}
+
+	return rows.Err()
 }
 
 func toIntSlice(xs []int32) []int {
@@ -801,9 +997,22 @@ func (r *PlanoRepo) ListAtividades(
 	return out, nil
 }
 
-// ReplaceAtividades rewrites the whole layout in one transaction. Delete-then-
-// insert (rather than per-row updates) is what keeps positions consistent: the
-// unique constraint is deferred to commit, so intermediate states never clash.
+// ReplaceAtividades rewrites the whole layout in one transaction.
+//
+// An activity that carries a real id is UPSERTED, not deleted and reinserted:
+// registros_bloco.atividade_id is FK ON DELETE SET NULL, so a blanket
+// DELETE FROM atividades would strip the activity link off every study record in
+// the plan on every move. Worse, when a day legitimately schedules the same
+// discipline twice, the cascade collapses the two records into two identical
+// (data, disciplina) rows and violates registros_bloco_legado_key — wedging the
+// plan so no further move, antecipação or registro can be saved. Keeping the
+// surviving rows in place means their records stay linked and nothing is
+// cascaded. Only rows that are genuinely gone from the new layout are deleted
+// (their records fall back to the legacy key, which is the intended behaviour
+// when an activity really disappears).
+//
+// The unique constraint on (plano_id, data, posicao) is deferred to commit, so
+// the intermediate states an upsert passes through never clash.
 func (r *PlanoRepo) ReplaceAtividades(
 	ctx context.Context,
 	planoID uuid.UUID,
@@ -815,28 +1024,50 @@ func (r *PlanoRepo) ReplaceAtividades(
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
-	if _, err := tx.Exec(ctx, `DELETE FROM atividades WHERE plano_id = $1`, planoID); err != nil {
+	manter := make([]uuid.UUID, 0, len(as))
+	for _, a := range as {
+		if id, err := uuid.Parse(a.ID); err == nil {
+			manter = append(manter, id)
+		}
+	}
+
+	// Drop only the activities that are not in the new layout — never the ones
+	// being kept, so their study records are not cascaded.
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM atividades WHERE plano_id = $1 AND NOT (id = ANY($2))`,
+		planoID, manter,
+	); err != nil {
 		return fmt.Errorf("delete atividades: %w", err)
 	}
 
-	const ins = `
+	const upsert = `
 		INSERT INTO atividades
 			(id, plano_id, data, posicao, disciplina, tema, passada, tipo,
 			 duracao_min, origem_dia, origem_pos)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		ON CONFLICT (id) DO UPDATE SET
+			data = EXCLUDED.data, posicao = EXCLUDED.posicao,
+			disciplina = EXCLUDED.disciplina, tema = EXCLUDED.tema,
+			passada = EXCLUDED.passada, tipo = EXCLUDED.tipo,
+			duracao_min = EXCLUDED.duracao_min, origem_dia = EXCLUDED.origem_dia,
+			origem_pos = EXCLUDED.origem_pos, atualizado_em = now()`
 
-	for _, a := range as {
-		id, err := uuid.Parse(a.ID)
-		if err != nil {
-			// A freshly derived activity has no id yet; give it one.
-			id = uuid.New()
+	if len(as) > 0 {
+		batch := &pgx.Batch{}
+		for _, a := range as {
+			id, err := uuid.Parse(a.ID)
+			if err != nil {
+				// A freshly derived activity has no id yet; give it one.
+				id = uuid.New()
+			}
+
+			batch.Queue(upsert,
+				id, planoID, a.Data, a.Posicao, a.Disciplina, a.Tema, a.Passada,
+				string(a.Tipo), a.DuracaoMin, a.OrigemDia, a.OrigemPos,
+			)
 		}
-
-		if _, err := tx.Exec(ctx, ins,
-			id, planoID, a.Data, a.Posicao, a.Disciplina, a.Tema, a.Passada,
-			string(a.Tipo), a.DuracaoMin, a.OrigemDia, a.OrigemPos,
-		); err != nil {
-			return fmt.Errorf("insert atividade: %w", err)
+		if err := tx.SendBatch(ctx, batch).Close(); err != nil {
+			return fmt.Errorf("upsert atividades: %w", err)
 		}
 	}
 
