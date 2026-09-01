@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
-import { aplicarMovimento, blocosComAtividade, diaConcluido, siglas } from '$lib/estudo';
+import { blocosComAtividade, diaConcluido, siglas } from '$lib/estudo';
 import { chave, lerMigrando } from '$lib/storageKey';
 import type {
 	AnotacaoInput,
@@ -48,17 +48,6 @@ export function blocoDaAtividade(
 			: undefined;
 
 	return legado ?? null;
-}
-
-/** Optimistic local rearrangement, mirroring the backend's move/swap rules. */
-function moverLocalmente(
-	p: PlanoResposta,
-	id: string,
-	data: string,
-	posicao: number,
-	trocar: boolean
-): PlanoResposta {
-	return { ...p, dias: aplicarMovimento(p.dias, id, data, posicao, trocar) };
 }
 
 const cacheSufixo = (slug: string) => `.plano.${slug}.v1`;
@@ -316,11 +305,10 @@ class PlanoStore {
 	};
 
 	/**
-	 * Moves one activity, optimistically.
-	 *
-	 * The board is rearranged locally first so the drop feels immediate, then the
-	 * server's authoritative plan replaces it. If the request fails the previous
-	 * plan is restored exactly, so a rejected move leaves no trace on screen.
+	 * Moves one activity to (data, posicao). Waits on the server: the board is
+	 * one PATCH away and rearranging optimistically used to hide the exact class
+	 * of bug that led to drag being taken out — the local reorder disagreed with
+	 * what the backend actually did, and the two flashed past each other.
 	 */
 	moverAtividade = async (
 		id: string,
@@ -331,22 +319,11 @@ class PlanoStore {
 		if (this.movendo) return false;
 		this.movendo = true;
 
-		// Snapshot for rollback. A structural clone keeps the optimistic edit from
-		// aliasing the object we intend to restore.
-		const anterior = this.plano ? structuredClone($state.snapshot(this.plano)) : null;
-
-		if (this.plano) this.plano = moverLocalmente(this.plano, id, data, posicao, trocar);
-
 		try {
-			// No "Salvo" flash: the board already rearranged optimistically, so the
-			// drop reads as done. The toast on top of the server response landing
-			// only drew attention to the re-render.
 			this.commit(await api.moverAtividade(this.slug, id, data, posicao, trocar), false);
 
 			return true;
 		} catch (e) {
-			// Put the board back exactly as it was before the optimistic edit.
-			if (anterior) this.plano = anterior;
 			this.erro = e instanceof Error ? e.message : 'Não foi possível mover a atividade';
 
 			return false;

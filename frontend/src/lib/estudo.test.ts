@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { alvoNoPonto } from '$lib/arrastarToque';
 import { chave, migrar } from '$lib/storageKey';
 import {
 	PESO_PADRAO,
 	agruparPorBloco,
 	atividadeFeita,
 	VAZIO,
-	aplicarMovimento,
 	blocosComAtividade,
 	diaConcluido,
 	numeroHierarquico,
@@ -305,79 +303,6 @@ describe('siglas', () => {
 	});
 });
 
-describe('aplicarMovimento', () => {
-	const base = () => [
-		{ data: '2026-08-31', itens: [{ id: 'a' }, { id: 'b' }] },
-		{ data: '2026-09-02', itens: [{ id: 'c' }] },
-		{ data: '2026-09-07', itens: [] as { id: string }[] }
-	];
-
-	const ids = (dias: { data: string; itens: { id: string }[] }[], data: string) =>
-		dias.find((d) => d.data === data)!.itens.map((i) => i.id);
-
-	const todos = (dias: { itens: { id: string }[] }[]) =>
-		dias.flatMap((d) => d.itens.map((i) => i.id)).sort();
-
-	it('troca duas matérias entre dias ocupados', () => {
-		const out = aplicarMovimento(base(), 'a', '2026-09-02', 0, true);
-
-		expect(ids(out, '2026-09-02')).toEqual(['a']);
-		expect(ids(out, '2026-08-31')).toEqual(['c', 'b']);
-	});
-
-	it('move para um dia vazio sem trocar', () => {
-		const out = aplicarMovimento(base(), 'a', '2026-09-07', 0, false);
-
-		expect(ids(out, '2026-09-07')).toEqual(['a']);
-		expect(ids(out, '2026-08-31')).toEqual(['b']);
-	});
-
-	it('funciona entre meses diferentes, usando a data ISO completa', () => {
-		const out = aplicarMovimento(base(), 'c', '2026-08-31', 0, true);
-
-		expect(ids(out, '2026-08-31')).toEqual(['c', 'b']);
-		expect(ids(out, '2026-09-02')).toEqual(['a']);
-	});
-
-	it('não duplica nem perde matérias', () => {
-		const antes = todos(base());
-
-		for (const [id, data, pos, troca] of [
-			['a', '2026-09-02', 0, true],
-			['b', '2026-09-07', 0, false],
-			['c', '2026-08-31', 1, false]
-		] as const) {
-			const out = aplicarMovimento(base(), id, data, pos, troca);
-			expect(todos(out)).toEqual(antes);
-		}
-	});
-
-	it('reordena dentro do mesmo dia', () => {
-		const out = aplicarMovimento(base(), 'b', '2026-08-31', 0, false);
-		expect(ids(out, '2026-08-31')).toEqual(['b', 'a']);
-	});
-
-	it('esvazia o dia de origem quando leva a única matéria', () => {
-		const out = aplicarMovimento(base(), 'c', '2026-09-07', 0, false);
-
-		expect(ids(out, '2026-09-02')).toEqual([]);
-		expect(ids(out, '2026-09-07')).toEqual(['c']);
-	});
-
-	it('ignora um id desconhecido em vez de corromper o plano', () => {
-		const out = aplicarMovimento(base(), 'zzz', '2026-09-02', 0, true);
-		expect(todos(out)).toEqual(todos(base()));
-	});
-
-	it('não altera os arrays originais', () => {
-		const dias = base();
-		aplicarMovimento(dias, 'a', '2026-09-02', 0, true);
-
-		expect(ids(dias, '2026-08-31')).toEqual(['a', 'b']);
-		expect(ids(dias, '2026-09-02')).toEqual(['c']);
-	});
-});
-
 describe('registro por atividade', () => {
 	const itens = [
 		{ id: 'atv-1', disciplina: 'D01' },
@@ -491,31 +416,6 @@ describe('registro por atividade', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
-
-describe('alvoNoPonto', () => {
-	// The touch drop target is resolved from coordinates, since touch fires no
-	// dragover. These cover the parsing contract, not the DOM hit-testing.
-	function fakeElement(dia?: string, pos?: string) {
-		return {
-			closest: () => (dia === undefined ? null : { dataset: { atvDia: dia, atvPos: pos } })
-		} as unknown as Element;
-	}
-
-	it('lê a data ISO e a posição do slot sob o ponto', () => {
-		vi.stubGlobal('document', { elementFromPoint: () => fakeElement('2026-09-02', '1') });
-		expect(alvoNoPonto(10, 10)).toEqual({ data: '2026-09-02', posicao: 1 });
-	});
-
-	it('devolve null quando não há atividade sob o ponto', () => {
-		vi.stubGlobal('document', { elementFromPoint: () => fakeElement(undefined) });
-		expect(alvoNoPonto(10, 10)).toBeNull();
-	});
-
-	it('rejeita uma posição não numérica em vez de mover para NaN', () => {
-		vi.stubGlobal('document', { elementFromPoint: () => fakeElement('2026-09-02', 'abc') });
-		expect(alvoNoPonto(10, 10)).toBeNull();
-	});
-});
 
 describe('migração das chaves de armazenamento', () => {
 	// Renaming the project must not sign anyone out: the value stored under the

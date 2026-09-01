@@ -29,6 +29,8 @@
 		| 'expandir'
 		| 'chevron'
 		| 'busca'
+		| 'topo'
+		| 'adiantar'
 		| 'link';
 
 	/** Icon sizes, in px. `nav` is the sidebar/menu size; `sm` supports a label
@@ -169,6 +171,16 @@
 	{:else if name === 'busca'}
 		<circle cx="11" cy="11" r="6" />
 		<path d="m15.5 15.5 3.5 3.5" />
+	{:else if name === 'topo'}
+		<!-- up-arrow to a bar: send this to the very top -->
+		<path d="M5 6h14" />
+		<path d="M12 10v9" />
+		<path d="m8 14 4-4 4 4" />
+	{:else if name === 'adiantar'}
+		<!-- left-arrow to a bar: bring this forward to today -->
+		<path d="M6 5v14" />
+		<path d="M9 12h10" />
+		<path d="m13 8-4 4 4 4" />
 	{:else if name === 'link'}
 		<!-- external link: a box with an arrow leaving its top-right corner -->
 		<path d="M13 5h6v6" />

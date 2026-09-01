@@ -37,61 +37,31 @@
 	}
 
 	/**
-	 * The only thing that blocks a move is having been marked done — moving a
-	 * concluded activity would rewrite history. Everything else is movable.
+	 * A day is movable when it has at least one activity. Rearranging is
+	 * per-activity: one subject moves at a time via its "levar para o topo"
+	 * button, and the same-day insert at position 0 covers what drag used to.
 	 */
 	function diaMovivel(d: Dia): boolean {
 		return d.itens.length > 0;
 	}
-
-	// Rearranging is per-activity: a whole day is never swapped with another, so
-	// there is no day-level drag or swap here — only AtividadeItem moves.
-	let arrastandoAtv = $state<string | null>(null);
-	// Slot a touch drag is hovering, so the target row can show "trocar" without
-	// the dragover events that touch never fires.
-	let sobrevoo = $state<{ data: string; posicao: number } | null>(null);
-
-	// Days that can receive an activity: the ones the engine filled with content.
-	const datasDisponiveis = $derived(
-		(plano?.dias ?? []).filter((d) => d.itens.length > 0).map((d) => d.data)
-	);
 
 	/** The date an activity currently sits on, or null if it is not in the plan. */
 	function dataAtual(id: string): string | null {
 		for (const d of plano?.dias ?? []) {
 			if (d.itens.some((x) => x.id === id)) return d.data;
 		}
-
 		return null;
 	}
 
 	/**
-	 * Moves one activity. When the target slot in another day is already taken,
-	 * the two subjects swap places instead of the target day growing — which is
-	 * what "move this to the 2nd" means when the 2nd is already full.
+	 * Inserts one activity at the first slot of its own day. Same-day inserts
+	 * always shift, never swap — there is no other day to exchange with.
 	 */
-	async function mover(id: string, data: string, posicao: number) {
-		const origem = dataAtual(id);
-		const destino = plano?.dias.find((d) => d.data === data);
-
-		// An occupied slot swaps the two activities; an empty one is a plain move.
-		// Same-day reordering always inserts, since there is no second day to
-		// exchange with.
-		const ocupado = !!destino && posicao < destino.itens.length;
-		const trocar = ocupado && origem !== data;
-
-		// A move that worked needs no announcement — the board shows it. Only a
-		// refusal does, and planoStore.erro carries that.
-		await planoStore.moverAtividade(id, data, posicao, trocar);
+	async function moverParaTopo(id: string) {
+		const data = dataAtual(id);
+		if (!data) return;
+		await planoStore.moverAtividade(id, data, 0, false);
 	}
-
-	function soltarAtv(data: string, posicao: number) {
-		if (!arrastandoAtv) return;
-		const id = arrastandoAtv;
-		arrastandoAtv = null;
-		void mover(id, data, posicao);
-	}
-
 </script>
 
 <PageHead
@@ -148,17 +118,7 @@
 						<DiaCard
 							dia={d}
 							movivel={diaMovivel(d)}
-							{datasDisponiveis}
-							onMover={mover}
-							arrastandoAlgo={arrastandoAtv !== null}
-							onArrastarAtv={(id) => (arrastandoAtv = id)}
-							onLargarAtv={() => {
-								arrastandoAtv = null;
-								sobrevoo = null;
-							}}
-							onSobrevoar={(alvo) => (sobrevoo = alvo)}
-							{sobrevoo}
-							onSoltarAtv={(pos) => soltarAtv(d.data, pos)}
+							onMoverParaTopo={moverParaTopo}
 						/>
 					{/each}
 				</div>

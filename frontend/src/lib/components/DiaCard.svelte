@@ -17,42 +17,24 @@
 	 * One day of the schedule, as a card.
 	 *
 	 * The date is a fixed plaque on the left, the day's own actions get their own
-	 * band, and the activities own the body underneath. Before this, all three
-	 * competed for the same line and the topic text lost.
+	 * band, and the activities own the body underneath.
 	 *
 	 * A rest day (no items, not a review) collapses to a single quiet line
 	 * instead of a full card — it carries no work to show.
 	 *
-	 * The day is not a movable unit: rearranging happens one activity at a time
-	 * (see AtividadeItem), so a day carries no swap arrows and is not a drag
-	 * source or a drop target.
+	 * Rearranging is per-activity and explicit: each activity carries a "levar
+	 * para o topo" button (see AtividadeItem). Drag was removed — it leaked
+	 * corner cases that made the whole schedule feel flaky.
 	 */
 	let {
 		dia,
 		movivel,
-		datasDisponiveis,
-		onMover,
-		onArrastarAtv,
-		onLargarAtv,
-		onSobrevoar,
-		sobrevoo = null,
-		onSoltarAtv,
-		arrastandoAlgo = false,
-		onTrocarComDestino
+		onMoverParaTopo
 	}: {
 		dia: Dia;
 		movivel: boolean;
-		datasDisponiveis: string[];
-		onMover: (id: string, data: string, posicao: number) => void;
-		onArrastarAtv: (id: string) => void;
-		onLargarAtv: () => void;
-		onSobrevoar?: (alvo: { data: string; posicao: number } | null) => void;
-		/** slot a touch drag is currently over, anywhere in the plan */
-		sobrevoo?: { data: string; posicao: number } | null;
-		onSoltarAtv: (posicao: number) => void;
-		/** true while some activity is being dragged, so drop zones can show */
-		arrastandoAlgo?: boolean;
-		onTrocarComDestino?: (id: string, data: string, posicao: number) => void;
+		/** Moves one activity to the first slot of its own day. */
+		onMoverParaTopo: (id: string) => void;
 	} = $props();
 
 	const hoje = $derived(dia.data === hojeISO());
@@ -121,9 +103,6 @@
 		const erro = await planoStore.anteciparAtividade(id, hojeISO());
 		if (erro) planoStore.erro = erro;
 	}
-
-	// Highlight state for the day's tail drop zone.
-	let vagaSobre = $state(false);
 
 	/** Which activity's form is open, by activity id. */
 	let editando = $state<string | null>(null);
@@ -322,13 +301,7 @@
 								data={dia.data}
 								indice={i}
 								podeMover={movivel}
-								{datasDisponiveis}
-								{onMover}
-								onArrastar={onArrastarAtv}
-								onLargar={onLargarAtv}
-								onSobrevoar={onSobrevoar}
-								sobrevoado={sobrevoo?.data === dia.data && sobrevoo?.posicao === i}
-								onSoltar={onSoltarAtv}
+								{onMoverParaTopo}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
 								onAntecipar={(id) => void antecipar(id)}
@@ -395,28 +368,6 @@
 							</div>
 						{/if}
 
-						{#if arrastandoAlgo}
-							<!-- Dropping past the last activity MOVES it here (no occupant to
-							     swap with), which the label states rather than implies. -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="vaga"
-								class:sobre={vagaSobre}
-								ondragover={(e) => {
-									e.preventDefault();
-									if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-									vagaSobre = true;
-								}}
-								ondragleave={() => (vagaSobre = false)}
-								ondrop={(e) => {
-									e.preventDefault();
-									vagaSobre = false;
-									onSoltarAtv(dia.itens.length);
-								}}
-							>
-								mover para o fim deste dia
-							</div>
-						{/if}
 					</div>
 				{/if}
 
@@ -548,26 +499,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-	}
-	/* An explicit landing area for "move" as opposed to "swap": it only exists
-	   while something is being dragged. */
-	.vaga {
-		margin: 4px 8px 2px;
-		padding: 7px 10px;
-		border: 1px dashed var(--border-strong);
-		border-radius: 8px;
-		font-family: var(--font-mono);
-		font-size: 10px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--text-faint);
-		text-align: center;
-	}
-	.vaga.sobre {
-		border-color: var(--accent);
-		border-style: solid;
-		background: var(--accent-soft);
-		color: var(--accent);
 	}
 	/* Set apart from the subjects above without competing with them: this is what
 	   closes the day, not another thing to move. */
