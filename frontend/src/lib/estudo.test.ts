@@ -4,6 +4,7 @@ import { chave, migrar } from '$lib/storageKey';
 import {
 	PESO_PADRAO,
 	agruparPorBloco,
+	atividadeFeita,
 	VAZIO,
 	aplicarMovimento,
 	blocosComAtividade,
@@ -566,5 +567,27 @@ describe('migração das chaves de armazenamento', () => {
 	it('monta a chave com o prefixo atual', () => {
 		expect(chave('.plano.tce.v1')).toBe('studygo.plano.tce.v1');
 		expect(chave(':rail')).toBe('studygo:rail');
+	});
+});
+
+describe('atividadeFeita', () => {
+	it('usa o registro do próprio bloco quando existe', () => {
+		expect(atividadeFeita({ concluido: true }, true, false)).toBe(true);
+		expect(atividadeFeita({ concluido: false }, true, true)).toBe(false);
+	});
+
+	it('uma matéria adiantada para um dia concluído NÃO nasce concluída', () => {
+		// O dia está fechado e já tem blocos por atividade; a matéria recém-trazida
+		// não tem registro próprio. Ela ainda precisa ser estudada.
+		expect(atividadeFeita(null, true, true)).toBe(false);
+	});
+
+	it('registro legado (sem blocos por atividade) ainda cai no flag do dia', () => {
+		expect(atividadeFeita(null, false, true)).toBe(true);
+		expect(atividadeFeita(null, false, false)).toBe(false);
+	});
+
+	it('sem registro nenhum, não está concluída', () => {
+		expect(atividadeFeita(null, false, undefined)).toBe(false);
 	});
 });

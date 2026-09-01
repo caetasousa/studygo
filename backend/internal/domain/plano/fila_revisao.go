@@ -28,7 +28,14 @@ type ItemRevisao struct {
 //
 // One discipline per day: a block that jumps between subjects is several
 // shallow reviews instead of one real one.
-func FilaRevisao(dias []Dia, porDia int) map[int][]ItemRevisao {
+//
+// `estudado` reports whether an activity was actually studied. Only what the
+// student really did enters the queue: a topic that was merely SCHEDULED for an
+// earlier day was, until this took a predicate, offered up for review as if it
+// had happened — the block asked to revise a subject never opened. Review is a
+// second pass over your own work, so a day the student skipped simply leaves
+// the queue shorter rather than inventing material.
+func FilaRevisao(dias []Dia, porDia int, estudado func(ItemDia, Dia) bool) map[int][]ItemRevisao {
 	if porDia <= 0 {
 		return map[int][]ItemRevisao{}
 	}
@@ -54,6 +61,10 @@ func FilaRevisao(dias []Dia, porDia int) map[int][]ItemRevisao {
 
 		for _, it := range d.Itens {
 			if it.Disciplina == "" || it.Tema == "" {
+				continue
+			}
+
+			if estudado != nil && !estudado(it, d) {
 				continue
 			}
 
@@ -151,7 +162,9 @@ func RevisoesPorDisciplina(dias []Dia, porDia int) map[string]float64 {
 	revisados := map[string]int{}
 	temas := map[string]map[string]bool{}
 
-	for n, itens := range FilaRevisao(dias, porDia) {
+	// nil: this is a PROJECTION of the plan — how much review the schedule
+	// promises if it is followed — not what the student has actually earned.
+	for n, itens := range FilaRevisao(dias, porDia, nil) {
 		_ = n
 
 		for _, it := range itens {

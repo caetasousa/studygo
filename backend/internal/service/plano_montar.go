@@ -74,7 +74,7 @@ func (s *PlanoService) montar(
 		Nomes:    nomes,
 		Simulado: res.Simulado,
 		Cadernos: plano.Caderno(resultadosDoPlano(res.Dias, salvo)),
-		Revisao:  plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config)),
+		Revisao:  plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config), foiEstudado(salvo)),
 	}
 
 	// Loaded once for every day's review tail below, rather than per day: the
@@ -287,6 +287,44 @@ func montarMarcos(c concurso.Concurso, checks map[uuid.UUID]bool) []MarcoRespost
 	}
 
 	return out
+}
+
+// foiEstudado reports whether an activity was actually studied, which is what
+// earns it a place in the review queue.
+//
+// The activity's OWN block decides it: concluído, or with hours logged against
+// it. Falling back to "any block of this discipline" would let one finished
+// subject vouch for another activity of the same discipline on the same day —
+// the very confusion that made a topic brought forward look already done.
+//
+// The discipline-wide lookup survives only for LEGACY records, the ones written
+// before activities were addressable: they carry no id at all, so the day is the
+// finest grain available.
+func foiEstudado(salvo plano.Salvo) func(plano.ItemDia, plano.Dia) bool {
+	return func(it plano.ItemDia, d plano.Dia) bool {
+		reg, ok := salvo.Registros[plano.DayOf(d.Data)]
+		if !ok {
+			return false
+		}
+
+		if b := reg.BlocoDeAtividade(it.AtividadeID); b != nil {
+			return b.Concluido || (b.Horas != nil && *b.Horas > 0)
+		}
+
+		// Any block carrying an id means this day is recorded per activity, so a
+		// missing block for THIS activity means it was not studied.
+		for _, b := range reg.Blocos {
+			if b.AtividadeID != "" {
+				return false
+			}
+		}
+
+		if b := reg.BlocoDe(it.Disciplina); b != nil {
+			return b.Concluido || (b.Horas != nil && *b.Horas > 0)
+		}
+
+		return reg.Concluido
+	}
 }
 
 // temasPorRevisao is how many topics one review block covers.

@@ -139,6 +139,30 @@ func (f *fakePlanos) ReplaceAtividades(_ context.Context, _ uuid.UUID, as []plan
 		}
 	}
 
+	// The real repository does DELETE-then-INSERT, and registros_bloco.atividade_id
+	// is ON DELETE SET NULL — so every record pointing at an activity that does not
+	// come back under the SAME id loses its link. Reproducing that here is the
+	// whole point of the fake: without it the tests were greener than production.
+	sobrevive := make(map[string]bool, len(novas))
+	for _, a := range novas {
+		sobrevive[a.ID] = true
+	}
+
+	for data, reg := range f.salvo.Registros {
+		mudou := false
+
+		for i := range reg.Blocos {
+			if id := reg.Blocos[i].AtividadeID; id != "" && !sobrevive[id] {
+				reg.Blocos[i].AtividadeID = ""
+				mudou = true
+			}
+		}
+
+		if mudou {
+			f.salvo.Registros[data] = reg
+		}
+	}
+
 	f.atividades = novas
 
 	return nil

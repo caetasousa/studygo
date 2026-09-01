@@ -490,3 +490,29 @@ export function blocosComAtividade<
 export function diaConcluido(blocos: readonly { concluido: boolean }[]): boolean {
 	return blocos.length > 0 && blocos.every((b) => b.concluido);
 }
+
+/**
+ * Whether one scheduled activity counts as done.
+ *
+ * The block's own record decides it. The day-level flag is only a fallback for
+ * LEGACY records — the ones written before activities were addressable, which
+ * carry no per-block state at all.
+ *
+ * Falling back to the day for an activity that simply has no record is what
+ * made a subject brought forward into an already-finished day show up struck
+ * through, as if it had been studied: the student moved it there precisely
+ * because it still had to be done. An activity with an id and no record of its
+ * own is NOT done, whatever the day says.
+ */
+export function atividadeFeita(
+	bloco: { concluido: boolean } | null | undefined,
+	temRegistroPorAtividade: boolean,
+	diaConcluidoFlag: boolean | undefined
+): boolean {
+	if (bloco) return bloco.concluido;
+
+	// Nenhum bloco por atividade em lugar nenhum do dia: registro legado.
+	if (!temRegistroPorAtividade) return diaConcluidoFlag ?? false;
+
+	return false;
+}

@@ -710,3 +710,292 @@ func TestFluxo_DiaSoFechaQuandoTodasAsMateriasFecham(t *testing.T) {
 		t.Error("o dia não fechou mesmo com as duas matérias concluídas")
 	}
 }
+
+// A revisão do dia só pode puxar matéria que o aluno JÁ ESTUDOU. Hoje a fila é
+// montada do que estava AGENDADO, então ela oferece assunto nunca estudado.
+func TestFluxo_RevisaoSoOfereceOQueFoiEstudado(t *testing.T) {
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	resp, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Nada foi registrado: nenhum dia tem estudo lançado.
+	est := diasDeEstudo(resp)
+
+	for i, d := range est {
+		if i > 6 {
+			break
+		}
+
+		if d.Revisao == nil {
+			t.Logf("dia %s: sem revisão nomeada", d.Data)
+			continue
+		}
+
+		t.Logf("dia %s: REV oferece %q (registro do dia: %v)",
+			d.Data, d.Revisao.Disciplina, d.Registro != nil)
+
+		// Nada foi estudado ainda, então NENHUM dia deveria ter revisão nomeada.
+		if d.Revisao.Disciplina != "" {
+			t.Errorf("dia %s revisa %q sem nada ter sido estudado",
+				d.Data, d.Revisao.Disciplina)
+		}
+	}
+}
+
+// E o outro lado: depois de estudar, a revisão TEM de aparecer — e só com o
+// que foi estudado.
+func TestFluxo_RevisaoApareceDepoisDeEstudar(t *testing.T) {
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje := est[0]
+	horas := 1.0
+
+	blocos := make([]RegistroBlocoInput, 0, len(hoje.Itens))
+	estudadas := map[string]bool{}
+	for _, it := range hoje.Itens {
+		blocos = append(blocos, RegistroBlocoInput{
+			AtividadeID: it.ID, Disciplina: it.Disciplina,
+			Horas: &horas, Concluido: true,
+		})
+		estudadas[it.Disciplina] = true
+	}
+	t.Logf("estudando hoje: %v", rotulos(hoje))
+
+	depois, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{Blocos: blocos})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est2 := diasDeEstudo(depois)
+	amanha := est2[1]
+
+	if amanha.Revisao == nil || amanha.Revisao.Disciplina == "" {
+		t.Fatalf("dia %s não tem revisão, mas hoje foi estudado", amanha.Data)
+	}
+
+	t.Logf("dia %s revisa %q", amanha.Data, amanha.Revisao.Disciplina)
+
+	if !estudadas[amanha.Revisao.Disciplina] {
+		t.Errorf("revisa %q, que NÃO foi estudada (estudadas: %v)",
+			amanha.Revisao.Disciplina, estudadas)
+	}
+}
+
+// Abrir o registro do dia sem concluir nada (0 horas, sem check) NÃO conta como
+// estudado: a revisão não pode puxar dali.
+func TestFluxo_RegistroVazioNaoEntraNaRevisao(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje := est[0]
+
+	// Registra o dia com uma anotação, sem horas e sem concluir.
+	blocos := make([]RegistroBlocoInput, 0, len(hoje.Itens))
+	for _, it := range hoje.Itens {
+		blocos = append(blocos, RegistroBlocoInput{
+			AtividadeID: it.ID,
+			Disciplina:  it.Disciplina,
+			Nota:        "comecei e parei",
+			Concluido:   false,
+		})
+	}
+
+	depois, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{Blocos: blocos})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, d := range diasDeEstudo(depois) {
+		if i > 3 {
+			break
+		}
+
+		if d.Revisao != nil && d.Revisao.Disciplina != "" {
+			t.Errorf("dia %s revisa %q, mas nada foi de fato estudado",
+				d.Data, d.Revisao.Disciplina)
+		}
+	}
+}
+
+// Registros antigos não têm atividade_id: guardam só "disciplina X neste dia".
+// A revisão precisa reconhecê-los, senão quem já usava o app perde a revisão
+// de tudo que estudou antes das atividades passarem a ser endereçáveis.
+func TestFluxo_RegistroLegadoContaParaRevisao(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje := est[0]
+	horas := 1.0
+
+	// Sem AtividadeID — exatamente a forma dos registros legados.
+	blocos := make([]RegistroBlocoInput, 0, len(hoje.Itens))
+	for _, it := range hoje.Itens {
+		blocos = append(blocos, RegistroBlocoInput{
+			Disciplina: it.Disciplina,
+			Horas:      &horas,
+			Concluido:  true,
+		})
+	}
+
+	depois, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{Blocos: blocos})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	amanha := diasDeEstudo(depois)[1]
+	if amanha.Revisao == nil || amanha.Revisao.Disciplina == "" {
+		t.Errorf("dia %s sem revisão: um registro legado concluído tem de contar", amanha.Data)
+	} else {
+		t.Logf("dia %s revisa %q", amanha.Data, amanha.Revisao.Disciplina)
+	}
+}
+
+// Adiantar para um dia que JÁ tem a mesma matéria não pode gravar uma segunda
+// linha da mesma disciplina+tema nesse dia. A tela funde e esconde, mas o banco
+// acumula — foi assim que a pilha reapareceu.
+func TestFluxo_AnteciparNaoGravaDuplicataNoBanco(t *testing.T) {
+	ce := novoCenarioUmTopico(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje := est[0]
+
+	// Procura, num dia à frente, a MESMA disciplina que já está em hoje.
+	disc := hoje.Itens[0].Disciplina
+	var alvoID, alvoDia string
+	for _, d := range est[1:] {
+		for _, it := range d.Itens {
+			if it.Disciplina == disc {
+				alvoID, alvoDia = it.ID, d.Data
+				break
+			}
+		}
+		if alvoID != "" {
+			break
+		}
+	}
+
+	if alvoID == "" {
+		t.Skip("cenário sem a mesma disciplina em outro dia")
+	}
+
+	t.Logf("hoje já tem %s; adiantando outra %s de %s", disc, disc, alvoDia)
+
+	if _, err := ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+		ID: alvoID, Data: hoje.Data,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	as, _ := ce.planos.ListAtividades(ctx, ce.planos.salvo.ID)
+
+	contagem := map[string]int{}
+	for _, a := range as {
+		if a.Data.Format("2006-01-02") == hoje.Data {
+			contagem[a.Disciplina+"/"+a.Tema]++
+		}
+	}
+
+	for k, n := range contagem {
+		t.Logf("gravado em hoje: %s x%d", k, n)
+		if n > 1 {
+			t.Errorf("o banco tem %d linhas de %s no mesmo dia", n, k)
+		}
+	}
+}
+
+// A revisão tem de olhar o bloco DA ATIVIDADE, não só a disciplina: num dia com
+// duas matérias, concluir uma não pode fazer a outra entrar na fila.
+func TestFluxo_RevisaoDistingueAtividadeDentroDoDia(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje := est[0]
+
+	if len(hoje.Itens) < 2 {
+		t.Skip("precisa de um dia com 2 matérias")
+	}
+
+	feita := hoje.Itens[0]
+	naoFeita := hoje.Itens[1]
+	horas := 1.0
+
+	// Só a primeira é concluída; a segunda é enviada em branco.
+	if _, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{
+		Blocos: []RegistroBlocoInput{
+			{AtividadeID: feita.ID, Disciplina: feita.Disciplina, Horas: &horas, Concluido: true},
+			{AtividadeID: naoFeita.ID, Disciplina: naoFeita.Disciplina, Nota: "não deu tempo"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	depois, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("concluída: %s | pendente: %s", feita.Disciplina, naoFeita.Disciplina)
+
+	for i, d := range diasDeEstudo(depois) {
+		if i == 0 || i > 3 {
+			continue
+		}
+
+		if d.Revisao == nil || d.Revisao.Disciplina == "" {
+			continue
+		}
+
+		t.Logf("dia %s revisa %q", d.Data, d.Revisao.Disciplina)
+
+		if d.Revisao.Disciplina == naoFeita.Disciplina {
+			t.Errorf("dia %s revisa %q, que ficou pendente hoje", d.Data, naoFeita.Disciplina)
+		}
+	}
+}

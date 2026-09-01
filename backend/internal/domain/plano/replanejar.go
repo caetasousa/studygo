@@ -128,6 +128,26 @@ func AntecipouAtividade(
 		return nil, ErrDiaConcluido
 	}
 
+	// Today already teaches this exact topic: bringing a second copy in would
+	// store two rows the schedule then merges away on screen, so the pile grows
+	// invisibly. The activity is simply dropped from its old day — the student
+	// did finish the subject, and it is already represented today.
+	for _, a := range doDia(atividades, hoje) {
+		if a.ID == atividades[idx].ID {
+			continue
+		}
+
+		if a.Disciplina == atividades[idx].Disciplina && a.Tema == atividades[idx].Tema {
+			saida := make([]Atividade, 0, len(atividades))
+			saida = append(saida, atividades[:idx]...)
+			saida = append(saida, atividades[idx+1:]...)
+
+			renumerar(saida, map[time.Time]bool{origem: true})
+
+			return saida, nil
+		}
+	}
+
 	// It joins the end of today, after whatever was already scheduled.
 	posicao := len(doDia(atividades, hoje))
 

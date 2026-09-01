@@ -86,7 +86,7 @@ func (s *PlanoService) RegistrarRevisao(
 		return PlanoResposta{}, ErrValidacao{Msg: "esse dia não faz parte do plano"}
 	}
 
-	revisao := plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config))[d.N]
+	revisao := plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config), foiEstudado(salvo))[d.N]
 	if len(revisao) == 0 {
 		return PlanoResposta{}, ErrValidacao{
 			Msg: "esse dia ainda não tem revisão — ela começa a partir do segundo dia de estudo",

@@ -23,7 +23,7 @@ func TestFilaRevisao(t *testing.T) {
 
 		dias := []plano.Dia{diaEstudo(1, item("POR", "Crase"))}
 
-		if got := plano.FilaRevisao(dias, 2); len(got) != 0 {
+		if got := plano.FilaRevisao(dias, 2, nil); len(got) != 0 {
 			t.Errorf("dia 1 revisou %v; não há o que revisar ainda", got)
 		}
 	})
@@ -38,7 +38,7 @@ func TestFilaRevisao(t *testing.T) {
 			diaEstudo(3, item("POR", "Concordância"), item("MAT", "Juros")),
 		}
 
-		got := plano.FilaRevisao(dias, 1)
+		got := plano.FilaRevisao(dias, 1, nil)
 
 		if len(got[2]) != 1 || got[2][0].Tema != "Crase" {
 			t.Fatalf("dia 2 = %v, quer Crase", got[2])
@@ -59,7 +59,7 @@ func TestFilaRevisao(t *testing.T) {
 			diaEstudo(3, item("POR", "p3"), item("MAT", "m3")),
 		}
 
-		for n, itens := range plano.FilaRevisao(dias, 4) {
+		for n, itens := range plano.FilaRevisao(dias, 4, nil) {
 			for _, it := range itens {
 				if it.Disciplina != itens[0].Disciplina {
 					t.Errorf("dia %d misturou matérias: %v", n, itens)
@@ -77,7 +77,7 @@ func TestFilaRevisao(t *testing.T) {
 			diaEstudo(2), diaEstudo(3), diaEstudo(4),
 		}
 
-		got := plano.FilaRevisao(dias, 1)
+		got := plano.FilaRevisao(dias, 1, nil)
 
 		for _, n := range []int{2, 3, 4} {
 			if len(got[n]) != 1 || got[n][0].Tema != "p1" {
@@ -94,7 +94,7 @@ func TestFilaRevisao(t *testing.T) {
 			{N: 2, Tipo: plano.TipoRevisaoDirigida, Fase: plano.FaseReta, Itens: []plano.ItemDia{item("POR", "p1")}},
 		}
 
-		if got := plano.FilaRevisao(dias, 1); len(got) != 0 {
+		if got := plano.FilaRevisao(dias, 1, nil); len(got) != 0 {
 			t.Errorf("a fila entrou na reta final: %v", got)
 		}
 	})
@@ -104,7 +104,7 @@ func TestFilaRevisao(t *testing.T) {
 
 		dias := []plano.Dia{diaEstudo(1, item("POR", "p1")), diaEstudo(2)}
 
-		if got := plano.FilaRevisao(dias, 5); len(got[2]) != 1 {
+		if got := plano.FilaRevisao(dias, 5, nil); len(got[2]) != 1 {
 			t.Errorf("dia 2 = %v, quer só p1 uma vez", got[2])
 		}
 	})

@@ -6,6 +6,7 @@
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
 	import { blocoDaAtividade, planoStore } from '$lib/stores/plano.svelte';
+	import { atividadeFeita } from '$lib/estudo';
 	import AtividadeForm from './AtividadeForm.svelte';
 	import RevisaoForm from './RevisaoForm.svelte';
 	import type { Dia, ItemDia } from '$lib/types';
@@ -64,11 +65,16 @@
 	const mes = $derived(MESES[Number(dia.data.slice(5, 7)) - 1]);
 
 	/** Whether one scheduled ACTIVITY is already marked done. */
-	function feita(codigo: string, atividadeId: string): boolean {
-		const b = blocoDaAtividade(dia.registro, { id: atividadeId, disciplina: codigo });
+	// True once the day has any per-activity record at all: from then on, the
+	// absence of a block for one activity MEANS that activity is not done.
+	const temRegistroPorAtividade = $derived(
+		(dia.registro?.blocos ?? []).some((b) => !!b.atividadeId)
+	);
 
-		// Older records carry no per-block flag: fall back to the day's own.
-		return b?.concluido ?? dia.registro?.concluido ?? false;
+	function feita(codigo: string, atividadeId: string): boolean {
+		const b = blocoDaAtividade(dia.registro, { id: atividadeId, disciplina: codigo }, dia.itens);
+
+		return atividadeFeita(b, temRegistroPorAtividade, dia.registro?.concluido);
 	}
 
 	// Only used by the special days, which still log at day level.
