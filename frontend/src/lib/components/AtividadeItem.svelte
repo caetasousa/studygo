@@ -22,8 +22,9 @@
 		item,
 		data,
 		indice,
-		total,
 		podeMover,
+		podeSubir,
+		podeDescer,
 		onMoverAcima,
 		onMoverAbaixo,
 		concluida = false,
@@ -35,12 +36,14 @@
 		data: string;
 		/** slot of this activity in its day */
 		indice: number;
-		/** how many activities the day holds, so the last one hides the "down" button */
-		total: number;
 		podeMover: boolean;
-		/** Swap this activity with the one right above it. */
+		/** true when there is a slot to swap with above — same day or previous useful day */
+		podeSubir: boolean;
+		/** true when there is a slot to swap with below — same day or next useful day */
+		podeDescer: boolean;
+		/** Swap this activity with the one above (crossing days at the top). */
 		onMoverAcima: (id: string) => void;
-		/** Swap this activity with the one right below it. */
+		/** Swap this activity with the one below (crossing days at the bottom). */
 		onMoverAbaixo: (id: string) => void;
 		/** this activity finished, shown as a quiet mark (edited in its form) */
 		concluida?: boolean;
@@ -66,9 +69,6 @@
 	// An activity the backend has not given an id to cannot be addressed yet, and
 	// one already marked done must not move: that would rewrite what was studied.
 	const movivel = $derived(podeMover && !!item.id && !concluida);
-	// The topmost row has nowhere higher; the bottom row has nowhere lower.
-	const noTopo = $derived(indice === 0);
-	const noFundo = $derived(indice >= total - 1);
 
 	// Only a topic still ahead can be brought forward.
 	const ehFuturo = $derived(data > hojeISO());
@@ -112,14 +112,14 @@
 				<NavIcon name="check" size="sm" />
 			</span>
 		{/if}
-		{#if movivel && !noTopo}
+		{#if movivel && podeSubir}
 			<IconButton
 				icon="subir"
 				label="Subir {nome} uma posição"
 				onclick={() => onMoverAcima(item.id)}
 			/>
 		{/if}
-		{#if movivel && !noFundo}
+		{#if movivel && podeDescer}
 			<IconButton
 				icon="descer"
 				label="Descer {nome} uma posição"

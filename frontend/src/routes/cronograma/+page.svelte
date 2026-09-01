@@ -38,32 +38,62 @@
 
 	/**
 	 * A day is movable when it has at least one activity. Rearranging is
-	 * per-activity: each row carries an up and a down button that swap it
-	 * with its neighbour in the same day.
+	 * per-activity: each row carries an up and a down button that step it
+	 * one slot at a time, crossing the day boundary when it reaches the top
+	 * or bottom.
 	 */
 	function diaMovivel(d: Dia): boolean {
 		return d.itens.length > 0;
 	}
 
+	/** Days that receive activities: study, weekly review, guided review. */
+	function ehDiaUtil(d: Dia): boolean {
+		return d.tipo === 'est' || d.tipo === 'rev' || d.tipo === 'revd';
+	}
+
 	/** The (day, index) an activity currently sits on, or null. */
-	function posicaoAtual(id: string): { data: string; indice: number } | null {
+	function posicaoAtual(id: string): { dia: Dia; indice: number } | null {
 		for (const d of plano?.dias ?? []) {
 			const i = d.itens.findIndex((x) => x.id === id);
-			if (i >= 0) return { data: d.data, indice: i };
+			if (i >= 0) return { dia: d, indice: i };
+		}
+		return null;
+	}
+
+	/** The nearest neighbour of `d` in the plan that accepts activities. */
+	function diaVizinho(d: Dia, passo: -1 | 1): Dia | null {
+		const dias = plano?.dias ?? [];
+		const i = dias.findIndex((x) => x.data === d.data);
+		if (i < 0) return null;
+		for (let j = i + passo; j >= 0 && j < dias.length; j += passo) {
+			if (ehDiaUtil(dias[j])) return dias[j];
 		}
 		return null;
 	}
 
 	/**
-	 * Swaps one activity with its neighbour, using the backend's swap
-	 * semantics (trocar=true) so neither day changes size.
+	 * Steps one activity by one slot. Inside the day it swaps with the
+	 * neighbour (backend TrocarAtividades). At the top or bottom of a day it
+	 * crosses to the nearest useful day — up goes to the BOTTOM of the day
+	 * before, down to the TOP of the day after — with trocar=false so the
+	 * source day loses one and the target day gains one.
 	 */
 	async function moverPorPasso(id: string, passo: -1 | 1) {
 		const p = posicaoAtual(id);
 		if (!p) return;
-		const alvo = p.indice + passo;
-		if (alvo < 0) return;
-		await planoStore.moverAtividade(id, p.data, alvo, true);
+
+		const dentro = p.indice + passo;
+		if (dentro >= 0 && dentro < p.dia.itens.length) {
+			await planoStore.moverAtividade(id, p.dia.data, dentro, true);
+			return;
+		}
+
+		const vizinho = diaVizinho(p.dia, passo);
+		if (!vizinho) return; // no useful day on that side; button was hidden anyway
+
+		// Up → land at the END of the previous useful day; down → land at slot 0.
+		const alvoPos = passo === -1 ? vizinho.itens.length : 0;
+		await planoStore.moverAtividade(id, vizinho.data, alvoPos, false);
 	}
 
 	const moverAcima = (id: string) => moverPorPasso(id, -1);
@@ -124,6 +154,8 @@
 						<DiaCard
 							dia={d}
 							movivel={diaMovivel(d)}
+							temAntes={diaVizinho(d, -1) !== null}
+							temDepois={diaVizinho(d, 1) !== null}
 							onMoverAcima={moverAcima}
 							onMoverAbaixo={moverAbaixo}
 						/>

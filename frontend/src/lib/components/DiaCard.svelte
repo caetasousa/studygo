@@ -29,14 +29,20 @@
 	let {
 		dia,
 		movivel,
+		temAntes = false,
+		temDepois = false,
 		onMoverAcima,
 		onMoverAbaixo
 	}: {
 		dia: Dia;
 		movivel: boolean;
-		/** Swap one activity with the one right above it in the same day. */
+		/** true when there is a useful day earlier in the plan, so the FIRST row of this day can still step up (into the previous day). */
+		temAntes?: boolean;
+		/** true when there is a useful day later in the plan, so the LAST row of this day can still step down. */
+		temDepois?: boolean;
+		/** Step one activity up by one slot (crossing days at the top). */
 		onMoverAcima: (id: string) => void;
-		/** Swap one activity with the one right below it in the same day. */
+		/** Step one activity down by one slot (crossing days at the bottom). */
 		onMoverAbaixo: (id: string) => void;
 	} = $props();
 
@@ -303,8 +309,9 @@
 								item={it}
 								data={dia.data}
 								indice={i}
-								total={dia.itens.length}
 								podeMover={movivel}
+								podeSubir={i > 0 || temAntes}
+								podeDescer={i < dia.itens.length - 1 || temDepois}
 								{onMoverAcima}
 								{onMoverAbaixo}
 								minutos={minutosPorItem[i] ?? null}

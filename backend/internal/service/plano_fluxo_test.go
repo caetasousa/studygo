@@ -1380,3 +1380,76 @@ func TestFluxo_SalvarContinuaFuncionandoAposAdiantarVarias(t *testing.T) {
 		}
 	}
 }
+
+// A última matéria do dia, ao descer, atravessa a fronteira e vai para o TOPO
+// do próximo dia útil. A primeira do dia, ao subir, vai para o FUNDO do dia
+// útil anterior. É o mesmo MoverAtividade — só a data e a posição mudam.
+func TestFluxo_MoverEntreDiasVizinhos(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("Obter: %v", err)
+	}
+
+	est := diasDeEstudo(inicial)
+	dia1, dia2 := est[0], est[1]
+	if len(dia1.Itens) < 2 || len(dia2.Itens) < 2 {
+		t.Fatalf("cenário precisa de 2 itens em cada dia inicial")
+	}
+
+	// Desce a última matéria do dia1 → topo do dia2.
+	ultima := dia1.Itens[len(dia1.Itens)-1]
+	depois, err := ce.svc.MoverAtividade(ctx, ce.usuario, ce.slug, MoverAtividadeInput{
+		ID: ultima.ID, Data: dia2.Data, Posicao: 0,
+	})
+	if err != nil {
+		t.Fatalf("descer para o próximo dia: %v", err)
+	}
+
+	est = diasDeEstudo(depois)
+	if est[0].Itens[len(est[0].Itens)-1].ID == ultima.ID {
+		t.Errorf("a matéria ficou no dia1: %v", rotulos(est[0]))
+	}
+	if est[1].Itens[0].ID != ultima.ID {
+		t.Errorf("a matéria não chegou no topo do dia2: %v", rotulos(est[1]))
+	}
+
+	// Sobe a agora-primeira do dia2 (a mesma) → fundo do dia1. Ida e volta.
+	primeira := est[1].Itens[0]
+	dia1Data, dia2Data := est[0].Data, est[1].Data
+	posFundo := len(est[0].Itens)
+
+	depois, err = ce.svc.MoverAtividade(ctx, ce.usuario, ce.slug, MoverAtividadeInput{
+		ID: primeira.ID, Data: dia1Data, Posicao: posFundo,
+	})
+	if err != nil {
+		t.Fatalf("subir para o dia anterior: %v", err)
+	}
+
+	est = diasDeEstudo(depois)
+	// achar o dia1 e o dia2 pelas datas (posição na lista pode mudar)
+	var d1, d2 DiaResposta
+	for _, d := range est {
+		switch d.Data {
+		case dia1Data:
+			d1 = d
+		case dia2Data:
+			d2 = d
+		}
+	}
+
+	if d1.Itens[len(d1.Itens)-1].ID != primeira.ID {
+		t.Errorf("a matéria não voltou ao fundo do dia1: %v", rotulos(d1))
+	}
+	for _, it := range d2.Itens {
+		if it.ID == primeira.ID {
+			t.Errorf("a matéria ficou também no dia2: %v", rotulos(d2))
+			break
+		}
+	}
+}
