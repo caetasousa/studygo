@@ -14,15 +14,18 @@
 	 * touch). The gesture leaked corner cases — a scroll that turned into a
 	 * drag mid-flight, a drop that landed on air, a touch that never fired the
 	 * events pointer relied on — and the fix for one usually broke another.
-	 * The subject moves by an explicit button now: "levar para o topo do dia".
-	 * Bringing a future subject forward stays as "já terminei este assunto hoje".
+	 * Now each row carries just two buttons — up and down — that swap it with
+	 * its neighbour. Bringing a future subject forward stays as "já terminei
+	 * este assunto hoje".
 	 */
 	let {
 		item,
 		data,
 		indice,
+		total,
 		podeMover,
-		onMoverParaTopo,
+		onMoverAcima,
+		onMoverAbaixo,
 		concluida = false,
 		minutos = null,
 		onAntecipar,
@@ -32,9 +35,13 @@
 		data: string;
 		/** slot of this activity in its day */
 		indice: number;
+		/** how many activities the day holds, so the last one hides the "down" button */
+		total: number;
 		podeMover: boolean;
-		/** Moves this activity to the first slot of its own day. */
-		onMoverParaTopo: (id: string) => void;
+		/** Swap this activity with the one right above it. */
+		onMoverAcima: (id: string) => void;
+		/** Swap this activity with the one right below it. */
+		onMoverAbaixo: (id: string) => void;
 		/** this activity finished, shown as a quiet mark (edited in its form) */
 		concluida?: boolean;
 		/** planned length of this activity's block, in minutes */
@@ -59,8 +66,9 @@
 	// An activity the backend has not given an id to cannot be addressed yet, and
 	// one already marked done must not move: that would rewrite what was studied.
 	const movivel = $derived(podeMover && !!item.id && !concluida);
-	// The topmost activity of the day has nowhere higher to go.
+	// The topmost row has nowhere higher; the bottom row has nowhere lower.
 	const noTopo = $derived(indice === 0);
+	const noFundo = $derived(indice >= total - 1);
 
 	// Only a topic still ahead can be brought forward.
 	const ehFuturo = $derived(data > hojeISO());
@@ -106,9 +114,16 @@
 		{/if}
 		{#if movivel && !noTopo}
 			<IconButton
-				icon="topo"
-				label="Levar {nome} para o topo do dia"
-				onclick={() => onMoverParaTopo(item.id)}
+				icon="subir"
+				label="Subir {nome} uma posição"
+				onclick={() => onMoverAcima(item.id)}
+			/>
+		{/if}
+		{#if movivel && !noFundo}
+			<IconButton
+				icon="descer"
+				label="Descer {nome} uma posição"
+				onclick={() => onMoverAbaixo(item.id)}
 			/>
 		{/if}
 		{#if onAntecipar && ehFuturo && movivel}

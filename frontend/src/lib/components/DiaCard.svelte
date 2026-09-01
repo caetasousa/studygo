@@ -29,12 +29,15 @@
 	let {
 		dia,
 		movivel,
-		onMoverParaTopo
+		onMoverAcima,
+		onMoverAbaixo
 	}: {
 		dia: Dia;
 		movivel: boolean;
-		/** Moves one activity to the first slot of its own day. */
-		onMoverParaTopo: (id: string) => void;
+		/** Swap one activity with the one right above it in the same day. */
+		onMoverAcima: (id: string) => void;
+		/** Swap one activity with the one right below it in the same day. */
+		onMoverAbaixo: (id: string) => void;
 	} = $props();
 
 	const hoje = $derived(dia.data === hojeISO());
@@ -300,8 +303,10 @@
 								item={it}
 								data={dia.data}
 								indice={i}
+								total={dia.itens.length}
 								podeMover={movivel}
-								{onMoverParaTopo}
+								{onMoverAcima}
+								{onMoverAbaixo}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
 								onAntecipar={(id) => void antecipar(id)}

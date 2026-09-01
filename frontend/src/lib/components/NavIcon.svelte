@@ -30,6 +30,8 @@
 		| 'chevron'
 		| 'busca'
 		| 'topo'
+		| 'subir'
+		| 'descer'
 		| 'adiantar'
 		| 'link';
 
@@ -176,6 +178,14 @@
 		<path d="M5 6h14" />
 		<path d="M12 10v9" />
 		<path d="m8 14 4-4 4 4" />
+	{:else if name === 'subir'}
+		<!-- plain up chevron+shaft: swap with the row above -->
+		<path d="M12 6v13" />
+		<path d="m7 11 5-5 5 5" />
+	{:else if name === 'descer'}
+		<!-- plain down chevron+shaft: swap with the row below -->
+		<path d="M12 5v13" />
+		<path d="m7 13 5 5 5-5" />
 	{:else if name === 'adiantar'}
 		<!-- left-arrow to a bar: bring this forward to today -->
 		<path d="M6 5v14" />

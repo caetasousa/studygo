@@ -38,30 +38,36 @@
 
 	/**
 	 * A day is movable when it has at least one activity. Rearranging is
-	 * per-activity: one subject moves at a time via its "levar para o topo"
-	 * button, and the same-day insert at position 0 covers what drag used to.
+	 * per-activity: each row carries an up and a down button that swap it
+	 * with its neighbour in the same day.
 	 */
 	function diaMovivel(d: Dia): boolean {
 		return d.itens.length > 0;
 	}
 
-	/** The date an activity currently sits on, or null if it is not in the plan. */
-	function dataAtual(id: string): string | null {
+	/** The (day, index) an activity currently sits on, or null. */
+	function posicaoAtual(id: string): { data: string; indice: number } | null {
 		for (const d of plano?.dias ?? []) {
-			if (d.itens.some((x) => x.id === id)) return d.data;
+			const i = d.itens.findIndex((x) => x.id === id);
+			if (i >= 0) return { data: d.data, indice: i };
 		}
 		return null;
 	}
 
 	/**
-	 * Inserts one activity at the first slot of its own day. Same-day inserts
-	 * always shift, never swap — there is no other day to exchange with.
+	 * Swaps one activity with its neighbour, using the backend's swap
+	 * semantics (trocar=true) so neither day changes size.
 	 */
-	async function moverParaTopo(id: string) {
-		const data = dataAtual(id);
-		if (!data) return;
-		await planoStore.moverAtividade(id, data, 0, false);
+	async function moverPorPasso(id: string, passo: -1 | 1) {
+		const p = posicaoAtual(id);
+		if (!p) return;
+		const alvo = p.indice + passo;
+		if (alvo < 0) return;
+		await planoStore.moverAtividade(id, p.data, alvo, true);
 	}
+
+	const moverAcima = (id: string) => moverPorPasso(id, -1);
+	const moverAbaixo = (id: string) => moverPorPasso(id, 1);
 </script>
 
 <PageHead
@@ -118,7 +124,8 @@
 						<DiaCard
 							dia={d}
 							movivel={diaMovivel(d)}
-							onMoverParaTopo={moverParaTopo}
+							onMoverAcima={moverAcima}
+							onMoverAbaixo={moverAbaixo}
 						/>
 					{/each}
 				</div>
