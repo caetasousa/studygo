@@ -331,7 +331,10 @@ class PlanoStore {
 		if (this.plano) this.plano = moverLocalmente(this.plano, id, data, posicao, trocar);
 
 		try {
-			this.commit(await api.moverAtividade(this.slug, id, data, posicao, trocar));
+			// No "Salvo" flash: the board already rearranged optimistically, so the
+			// drop reads as done. The toast on top of the server response landing
+			// only drew attention to the re-render.
+			this.commit(await api.moverAtividade(this.slug, id, data, posicao, trocar), false);
 
 			return true;
 		} catch (e) {
@@ -354,7 +357,7 @@ class PlanoStore {
 	 */
 	adiarDia = async (data: string): Promise<string | null> => {
 		try {
-			this.commit(await api.adiarDia(this.slug, data));
+			this.commit(await api.adiarDia(this.slug, data), false);
 
 			return null;
 		} catch (e) {
@@ -365,7 +368,7 @@ class PlanoStore {
 	/** Brings an activity forward to the day it was actually finished on. */
 	anteciparAtividade = async (id: string, data: string): Promise<string | null> => {
 		try {
-			this.commit(await api.anteciparAtividade(this.slug, id, data));
+			this.commit(await api.anteciparAtividade(this.slug, id, data), false);
 
 			return null;
 		} catch (e) {
