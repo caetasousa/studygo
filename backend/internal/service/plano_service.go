@@ -67,6 +67,8 @@ func (s *PlanoService) Salvar(
 		return PlanoResposta{}, err
 	}
 
+	anterior := salvo.Config
+
 	cfg, tema, err := aplicarConfigInput(salvo, c, in)
 	if err != nil {
 		return PlanoResposta{}, err
@@ -84,7 +86,59 @@ func (s *PlanoService) Salvar(
 		return PlanoResposta{}, err
 	}
 
+	// Changing the day's rhythm has to reach the schedule. Once any day has been
+	// recorded the whole plan is materialised, and AplicarAtividades then makes
+	// the stored layout win for every day — so a new blocosPorDia would show only
+	// on days the store has never seen. Drop the materialised activities for the
+	// days still ahead (keeping history, finished days and hand-moved blocks), so
+	// the engine regenerates those under the new setting.
+	if ritmoMudou(anterior, cfg) {
+		if err := s.regenerarDiasFuturos(ctx, c, salvo); err != nil {
+			return PlanoResposta{}, err
+		}
+	}
+
 	return s.montar(ctx, c, salvo)
+}
+
+// ritmoMudou reports whether a config change touched how a day is filled —
+// blocks per day or block length — which is what a materialised plan freezes.
+func ritmoMudou(antes, depois plano.Config) bool {
+	antes = antes.Normalizar()
+	depois = depois.Normalizar()
+
+	return antes.BlocosPorDia != depois.BlocosPorDia ||
+		antes.MinutosBloco != depois.MinutosBloco
+}
+
+// regenerarDiasFuturos drops the materialised activities for content days from
+// today onward that the student has neither finished nor moved by hand, so the
+// next montar rebuilds them from the engine under the current config.
+func (s *PlanoService) regenerarDiasFuturos(
+	ctx context.Context,
+	c concurso.Concurso,
+	salvo plano.Salvo,
+) error {
+	atividades, err := s.planos.ListAtividades(ctx, salvo.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(atividades) == 0 {
+		return nil
+	}
+
+	retidas := plano.ReterAoMudarRitmo(
+		atividades,
+		plano.DayOf(s.clock.Now()),
+		s.diaConcluido(salvo),
+	)
+
+	if len(retidas) == len(atividades) {
+		return nil
+	}
+
+	return s.planos.ReplaceAtividades(ctx, salvo.ID, retidas)
 }
 
 // RegistrarDia upserts one day's log.

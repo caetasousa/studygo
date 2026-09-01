@@ -660,3 +660,49 @@ func TestAtividadesFaltantes(t *testing.T) {
 		t.Errorf("faltantes = %d, quer 0 quando tudo já está guardado", n)
 	}
 }
+
+// Changing blocosPorDia after the plan was materialised: the days still ahead
+// must be released back to the engine, while history, finished days and
+// hand-moved blocks are kept.
+func TestReterAoMudarRitmo(t *testing.T) {
+	t.Parallel()
+
+	hoje := dia(2026, 9, 10)
+
+	d5, d12, d15 := dia(2026, 9, 5), dia(2026, 9, 12), dia(2026, 9, 15)
+	p0, p1 := 0, 1
+
+	atividades := []plano.Atividade{
+		// Past day — kept as history.
+		{ID: "passado", Data: d5, Posicao: 0, Disciplina: "POR", OrigemDia: &d5, OrigemPos: &p0},
+		// Future, untouched — dropped so the engine can regenerate it.
+		{ID: "futuro-a", Data: d12, Posicao: 0, Disciplina: "MAT", OrigemDia: &d12, OrigemPos: &p0},
+		{ID: "futuro-b", Data: d12, Posicao: 1, Disciplina: "DIR", OrigemDia: &d12, OrigemPos: &p1},
+		// Future but hand-moved (origin day differs) — kept.
+		{ID: "movida", Data: d15, Posicao: 0, Disciplina: "INF", OrigemDia: &d12, OrigemPos: &p1},
+		// Future, on a day the student marked done — kept.
+		{ID: "concluida", Data: d15, Posicao: 1, Disciplina: "POR", OrigemDia: &d15, OrigemPos: &p1},
+	}
+
+	concluido := func(dt time.Time) bool { return dt.Equal(d15) }
+
+	retidas := plano.ReterAoMudarRitmo(atividades, hoje, concluido)
+
+	got := map[string]bool{}
+	for _, a := range retidas {
+		got[a.ID] = true
+	}
+
+	quer := []string{"passado", "movida", "concluida"}
+	for _, id := range quer {
+		if !got[id] {
+			t.Errorf("%q deveria ter sido retida", id)
+		}
+	}
+
+	for _, id := range []string{"futuro-a", "futuro-b"} {
+		if got[id] {
+			t.Errorf("%q deveria ter sido descartada (dia futuro, intocado)", id)
+		}
+	}
+}

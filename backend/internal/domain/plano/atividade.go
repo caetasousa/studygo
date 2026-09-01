@@ -500,6 +500,48 @@ func RestaurarAtividades(atividades []Atividade) []Atividade {
 	return saida
 }
 
+// ReterAoMudarRitmo keeps only the activities that a change to the day's rhythm
+// (blocosPorDia, minutosBloco) must not disturb, dropping the rest so the engine
+// regenerates them under the new configuration.
+//
+// The rule the student expects: what is already behind them, or done, or that
+// they arranged by hand, stays put; the days still ahead follow the new setting.
+// So an activity is kept when ANY of these holds:
+//
+//   - it sits on a day before `desde` (history);
+//   - its day is `concluido` (already closed);
+//   - the student moved it — `Movida()`, or it was carried into a day it did not
+//     originate in.
+//
+// Everything else — an untouched, unfinished, future block — is dropped. With no
+// stored activity claiming those slots, montar's AplicarAtividades falls through
+// to the freshly generated layout for those days, which is exactly "only the
+// days ahead change".
+func ReterAoMudarRitmo(
+	atividades []Atividade,
+	desde time.Time,
+	concluido func(time.Time) bool,
+) []Atividade {
+	desde = day(desde)
+	out := make([]Atividade, 0, len(atividades))
+
+	for _, a := range atividades {
+		dt := day(a.Data)
+
+		manter := dt.Before(desde) ||
+			concluido(dt) ||
+			a.Movida() ||
+			a.OrigemDia == nil ||
+			!sameDay(*a.OrigemDia, dt)
+
+		if manter {
+			out = append(out, a)
+		}
+	}
+
+	return out
+}
+
 func tipoDaAtividade(t Tipo) TipoAtividade {
 	switch t {
 	case TipoRevisaoSemanal, TipoRevisaoDirigida:
