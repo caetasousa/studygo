@@ -21,6 +21,23 @@ server {
     ssl_certificate     /etc/letsencrypt/live/{{ app_domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ app_domain }}/privkey.pem;
 
+    # nginx's own default (1m) is well under what the app actually accepts —
+    # the edital PDF upload has its own limit further down the chain (the
+    # backend's own 20 MiB, see maxEditalPDF), so the edge has to allow at
+    # least that much or it rejects the request before the app ever sees it.
+    client_max_body_size 20m;
+
+    # nginx's own default read timeout (60s) is well under how long edital
+    # import can legitimately take: OCR plus the Gemini calls, on a VPS with
+    # less CPU than a dev machine, routinely runs past a minute. The frontend
+    # container's own nginx already waits up to 300s for exactly this reason
+    # (see frontend/nginx.conf) — matching it here is what stops the EDGE from
+    # cutting the connection first and handing the browser a 504 while the
+    # import is still legitimately running.
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+
     # The frontend container serves the SPA and proxies /api to the backend on
     # the compose network, so edge nginx only needs one upstream.
     location / {
@@ -32,6 +49,11 @@ server {
     }
 }
 {% else %}
+    client_max_body_size 20m;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+
     location / {
         proxy_pass http://127.0.0.1:{{ frontend_port }};
         proxy_set_header Host $host;
