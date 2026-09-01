@@ -142,13 +142,29 @@
 	// --- touch: press and hold ---------------------------------------------
 	// The row the finger is currently over, so the same "trocar" affordance the
 	// mouse gets is shown on touch too.
+	//
+	// ultimoAlvoValido remembers the last row a HIT actually landed on — not
+	// just the last point sampled. A real finger is not a mathematically
+	// centred point: the instant it lifts, it commonly drifts one or two
+	// pixels off the row it was resting on, right into the 2px gap between
+	// activities or the strip a neighbouring row's own padding claims. That
+	// last, slightly-missed sample used to BE the drop target — a miss by a
+	// couple of pixels then read as "dropped on nothing" and moved nothing at
+	// all, even though the row had clearly been highlighted a moment before.
+	// Falling back to the last point that DID hit something is what makes the
+	// drop land on what the person watched get highlighted, not on the exact
+	// pixel the finger happened to be leaving from.
+	let ultimoAlvoValido: { data: string; posicao: number } | null = null;
+
 	function toqueMoveu(x: number, y: number) {
 		const alvo = alvoNoPonto(x, y);
+		if (alvo) ultimoAlvoValido = alvo;
 		onSobrevoar?.(alvo && alvo.data === data && alvo.posicao === indice ? null : alvo);
 	}
 
 	function toqueSoltou(x: number, y: number) {
-		const alvo = alvoNoPonto(x, y);
+		const alvo = alvoNoPonto(x, y) ?? ultimoAlvoValido;
+		ultimoAlvoValido = null;
 
 		arrastandoEu = false;
 		onSobrevoar?.(null);
