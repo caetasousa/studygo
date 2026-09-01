@@ -128,27 +128,14 @@ func AntecipouAtividade(
 		return nil, ErrDiaConcluido
 	}
 
-	// Today already teaches this exact topic: bringing a second copy in would
-	// store two rows the schedule then merges away on screen, so the pile grows
-	// invisibly. The activity is simply dropped from its old day — the student
-	// did finish the subject, and it is already represented today.
-	for _, a := range doDia(atividades, hoje) {
-		if a.ID == atividades[idx].ID {
-			continue
-		}
-
-		if a.Disciplina == atividades[idx].Disciplina && a.Tema == atividades[idx].Tema {
-			saida := make([]Atividade, 0, len(atividades))
-			saida = append(saida, atividades[:idx]...)
-			saida = append(saida, atividades[idx+1:]...)
-
-			renumerar(saida, map[time.Time]bool{origem: true})
-
-			return saida, nil
-		}
-	}
-
 	// It joins the end of today, after whatever was already scheduled.
+	//
+	// The activity is MOVED, never deleted, even when today already teaches this
+	// exact topic. Its row is the only record that the pass left its origin day:
+	// dropping it made the engine regenerate the topic there, so the subject
+	// reappeared on the very day it had just been moved off. AplicarAtividades
+	// reads OrigemDia to silence that slot, and MesclarItensIguais collapses the
+	// pair today, so the duplicate never reaches the screen or the store.
 	posicao := len(doDia(atividades, hoje))
 
 	saida := append([]Atividade(nil), atividades...)

@@ -730,6 +730,10 @@ func (s *PlanoService) AntecipouAtividade(
 		return PlanoResposta{}, erroDeReplanejamento(err)
 	}
 
+	// Landing on a day that already teaches this topic leaves two rows the
+	// screen merges away; only one belongs in the store.
+	movidas = plano.DeduplicarAtividades(movidas)
+
 	if err := s.planos.ReplaceAtividades(ctx, salvo.ID, movidas); err != nil {
 		return PlanoResposta{}, err
 	}

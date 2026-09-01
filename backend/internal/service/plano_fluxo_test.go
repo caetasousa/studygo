@@ -999,3 +999,206 @@ func TestFluxo_RevisaoDistingueAtividadeDentroDoDia(t *testing.T) {
 		}
 	}
 }
+
+// Adiantar tira a matéria da PRÓXIMA passagem: ela sobe para hoje e o dia de
+// onde saiu deixa de oferecê-la. Foi o relato "a riscada de hoje aparece de
+// novo amanhã".
+func TestFluxo_AdiantadaSaiDaProximaPassagem(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje, amanha := est[0], est[1]
+	alvo := amanha.Itens[0]
+
+	t.Logf("hoje:   %v", rotulos(hoje))
+	t.Logf("amanhã: %v", rotulos(amanha))
+	t.Logf("adiantando %s/%s", alvo.Disciplina, alvo.Tema)
+
+	depois, err := ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+		ID: alvo.ID, Data: hoje.Data,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est2 := diasDeEstudo(depois)
+	t.Logf("DEPOIS hoje:   %v", rotulos(est2[0]))
+	t.Logf("DEPOIS amanhã: %v", rotulos(est2[1]))
+
+	if n := ocorrencias(est2[0], alvo.Disciplina, alvo.Tema); n != 1 {
+		t.Errorf("hoje mostra %d vezes, quer exatamente 1", n)
+	}
+
+	if n := ocorrencias(est2[1], alvo.Disciplina, alvo.Tema); n != 0 {
+		t.Errorf("amanhã ainda mostra %s/%s — não saiu da próxima passagem",
+			alvo.Disciplina, alvo.Tema)
+	}
+
+	for _, d := range est2 {
+		if len(d.Itens) == 0 {
+			t.Errorf("dia %s ficou vazio", d.Data)
+		}
+	}
+}
+
+// O mesmo, num concurso do tamanho real do usuário: várias disciplinas de 6
+// temas, 2 blocos por dia.
+func novoCenarioRealista(t *testing.T) *cenario {
+	t.Helper()
+
+	hoje := diaT(2026, 9, 1)
+	userID, concursoID := uuid.New(), uuid.New()
+
+	temas := func(p string) []string {
+		out := make([]string, 6)
+		for i := range out {
+			out[i] = p + " tema " + string(rune('A'+i))
+		}
+
+		return out
+	}
+
+	codigos := []string{"LINPO", "BANDA", "INTAR", "DESSI", "DEVPL", "ENGSO", "MATRA", "SEGIN"}
+	discs := make([]concurso.Disciplina, 0, len(codigos))
+	questoes := map[string]int{}
+
+	for i, c := range codigos {
+		bloco, peso := concurso.BlocoEspecifico, 2
+		if i == 0 || i == 6 {
+			bloco, peso = concurso.BlocoGeral, 1
+		}
+
+		discs = append(discs, concurso.Disciplina{
+			ID: uuid.New(), Codigo: c, Nome: c, Bloco: bloco,
+			Peso: peso, QuestoesPadrao: 10, Ordem: i, Temas: temas(c),
+		})
+		questoes[c] = 10
+	}
+
+	cfg := plano.ConfigPadrao()
+	cfg.Inicio = hoje
+	cfg.Prova = diaT(2026, 12, 15)
+	cfg.HorasDia = 1.67
+	cfg.DiasEstudo = []int{1, 2, 3, 4, 5}
+	cfg.DiaRevisao = 5
+	cfg.RetaFinalDias = 30
+	cfg.Questoes = questoes
+	cfg.BlocosPorDia = 2
+	cfg.MinutosBloco = 30
+	cfg.MinutosRevisao = 40
+
+	planos := &fakePlanos{salvo: plano.Salvo{
+		ID: uuid.New(), UserID: userID, ConcursoID: concursoID,
+		TemaUI: "dark", Config: cfg.Normalizar(),
+		Registros:    map[time.Time]plano.Registro{},
+		Reordenacoes: map[time.Time]plano.Reordenacao{},
+		Marcos:       map[uuid.UUID]bool{},
+		Revisoes:     map[time.Time]plano.RegistroRevisao{},
+	}}
+
+	c := concurso.Concurso{
+		ID: concursoID, OwnerID: userID, Slug: "x", Nome: "X",
+		ProvaPadrao: diaT(2026, 12, 15), RetaPadraoDias: 30, Disciplinas: discs,
+	}
+
+	return &cenario{
+		svc:     NewPlanoService(planos, &fakeConcursos{c: c}, relogioFixo{t: hoje}),
+		planos:  planos,
+		usuario: userID,
+		slug:    "x",
+		hoje:    hoje,
+	}
+}
+
+func TestFluxo_Realista_AdiantadaSaiDaProximaPassagem(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenarioRealista(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje, amanha := est[0], est[1]
+	alvo := amanha.Itens[0]
+
+	t.Logf("hoje:   %v", rotulos(hoje))
+	t.Logf("amanhã: %v", rotulos(amanha))
+
+	depois, err := ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+		ID: alvo.ID, Data: hoje.Data,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est2 := diasDeEstudo(depois)
+	t.Logf("DEPOIS hoje:   %v", rotulos(est2[0]))
+	t.Logf("DEPOIS amanhã: %v", rotulos(est2[1]))
+
+	if n := ocorrencias(est2[0], alvo.Disciplina, alvo.Tema); n != 1 {
+		t.Errorf("hoje mostra %d, quer 1", n)
+	}
+
+	if n := ocorrencias(est2[1], alvo.Disciplina, alvo.Tema); n != 0 {
+		t.Errorf("amanhã ainda mostra %s/%s", alvo.Disciplina, alvo.Tema)
+	}
+
+	for _, d := range est2 {
+		if len(d.Itens) == 0 {
+			t.Errorf("dia %s ficou vazio", d.Data)
+		}
+	}
+}
+
+// Uma disciplina de UM tema só, sozinha no dia seguinte, é o único caso em que a
+// regra não pode ser cumprida: tirar o tema deixaria o dia em branco. O que
+// continua valendo é o dia não ficar vazio nem mostrar o tema duas vezes.
+func TestFluxo_AdiantarComUmTopicoNaoEsvaziaODia(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenarioUmTopico(t)
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est := diasDeEstudo(inicial)
+	hoje, amanha := est[0], est[1]
+	alvo := amanha.Itens[0]
+
+	depois, err := ce.svc.AntecipouAtividade(ctx, ce.usuario, ce.slug, AnteciparInput{
+		ID: alvo.ID, Data: hoje.Data,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	est2 := diasDeEstudo(depois)
+
+	if len(est2[1].Itens) == 0 {
+		t.Error("o dia de origem ficou vazio")
+	}
+
+	for _, d := range est2 {
+		if n := ocorrencias(d, alvo.Disciplina, alvo.Tema); n > 1 {
+			t.Errorf("dia %s mostra %s/%s %d vezes", d.Data, alvo.Disciplina, alvo.Tema, n)
+		}
+	}
+}

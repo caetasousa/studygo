@@ -797,3 +797,60 @@ func TestReterAoMudarRitmo_ReordenadaNoMesmoDia(t *testing.T) {
 		t.Fatalf("got %d, quer 1 — uma reordenação manual no mesmo dia não pode ser descartada", len(got))
 	}
 }
+
+// O caso que só a supressão por TEMA resolve: o motor agenda o mesmo tema em
+// DOIS slots do dia; a atividade de um deles foi levada para outro dia. O slot
+// vizinho não pode regenerar o tema — a passagem já foi gasta.
+func TestAplicarAtividades_SlotVizinhoNaoRegeneraTemaMovido(t *testing.T) {
+	t.Parallel()
+
+	d1, d2 := dia(2026, 9, 1), dia(2026, 9, 2)
+	p0, p1 := 0, 1
+
+	dias := []plano.Dia{
+		{N: 1, Data: d1, Tipo: plano.TipoEstudo, Itens: []plano.ItemDia{
+			{Disciplina: "LP", Tema: "Crase"},
+		}},
+		// O motor repete "Fundamentos" em dois slots do dia 2.
+		{N: 2, Data: d2, Tipo: plano.TipoEstudo, Itens: []plano.ItemDia{
+			{Disciplina: "IA", Tema: "Fundamentos"},
+			{Disciplina: "IA", Tema: "Fundamentos"},
+		}},
+	}
+
+	// A atividade do slot 0 do dia 2 foi adiantada para o dia 1.
+	od := d2
+	armazenadas := []plano.Atividade{
+		{ID: "lp", Data: d1, Posicao: 0, Disciplina: "LP", Tema: "Crase",
+			OrigemDia: &d1, OrigemPos: &p0},
+		{ID: "movida", Data: d1, Posicao: 1, Disciplina: "IA", Tema: "Fundamentos",
+			OrigemDia: &od, OrigemPos: &p0},
+		{ID: "fica", Data: d2, Posicao: 0, Disciplina: "IA", Tema: "Fundamentos",
+			OrigemDia: &od, OrigemPos: &p1},
+	}
+
+	plano.AplicarAtividades(dias, armazenadas)
+
+	conta := func(d plano.Dia) int {
+		n := 0
+		for _, it := range d.Itens {
+			if it.Disciplina == "IA" && it.Tema == "Fundamentos" {
+				n++
+			}
+		}
+		return n
+	}
+
+	if n := conta(dias[0]); n != 1 {
+		t.Errorf("dia 1 mostra IA/Fundamentos %d vezes, quer 1", n)
+	}
+
+	// O dia 2 mantém UMA (a que ficou), nunca duas.
+	if n := conta(dias[1]); n != 1 {
+		t.Errorf("dia 2 mostra IA/Fundamentos %d vezes, quer 1", n)
+	}
+
+	if len(dias[1].Itens) == 0 {
+		t.Error("dia 2 ficou vazio")
+	}
+}

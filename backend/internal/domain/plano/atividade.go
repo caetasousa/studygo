@@ -640,11 +640,27 @@ func DeduplicarAtividades(atividades []Atividade) []Atividade {
 	}
 
 	out := make([]Atividade, 0, len(atividades))
+	// A day never stores the same topic twice, whatever slot each row came from:
+	// bringing a subject forward onto a day that already teaches it would leave
+	// two rows the screen merges away, and the store would grow a pile nobody
+	// can see. The first row wins, so the one already settled there keeps its id
+	// and its record.
+	noDia := map[string]int{} // chave do dia+tema -> índice em `out`
 
 	for i, a := range atividades {
-		if a.OrigemDia == nil || a.OrigemPos == nil || mantido[i] {
-			out = append(out, a)
+		if a.OrigemDia != nil && a.OrigemPos != nil && !mantido[i] {
+			continue
 		}
+
+		chave := chaveTema(day(a.Data), a.Disciplina, a.Tema)
+
+		if _, repetida := noDia[chave]; repetida && a.Disciplina != "" {
+			continue
+		}
+
+		noDia[chave] = len(out)
+
+		out = append(out, a)
 	}
 
 	return out
@@ -666,4 +682,8 @@ func origensReivindicadas(atividades []Atividade) map[string]bool {
 
 func chaveOrigem(data time.Time, posicao int) string {
 	return data.Format(time.DateOnly) + ":" + itoa(posicao)
+}
+
+func chaveTema(data time.Time, disciplina, tema string) string {
+	return data.Format(time.DateOnly) + "\x00" + disciplina + "\x00" + tema
 }
