@@ -26,6 +26,9 @@ type Salvo struct {
 	Registros    map[time.Time]Registro
 	Marcos       map[uuid.UUID]bool
 	Reordenacoes map[time.Time]Reordenacao
+	// Revisoes is the log of the daily review tail, keyed by the day it closed
+	// — see RegistroRevisao.
+	Revisoes map[time.Time]RegistroRevisao
 }
 
 // Origem says where a notebook entry came from. Anything but OrigemManual was
@@ -60,5 +63,6 @@ func NewSalvo() Salvo {
 		Registros:    map[time.Time]Registro{},
 		Marcos:       map[uuid.UUID]bool{},
 		Reordenacoes: map[time.Time]Reordenacao{},
+		Revisoes:     map[time.Time]RegistroRevisao{},
 	}
 }

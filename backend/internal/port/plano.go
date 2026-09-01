@@ -39,6 +39,11 @@ type PlanoRepository interface {
 
 	DeleteRegistros(ctx context.Context, planoID uuid.UUID) error
 
+	// UpsertRevisaoRegistro logs one day's review-tail result (see
+	// plano.RegistroRevisao) — keyed by date, since the review tail is not a
+	// stored activity.
+	UpsertRevisaoRegistro(ctx context.Context, planoID uuid.UUID, r plano.RegistroRevisao) error
+
 	SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error
 
 	ListAnotacoes(ctx context.Context, planoID uuid.UUID) ([]plano.Anotacao, error)

@@ -59,13 +59,6 @@ type RegistroInput struct {
 	Blocos    []RegistroBlocoInput `json:"blocos"`
 }
 
-// RevisaoInput is the result of one queued review.
-type RevisaoInput struct {
-	ID       uuid.UUID `json:"-"`
-	Questoes int       `json:"questoes"`
-	Acertos  int       `json:"acertos"`
-}
-
 // RegistroBlocoInput is one discipline's numbers inside a day. When any block is
 // sent the day-level totals are derived from them and the client's own totals
 // are ignored.
@@ -168,6 +161,9 @@ type DiaResposta struct {
 	Blocos     []BlocoResposta   `json:"blocos"`
 	Registro   *RegistroResposta `json:"registro"`
 	Reordenado bool              `json:"reordenado"`
+	// Revisao is set only on the day's review tail, and only once it names a
+	// discipline (from the plan's second study day onward).
+	Revisao *RevisaoResposta `json:"revisao"`
 }
 
 type ItemResposta struct {
@@ -185,6 +181,20 @@ type BlocoResposta struct {
 	Minutos int    `json:"minutos"`
 	Titulo  string `json:"titulo"`
 	Detalhe string `json:"detalhe"`
+}
+
+// RevisaoResposta is one day's review tail: what to log (questões/acertos), and
+// the observação already saved for it, if any — editable from the day it
+// starts appearing, the plan's second study day onward, since the queue has
+// nothing to name before then (see plano.FilaRevisao).
+type RevisaoResposta struct {
+	Disciplina string `json:"disciplina"`
+	Questoes   *int   `json:"questoes"`
+	Acertos    *int   `json:"acertos"`
+	// AnotacaoID is empty until an observação has been saved; RegistrarRevisao
+	// creates it the first time and edits the same row after.
+	AnotacaoID string `json:"anotacaoId"`
+	Observacao string `json:"observacao"`
 }
 
 type RegistroResposta struct {

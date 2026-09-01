@@ -182,8 +182,23 @@ class PlanoStore {
 		this.run((s) => api.registrarDia(s, data, input));
 	limparRegistros = () => this.run((s) => api.limparRegistros(s));
 	marcarMarco = (id: string, cumprido: boolean) => this.run((s) => api.marcarMarco(s, id, cumprido));
-	registrarRevisao = (id: string, questoes: number, acertos: number) =>
-		this.run((s) => api.registrarRevisao(s, id, questoes, acertos));
+	/**
+	 * Logs one day's review-tail result. Returns the error message on failure
+	 * (invalid: acertos > questões) so the form can show it inline and stay
+	 * open, instead of closing over a save that did not land.
+	 */
+	registrarRevisao = async (
+		data: string,
+		v: { questoes: number | null; acertos: number | null; observacao: string }
+	): Promise<string | null> => {
+		try {
+			this.commit(await api.registrarRevisao(this.slug, data, v));
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível salvar a revisão';
+		}
+	};
 	reordenar = (a: string, b: string) => this.run((s) => api.reordenar(s, a, b));
 
 	/**

@@ -92,6 +92,10 @@ func (r *PlanoRepo) PlanoByUser(ctx context.Context, userID, concursoID uuid.UUI
 		return plano.Salvo{}, err
 	}
 
+	if err := r.loadRevisoes(ctx, s.ID, &s); err != nil {
+		return plano.Salvo{}, err
+	}
+
 	return s, nil
 }
 
@@ -196,6 +200,49 @@ func (r *PlanoRepo) loadRegistrosBloco(ctx context.Context, planoID uuid.UUID, s
 	}
 
 	return rows.Err()
+}
+
+func (r *PlanoRepo) loadRevisoes(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT data, questoes, acertos FROM registros_revisao WHERE plano_id = $1`,
+		planoID,
+	)
+	if err != nil {
+		return fmt.Errorf("querying registros_revisao: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var reg plano.RegistroRevisao
+		if err := rows.Scan(&reg.Data, &reg.Questoes, &reg.Acertos); err != nil {
+			return fmt.Errorf("scanning registro_revisao: %w", err)
+		}
+
+		s.Revisoes[reg.Data.UTC()] = reg
+	}
+
+	return rows.Err()
+}
+
+// UpsertRevisaoRegistro logs one day's review-tail result.
+func (r *PlanoRepo) UpsertRevisaoRegistro(
+	ctx context.Context,
+	planoID uuid.UUID,
+	reg plano.RegistroRevisao,
+) error {
+	if _, err := r.pool.Exec(
+		ctx,
+		`INSERT INTO registros_revisao (plano_id, data, questoes, acertos)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (plano_id, data) DO UPDATE SET
+		   questoes = EXCLUDED.questoes, acertos = EXCLUDED.acertos, atualizado_em = now()`,
+		planoID, reg.Data, reg.Questoes, reg.Acertos,
+	); err != nil {
+		return fmt.Errorf("upserting registro_revisao: %w", err)
+	}
+
+	return nil
 }
 
 func (r *PlanoRepo) loadMarcos(ctx context.Context, planoID uuid.UUID, s *plano.Salvo) error {

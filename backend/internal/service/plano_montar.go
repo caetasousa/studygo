@@ -77,6 +77,14 @@ func (s *PlanoService) montar(
 		Revisao:  plano.FilaRevisao(res.Dias, temasPorRevisao(salvo.Config)),
 	}
 
+	// Loaded once for every day's review tail below, rather than per day: the
+	// list is small, and re-querying it per day would be one query per day of
+	// the whole plan.
+	anotacoes, err := s.planos.ListAnotacoes(ctx, salvo.ID)
+	if err != nil {
+		return PlanoResposta{}, err
+	}
+
 	dias := make([]DiaResposta, 0, len(res.Dias))
 	var hojeIndex *int
 
@@ -123,6 +131,10 @@ func (s *PlanoService) montar(
 				Titulo:  b.Titulo,
 				Detalhe: b.Detalhe,
 			})
+
+			if b.Disciplina != "" {
+				dr.Revisao = montarRevisao(b.Disciplina, plano.DayOf(d.Data), salvo.Revisoes, anotacoes)
+			}
 		}
 
 		if r, ok := salvo.Registros[plano.DayOf(d.Data)]; ok {

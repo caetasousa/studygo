@@ -11,6 +11,11 @@ type Bloco struct {
 	Minutos int    `json:"minutos"`
 	Titulo  string `json:"titulo"`
 	Detalhe string `json:"detalhe"`
+	// Disciplina is set only on the review tail (see caudaRevisao), once the
+	// queue actually has something to name — the codigo, not the display
+	// name, so a caller can key a record or a caderno link on it without
+	// reverse-engineering it back out of Titulo.
+	Disciplina string `json:"-"`
 }
 
 // BlocoCtx carries everything the breakdown needs beyond the day itself.
@@ -187,9 +192,10 @@ func caudaRevisao(d Dia, ctx BlocoCtx, minutos int) Bloco {
 	}
 
 	return Bloco{
-		Minutos: minutos,
-		Titulo:  "Revisão — " + nome,
-		Detalhe: revisaoDetalhe(itens, ctx.Cadernos),
+		Minutos:    minutos,
+		Titulo:     "Revisão — " + nome,
+		Detalhe:    revisaoDetalhe(itens, ctx.Cadernos),
+		Disciplina: itens[0].Disciplina,
 	}
 }
 

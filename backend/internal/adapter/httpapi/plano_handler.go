@@ -257,6 +257,32 @@ func (h *PlanoHandler) AdiarDia(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, resp)
 }
 
+// RegistrarRevisao logs one day's review-tail result (battery + observação).
+func (h *PlanoHandler) RegistrarRevisao(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.ctx(r)
+	if !ok {
+		writeError(w, r, h.logger, errUnauthorized)
+
+		return
+	}
+
+	var req service.RevisaoInput
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	resp, err := h.planos.RegistrarRevisao(r.Context(), id, slug, r.PathValue("data"), req)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, resp)
+}
+
 // Antecipar brings an activity forward to the day it was actually finished on.
 func (h *PlanoHandler) Antecipar(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.ctx(r)

@@ -170,10 +170,16 @@ export const api = {
 			body: JSON.stringify({ cumprido })
 		}),
 
-	registrarRevisao: (slug: string, id: string, questoes: number, acertos: number) =>
-		request<PlanoResposta>(`${planoBase(slug)}/revisoes/${id}`, {
+	/** Logs one day's review-tail result: the battery plus the observação that
+	 *  goes into the notebook under the discipline that day's review covered. */
+	registrarRevisao: (
+		slug: string,
+		data: string,
+		input: { questoes: number | null; acertos: number | null; observacao: string }
+	) =>
+		request<PlanoResposta>(`${planoBase(slug)}/revisoes/${data}`, {
 			method: 'PATCH',
-			body: JSON.stringify({ questoes, acertos })
+			body: JSON.stringify(input)
 		}),
 
 	previewTec: (slug: string, csv: string) =>

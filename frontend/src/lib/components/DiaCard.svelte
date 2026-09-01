@@ -7,6 +7,7 @@
 	import { hojeISO, weekdayShort } from '$lib/format';
 	import { blocoDaAtividade, planoStore } from '$lib/stores/plano.svelte';
 	import AtividadeForm from './AtividadeForm.svelte';
+	import RevisaoForm from './RevisaoForm.svelte';
 	import type { Dia, ItemDia } from '$lib/types';
 
 	const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -127,6 +128,40 @@
 
 	const nomeDe = (codigo: string) => planoStore.discIndex[codigo]?.nome ?? codigo;
 
+	// One review tail per day, so a boolean is enough — unlike the subject
+	// activities above, which need an id to tell several open forms apart.
+	let editandoRevisao = $state(false);
+	let salvandoRevisao = $state(false);
+	let erroRevisaoForm = $state<string | null>(null);
+	let gatilhoRevisao: HTMLElement | null = null;
+
+	async function salvarRevisao(v: { questoes: number | null; acertos: number | null; observacao: string }) {
+		if (salvandoRevisao) return;
+
+		salvandoRevisao = true;
+		erroRevisaoForm = null;
+
+		const msg = await planoStore.registrarRevisao(dia.data, v);
+
+		salvandoRevisao = false;
+
+		if (msg) {
+			erroRevisaoForm = msg;
+
+			return;
+		}
+
+		fecharRevisaoForm();
+	}
+
+	function fecharRevisaoForm() {
+		editandoRevisao = false;
+		erroRevisaoForm = null;
+		salvandoRevisao = false;
+		gatilhoRevisao?.focus();
+		gatilhoRevisao = null;
+	}
+
 	/**
 	 * Saves one activity. `salvando` gates the button so a double click cannot
 	 * fire two requests, and a failure keeps the form open with the message
@@ -196,23 +231,15 @@
 	const blocoRevisao = $derived(dia.blocos.find((b) => ehRevisao(b.titulo)) ?? null);
 
 	/**
-	 * The subject being revised, taken from the block's title.
-	 *
-	 * The block carries the topics in its `detalhe`, but the row only shows the
-	 * subject: the day's own subjects are named the same way, and the detail
-	 * belongs in the notebook the link opens.
+	 * The subject being revised, from the backend's own field — not the
+	 * block's title. Reverse-engineering it out of "Revisão — <nome>" broke
+	 * the moment two disciplines shared a display name, and the caderno link
+	 * disappeared right along with it. dia.revisao is set from the plan's
+	 * second study day onward, once the queue has something to name.
 	 */
+	const disciplinaRevisada = $derived(dia.revisao?.disciplina ?? '');
 	const materiaRevisada = $derived(
-		blocoRevisao?.titulo.startsWith('Revisão — ')
-			? blocoRevisao.titulo.slice('Revisão — '.length)
-			: ''
-	);
-
-	/** The codigo behind that name, so the link can point at its notebook. */
-	const disciplinaRevisada = $derived(
-		Object.keys(planoStore.discIndex).find(
-			(c) => planoStore.discIndex[c]?.nome === materiaRevisada
-		) ?? ''
+		disciplinaRevisada ? (planoStore.discIndex[disciplinaRevisada]?.nome ?? disciplinaRevisada) : ''
 	);
 
 	/**
@@ -312,16 +339,33 @@
 								<span class="chip rev-selo">REV</span>
 								<span class="txt">
 									<span class="tema">{materiaRevisada || 'Revisão'}</span>
+									{#if dia.revisao?.questoes != null}
+										<span class="rev-resultado" title="Acertos já registrados nesta revisão">
+											{dia.revisao.acertos ?? 0}/{dia.revisao.questoes}
+										</span>
+									{/if}
 								</span>
 								<span class="acoes">
-									{#if materiaRevisada}
+									{#if dia.revisao}
+										<!-- From the plan's second study day onward: the queue has
+										     nothing to name before then, so there is nothing to log
+										     or link to yet (see plano.FilaRevisao). -->
+										<IconButton
+											icon="registrar"
+											label="Registrar revisão de {materiaRevisada}"
+											onclick={(e) => {
+												gatilhoRevisao = e.currentTarget as HTMLElement;
+												erroRevisaoForm = null;
+												editandoRevisao = true;
+											}}
+										/>
 										<a
 											class="rev-link"
 											href="/caderno#{disciplinaRevisada}"
 											title="Abrir o caderno de erros de {materiaRevisada}"
 											aria-label="Abrir o caderno de erros de {materiaRevisada}"
 										>
-											<NavIcon name="registrar" size="sm" />
+											<NavIcon name="caderno" size="sm" />
 										</a>
 									{/if}
 								</span>
@@ -371,6 +415,18 @@
 			/>
 		{/if}
 	{/each}
+
+	{#if editandoRevisao && dia.revisao}
+		<RevisaoForm
+			data={dia.data}
+			nome={materiaRevisada}
+			revisao={dia.revisao}
+			salvando={salvandoRevisao}
+			erro={erroRevisaoForm}
+			onSalvar={(v) => void salvarRevisao(v)}
+			onCancelar={fecharRevisaoForm}
+		/>
+	{/if}
 {/if}
 
 <style>
@@ -541,9 +597,17 @@
 		line-height: 1.5;
 		color: var(--text);
 	}
+	.rev-resultado {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		color: var(--text-faint);
+		margin-left: 8px;
+		font-variant-numeric: tabular-nums;
+	}
 	.revisao-bloco .acoes {
 		display: flex;
 		align-items: center;
+		gap: 2px;
 		align-self: center;
 	}
 	.rev-link {

@@ -39,6 +39,18 @@ type RegistroBloco struct {
 	AtividadeID string
 }
 
+// RegistroRevisao is the user's log for one day's review tail (see
+// caudaRevisao) — the spaced-review block that closes a content day from its
+// second day onward. It is not an Atividade: the review tail is a rolling
+// queue the engine derives fresh every time (FilaRevisao), never a stored,
+// individually addressable unit like a subject block — so it is keyed by
+// date, the one thing that is stable about it.
+type RegistroRevisao struct {
+	Data     time.Time
+	Questoes *int
+	Acertos  *int
+}
+
 // BlocoDeAtividade returns the record for one scheduled activity, or nil.
 func (r Registro) BlocoDeAtividade(id string) *RegistroBloco {
 	if id == "" {

@@ -258,6 +258,17 @@ export interface Registro {
 }
 
 
+/** One day's review tail — set only once the queue has something to name
+ *  (the plan's second study day onward). */
+export interface Revisao {
+	disciplina: string;
+	questoes: number | null;
+	acertos: number | null;
+	/** Empty until an observação has been saved; PATCHing again edits it. */
+	anotacaoId: string;
+	observacao: string;
+}
+
 export interface Dia {
 	n: number;
 	data: string;
@@ -270,6 +281,7 @@ export interface Dia {
 	blocos: Bloco[];
 	registro: Registro | null;
 	reordenado: boolean;
+	revisao: Revisao | null;
 }
 
 export interface Marco {
