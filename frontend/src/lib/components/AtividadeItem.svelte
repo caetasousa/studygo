@@ -648,13 +648,30 @@
 		.alca {
 			display: none; /* touch: the menu is the reliable path */
 		}
-		/* Narrow: code and actions share the top line, the topic gets the full
-		   width beneath them rather than a squeezed third column. */
+		/* Narrow: minutes, code and the actions share the top line; the topic
+		   gets the full width beneath them rather than a squeezed third column.
+		   Explicit areas keep the actions on that top line, right-aligned —
+		   grid auto-placement was dropping them onto a line of their own, at the
+		   far left, once .txt claimed a full row. */
 		.atv {
-			grid-template-columns: auto auto minmax(0, 1fr);
+			grid-template-columns: auto auto 1fr auto;
+			grid-template-areas:
+				'min chip . acoes'
+				'txt txt txt txt';
+			gap: 4px 8px;
+		}
+		.min {
+			grid-area: min;
+		}
+		.chip {
+			grid-area: chip;
 		}
 		.txt {
-			grid-column: 1 / -1;
+			grid-area: txt;
+		}
+		.acoes {
+			grid-area: acoes;
+			justify-self: end;
 		}
 	}
 </style>
