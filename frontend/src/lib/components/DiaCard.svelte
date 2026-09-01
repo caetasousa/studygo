@@ -706,5 +706,30 @@
 		.placa-dia {
 			font-size: 19px;
 		}
+		/* Mirror AtividadeItem's narrow grid (see the note by .revisao-bloco): the
+		   duration, seal and actions sit on the top line, the subject flows full
+		   width beneath — otherwise the review's title wrapped one word per line
+		   in a squeezed middle column. */
+		.revisao-bloco {
+			grid-template-columns: auto auto 1fr auto;
+			grid-template-areas:
+				'min chip . acoes'
+				'txt txt txt txt';
+			align-items: center;
+			gap: 4px 8px;
+		}
+		.revisao-bloco .min {
+			grid-area: min;
+		}
+		.revisao-bloco .chip {
+			grid-area: chip;
+		}
+		.revisao-bloco .txt {
+			grid-area: txt;
+		}
+		.revisao-bloco .acoes {
+			grid-area: acoes;
+			justify-self: end;
+		}
 	}
 </style>

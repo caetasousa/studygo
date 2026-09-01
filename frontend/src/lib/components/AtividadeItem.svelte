@@ -658,7 +658,12 @@
 			grid-template-areas:
 				'min chip . acoes'
 				'txt txt txt txt';
-			gap: 4px 8px;
+			/* center, not baseline: the 36px tap target in row 1 was stretching the
+			   track and leaving a gap of air above the topic on the row below */
+			align-items: center;
+			row-gap: 0;
+			column-gap: 8px;
+			padding: 6px 8px;
 		}
 		.min {
 			grid-area: min;
@@ -668,6 +673,11 @@
 		}
 		.txt {
 			grid-area: txt;
+			/* the topic sits directly under the code, no baseline padding */
+			align-self: start;
+		}
+		.tema {
+			line-height: 1.35;
 		}
 		.acoes {
 			grid-area: acoes;
