@@ -1,6 +1,9 @@
 ---
-app_domain: caetasousa.tech
-app_domain_www: www.caetasousa.tech
+app_domain: cronograma.caetasousa.tech
+# No separate www DNS record for this subdomain, so the vhost and certificate
+# just cover the one name twice rather than requiring www.cronograma... to
+# resolve too.
+app_domain_www: cronograma.caetasousa.tech
 backend_port: 8080
 frontend_port: 5173
 # Still `annygo`, from the project's old name: this is the live database on the
