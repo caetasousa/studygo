@@ -88,15 +88,19 @@ código, camadas e regras do projeto: **[CLAUDE.md](CLAUDE.md)**.
 ```bash
 git clone <url-do-repo> && cd studygo
 cp .env.example .env          # defina JWT_SECRET
-docker compose up -d --build
+make up                       # ou: docker compose up -d --build
 open http://localhost:5173
 ```
+
+`make` sozinho lista todos os atalhos — `make check` roda os testes dos três
+serviços, `make deploy` publica.
 
 Salvou um arquivo, a mudança chega ao navegador (ou reinicia a API em ~5s) sem
 rebuild — o `docker-compose.override.yml` é carregado sozinho pelo Compose e
 aponta frontend e backend para os estágios `dev`. `--build` só quando mudar
 dependência.
 
+- **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** — o caminho de uma mudança: `make check` → `make commit` → `make deploy`
 - **[docs/rodar-local.md](docs/rodar-local.md)** — rodar e desenvolver localmente, variáveis do `.env`, hot-reload, checagens
-- **[docs/deploy.md](docs/deploy.md)** — provisionar e atualizar a VPS com Ansible
+- **[docs/deploy.md](docs/deploy.md)** — provisionar a VPS pela primeira vez (Ansible)
 - **[CLAUDE.md](CLAUDE.md)** — arquitetura e convenções para contribuir

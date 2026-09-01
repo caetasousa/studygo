@@ -65,13 +65,19 @@ Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
 
 ## Atualizações
 
-`bootstrap.yml` e `lockdown.yml` rodam **uma vez** por servidor. Depois:
+`bootstrap.yml` e `lockdown.yml` rodam **uma vez** por servidor. O dia a dia
+depois disso é pelo `make`, da raiz do repositório:
 
 ```bash
-cd ansible
-ansible-playbook deploy.yml   # mudou backend ou frontend → nova versão no ar
-ansible-playbook site.yml     # mudou infra (nginx, firewall, cert…)
+make deploy     # checks + build das imagens + nova versão no ar
+make provision  # mudou infra (nginx, firewall, cert…)
+make health     # confirma que respondeu
 ```
+
+Equivalem a `ansible-playbook deploy.yml` / `site.yml` dentro de `ansible/`, com
+os checks dos três serviços rodando antes. O fluxo completo (desenvolver,
+verificar, commitar, publicar) está em
+[fluxo-de-trabalho.md](fluxo-de-trabalho.md).
 
 `deploy.yml` roda as migrations no boot do backend (advisory-lock, então o
 worker pode subir junto sem corrida) e é seguro repetir.

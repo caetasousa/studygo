@@ -13,6 +13,19 @@ The data model is multi-concurso generic (`concursos → disciplinas → temas /
 
 ## Commands
 
+**The `Makefile` at the repo root is the entry point** — `make` lists every
+target, and `docs/fluxo-de-trabalho.md` documents the whole path from an edit to
+production. The wrappers worth knowing: `make up` / `make down` (local stack),
+`make check` (all three services' checks, in order), `make commit m="…"` (checks
+then commits **what is already staged** — it deliberately never runs `git add
+-A`), `make deploy` (checks, then `ansible-playbook deploy.yml`), `make health`.
+
+Running `ansible-playbook` directly from a non-interactive harness fails with
+"Ansible requires blocking IO"; clear `O_NONBLOCK` on fds 0/1/2 before exec'ing
+it. The user's own terminal is unaffected.
+
+The underlying commands, when a target does not fit:
+
 Backend, from `backend/`:
 
 ```bash

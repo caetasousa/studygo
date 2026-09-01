@@ -1,0 +1,161 @@
+# Fluxo de trabalho: alterar → verificar → commitar → publicar
+
+Todo o caminho de uma mudança, do editor até o ar, passa por `make`. Rode `make`
+sozinho na raiz para ver a lista completa de alvos.
+
+```
+editar código
+     │
+     ├── make up ............ stack local de pé, hot reload
+     │
+     ├── make check ......... backend + frontend + edital-processor
+     │
+     ├── git add <arquivos>
+     ├── make commit m="..." . roda os checks de novo e commita
+     ├── git push ........... você, sempre
+     │
+     └── make deploy ........ checks + build das imagens + VPS
+              │
+              └── make health  confirma no ar
+```
+
+---
+
+## 1. Desenvolver
+
+```bash
+make up                  # sobe tudo com hot reload → http://localhost:5173
+make logs svc=backend    # acompanhar a API
+make ps                  # status
+make down                # parar
+```
+
+Salvou um arquivo, o navegador recarrega sozinho (frontend) ou a API reinicia em
+~5s (backend). `--build` só é necessário quando muda uma **dependência**:
+
+```bash
+make rebuild
+```
+
+Para começar do zero, apagando o banco local:
+
+```bash
+make reset
+```
+
+Para ver como fica **de verdade** (imagens de produção, sem hot reload, igual ao
+que roda na VPS):
+
+```bash
+make prod-local
+```
+
+## 2. Verificar
+
+```bash
+make check
+```
+
+Roda os três, na ordem, e para no primeiro que falhar:
+
+| Alvo | O que roda | Onde |
+|---|---|---|
+| `make check-backend` | `go build ./...` · `go vet ./...` · `go test ./...` | `backend/` |
+| `make check-frontend` | `npm run check` (svelte-check) · `npm test` (vitest) | `frontend/` |
+| `make check-processor` | `ruff check` · `mypy --strict` · `pytest` | `edital-processor/` |
+
+`make fmt` formata o Go (`gofmt`) e o Python (`ruff format`) antes de commitar.
+
+> Os testes marcados `integration` e `gemini` do `edital-processor` são pulados
+> fora do container / sem chave real — é esperado ver `5 skipped`.
+
+## 3. Commitar
+
+```bash
+git add backend/internal/domain/plano/replanejar.go   # você escolhe o que entra
+make commit m="fix(backend): fechar lacuna deixada pelo assunto adiantado"
+git push
+```
+
+`make commit`:
+
+1. exige a mensagem em `m=` — sem ela, para;
+2. recusa se **nada** estiver no stage;
+3. mostra a lista de arquivos que vão entrar;
+4. roda `make check`;
+5. só então commita.
+
+**Ele não roda `git add -A` de propósito.** Já aconteceu de um par de chaves SSH
+gerado sem querer aparecer solto na raiz do repo — com `add -A` isso entra no
+commit sem ninguém ver. Você escolhe o que entra; o make garante que o que entra
+passa nos checks.
+
+A mensagem segue [Conventional Commits](https://www.conventionalcommits.org/):
+`tipo(escopo): descrição no imperativo, minúscula, sem ponto final`.
+
+| Tipo | Quando |
+|---|---|
+| `feat` | funcionalidade nova |
+| `fix` | correção de bug |
+| `refactor` | reorganização sem mudar comportamento |
+| `test` | só testes |
+| `docs` | só documentação |
+| `chore`, `ci`, `build`, `style`, `perf` | o resto |
+
+Escopos usados aqui: `backend`, `frontend`, `ansible`, `docker`, `nginx`,
+`claude`. Omita o escopo só quando a mudança atravessa o repo inteiro.
+
+**O `git push` é sempre seu** — nenhum alvo do Makefile empurra para o remoto.
+
+## 4. Publicar
+
+```bash
+make deploy    # checks + build das imagens + envia + sobe o stack na VPS
+make health    # GET https://<app_domain>/health → {"status":"ok"}
+```
+
+`make deploy` roda `make check` antes de qualquer coisa: uma versão que não
+compila não chega no ar por esquecimento. Se você acabou de rodar os checks e
+quer pular essa parte:
+
+```bash
+make deploy-fast
+```
+
+Quando a mudança for de **infraestrutura** (nginx, firewall, certificado), e não
+de código:
+
+```bash
+make provision
+```
+
+Depois do deploy, para olhar a VPS sem abrir SSH na mão:
+
+```bash
+make deploy-status              # docker compose ps remoto
+make deploy-logs svc=backend    # últimas 80 linhas
+make deploy-logs svc=edital-processor
+```
+
+### O que o deploy faz
+
+As imagens são buildadas **na sua máquina**, salvas em tarball, copiadas e
+carregadas na VPS — o código-fonte nunca vai para o servidor. As migrations
+rodam sozinhas no boot do backend (com advisory lock, então o worker pode subir
+junto). Repetir o deploy é seguro.
+
+O passo a passo do **primeiro** deploy de um servidor novo (bootstrap, lockdown,
+provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
+
+## Resumo dos alvos
+
+| Alvo | Para quê |
+|---|---|
+| `make` / `make help` | lista tudo |
+| `make up` `down` `restart` `ps` `logs` | stack local |
+| `make rebuild` `reset` `prod-local` | variações do stack local |
+| `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
+| `make fmt` | formatação |
+| `make status` `commit` | git |
+| `make deploy` `deploy-fast` `provision` | publicar |
+| `make deploy-status` `deploy-logs` `health` | olhar a produção |
