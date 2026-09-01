@@ -148,6 +148,24 @@ func TestConcursoFromInput(t *testing.T) {
 		}
 	})
 
+	t.Run("cadernoUrl é preservada e trimada", func(t *testing.T) {
+		t.Parallel()
+
+		in := base
+		in.Disciplinas = []DisciplinaInput{
+			{Nome: "Constitucional", Bloco: "esp", Questoes: 15, CadernoURL: "  https://tec.com/caderno/1  "},
+			{Nome: "Português", Bloco: "ger", Questoes: 10},
+		}
+
+		c, _ := concursoFromInput(in)
+		if c.Disciplinas[0].CadernoURL != "https://tec.com/caderno/1" {
+			t.Errorf("cadernoUrl = %q, quero a URL trimada", c.Disciplinas[0].CadernoURL)
+		}
+		if c.Disciplinas[1].CadernoURL != "" {
+			t.Errorf("cadernoUrl vazia = %q", c.Disciplinas[1].CadernoURL)
+		}
+	})
+
 	t.Run("Validar rejeita soma de pontos zero", func(t *testing.T) {
 		t.Parallel()
 

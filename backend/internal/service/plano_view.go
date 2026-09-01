@@ -101,13 +101,16 @@ type ConcursoResposta struct {
 }
 
 type DisciplinaResposta struct {
-	Codigo string          `json:"codigo"`
-	Nome   string          `json:"nome"`
-	Bloco  string          `json:"bloco"`
-	Peso   int             `json:"peso"`
-	Cor    int             `json:"cor"` // palette index 0..12
-	Temas  []string        `json:"temas"`
-	Fontes []FonteResposta `json:"fontes"`
+	Codigo string `json:"codigo"`
+	Nome   string `json:"nome"`
+	Bloco  string `json:"bloco"`
+	Peso   int    `json:"peso"`
+	Cor    int    `json:"cor"` // palette index 0..12
+	// CadernoURL is an optional link to this subject's external error notebook;
+	// the schedule's review block links to it when set.
+	CadernoURL string          `json:"cadernoUrl"`
+	Temas      []string        `json:"temas"`
+	Fontes     []FonteResposta `json:"fontes"`
 }
 
 // FonteResposta is a study source. Tipo "questoes" is the discipline's question

@@ -220,10 +220,10 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		if err := tx.QueryRow(
 			ctx,
 			`INSERT INTO disciplinas
-			   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)
+			   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			 RETURNING id`,
-			c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso, d.QuestoesPadrao, d.Ordem,
+			c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso, d.QuestoesPadrao, d.Ordem, d.CadernoURL,
 		).Scan(&d.ID); err != nil {
 			return fmt.Errorf("inserting disciplina %s: %w", d.Nome, err)
 		}
@@ -304,7 +304,7 @@ func tipoFonte(t string) string {
 func (r *ConcursoRepo) disciplinas(ctx context.Context, concursoID uuid.UUID) ([]concurso.Disciplina, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, codigo, nome, bloco, peso, questoes_padrao, ordem
+		`SELECT id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url
 		 FROM disciplinas WHERE concurso_id = $1 ORDER BY ordem`,
 		concursoID,
 	)
@@ -319,7 +319,9 @@ func (r *ConcursoRepo) disciplinas(ctx context.Context, concursoID uuid.UUID) ([
 	for rows.Next() {
 		var d concurso.Disciplina
 		var bloco string
-		if err := rows.Scan(&d.ID, &d.Codigo, &d.Nome, &bloco, &d.Peso, &d.QuestoesPadrao, &d.Ordem); err != nil {
+		if err := rows.Scan(
+			&d.ID, &d.Codigo, &d.Nome, &bloco, &d.Peso, &d.QuestoesPadrao, &d.Ordem, &d.CadernoURL,
+		); err != nil {
 			return nil, fmt.Errorf("scanning disciplina: %w", err)
 		}
 

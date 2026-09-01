@@ -188,13 +188,14 @@ func montarConcurso(c concurso.Concurso) ConcursoResposta {
 		}
 
 		discs = append(discs, DisciplinaResposta{
-			Codigo: d.Codigo,
-			Nome:   d.Nome,
-			Bloco:  string(d.Bloco),
-			Peso:   d.Peso,
-			Cor:    i % 13,
-			Temas:  d.Temas,
-			Fontes: fontes,
+			Codigo:     d.Codigo,
+			Nome:       d.Nome,
+			Bloco:      string(d.Bloco),
+			Peso:       d.Peso,
+			Cor:        i % 13,
+			CadernoURL: d.CadernoURL,
+			Temas:      d.Temas,
+			Fontes:     fontes,
 		})
 	}
 

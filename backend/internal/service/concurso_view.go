@@ -33,9 +33,11 @@ type DisciplinaInput struct {
 	// Peso is the points a question of this discipline is worth. 0 means "use
 	// the block default" (1 for ger, 2 for esp) — preserved for manual
 	// registration. A positive value from the user overrides it.
-	Peso   int          `json:"peso"`
-	Temas  []string     `json:"temas"`
-	Fontes []FonteInput `json:"fontes"`
+	Peso int `json:"peso"`
+	// CadernoURL is an optional link to this subject's external error notebook.
+	CadernoURL string       `json:"cadernoUrl"`
+	Temas      []string     `json:"temas"`
+	Fontes     []FonteInput `json:"fontes"`
 }
 
 type FonteInput struct {
@@ -276,12 +278,13 @@ func detalheDe(c concurso.Concurso) ConcursoDetalhe {
 
 	for _, d := range c.Disciplinas {
 		di := DisciplinaInput{
-			Nome:     d.Nome,
-			Bloco:    string(d.Bloco),
-			Questoes: d.QuestoesPadrao,
-			Peso:     d.Peso,
-			Temas:    append([]string{}, d.Temas...),
-			Fontes:   []FonteInput{},
+			Nome:       d.Nome,
+			Bloco:      string(d.Bloco),
+			Questoes:   d.QuestoesPadrao,
+			Peso:       d.Peso,
+			CadernoURL: d.CadernoURL,
+			Temas:      append([]string{}, d.Temas...),
+			Fontes:     []FonteInput{},
 		}
 
 		for _, f := range d.Fontes {
@@ -349,6 +352,7 @@ func concursoFromInput(in ConcursoInput) (concurso.Concurso, []string) {
 			Bloco:          bloco,
 			Peso:           peso,
 			QuestoesPadrao: maxZero(di.Questoes),
+			CadernoURL:     strings.TrimSpace(di.CadernoURL),
 			Temas:          limparLinhas(di.Temas),
 			Fontes:         []concurso.Fonte{},
 		}

@@ -66,8 +66,12 @@ type Disciplina struct {
 	Peso           int
 	QuestoesPadrao int
 	Ordem          int
-	Temas          []string
-	Fontes         []Fonte
+	// CadernoURL is an optional link to where the student keeps this subject's
+	// mistakes (a TEC/Qconcursos caderno, a personal doc). The schedule's review
+	// block links straight to it.
+	CadernoURL string
+	Temas      []string
+	Fontes     []Fonte
 }
 
 // Fonte is a study source for a discipline — a law, a piece of jurisprudence, a

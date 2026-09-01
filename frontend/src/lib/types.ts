@@ -46,6 +46,8 @@ export interface DisciplinaInput {
 	questoes: number;
 	/** 0 = use the block default (1 for ger, 2 for esp); a positive value overrides it. */
 	peso: number;
+	/** Optional link to this subject's external error notebook (TEC, Qconcursos, a doc). */
+	cadernoUrl: string;
 	temas: string[];
 	fontes: FonteInput[];
 }
@@ -158,6 +160,8 @@ export interface Disciplina {
 	bloco: 'esp' | 'ger';
 	peso: number;
 	cor: number;
+	/** Optional link to this subject's external error notebook; the review block links to it. */
+	cadernoUrl: string;
 	temas: string[];
 	fontes: Fonte[];
 }

@@ -240,6 +240,7 @@
 				bloco,
 				questoes: Math.max(0, d.questoes ?? 0),
 				peso: Math.max(0, Math.round(d.peso ?? 0)),
+				cadernoUrl: '',
 				temas: d.temasTexto
 					.split('\n')
 					.map((t) => t.trim())

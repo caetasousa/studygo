@@ -28,7 +28,8 @@
 		| 'recolher'
 		| 'expandir'
 		| 'chevron'
-		| 'busca';
+		| 'busca'
+		| 'link';
 
 	/** Icon sizes, in px. `nav` is the sidebar/menu size; `sm` supports a label
 	 *  (metric badges, inline hints); `md` is the default for buttons and titles. */
@@ -168,6 +169,11 @@
 	{:else if name === 'busca'}
 		<circle cx="11" cy="11" r="6" />
 		<path d="m15.5 15.5 3.5 3.5" />
+	{:else if name === 'link'}
+		<!-- external link: a box with an arrow leaving its top-right corner -->
+		<path d="M13 5h6v6" />
+		<path d="m19 5-8 8" />
+		<path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
 	{/if}
 </svg>
 

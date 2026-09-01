@@ -76,7 +76,7 @@
 	}
 
 	function vazia(): DisciplinaInput {
-		return { nome: '', bloco: 'esp', questoes: 0, peso: 0, temas: [], fontes: [] };
+		return { nome: '', bloco: 'esp', questoes: 0, peso: 0, cadernoUrl: '', temas: [], fontes: [] };
 	}
 
 	// The form owns editable copies seeded from `inicial` at mount. Parents only
@@ -108,6 +108,8 @@
 		questoes: number;
 		// 0 = block default (1 ger / 2 esp). A positive value overrides it.
 		peso: number;
+		// Optional link to this subject's external error notebook.
+		cadernoUrl: string;
 		temasTexto: string;
 		fontesTexto: string;
 	}
@@ -118,6 +120,7 @@
 			bloco: d.bloco,
 			questoes: d.questoes,
 			peso: d.peso ?? 0,
+			cadernoUrl: d.cadernoUrl ?? '',
 			temasTexto: (d.temas ?? []).join('\n'),
 			fontesTexto: (d.fontes ?? []).map((f) => `${f.titulo} | ${f.url}`).join('\n')
 		}))
@@ -192,6 +195,7 @@
 			bloco: 'esp',
 			questoes: 0,
 			peso: PESO_PADRAO.esp,
+			cadernoUrl: '',
 			temasTexto: '',
 			fontesTexto: ''
 		});
@@ -233,6 +237,7 @@
 			bloco: d.bloco,
 			questoes: Math.max(0, d.questoes || 0),
 			peso: Math.max(0, Math.round(d.peso || 0)),
+			cadernoUrl: d.cadernoUrl.trim(),
 			temas: d.temasTexto
 				.split('\n')
 				.map((t) => t.trim())
@@ -426,9 +431,24 @@
 
 						<details style="margin-top:10px">
 							<summary style="cursor:pointer;font-size:13px;color:var(--text-muted)">
-								Temas e fontes (opcional)
+								Temas, fontes e caderno (opcional)
 							</summary>
 							<div class="form-grid" style="margin-top:10px">
+								<div class="field" style="flex:1 1 100%">
+									<label for="cf-d{i}-caderno">Caderno de erros — link</label>
+									<input
+										id="cf-d{i}-caderno"
+										type="url"
+										inputmode="url"
+										bind:value={d.cadernoUrl}
+										placeholder="https://www.tecconcursos.com.br/questoes/caderno/..."
+										style="width:100%"
+									/>
+									<p class="page-sub" style="margin:4px 0 0;font-size:12px">
+										Onde você guarda os erros desta matéria (TEC, Qconcursos, um documento).
+										Aparece como atalho no bloco de revisão do dia.
+									</p>
+								</div>
 								<div class="field" style="flex:1 1 320px">
 									<label for="cf-d{i}-temas">Tópicos — um por linha</label>
 									<textarea

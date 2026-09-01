@@ -79,6 +79,7 @@ interface DiscInfo {
 	sigla: string;
 	cor: number;
 	bloco: 'esp' | 'ger';
+	cadernoUrl: string;
 }
 
 class PlanoStore {
@@ -94,7 +95,13 @@ class PlanoStore {
 	discIndex = $derived.by<Record<string, DiscInfo>>(() => {
 		const m: Record<string, DiscInfo> = {};
 		for (const d of this.plano?.concurso.disciplinas ?? []) {
-			m[d.codigo] = { nome: d.nome, sigla: d.sigla, cor: d.cor, bloco: d.bloco };
+			m[d.codigo] = {
+				nome: d.nome,
+				sigla: d.sigla,
+				cor: d.cor,
+				bloco: d.bloco,
+				cadernoUrl: d.cadernoUrl ?? ''
+			};
 		}
 		return m;
 	});

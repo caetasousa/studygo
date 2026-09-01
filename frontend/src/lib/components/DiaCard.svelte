@@ -241,6 +241,11 @@
 	const materiaRevisada = $derived(
 		disciplinaRevisada ? (planoStore.discIndex[disciplinaRevisada]?.nome ?? disciplinaRevisada) : ''
 	);
+	// The subject's external error notebook, when the user set one on the
+	// discipline — the review block links straight to it.
+	const cadernoExterno = $derived(
+		disciplinaRevisada ? (planoStore.discIndex[disciplinaRevisada]?.cadernoUrl ?? '') : ''
+	);
 
 	/**
 	 * Minutes per activity, by position.
@@ -362,11 +367,23 @@
 										<a
 											class="rev-link"
 											href="/caderno#{disciplinaRevisada}"
-											title="Abrir o caderno de erros de {materiaRevisada}"
-											aria-label="Abrir o caderno de erros de {materiaRevisada}"
+											title="Ver os erros de {materiaRevisada} no app"
+											aria-label="Ver os erros de {materiaRevisada} no app"
 										>
 											<NavIcon name="caderno" size="sm" />
 										</a>
+										{#if cadernoExterno}
+											<a
+												class="rev-link"
+												href={cadernoExterno}
+												target="_blank"
+												rel="noopener noreferrer"
+												title="Abrir o caderno de erros de {materiaRevisada}"
+												aria-label="Abrir o caderno de erros de {materiaRevisada} (link externo)"
+											>
+												<NavIcon name="link" size="sm" />
+											</a>
+										{/if}
 									{/if}
 								</span>
 							</div>
