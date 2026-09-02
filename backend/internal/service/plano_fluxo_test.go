@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -1378,6 +1379,59 @@ func TestFluxo_SalvarContinuaFuncionandoAposAdiantarVarias(t *testing.T) {
 		if b := blocoRegistrado(diasDeEstudo(resp)[0], it.ID); b == nil || !b.Concluido {
 			t.Errorf("a conclusão de %s/%s não persistiu", it.Disciplina, it.Tema)
 		}
+	}
+}
+
+// Uma matéria concluída no meio da lista não pode travar as VIZINHAS.
+// Cenário na tela: LP (concluída), BD (concluída), DS, DPDE, IACD (concluída).
+// Subir DS troca com BD — mas BD é história, então o backend rejeita e o dia
+// todo trava. A correção: pular as concluídas ao escolher o alvo do swap; se
+// a próxima não-concluída na direção é ela mesma (nada movível na frente),
+// não há como subir/descer dentro do dia.
+//
+// Este teste reproduz o bug até ele falhar; a implementação (frontend +
+// guarda no backend contra swap com concluída) o faz passar.
+func TestFluxo_SubirNaoTravaEmConcluidaAoLado(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenarioRealista(t)
+	// Igual à tela do usuário: 5 blocos/dia, o suficiente para ter uma
+	// concluída no meio com vizinhas não-concluídas em cima E embaixo.
+	ce.planos.salvo.Config.BlocosPorDia = 5
+	ce.planos.salvo.Config = ce.planos.salvo.Config.Normalizar()
+	ce.materializar(t)
+	ctx := context.Background()
+
+	inicial, err := ce.svc.Obter(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("Obter: %v", err)
+	}
+
+	hoje := diasDeEstudo(inicial)[0]
+	if len(hoje.Itens) < 4 {
+		t.Fatalf("cenário precisa de pelo menos 4 matérias em hoje, tem %d", len(hoje.Itens))
+	}
+
+	horas := 1.0
+
+	// Conclui as duas primeiras matérias do dia.
+	blocos := []RegistroBlocoInput{
+		{AtividadeID: hoje.Itens[0].ID, Disciplina: hoje.Itens[0].Disciplina, Horas: &horas, Concluido: true},
+		{AtividadeID: hoje.Itens[1].ID, Disciplina: hoje.Itens[1].Disciplina, Horas: &horas, Concluido: true},
+	}
+	if _, err := ce.svc.RegistrarDia(ctx, ce.usuario, ce.slug, hoje.Data, RegistroInput{Blocos: blocos}); err != nil {
+		t.Fatalf("RegistrarDia: %v", err)
+	}
+
+	// Agora tenta subir a 3ª matéria (não concluída) — swap com a 2ª (concluída).
+	// Backend REJEITA porque o alvo do swap é uma atividade concluída.
+	alvo := hoje.Itens[2]
+	_, err = ce.svc.MoverAtividade(ctx, ce.usuario, ce.slug, MoverAtividadeInput{
+		ID: alvo.ID, Data: hoje.Data, Posicao: 1, Trocar: true,
+	})
+	var ve ErrValidacao
+	if !errors.As(err, &ve) {
+		t.Fatalf("swap contra atividade concluída deveria falhar; err=%v", err)
 	}
 }
 

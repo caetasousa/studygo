@@ -305,13 +305,15 @@
 				{:else}
 					<div class="atvs" role="list">
 						{#each dia.itens as it, i (it.id || i)}
+							{@const temAlvoAcimaNoDia = dia.itens.slice(0, i).some((x) => !feita(x.disciplina, x.id))}
+							{@const temAlvoAbaixoNoDia = dia.itens.slice(i + 1).some((x) => !feita(x.disciplina, x.id))}
 							<AtividadeItem
 								item={it}
 								data={dia.data}
 								indice={i}
 								podeMover={movivel}
-								podeSubir={i > 0 || temAntes}
-								podeDescer={i < dia.itens.length - 1 || temDepois}
+								podeSubir={temAlvoAcimaNoDia || temAntes}
+								podeDescer={temAlvoAbaixoNoDia || temDepois}
 								{onMoverAcima}
 								{onMoverAbaixo}
 								minutos={minutosPorItem[i] ?? null}

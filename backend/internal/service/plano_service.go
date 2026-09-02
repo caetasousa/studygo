@@ -798,6 +798,23 @@ func (s *PlanoService) MoverAtividade(
 		}
 	}
 
+	// A swap moves BOTH activities — the guard above only protects the caller's
+	// side. Without this the neighbour of a concluded row silently rewrote what
+	// that row logged: swapping a still-to-study block with a finished one moved
+	// the finished topic to a different slot without touching its record, so a
+	// completion ended up pointing at a subject the student had never studied.
+	if mov.Trocar {
+		destinoLista := plano.AtividadesDoDia(atividades, destino)
+		if mov.Posicao >= 0 && mov.Posicao < len(destinoLista) {
+			alvoID := destinoLista[mov.Posicao].ID
+			if alvoID != mov.ID && atividadeConcluida(salvo, atividades, alvoID) {
+				return PlanoResposta{}, ErrValidacao{
+					Msg: "uma matéria já concluída não pode ser trocada",
+				}
+			}
+		}
+	}
+
 	mover := plano.MoverAtividade
 	if mov.Trocar {
 		mover = plano.TrocarAtividades
