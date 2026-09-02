@@ -103,10 +103,10 @@
 	}
 
 	/**
-	 * Brings a future activity forward to today. A refusal used to be
-	 * discarded silently — the icon just did nothing, most often because today
-	 * had already been fully checked off and the day itself was still (wrongly)
-	 * treated as locked against new arrivals.
+	 * Brings a future activity forward to today. Only offered when everything
+	 * scheduled ABOVE it in the day is already finished — the point of
+	 * antecipar is "eu já cheguei aqui hoje", which only makes sense once
+	 * the earlier blocks are done.
 	 */
 	async function antecipar(id: string) {
 		const erro = await planoStore.anteciparAtividade(id, hojeISO());
@@ -307,6 +307,7 @@
 						{#each dia.itens as it, i (it.id || i)}
 							{@const temAlvoAcimaNoDia = dia.itens.slice(0, i).some((x) => !feita(x.disciplina, x.id))}
 							{@const temAlvoAbaixoNoDia = dia.itens.slice(i + 1).some((x) => !feita(x.disciplina, x.id))}
+							{@const anterioresFeitos = dia.itens.slice(0, i).every((x) => feita(x.disciplina, x.id))}
 							<AtividadeItem
 								item={it}
 								data={dia.data}
@@ -318,7 +319,7 @@
 								{onMoverAbaixo}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={feita(it.disciplina, it.id)}
-								onAntecipar={(id) => void antecipar(id)}
+								onAntecipar={anterioresFeitos ? (id) => void antecipar(id) : undefined}
 								onRegistrar={(el) => {
 									gatilho = el;
 									erroForm = null;

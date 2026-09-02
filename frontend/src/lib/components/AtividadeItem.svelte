@@ -49,7 +49,9 @@
 		concluida?: boolean;
 		/** planned length of this activity's block, in minutes */
 		minutos?: number | null;
-		/** brings this activity forward to today, when finished ahead of schedule */
+		/** brings this activity forward to today. The parent only wires this in
+		 *  when everything above the row in the same day is already done, so the
+		 *  button shows exactly when "eu já cheguei aqui hoje" is honest. */
 		onAntecipar?: (id: string) => void;
 		/** Opens this activity's form. Receives the trigger so focus can return. */
 		onRegistrar?: (gatilho: HTMLElement) => void;
