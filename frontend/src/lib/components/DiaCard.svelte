@@ -333,7 +333,6 @@
 						     carefully its columns are copied. -->
 						{#if blocoRevisao}
 							<div class="atv revisao-bloco">
-								<span class="alca vazia" aria-hidden="true"></span>
 								<span class="min">{blocoRevisao.minutos} min</span>
 								<span class="chip rev-selo">REV</span>
 								<span class="txt">
@@ -517,26 +516,22 @@
 	}
 	/* Set apart from the subjects above without competing with them: this is what
 	   closes the day, not another thing to move. */
-	/* Same column structure as an activity row — handle | minutes | code |
-	   subject | action — so the review lines up with the subjects above it
-	   instead of reading as a footnote. */
+	/* Same column structure as an activity row — minutes | code | subject |
+	   action — so the review lines up with the subjects above it instead of
+	   reading as a footnote. */
 	/* The activity row's styles are scoped to AtividadeItem, so they cannot be
 	   inherited here — the grid is restated with the same values. Any change to
-	   AtividadeItem's own grid has to be mirrored, which is the cost of the two
-	   rows living in different components. */
+	   AtividadeItem's own grid (.atv) has to be mirrored here, which is the cost
+	   of the two rows living in different components. */
 	.revisao-bloco {
 		display: grid;
-		grid-template-columns: 18px auto auto minmax(0, 1fr) auto;
+		grid-template-columns: auto auto minmax(0, 1fr) auto;
 		align-items: baseline;
 		gap: 6px 10px;
 		padding: 7px 8px;
 		border-radius: 8px;
 		border-top: 1px dashed var(--border);
 		margin-top: 2px;
-	}
-	.revisao-bloco .alca {
-		width: 18px;
-		height: 18px;
 	}
 	.revisao-bloco .min {
 		font-family: var(--font-mono);
