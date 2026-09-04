@@ -1,6 +1,0 @@
-DROP TABLE IF EXISTS rev_ciclo;
-DROP TABLE IF EXISTS conteudo_programatico;
-DROP TABLE IF EXISTS marcos;
-DROP TABLE IF EXISTS temas;
-DROP TABLE IF EXISTS disciplinas;
-DROP TABLE IF EXISTS concursos;
