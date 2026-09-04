@@ -1,6 +1,6 @@
 <script lang="ts">
 	import IconButton from '$lib/components/IconButton.svelte';
-	import { PESO_PADRAO, pareceEmentaCorrida, sugerirTopicos } from '$lib/estudo';
+	import { PESO_PADRAO, pareceEmentaCorrida, sugerirTopicos  } from '$lib/estudo';
 	import NavIcon from './NavIcon.svelte';
 	import { sintetizarConteudo } from '$lib/conteudo';
 	import { api, type FonteEdital } from '$lib/api';

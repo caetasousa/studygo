@@ -1,10 +1,14 @@
-// Wire types — mirror of the Go service view models (internal/service/plano_view.go
-// and the httpapi handlers). Keep in sync with the backend.
+// Tipos do contrato HTTP — espelho dos DTOs do backend
+// (backend/internal/adapter/httpapi/dto_*.go).
+//
+// O snapshot em backend/internal/adapter/httpapi/testdata guarda a forma desses
+// payloads: quando ele muda, este arquivo muda junto.
 
 export interface Usuario {
 	id: string;
 	email: string;
 	nome: string;
+	temaUi: 'light' | 'dark' | 'system';
 }
 
 export interface AuthResponse {
@@ -153,9 +157,9 @@ export interface ConteudoEditalResposta {
 }
 
 export interface Disciplina {
+	/** Mnemônico exibido nos chips do cronograma ("DIRAD"). É o que o servidor
+	 *  gravou: a tela não deriva sigla própria, ou discordaria do banco. */
 	codigo: string;
-	/** Short mnemonic for display (RL, LP, BD); codigo remains the technical id. */
-	sigla: string;
 	nome: string;
 	bloco: 'esp' | 'ger';
 	peso: number;
@@ -221,15 +225,23 @@ export interface Config {
 export type Tipo = 'est' | 'revd' | 'sim' | 'disc' | 'vespera' | 'rev';
 export type Fase = 'base' | 'reta';
 
-export interface ItemDia {
-	/** Addresses this scheduled activity. Generated plans receive a stable
-	 *  synthetic id; the backend materialises it transparently on the first write. */
+/** Uma atividade agendada, com o que foi lançado nela.
+ *
+ *  O cronograma é materializado no servidor, então `id` é sempre um uuid real
+ *  desde o primeiro carregamento. */
+export interface Atividade {
 	id: string;
 	disciplina: string;
 	tema: string;
 	passada: number;
-	/** True when the user placed this activity here, rather than the engine. */
+	/** Verdadeiro quando foi o estudante que colocou a atividade aqui. */
 	movida: boolean;
+	horas: number | null;
+	questoes: number | null;
+	acertos: number | null;
+	erros: number | null;
+	nota: string;
+	concluido: boolean;
 }
 
 export interface Bloco {
@@ -238,38 +250,12 @@ export interface Bloco {
 	detalhe: string;
 }
 
-export interface RegistroBloco {
-	disciplina: string;
-	horas: number | null;
-	questoes: number | null;
-	acertos: number | null;
-	erros: number | null;
-	nota: string;
-	/** This discipline finished, independently of the day's own flag. */
-	concluido: boolean;
-	/** The scheduled activity this record belongs to. Empty on legacy rows. */
-	atividadeId: string;
-}
-
-export interface Registro {
-	horas: number | null;
-	concluido: boolean;
-	questoes: number | null;
-	acertos: number | null;
-	erros: number | null;
-	nota: string;
-	blocos: RegistroBloco[];
-}
-
-
-/** One day's review tail — set only once the queue has something to name
- *  (the plan's second study day onward). */
+/** A cauda de revisão do dia — presente a partir do segundo dia de estudo, que
+ *  é quando a fila já tem o que nomear. */
 export interface Revisao {
 	disciplina: string;
 	questoes: number | null;
 	acertos: number | null;
-	/** Empty until an observação has been saved; PATCHing again edits it. */
-	anotacaoId: string;
 	observacao: string;
 }
 
@@ -279,12 +265,19 @@ export interface Dia {
 	semana: number;
 	fase: Fase;
 	tipo: Tipo;
-	itens: ItemDia[];
+	itens: Atividade[];
 	tema: string;
 	meta: number;
 	blocos: Bloco[];
-	registro: Registro | null;
-	reordenado: boolean;
+	/** Nome do dia na tela ("SIMULADO", "VÉSPERA"); vazio nos dias de conteúdo.
+	 *  Vem do servidor para que exista uma única tabela desses nomes. */
+	rotulo: string;
+	/** DERIVADO das atividades do dia — o cliente nunca o envia. */
+	concluido: boolean;
+	horas: number | null;
+	questoes: number | null;
+	acertos: number | null;
+	nota: string;
 	revisao: Revisao | null;
 }
 
@@ -356,13 +349,14 @@ export interface PlanoResposta {
 	props: Props;
 	alertas: Alerta[];
 	hojeIndex: number | null;
-	reordenados: string[];
+	/** Habilita "restaurar ordem automática": o estudante rearranjou algo. */
+	temMovimentacaoManual: boolean;
 	geradoEm: string;
 }
 
-// ConfigInput patches the plan config. Every study-method field is optional — an
-// absent field leaves that setting untouched, so a patch that touches one
-// control never resets the rest.
+// ConfigInput altera a configuração do plano. Todo campo de método é opcional:
+// um campo ausente deixa aquela escolha intacta, para que salvar um controle não
+// redefina os outros.
 export interface ConfigInput {
 	inicio?: string;
 	prova?: string;
@@ -370,7 +364,6 @@ export interface ConfigInput {
 	diasEstudo?: number[];
 	diaRevisao?: number;
 	retaFinalDias?: number;
-	temaUi?: string;
 	questoes?: Record<string, number>;
 
 	blocosPorDia?: number;
@@ -386,40 +379,39 @@ export interface ConfigInput {
 	limiarFraco?: number;
 }
 
-export interface RegistroBlocoInput {
-	disciplina: string;
+/** O lançamento de UMA atividade. A conclusão do dia não vai aqui: ela é
+ *  derivada no servidor a partir das atividades daquele dia. */
+export interface RegistroInput {
+	atividadeId: string;
 	horas: number | null;
 	questoes: number | null;
 	acertos: number | null;
 	nota: string;
 	concluido: boolean;
-	/** Addresses one activity; preferred over `disciplina`. */
-	atividadeId: string;
 }
 
-export interface RegistroInput {
-	horas: number | null;
-	concluido: boolean;
+/** O que pertence ao dia e não a uma atividade: a anotação livre e o resultado
+ *  da cauda de revisão. */
+export interface RegistroDiaInput {
+	nota: string;
 	questoes: number | null;
 	acertos: number | null;
-	nota: string;
-	blocos: RegistroBlocoInput[];
+	observacao: string;
 }
 
 export interface PontoSerie {
 	data: string;
-	n: number;
 	horas: number;
 	questoes: number;
 	acertos: number;
-	concluido: boolean;
 }
 
 export interface ResumoSemana {
 	semana: number;
 	horasPrevisto: number;
-	horasLancado: number;
+	horas: number;
 	questoes: number;
+	acertos: number;
 }
 
 export interface Estatisticas {
@@ -429,7 +421,7 @@ export interface Estatisticas {
 	streak: number;
 	horasTotal: number;
 	questoesTotal: number;
-	acertosTotal: number;
+	acertoPct: number | null;
 }
 
 export type OrigemAnotacao = 'manual' | 'revisao' | 'tec' | 'simulado';
@@ -437,16 +429,16 @@ export type OrigemAnotacao = 'manual' | 'revisao' | 'tec' | 'simulado';
 export interface AnotacaoView {
 	id: string;
 	data: string | null;
-	disciplina: string | null;
+	/** Código da disciplina; vazio quando a anotação não é de nenhuma. */
+	disciplina: string;
 	tema: string;
 	texto: string;
 	origem: OrigemAnotacao;
 	url: string;
 	resolvido: boolean;
-	criadoEm: string;
 }
 
-export interface DiaNota {
+export interface DiaComNota {
 	data: string;
 	n: number;
 	disciplinas: string[];
@@ -458,31 +450,32 @@ export interface DiaFraco {
 	n: number;
 	questoes: number;
 	acertos: number;
-	pct: number;
+	aprov: number;
 }
 
 export interface ItemCaderno {
 	tema: string;
-	erros: number;
 	questoes: number;
 	acertos: number;
-	aproveitamento: number;
+	/** Quantas vezes o tema foi errado — o que o torna candidato a revisão. */
+	erros: number;
+	aprov: number;
 	ultimaData: string;
 }
 
-/** One discipline's error notebook — what the daily review tail drills. */
+/** O caderno de erros de uma disciplina — o que a revisão diária vai drilar. */
 export interface CadernoDisciplina {
-	disciplina: string;
+	codigo: string;
 	nome: string;
 	cor: number;
-	temas: ItemCaderno[];
+	itens: ItemCaderno[];
 }
 
 export interface Caderno {
-	anotacoes: AnotacaoView[];
-	diasComNota: DiaNota[];
-	diasFracos: DiaFraco[];
 	porDisciplina: CadernoDisciplina[];
+	anotacoes: AnotacaoView[];
+	diasComNota: DiaComNota[];
+	diasFracos: DiaFraco[];
 }
 
 export interface AnotacaoInput {
@@ -496,13 +489,12 @@ export interface AnotacaoInput {
 
 export interface CasamentoTEC {
 	assunto: string;
+	disciplina: string;
+	tema: string;
 	questoes: number;
 	acertos: number;
 	erros: number;
 	pct: number;
-	disciplina: string;
-	nome: string;
-	tema: string;
 }
 
 export interface PreviewTEC {

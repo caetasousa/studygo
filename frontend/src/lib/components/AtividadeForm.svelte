@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import { fl } from '$lib/format';
 	import { valoresIniciais, valoresInvalidos } from '$lib/estudo';
-	import type { ItemDia, RegistroBloco } from '$lib/types';
+	import type { Atividade } from '$lib/types';
 
 	/**
 	 * Logs ONE scheduled activity — not the day.
@@ -28,13 +28,13 @@
 		onSalvarCaderno,
 		onCancelar
 	}: {
-		item: ItemDia;
+		item: Atividade;
 		/** ISO date of the activity, shown so the form says what it is editing. */
 		data: string;
 		/** full discipline name, for the title */
 		nome: string;
 		/** what is already recorded for THIS activity, if anything */
-		registro: RegistroBloco | null;
+		registro: Atividade | null;
 		/** the discipline's current error-notebook link (discipline-wide, not per-activity) */
 		cadernoUrl?: string;
 		salvando?: boolean;

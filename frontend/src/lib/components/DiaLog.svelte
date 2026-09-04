@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import type { Dia, RegistroBlocoInput } from '$lib/types';
+	import type { Dia } from '$lib/types';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { debounce, parseNum, parseInteger } from '$lib/debounce';
 	import IconButton from './IconButton.svelte';
@@ -28,16 +28,16 @@
 	// (revisão por questões, simulado), whatever the matéria's own mode says.
 	const diaDeQuestoes = $derived(dia.tipo === 'rev' || dia.tipo === 'sim');
 
+	// Uma linha por ATIVIDADE — nunca por disciplina: um dia que agenda a mesma
+	// matéria duas vezes tem duas linhas independentes, e a chave é o id.
 	const linhas = $derived(
-		dia.itens.length > 0
-			? dia.itens.map((it) => ({
-					codigo: it.disciplina,
-					atividadeId: it.id,
-					nome: disc[it.disciplina]?.nome ?? it.disciplina,
-					cor: disc[it.disciplina]?.cor ?? 0,
-					questoes: diaDeQuestoes || (modos[it.disciplina] ?? 'completo') !== 'teoria'
-				}))
-			: [{ codigo: '', atividadeId: '', nome: 'O dia', cor: -1, questoes: true }]
+		dia.itens.map((it) => ({
+			id: it.id,
+			codigo: it.disciplina,
+			nome: it.disciplina ? (disc[it.disciplina]?.nome ?? it.disciplina) : 'O dia',
+			cor: it.disciplina ? (disc[it.disciplina]?.cor ?? 0) : -1,
+			questoes: diaDeQuestoes || (modos[it.disciplina] ?? 'completo') !== 'teoria'
+		}))
 	);
 
 	const algumaComQuestoes = $derived(linhas.some((l) => l.questoes));
@@ -48,12 +48,14 @@
 		acertos: number | null;
 	}
 
+	// Tudo indexado pelo id da ATIVIDADE.
 	let valores = $state<Record<string, Campos>>({});
-	// Completion per discipline, keyed by codigo. The day's own flag below stays
-	// for the special days and for the stats, and is derived from these.
 	let feitos = $state<Record<string, boolean>>({});
-	let concluido = $state(false);
 	let nota = $state('');
+
+	// A conclusão do dia é DERIVADA das atividades — o servidor a calcula, e aqui
+	// ela só é exibida.
+	const concluido = $derived(linhas.length > 0 && linhas.every((l) => feitos[l.id]));
 
 	// Re-sync from the server only when the component switches to a different
 	// day — never mid-edit, so a debounced save in flight can't clobber newer
@@ -63,48 +65,33 @@
 		if (dia.data === carregadoDe) return;
 		carregadoDe = dia.data;
 		untrack(() => {
-			const reg = dia.registro;
 			const novo: Record<string, Campos> = {};
-
 			const novosFeitos: Record<string, boolean> = {};
 
-			if (dia.itens.length === 0) {
-				novo[''] = {
-					horas: reg?.horas ?? null,
-					questoes: reg?.questoes ?? null,
-					acertos: reg?.acertos ?? null
+			for (const it of dia.itens) {
+				novo[it.id] = {
+					horas: it.horas,
+					questoes: it.questoes,
+					acertos: it.acertos
 				};
-				novosFeitos[''] = reg?.concluido ?? false;
-			} else {
-				for (const it of dia.itens) {
-					const b = reg?.blocos?.find((x) => x.disciplina === it.disciplina);
-					novo[it.disciplina] = {
-						horas: b?.horas ?? null,
-						questoes: b?.questoes ?? null,
-						acertos: b?.acertos ?? null
-					};
-					// An older record has no per-block flag; fall back to the day's,
-					// so a day ticked before this existed still reads as done.
-					novosFeitos[it.disciplina] = b?.concluido ?? reg?.concluido ?? false;
-				}
+				novosFeitos[it.id] = it.concluido;
 			}
 
 			valores = novo;
 			feitos = novosFeitos;
-			concluido = reg?.concluido ?? false;
-			nota = reg?.nota ?? '';
+			nota = dia.nota;
 			aberto = false;
 		});
 	});
 
-	function campo(codigo: string): Campos {
-		return valores[codigo] ?? { horas: null, questoes: null, acertos: null };
+	function campo(id: string): Campos {
+		return valores[id] ?? { horas: null, questoes: null, acertos: null };
 	}
 
 	function soma(chave: keyof Campos): number | null {
 		let total: number | null = null;
 		for (const l of linhas) {
-			const v = campo(l.codigo)[chave];
+			const v = campo(l.id)[chave];
 			if (v !== null) total = (total ?? 0) + v;
 		}
 		return total;
@@ -125,49 +112,43 @@
 			: null;
 	}
 
+	// Só as atividades realmente alteradas são enviadas: a API é por atividade,
+	// então reenviar o dia inteiro a cada tecla seria trabalho (e risco) à toa.
+	let sujas = $state<Set<string>>(new Set());
+
 	const salvar = debounce(() => {
-		const porDisciplina = dia.itens.length > 0;
+		const pendentes = [...sujas];
+		sujas = new Set();
 
-		const blocos: RegistroBlocoInput[] = porDisciplina
-			? linhas
-					.map((l) => ({
-						disciplina: l.codigo,
-						atividadeId: l.atividadeId,
-						...campo(l.codigo),
-						nota: '',
-						concluido: feitos[l.codigo] ?? false
-					}))
-					.filter(
-						(b) =>
-							b.horas !== null || b.questoes !== null || b.acertos !== null || b.concluido
-					)
-			: [];
+		for (const id of pendentes) {
+			const l = linhas.find((x) => x.id === id);
+			if (!l) continue;
 
-		const dia0 = campo('');
+			void planoStore.salvarAtividade(id, {
+				...campo(id),
+				concluido: feitos[id] ?? false,
+				nota: ''
+			});
+		}
+	}, 450);
 
+	// A nota é do DIA, não de uma atividade, e por isso vai por outra rota.
+	const salvarNota = debounce(() => {
 		void planoStore.registrarDia(dia.data, {
-			// Com blocos, o servidor recalcula os totais do dia a partir deles.
-			horas: porDisciplina ? horasTotal : dia0.horas,
-			questoes: porDisciplina ? questoesTotal : dia0.questoes,
-			acertos: porDisciplina ? acertosTotal : dia0.acertos,
-			concluido,
 			nota,
-			blocos
+			questoes: dia.revisao?.questoes ?? null,
+			acertos: dia.revisao?.acertos ?? null,
+			observacao: dia.revisao?.observacao ?? ''
 		});
 	}, 450);
 
-	function setCampo(codigo: string, chave: keyof Campos, bruto: string) {
+	function setCampo(id: string, chave: keyof Campos, bruto: string) {
 		const v = chave === 'horas' ? parseNum(bruto) : parseInteger(bruto);
-		valores[codigo] = { ...campo(codigo), [chave]: v };
-		// Logging hours for a discipline implies you studied it.
-		if (chave === 'horas' && v && !feitos[codigo]) feitos[codigo] = true;
-		sincronizarDia();
+		valores[id] = { ...campo(id), [chave]: v };
+		// Lançar horas numa matéria implica que você a estudou.
+		if (chave === 'horas' && v && !feitos[id]) feitos[id] = true;
+		sujas.add(id);
 		salvar();
-	}
-
-	/** The day counts as done once every discipline in it does. */
-	function sincronizarDia() {
-		concluido = linhas.length > 0 && linhas.every((l) => feitos[l.codigo]);
 	}
 
 	// What ticking a discipline filled in on its own, so unticking can take back
@@ -179,42 +160,37 @@
 	 * were given; unticking puts it back the way it was, rather than leaving
 	 * hours behind that the user never typed.
 	 */
-	function alternarDisciplina(codigo: string, marcado: boolean) {
-		feitos[codigo] = marcado;
+	function alternarAtividade(id: string, marcado: boolean) {
+		feitos[id] = marcado;
 
 		if (marcado) {
-			if (campo(codigo).horas === null) {
+			if (campo(id).horas === null) {
 				const padrao = planoStore.plano?.config.horasDia ?? null;
 				if (padrao !== null && linhas.length > 0) {
 					const fatia = Math.round((padrao / linhas.length) * 100) / 100;
-					valores[codigo] = { ...campo(codigo), horas: fatia };
-					autoPreenchido[codigo] = true;
+					valores[id] = { ...campo(id), horas: fatia };
+					autoPreenchido[id] = true;
 				}
 			}
-		} else if (autoPreenchido[codigo]) {
-			valores[codigo] = { ...campo(codigo), horas: null };
-			autoPreenchido[codigo] = false;
+		} else if (autoPreenchido[id]) {
+			valores[id] = { ...campo(id), horas: null };
+			autoPreenchido[id] = false;
 		}
 
-		sincronizarDia();
+		sujas.add(id);
 		salvar();
 	}
 
-	// The whole-day checkbox (special days, and the card variant) drives every
-	// discipline at once, so the two views never disagree.
+	// O checkbox do dia inteiro liga todas as atividades de uma vez, para que as
+	// duas visões nunca discordem.
 	function onConcluido(e: Event) {
 		const marcado = (e.target as HTMLInputElement).checked;
-		for (const l of linhas) alternarDisciplina(l.codigo, marcado);
-		if (linhas.length === 0) {
-			concluido = marcado;
-			salvar();
-		}
-		concluido = marcado;
+		for (const l of linhas) alternarAtividade(l.id, marcado);
 	}
 
 	function onNota(e: Event) {
 		nota = (e.target as HTMLInputElement).value;
-		salvar();
+		salvarNota();
 	}
 
 	const resumo = $derived(
@@ -231,16 +207,16 @@
 
 {#snippet painel()}
 	<div class="blocos">
-		{#each linhas as l (l.codigo)}
-			{@const c = campo(l.codigo)}
+		{#each linhas as l (l.id)}
+			{@const c = campo(l.id)}
 			{@const err = errosDe(c)}
-			<div class="bl" class:feito={feitos[l.codigo]}>
+			<div class="bl" class:feito={feitos[l.id]}>
 				<label class="bl-ok" title="Marcar {l.nome} como concluída">
 					<input
 						type="checkbox"
 						class="checkbox"
-						checked={feitos[l.codigo] ?? false}
-						onchange={(e) => alternarDisciplina(l.codigo, e.currentTarget.checked)}
+						checked={feitos[l.id] ?? false}
+						onchange={(e) => alternarAtividade(l.id, e.currentTarget.checked)}
 					/>
 					<span class="sr-only">Concluí {l.nome}</span>
 				</label>
@@ -259,7 +235,7 @@
 						step="0.25"
 						placeholder="0,00"
 						value={c.horas ?? ''}
-						oninput={(e) => setCampo(l.codigo, 'horas', e.currentTarget.value)}
+						oninput={(e) => setCampo(l.id, 'horas', e.currentTarget.value)}
 					/>
 				</label>
 				{#if l.questoes}
@@ -273,7 +249,7 @@
 								? String(Math.round(dia.meta / linhas.length))
 								: String(dia.meta)}
 							value={c.questoes ?? ''}
-							oninput={(e) => setCampo(l.codigo, 'questoes', e.currentTarget.value)}
+							oninput={(e) => setCampo(l.id, 'questoes', e.currentTarget.value)}
 						/>
 					</label>
 					<label class="bl-in">
@@ -285,7 +261,7 @@
 							placeholder="0"
 							max={c.questoes ?? undefined}
 							value={c.acertos ?? ''}
-							oninput={(e) => setCampo(l.codigo, 'acertos', e.currentTarget.value)}
+							oninput={(e) => setCampo(l.id, 'acertos', e.currentTarget.value)}
 						/>
 					</label>
 					<span class="bl-err" class:vazio={err === null}>

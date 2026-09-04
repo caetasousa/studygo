@@ -32,7 +32,6 @@
 		| 'topo'
 		| 'subir'
 		| 'descer'
-		| 'adiantar'
 		| 'link';
 
 	/** Icon sizes, in px. `nav` is the sidebar/menu size; `sm` supports a label
@@ -186,11 +185,6 @@
 		<!-- plain down chevron+shaft: swap with the row below -->
 		<path d="M12 5v13" />
 		<path d="m7 13 5 5 5-5" />
-	{:else if name === 'adiantar'}
-		<!-- left-arrow to a bar: bring this forward to today -->
-		<path d="M6 5v14" />
-		<path d="M9 12h10" />
-		<path d="m13 8-4 4 4 4" />
 	{:else if name === 'link'}
 		<!-- external link: a box with an arrow leaving its top-right corner -->
 		<path d="M13 5h6v6" />

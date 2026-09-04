@@ -119,6 +119,23 @@ class AuthStore {
 		return this.refreshing;
 	}
 
+	/**
+	 * Grava a preferência visual da conta. O tema é do USUÁRIO, não do plano:
+	 * quem estuda para dois concursos não quer dois temas.
+	 *
+	 * A tela já aplicou o tema localmente; aqui só se persiste, e uma falha de
+	 * rede não desfaz o que o usuário acabou de ver.
+	 */
+	async definirTema(temaUi: string): Promise<void> {
+		try {
+			const { api } = await import('$lib/api');
+			this.usuario = await api.definirTema(temaUi);
+			this.persist();
+		} catch {
+			/* o tema local continua valendo; a próxima carga reconcilia */
+		}
+	}
+
 	async logout(): Promise<void> {
 		const token = this.refreshToken;
 		this.clear();

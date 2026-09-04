@@ -14,7 +14,9 @@ import type {
 	EstruturaResposta,
 	PlanoResposta,
 	PreviewTEC,
-	RegistroInput
+	RegistroInput,
+	RegistroDiaInput,
+	Usuario
 } from '$lib/types';
 
 export class ApiError extends Error {
@@ -155,8 +157,17 @@ export const api = {
 	salvarConfig: (slug: string, input: ConfigInput) =>
 		request<PlanoResposta>(planoBase(slug), { method: 'PUT', body: JSON.stringify(input) }),
 
-	registrarDia: (slug: string, data: string, input: RegistroInput) =>
-		request<PlanoResposta>(`${planoBase(slug)}/registros/${data}`, {
+	/** Lança o resultado de UMA atividade. A conclusão do dia é derivada no
+	 *  servidor a partir das atividades daquele dia — o cliente não a envia. */
+	registrarAtividade: (slug: string, input: RegistroInput) =>
+		request<PlanoResposta>(
+			`${planoBase(slug)}/atividades/${encodeURIComponent(input.atividadeId)}/registro`,
+			{ method: 'PUT', body: JSON.stringify(input) }
+		),
+
+	/** Grava o que pertence ao dia: a anotação livre e a cauda de revisão. */
+	registrarDia: (slug: string, data: string, input: RegistroDiaInput) =>
+		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}`, {
 			method: 'PATCH',
 			body: JSON.stringify(input)
 		}),
@@ -168,18 +179,6 @@ export const api = {
 		request<PlanoResposta>(`${planoBase(slug)}/marcos/${id}`, {
 			method: 'PUT',
 			body: JSON.stringify({ cumprido })
-		}),
-
-	/** Logs one day's review-tail result: the battery plus the observação that
-	 *  goes into the notebook under the discipline that day's review covered. */
-	registrarRevisao: (
-		slug: string,
-		data: string,
-		input: { questoes: number | null; acertos: number | null; observacao: string }
-	) =>
-		request<PlanoResposta>(`${planoBase(slug)}/revisoes/${data}`, {
-			method: 'PATCH',
-			body: JSON.stringify(input)
 		}),
 
 	previewTec: (slug: string, csv: string) =>
@@ -194,34 +193,22 @@ export const api = {
 			body: JSON.stringify({ csv, data })
 		}),
 
-	reordenar: (slug: string, dataA: string, dataB: string) =>
-		request<PlanoResposta>(`${planoBase(slug)}/reordenar`, {
-			method: 'POST',
-			body: JSON.stringify({ dataA, dataB })
-		}),
-
-	/** Moves one activity to (data, posicao). Sends only the change, not the plan. */
+	/** Move uma atividade para (data, posicao). Envia só a mudança. */
 	moverAtividade: (slug: string, id: string, data: string, posicao: number, trocar = false) =>
 		request<PlanoResposta>(`${planoBase(slug)}/atividades/mover`, {
 			method: 'POST',
 			body: JSON.stringify({ id, data, posicao, trocar })
 		}),
 
-	/** Pushes a lost day's content forward, shifting the rest of the plan. */
+	/** Empurra o conteúdo de um dia perdido, deslocando o resto do plano. */
 	adiarDia: (slug: string, data: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}/adiar`, { method: 'POST' }),
 
-	/** Brings an activity forward to the day it was actually finished on. */
-	anteciparAtividade: (slug: string, id: string, data: string) =>
-		request<PlanoResposta>(`${planoBase(slug)}/atividades/antecipar`, {
-			method: 'POST',
-			body: JSON.stringify({ id, data })
-		}),
-
-	/** Closes the gaps left by topics finished ahead of schedule. */
+	/** Fecha os buracos deixados por matérias terminadas antes da hora. */
 	compactarPlano: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/compactar`, { method: 'POST' }),
 
+	/** Descarta as movimentações manuais dos dias à frente. */
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 
@@ -250,5 +237,9 @@ export const api = {
 	dossie: (slug: string, disciplina: string) =>
 		request<Dossie>(`${planoBase(slug)}/dossie?disciplina=${encodeURIComponent(disciplina)}`),
 
-	exportCsvUrl: (slug: string) => `${planoBase(slug)}/export.csv`
+	exportCsvUrl: (slug: string) => `${planoBase(slug)}/export.csv`,
+
+	/** O tema é preferência do USUÁRIO, não do plano. */
+	definirTema: (temaUi: string) =>
+		request<Usuario>('/api/me/tema', { method: 'PUT', body: JSON.stringify({ temaUi }) })
 };

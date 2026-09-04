@@ -34,7 +34,7 @@
 
 	function setTema(t: Tema) {
 		applyTheme(t); // instant feedback; the save below persists it
-		salvar({ temaUi: t });
+		void auth.definirTema(t);
 	}
 
 	function toggleDia(wd: number) {
@@ -602,12 +602,12 @@
 					<button class="btn" onclick={compactar} disabled={compactando}>
 						{compactando ? 'Compactando…' : '⇡ Compactar dias vazios'}
 					</button>
-					<button class="btn" disabled={plano.reordenados.length === 0} onclick={restaurar}>
+					<button class="btn" disabled={!plano.temMovimentacaoManual} onclick={restaurar}>
 						↺ Restaurar ordem automática
 					</button>
 					<span class="page-sub" style="margin:0">
-						{plano.reordenados.length
-							? `${plano.reordenados.length} dia(s) reorganizado(s) manualmente.`
+						{plano.temMovimentacaoManual
+							? 'Há matérias que você reposicionou à mão.'
 							: 'Nenhuma troca manual ainda.'}
 					</span>
 				</div>

@@ -95,17 +95,17 @@
 				puxa daqui, começando pelos que você mais errou.
 			</p>
 			<div class="cad-grid">
-				{#each dados.porDisciplina as d (d.disciplina)}
+				{#each dados.porDisciplina as d (d.codigo)}
 					<!-- The schedule's review block links straight here, so each
 					     discipline needs an anchor of its own. -->
-					<div class="card cad-disc" id={d.disciplina}>
+					<div class="card cad-disc" id={d.codigo}>
 						<div class="card-top">
 							<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
 							<b>{d.nome}</b>
-							{#if cadernoUrl(d.disciplina)}
+							{#if cadernoUrl(d.codigo)}
 								<a
 									class="cad-link"
-									href={cadernoUrl(d.disciplina)}
+									href={cadernoUrl(d.codigo)}
 									target="_blank"
 									rel="noopener noreferrer"
 									title="Abrir o caderno de erros de {d.nome}"
@@ -113,14 +113,14 @@
 									caderno ↗
 								</a>
 							{/if}
-							<span class="cad-n">{d.temas.length} {d.temas.length === 1 ? 'assunto' : 'assuntos'}</span>
+							<span class="cad-n">{d.itens.length} {d.itens.length === 1 ? 'assunto' : 'assuntos'}</span>
 						</div>
 						<div class="card-body cad-body">
-							{#each d.temas as t (t.tema)}
+							{#each d.itens as t (t.tema)}
 								<div class="cad-item">
 									<span class="cad-tema">{semNumeroInicial(t.tema)}</span>
-									<span class="cad-pct" class:critico={t.aproveitamento < 50}>
-										{t.aproveitamento}%
+									<span class="cad-pct" class:critico={t.aprov < 50}>
+										{t.aprov}%
 									</span>
 									<span class="cad-meta">
 										{t.acertos}/{t.questoes}
@@ -165,7 +165,7 @@
 								<td>{fc(d.data)}</td>
 								<td>{d.questoes}</td>
 								<td>{d.acertos}</td>
-								<td class="dev neg">{d.pct}%</td>
+								<td class="dev neg">{d.aprov}%</td>
 							</tr>
 						{/each}
 					</tbody>

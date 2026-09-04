@@ -2,10 +2,9 @@
 	import NavIcon from './NavIcon.svelte';
 	import IconButton from './IconButton.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import { hojeISO } from '$lib/format';
 	import { semNumeroInicial } from '$lib/estudo';
 	import { tagStyle } from '$lib/format';
-	import type { ItemDia } from '$lib/types';
+	import type { Atividade } from '$lib/types';
 
 	/**
 	 * One activity in the schedule.
@@ -29,10 +28,9 @@
 		onMoverAbaixo,
 		concluida = false,
 		minutos = null,
-		onAntecipar,
 		onRegistrar
 	}: {
-		item: ItemDia;
+		item: Atividade;
 		data: string;
 		/** slot of this activity in its day */
 		indice: number;
@@ -49,10 +47,6 @@
 		concluida?: boolean;
 		/** planned length of this activity's block, in minutes */
 		minutos?: number | null;
-		/** brings this activity forward to today. The parent only wires this in
-		 *  when everything above the row in the same day is already done, so the
-		 *  button shows exactly when "eu já cheguei aqui hoje" is honest. */
-		onAntecipar?: (id: string) => void;
 		/** Opens this activity's form. Receives the trigger so focus can return. */
 		onRegistrar?: (gatilho: HTMLElement) => void;
 	} = $props();
@@ -64,7 +58,9 @@
 	const nome = $derived(disc[item.disciplina]?.nome ?? item.disciplina);
 	// The chip shows the discipline's code (DEV, ENG, BDD…) — a fixed-width badge
 	// keeps the topic text starting at the same x on every line.
-	const sigla = $derived(planoStore.siglaIndex[item.disciplina] ?? item.disciplina);
+	// O `codigo` da disciplina JÁ é o mnemônico que o servidor gravou; a tela não
+	// deriva sigla própria, ou mostraria algo diferente do que está no banco.
+	const sigla = $derived(item.disciplina);
 	const cor = $derived(disc[item.disciplina]?.cor ?? 0);
 	const tema = $derived(semNumeroInicial(item.tema));
 
@@ -73,7 +69,6 @@
 	const movivel = $derived(podeMover && !!item.id && !concluida);
 
 	// Only a topic still ahead can be brought forward.
-	const ehFuturo = $derived(data > hojeISO());
 </script>
 
 <div
@@ -126,13 +121,6 @@
 				icon="descer"
 				label="Descer {nome} uma posição"
 				onclick={() => onMoverAbaixo(item.id)}
-			/>
-		{/if}
-		{#if onAntecipar && ehFuturo && movivel}
-			<IconButton
-				icon="adiantar"
-				label="Já terminei {nome} hoje"
-				onclick={() => onAntecipar?.(item.id)}
 			/>
 		{/if}
 		{#if onRegistrar}

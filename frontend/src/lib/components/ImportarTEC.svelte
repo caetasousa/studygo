@@ -101,7 +101,7 @@
 						{#each previa.casados as c (c.assunto)}
 							<tr>
 								<td>{c.assunto}</td>
-								<td class="destino">{c.nome}{c.tema ? ` · ${c.tema}` : ''}</td>
+								<td class="destino">{c.disciplina}{c.tema ? ` · ${c.tema}` : ''}</td>
 								<td>{c.questoes}</td>
 								<td>{c.acertos}</td>
 								<td>{c.erros}</td>

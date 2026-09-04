@@ -38,7 +38,7 @@
 				fim: d.data
 			};
 			if (conta) s.alvo += plano.config.horasDia;
-			s.feito += d.registro?.horas ?? 0;
+			s.feito += d.horas ?? 0;
 			s.reta = s.reta || d.fase === 'reta';
 			if (d.data > s.fim) s.fim = d.data;
 			porSemana.set(d.semana, s);

@@ -136,13 +136,15 @@ export function sugerirTopicos(texto: string): string[] {
  * This is what the plan engine assumes when a discipline states no weight of its
  * own, so the form pre-fills the same number instead of showing an empty field.
  */
+/**
+ * Peso sugerido por bloco, usado só para PREENCHER o formulário de concurso.
+ *
+ * Não é a regra: quem decide o peso efetivo é o servidor, e mandar 0 significa
+ * "use o padrão do bloco". Aqui isto existe para o campo já abrir com o número
+ * que o usuário quase sempre quer.
+ */
 export const PESO_PADRAO: Record<Bloco, number> = { esp: 2, ger: 1 };
 
-export function pesoPadrao(bloco: string): number {
-	return PESO_PADRAO[bloco as Bloco] ?? 1;
-}
-
-/** Whether a stored topic looks like an un-split prose ementa worth offering to split. */
 export function pareceEmentaCorrida(texto: string, minimo = 220): boolean {
 	return texto.trim().length >= minimo && sugerirTopicos(texto).length > 1;
 }
@@ -259,69 +261,6 @@ function palavrasSignificativas(nome: string): string[] {
 	return boas.length > 0 ? boas : cruas;
 }
 
-/**
- * A display sigla for one discipline name.
- *
- * Multi-word names take each word's initial (Raciocínio Lógico → RL,
- * Direito Constitucional → DC), capped at 4 letters so a long title stays a
- * badge. A single word takes its first three letters (Informática → INF).
- * Returns '' when the name has nothing to build on.
- */
-export function sigla(nome: string): string {
-	const palavras = palavrasSignificativas(nome);
-	if (palavras.length === 0) return '';
-
-	if (palavras.length === 1) {
-		return palavras[0].slice(0, 3).toUpperCase();
-	}
-
-	return palavras
-		.slice(0, 4)
-		.map((p) => p[0])
-		.join('')
-		.toUpperCase();
-}
-
-/**
- * Assigns a unique display sigla to every discipline, keyed by its codigo.
- *
- * Collisions are resolved deterministically — by lengthening the first word
- * before falling back to a numeric suffix — so two disciplines never share a
- * badge and the result does not depend on iteration luck. Input order decides
- * who keeps the shorter form, so the mapping is stable for a given concurso.
- */
-export function siglas(
-	disciplinas: readonly { codigo: string; nome: string }[]
-): Record<string, string> {
-	const out: Record<string, string> = {};
-	const usadas = new Set<string>();
-
-	for (const d of disciplinas) {
-		const base = sigla(d.nome) || d.codigo.toUpperCase();
-		let escolhida = base;
-
-		if (usadas.has(escolhida)) {
-			// Lengthen with the first word's next letters before resorting to a
-			// digit: "DC"/"DCO" reads better than "DC"/"DC2".
-			const [primeira = ''] = palavrasSignificativas(d.nome);
-			for (let n = 2; n <= 4 && usadas.has(escolhida); n++) {
-				const alongada = (primeira.slice(0, n) + base.slice(1)).toUpperCase();
-				if (alongada !== base) escolhida = alongada;
-			}
-		}
-
-		for (let n = 2; usadas.has(escolhida); n++) {
-			escolhida = base + String(n);
-		}
-
-		usadas.add(escolhida);
-		out[d.codigo] = escolhida;
-	}
-
-	return out;
-}
-
-
 /* ---------------------------------------------------------------------------
  * One activity's record
  *
@@ -364,71 +303,13 @@ export function valoresInvalidos(v: ValoresAtividade): boolean {
 }
 
 /**
- * Rebuilds a day's block set with ONE activity replaced.
+ * Uma atividade está concluída quando o registro dela diz que sim.
  *
- * Every other activity is carried through untouched, which is what keeps saving
- * or completing one subject from disturbing the others. Blocks are addressed by
- * activity id, so two occurrences of the same discipline stay independent.
+ * Não existe mais caminho alternativo: toda atividade tem id e todo registro
+ * pertence a uma. Antes havia um fallback para a conclusão do DIA, e era ele que
+ * fazia uma matéria adiantada aparecer riscada — o estudante a trouxe para o dia
+ * justamente porque ela ainda estava por fazer.
  */
-export function blocosComAtividade<
-	I extends { id: string; disciplina: string },
-	B extends Partial<ValoresAtividade> & { atividadeId?: string; disciplina?: string }
->(
-	itens: readonly I[],
-	blocosAtuais: readonly B[],
-	atividadeId: string,
-	v: ValoresAtividade
-): (ValoresAtividade & { disciplina: string; atividadeId: string })[] {
-	const ocorrencias = new Map<string, number>();
-	for (const it of itens) {
-		ocorrencias.set(it.disciplina, (ocorrencias.get(it.disciplina) ?? 0) + 1);
-	}
-
-	return itens.map((it) => {
-		const porID = blocosAtuais.find((b) => b.atividadeId && b.atividadeId === it.id);
-		// A legacy block only says "discipline X on this date". It is safe to
-		// adopt when X occurs once; with two occurrences there is no honest way to
-		// decide which activity owns it. Reusing it for both would double the
-		// recorded hours and make one check complete two activities.
-		const legado =
-			(ocorrencias.get(it.disciplina) ?? 0) === 1
-				? blocosAtuais.find((b) => !b.atividadeId && b.disciplina === it.disciplina)
-				: undefined;
-		const atual = porID ?? legado;
-
-		const base = it.id === atividadeId ? v : valoresIniciais(atual);
-
-		return { ...base, disciplina: it.disciplina, atividadeId: it.id };
-	});
-}
-
-/** A day is done when every activity in it is — never set directly. */
-export function diaConcluido(blocos: readonly { concluido: boolean }[]): boolean {
-	return blocos.length > 0 && blocos.every((b) => b.concluido);
-}
-
-/**
- * Whether one scheduled activity counts as done.
- *
- * The block's own record decides it. The day-level flag is only a fallback for
- * LEGACY records — the ones written before activities were addressable, which
- * carry no per-block state at all.
- *
- * Falling back to the day for an activity that simply has no record is what
- * made a subject brought forward into an already-finished day show up struck
- * through, as if it had been studied: the student moved it there precisely
- * because it still had to be done. An activity with an id and no record of its
- * own is NOT done, whatever the day says.
- */
-export function atividadeFeita(
-	bloco: { concluido: boolean } | null | undefined,
-	temRegistroPorAtividade: boolean,
-	diaConcluidoFlag: boolean | undefined
-): boolean {
-	if (bloco) return bloco.concluido;
-
-	// Nenhum bloco por atividade em lugar nenhum do dia: registro legado.
-	if (!temRegistroPorAtividade) return diaConcluidoFlag ?? false;
-
-	return false;
+export function atividadeFeita(atividade: { concluido: boolean } | null | undefined): boolean {
+	return atividade?.concluido ?? false;
 }

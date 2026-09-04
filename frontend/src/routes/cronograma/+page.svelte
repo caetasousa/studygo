@@ -2,10 +2,10 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import PanoramaPlano from '$lib/components/PanoramaPlano.svelte';
 	import DiaCard from '$lib/components/DiaCard.svelte';
-	import { blocoDaAtividade, planoStore } from '$lib/stores/plano.svelte';
+	import { planoStore } from '$lib/stores/plano.svelte';
 	import { atividadeFeita } from '$lib/estudo';
 	import { fc, nf1 } from '$lib/format';
-	import type { Dia, ItemDia } from '$lib/types';
+	import type { Dia, Atividade } from '$lib/types';
 
 	const plano = $derived(planoStore.plano);
 
@@ -33,7 +33,7 @@
 	});
 
 	function saldoSemana(s: Semana): { h: number; alvo: number } {
-		const h = s.dias.reduce((a, d) => a + (d.registro?.horas ?? 0), 0);
+		const h = s.dias.reduce((a, d) => a + (d.horas ?? 0), 0);
 		return { h, alvo: s.dias.length * (plano?.config.horasDia ?? 0) };
 	}
 
@@ -52,12 +52,10 @@
 		return d.tipo === 'est' || d.tipo === 'rev' || d.tipo === 'revd';
 	}
 
-	/** True when this activity's block is marked done. Finished work is
-	 *  history — swapping onto or past it would rewrite what was studied. */
-	function feita(d: Dia, it: ItemDia): boolean {
-		const temRegistroPorAtividade = (d.registro?.blocos ?? []).some((b) => !!b.atividadeId);
-		const b = blocoDaAtividade(d.registro, it, d.itens);
-		return atividadeFeita(b, temRegistroPorAtividade, d.registro?.concluido);
+	/** Uma atividade concluída é história: trocar por cima dela reescreveria o
+	 *  que foi estudado. */
+	function feita(_d: Dia, it: Atividade): boolean {
+		return atividadeFeita(it);
 	}
 
 	/** The (day, index) an activity currently sits on, or null. */

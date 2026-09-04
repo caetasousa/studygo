@@ -1,54 +1,17 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
-import { blocosComAtividade, diaConcluido, siglas } from '$lib/estudo';
 import { chave, lerMigrando } from '$lib/storageKey';
 import type {
 	AnotacaoInput,
+	Atividade,
 	Caderno,
 	ConfigInput,
 	Estatisticas,
-	ItemDia,
 	PlanoResposta,
 	PreviewTEC,
-	Registro,
-	RegistroBloco,
-	RegistroBlocoInput,
-	RegistroInput
+	RegistroDiaInput
 } from '$lib/types';
-
-/**
- * Finds what is recorded for ONE scheduled activity.
- *
- * Prefers the activity id, which is the only key that tells two occurrences of
- * the same discipline in a day apart. Falls back to the discipline for records
- * written before activities were addressable — but only when no block claims an
- * activity id, so a legacy row never shadows a properly keyed one.
- */
-export function blocoDaAtividade(
-	reg: Registro | null | undefined,
-	item: Pick<ItemDia, 'id' | 'disciplina'>,
-	itensDoDia?: readonly Pick<ItemDia, 'id' | 'disciplina'>[]
-): RegistroBloco | null {
-	const blocos = reg?.blocos ?? [];
-
-	if (item.id) {
-		const porID = blocos.find((b) => b.atividadeId === item.id);
-		if (porID) return porID;
-	}
-
-	// A legacy block can only be attributed without guessing when the discipline
-	// occurs once on that day. Otherwise showing it in both editors would double
-	// hours and make a single historical check look like two completed sessions.
-	const ocorrencias =
-		itensDoDia?.filter((it) => it.disciplina === item.disciplina).length ?? 1;
-	const legado =
-		ocorrencias === 1
-			? blocos.find((b) => !b.atividadeId && b.disciplina === item.disciplina)
-			: undefined;
-
-	return legado ?? null;
-}
 
 const cacheSufixo = (slug: string) => `.plano.${slug}.v1`;
 const cacheKey = (slug: string) => chave(cacheSufixo(slug));
@@ -65,7 +28,6 @@ function readCache(slug: string | null): PlanoResposta | null {
 
 interface DiscInfo {
 	nome: string;
-	sigla: string;
 	cor: number;
 	bloco: 'esp' | 'ger';
 	cadernoUrl: string;
@@ -86,30 +48,11 @@ class PlanoStore {
 		for (const d of this.plano?.concurso.disciplinas ?? []) {
 			m[d.codigo] = {
 				nome: d.nome,
-				sigla: d.sigla,
 				cor: d.cor,
 				bloco: d.bloco,
 				cadernoUrl: d.cadernoUrl ?? ''
 			};
 		}
-		return m;
-	});
-
-	/**
-	 * Display siglas by codigo — RL, LP, BD. Derived from the names, never
-	 * stored: the codigo stays the technical key everything else is joined on.
-	 */
-	siglaIndex = $derived.by<Record<string, string>>(() => {
-		const disciplinas = this.plano?.concurso.disciplinas ?? [];
-		const fallback = siglas(disciplinas);
-		const m: Record<string, string> = {};
-
-		for (const d of disciplinas) {
-			// New responses own this presentation value. The generated fallback keeps
-			// an old localStorage cache readable during the deployment transition.
-			m[d.codigo] = d.sigla?.trim() || fallback[d.codigo] || d.codigo;
-		}
-
 		return m;
 	});
 
@@ -174,45 +117,44 @@ class PlanoStore {
 	}
 
 	salvarConfig = (input: ConfigInput) => this.run((s) => api.salvarConfig(s, input));
-	registrarDia = (data: string, input: RegistroInput) =>
+	registrarDia = (data: string, input: RegistroDiaInput) =>
 		this.run((s) => api.registrarDia(s, data, input));
 	limparRegistros = () => this.run((s) => api.limparRegistros(s));
 	marcarMarco = (id: string, cumprido: boolean) => this.run((s) => api.marcarMarco(s, id, cumprido));
 	/**
-	 * Logs one day's review-tail result. Returns the error message on failure
-	 * (invalid: acertos > questões) so the form can show it inline and stay
-	 * open, instead of closing over a save that did not land.
+	 * Grava o resultado da cauda de revisão do dia. Devolve a mensagem de erro
+	 * quando falha, para que o formulário a mostre e continue aberto em vez de
+	 * fechar sobre um save que não aconteceu.
 	 */
 	registrarRevisao = async (
 		data: string,
 		v: { questoes: number | null; acertos: number | null; observacao: string }
 	): Promise<string | null> => {
+		const dia = this.plano?.dias.find((d) => d.data === data);
+
 		try {
-			this.commit(await api.registrarRevisao(this.slug, data, v));
+			this.commit(
+				await api.registrarDia(this.slug, data, { ...v, nota: dia?.nota ?? '' })
+			);
 
 			return null;
 		} catch (e) {
 			return e instanceof Error ? e.message : 'Não foi possível salvar a revisão';
 		}
 	};
-	reordenar = (a: string, b: string) => this.run((s) => api.reordenar(s, a, b));
 
 	/**
-	 * Saves ONE scheduled activity's record, leaving every other subject of that
-	 * day exactly as it was.
+	 * Grava o registro de UMA atividade.
 	 *
-	 * The day's other blocks are re-sent unchanged (the API replaces the day's
-	 * block set), and the day's totals are recomputed from all of them. The day
-	 * counts as done only when every activity in it does — the flag is derived,
-	 * never set by hand.
+	 * Uma chamada só: a API é por atividade, então as outras matérias do dia não
+	 * são reenviadas nem recalculadas aqui. A conclusão do dia vem derivada do
+	 * servidor na resposta.
 	 *
-	 * Returns an error message on failure, or null on success, so the caller can
-	 * keep the form open and show what went wrong.
+	 * Devolve a mensagem de erro quando falha, para que o formulário continue
+	 * aberto mostrando o que deu errado.
 	 */
 	salvarAtividade = async (
-		data: string,
 		atividadeId: string,
-		disciplina: string,
 		v: {
 			horas: number | null;
 			questoes: number | null;
@@ -221,82 +163,8 @@ class PlanoStore {
 			nota: string;
 		}
 	): Promise<string | null> => {
-		const d = this.plano?.dias.find((x) => x.data === data);
-		if (!d) return 'dia não encontrado';
-
-		const reg = d.registro;
-
-		// The activity being recorded may still be scheduled for a later day — a
-		// topic finished ahead of time is recorded on the day it was studied, and
-		// the backend then moves it here. Include it, or rebuilding the day's
-		// blocks from this day's items alone would drop the very record being
-		// saved.
-		const daqui = d.itens.some((it) => it.id === atividadeId);
-		const itens = daqui
-			? d.itens
-			: [
-					...d.itens,
-					...(this.plano?.dias
-						.flatMap((x) => x.itens)
-						.filter((it) => it.id === atividadeId) ?? [])
-				];
-
-		// Rebuild the day's block set: this activity from the form, every other
-		// from what is already stored. Addressed by atividadeId so two occurrences
-		// of the same discipline in a day stay independent.
-		const blocosAtividades: RegistroBlocoInput[] = blocosComAtividade(
-			itens,
-			reg?.blocos ?? [],
-			atividadeId,
-			v
-		).map((b) => ({ ...b, nota: b.nota }));
-
-		// An old row without atividadeId is deliberately left ambiguous when the
-		// same discipline occurs more than once. Keep that historical row exactly
-		// once while editing a new activity; UpsertRegistro replaces the whole day.
-		const contagem = new Map<string, number>();
-		for (const it of itens) {
-			contagem.set(it.disciplina, (contagem.get(it.disciplina) ?? 0) + 1);
-		}
-		const legadosAmbiguos: RegistroBlocoInput[] = (reg?.blocos ?? [])
-			.filter(
-				(b) => !b.atividadeId && (contagem.get(b.disciplina) ?? 0) > 1
-			)
-			.map((b) => ({
-				disciplina: b.disciplina,
-				atividadeId: '',
-				horas: b.horas,
-				questoes: b.questoes,
-				acertos: b.acertos,
-				nota: b.nota,
-				concluido: b.concluido
-			}));
-		const blocos = [...blocosAtividades, ...legadosAmbiguos];
-
-		const soma = (f: (b: RegistroBlocoInput) => number | null): number | null => {
-			let t: number | null = null;
-			for (const b of blocos) {
-				const x = f(b);
-				if (x !== null) t = (t ?? 0) + x;
-			}
-			return t;
-		};
-
 		try {
-			this.commit(
-				await api.registrarDia(this.slug, data, {
-					horas: soma((b) => b.horas),
-					questoes: soma((b) => b.questoes),
-					acertos: soma((b) => b.acertos),
-					concluido: diaConcluido(blocosAtividades),
-					nota: reg?.nota ?? '',
-					blocos: blocos.filter(
-						(b) =>
-							b.horas !== null || b.questoes !== null || b.acertos !== null ||
-							b.concluido || b.nota !== ''
-					)
-				})
-			);
+			this.commit(await api.registrarAtividade(this.slug, { atividadeId, ...v }));
 
 			return null;
 		} catch (e) {
@@ -361,17 +229,6 @@ class PlanoStore {
 			return null;
 		} catch (e) {
 			return e instanceof Error ? e.message : 'Não foi possível adiar o dia';
-		}
-	};
-
-	/** Brings an activity forward to the day it was actually finished on. */
-	anteciparAtividade = async (id: string, data: string): Promise<string | null> => {
-		try {
-			this.commit(await api.anteciparAtividade(this.slug, id, data), false);
-
-			return null;
-		} catch (e) {
-			return e instanceof Error ? e.message : 'Não foi possível antecipar';
 		}
 	};
 

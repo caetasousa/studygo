@@ -19,11 +19,11 @@
 	const maxHoras = $derived(dados ? Math.max(1, ...dados.serie.map((p) => p.horas)) : 1);
 	const pctAcerto = $derived(
 		dados && dados.questoesTotal > 0
-			? Math.round((dados.acertosTotal / dados.questoesTotal) * 100)
+			? Math.round(((dados.acertoPct ?? 0) / dados.questoesTotal) * 100)
 			: null
 	);
 	const maxSemana = $derived(
-		dados ? Math.max(1, ...dados.porSemana.map((s) => Math.max(s.horasPrevisto, s.horasLancado))) : 1
+		dados ? Math.max(1, ...dados.porSemana.map((s) => Math.max(s.horasPrevisto, s.horas))) : 1
 	);
 
 	// A fresh plan has every week at 0 h lançado, which renders dozens of identical
@@ -36,7 +36,7 @@
 	// table of 20 identical rows says nothing.
 	const semanasComDados = $derived.by(() => {
 		const todas = dados?.porSemana ?? [];
-		const ultima = todas.reduce((acc, s, i) => (s.horasLancado > 0 || s.questoes > 0 ? i : acc), -1);
+		const ultima = todas.reduce((acc, s, i) => (s.horas > 0 || s.questoes > 0 ? i : acc), -1);
 		return todas.slice(0, ultima + 2);
 	});
 
@@ -105,16 +105,16 @@
 						<tr>
 							<td>Semana {String(s.semana).padStart(2, '0')}</td>
 							<td>{nf1.format(s.horasPrevisto)} h</td>
-							<td>{nf1.format(s.horasLancado)} h</td>
+							<td>{nf1.format(s.horas)} h</td>
 							<td>
 								<span class="mini-bar" style="display:inline-block;vertical-align:middle"
 									><i
 										style="width:{s.horasPrevisto
-											? Math.min(100, (s.horasLancado / s.horasPrevisto) * 100)
+											? Math.min(100, (s.horas / s.horasPrevisto) * 100)
 											: 0}%"
 									></i></span
 								>
-								{s.horasPrevisto ? Math.round((s.horasLancado / s.horasPrevisto) * 100) : 0}%
+								{s.horasPrevisto ? Math.round((s.horas / s.horasPrevisto) * 100) : 0}%
 							</td>
 							<td>{nf0.format(s.questoes)}</td>
 						</tr>

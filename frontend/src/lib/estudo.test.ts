@@ -1,21 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chave, migrar } from '$lib/storageKey';
 import {
-	PESO_PADRAO,
 	agruparPorBloco,
-	atividadeFeita,
 	VAZIO,
-	blocosComAtividade,
-	diaConcluido,
 	numeroHierarquico,
-	sigla,
-	siglas,
 	valoresIniciais,
 	valoresInvalidos,
 	ordenarDisciplinas,
 	iniciaisPlano,
 	pareceEmentaCorrida,
-	pesoPadrao,
 	planoCorresponde,
 	rotuloPlano,
 	semNumeroInicial,
@@ -153,19 +146,6 @@ describe('pareceEmentaCorrida', () => {
 	});
 });
 
-describe('pesoPadrao', () => {
-	it('dá peso 2 às específicas e 1 às gerais', () => {
-		expect(pesoPadrao('esp')).toBe(2);
-		expect(pesoPadrao('ger')).toBe(1);
-		expect(PESO_PADRAO.esp).toBe(2);
-		expect(PESO_PADRAO.ger).toBe(1);
-	});
-
-	it('cai no peso 1 para um grupo desconhecido', () => {
-		expect(pesoPadrao('outro')).toBe(1);
-	});
-});
-
 // The two records actually stored for this user: same concurso (TCE-GO), same
 // cargo, different especialidade — which is why the picker switches the study
 // plan, not the concurso.
@@ -243,178 +223,6 @@ describe('planoCorresponde', () => {
 	});
 });
 
-describe('sigla', () => {
-	// The exact examples the spec calls for.
-	it.each([
-		['Raciocínio Lógico', 'RL'],
-		['Língua Portuguesa', 'LP'],
-		['Direito Constitucional', 'DC'],
-		['Banco de Dados', 'BD'],
-		['Informática', 'INF']
-	])('%s -> %s', (nome, esperado) => {
-		expect(sigla(nome)).toBe(esperado);
-	});
-
-	it('ignora conectivos e aberturas genéricas', () => {
-		expect(sigla('Noções de Direito Administrativo')).toBe('DA');
-		expect(sigla('Contabilidade aplicada ao Setor Público')).toBe('CSP');
-	});
-
-	it('trata acentos sem deixar diacrítico na sigla', () => {
-		expect(sigla('Estatística')).toBe('EST');
-		expect(sigla('Órgãos Públicos')).toBe('OP');
-	});
-
-	it('é determinística', () => {
-		expect(sigla('Raciocínio Lógico')).toBe(sigla('Raciocínio Lógico'));
-	});
-
-	it('devolve vazio quando não há nada em que se apoiar', () => {
-		expect(sigla('')).toBe('');
-		expect(sigla('   ---   ')).toBe('');
-	});
-
-	it('limita a 4 letras para não virar texto', () => {
-		expect(sigla('Administração Financeira e Orçamentária Pública').length).toBeLessThanOrEqual(4);
-	});
-});
-
-describe('siglas', () => {
-	it('resolve colisões sem hardcode por disciplina', () => {
-		const mapa = siglas([
-			{ codigo: 'D01', nome: 'Direito Constitucional' },
-			{ codigo: 'D02', nome: 'Direito Civil' },
-			{ codigo: 'D03', nome: 'Direito Comercial' }
-		]);
-
-		const valores = Object.values(mapa);
-		expect(new Set(valores).size).toBe(valores.length);
-		expect(mapa['D01']).toBe('DC');
-	});
-
-	it('mantém o codigo técnico como chave, nunca o substitui', () => {
-		const mapa = siglas([{ codigo: 'D07', nome: 'Raciocínio Lógico' }]);
-		expect(mapa['D07']).toBe('RL');
-	});
-
-	it('cai no codigo quando o nome não produz sigla', () => {
-		const mapa = siglas([{ codigo: 'D09', nome: '---' }]);
-		expect(mapa['D09']).toBe('D09');
-	});
-});
-
-describe('registro por atividade', () => {
-	const itens = [
-		{ id: 'atv-1', disciplina: 'D01' },
-		{ id: 'atv-2', disciplina: 'D02' },
-		// The same discipline twice in one day: each occurrence is independent.
-		{ id: 'atv-3', disciplina: 'D01' }
-	];
-
-	const blocos = [
-		{ atividadeId: 'atv-1', disciplina: 'D01', horas: 2, questoes: 20, acertos: 15, concluido: true, nota: 'ok' },
-		{ atividadeId: 'atv-2', disciplina: 'D02', horas: 1, questoes: 10, acertos: 9, concluido: false, nota: '' }
-	];
-
-	it('carrega apenas os dados da atividade selecionada', () => {
-		const so2 = blocos.find((b) => b.atividadeId === 'atv-2')!;
-		expect(valoresIniciais(so2)).toEqual({
-			horas: 1, questoes: 10, acertos: 9, concluido: false, nota: ''
-		});
-	});
-
-	it('salvar altera somente a atividade escolhida', () => {
-		const out = blocosComAtividade(itens, blocos, 'atv-2', {
-			horas: 5, questoes: 50, acertos: 40, concluido: true, nota: 'nova'
-		});
-
-		expect(out.find((b) => b.atividadeId === 'atv-2')).toMatchObject({ horas: 5, nota: 'nova' });
-		// the others are carried through untouched
-		expect(out.find((b) => b.atividadeId === 'atv-1')).toMatchObject({
-			horas: 2, questoes: 20, acertos: 15, concluido: true, nota: 'ok'
-		});
-	});
-
-	it('mantém independentes duas ocorrências da mesma disciplina', () => {
-		const out = blocosComAtividade(itens, blocos, 'atv-3', {
-			horas: 4, questoes: null, acertos: null, concluido: true, nota: ''
-		});
-
-		expect(out.find((b) => b.atividadeId === 'atv-3')).toMatchObject({ horas: 4, concluido: true });
-		// atv-1 is the same discipline (D01) and must NOT have changed
-		expect(out.find((b) => b.atividadeId === 'atv-1')).toMatchObject({ horas: 2, concluido: true });
-	});
-
-	it('desmarcar preserva horas, questões, acertos e observação', () => {
-		const atual = valoresIniciais(blocos[0]);
-		const out = blocosComAtividade(itens, blocos, 'atv-1', { ...atual, concluido: false });
-		const b = out.find((x) => x.atividadeId === 'atv-1')!;
-
-		expect(b.concluido).toBe(false);
-		expect(b).toMatchObject({ horas: 2, questoes: 20, acertos: 15, nota: 'ok' });
-	});
-
-	it('marcar não preenche horas automaticamente', () => {
-		const out = blocosComAtividade(itens, blocos, 'atv-3', { ...VAZIO, concluido: true });
-		expect(out.find((b) => b.atividadeId === 'atv-3')!.horas).toBeNull();
-	});
-
-	it('concluir uma matéria não conclui as outras', () => {
-		const out = blocosComAtividade(itens, blocos, 'atv-2', {
-			...valoresIniciais(blocos[1]), concluido: true
-		});
-
-		expect(out.find((b) => b.atividadeId === 'atv-2')!.concluido).toBe(true);
-		expect(out.find((b) => b.atividadeId === 'atv-3')!.concluido).toBe(false);
-		expect(diaConcluido(out)).toBe(false);
-	});
-
-	it('o dia conclui só quando todas as atividades concluem', () => {
-		const todas = itens.map((it) => ({ ...VAZIO, concluido: true, disciplina: it.disciplina, atividadeId: it.id }));
-		expect(diaConcluido(todas)).toBe(true);
-		expect(diaConcluido([])).toBe(false);
-	});
-
-	it('cancelar não produz alteração: os valores originais seguem intactos', () => {
-		const original = valoresIniciais(blocos[0]);
-		// simulate editing a local copy and throwing it away
-		const rascunho = { ...original, horas: 99, concluido: false };
-		expect(rascunho).not.toEqual(original);
-		expect(valoresIniciais(blocos[0])).toEqual(original);
-	});
-
-	it('rejeita acertos maiores que questões', () => {
-		expect(valoresInvalidos({ ...VAZIO, questoes: 10, acertos: 11 })).toBe(true);
-		expect(valoresInvalidos({ ...VAZIO, questoes: 10, acertos: 10 })).toBe(false);
-		expect(valoresInvalidos({ ...VAZIO, questoes: null, acertos: 5 })).toBe(false);
-	});
-
-	it('adota registros antigos sem atividadeId pela disciplina', () => {
-		const legado = [{ disciplina: 'D02', horas: 3, questoes: null, acertos: null, concluido: true, nota: '' }];
-		const out = blocosComAtividade(itens, legado, 'atv-1', VAZIO);
-
-		expect(out.find((b) => b.atividadeId === 'atv-2')).toMatchObject({ horas: 3, concluido: true });
-	});
-
-	it('não duplica um registro legado quando a disciplina aparece duas vezes', () => {
-		const legado = [
-			{
-				disciplina: 'D01',
-				horas: 3,
-				questoes: 20,
-				acertos: 15,
-				concluido: true,
-				nota: 'registro antigo'
-			}
-		];
-		const out = blocosComAtividade(itens, legado, 'atv-2', VAZIO);
-
-		expect(out.find((b) => b.atividadeId === 'atv-1')).toMatchObject(VAZIO);
-		expect(out.find((b) => b.atividadeId === 'atv-3')).toMatchObject(VAZIO);
-		expect(out.reduce((total, b) => total + (b.horas ?? 0), 0)).toBe(0);
-	});
-});
-
 afterEach(() => vi.unstubAllGlobals());
 
 describe('migração das chaves de armazenamento', () => {
@@ -467,27 +275,5 @@ describe('migração das chaves de armazenamento', () => {
 	it('monta a chave com o prefixo atual', () => {
 		expect(chave('.plano.tce.v1')).toBe('studygo.plano.tce.v1');
 		expect(chave(':rail')).toBe('studygo:rail');
-	});
-});
-
-describe('atividadeFeita', () => {
-	it('usa o registro do próprio bloco quando existe', () => {
-		expect(atividadeFeita({ concluido: true }, true, false)).toBe(true);
-		expect(atividadeFeita({ concluido: false }, true, true)).toBe(false);
-	});
-
-	it('uma matéria adiantada para um dia concluído NÃO nasce concluída', () => {
-		// O dia está fechado e já tem blocos por atividade; a matéria recém-trazida
-		// não tem registro próprio. Ela ainda precisa ser estudada.
-		expect(atividadeFeita(null, true, true)).toBe(false);
-	});
-
-	it('registro legado (sem blocos por atividade) ainda cai no flag do dia', () => {
-		expect(atividadeFeita(null, false, true)).toBe(true);
-		expect(atividadeFeita(null, false, false)).toBe(false);
-	});
-
-	it('sem registro nenhum, não está concluída', () => {
-		expect(atividadeFeita(null, false, undefined)).toBe(false);
 	});
 });

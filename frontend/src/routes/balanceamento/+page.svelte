@@ -80,8 +80,8 @@
 				nome: g.nome,
 				dias: ds.length,
 				previsto: ds.length * plano.config.horasDia,
-				lancado: ds.reduce((a, d) => a + (d.registro?.horas ?? 0), 0),
-				questoes: ds.reduce((a, d) => a + (d.registro?.questoes ?? 0), 0)
+				lancado: ds.reduce((a, d) => a + (d.horas ?? 0), 0),
+				questoes: ds.reduce((a, d) => a + (d.questoes ?? 0), 0)
 			};
 		});
 	});

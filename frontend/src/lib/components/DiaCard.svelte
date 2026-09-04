@@ -5,11 +5,11 @@
 	import TemaTexto from './TemaTexto.svelte';
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
-	import { blocoDaAtividade, planoStore } from '$lib/stores/plano.svelte';
+	import { planoStore } from '$lib/stores/plano.svelte';
 	import { atividadeFeita } from '$lib/estudo';
 	import AtividadeForm from './AtividadeForm.svelte';
 	import RevisaoForm from './RevisaoForm.svelte';
-	import type { Dia, ItemDia } from '$lib/types';
+	import type { Dia, Atividade } from '$lib/types';
 
 	const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -55,38 +55,17 @@
 	const diaNum = $derived(Number(dia.data.slice(8, 10)));
 	const mes = $derived(MESES[Number(dia.data.slice(5, 7)) - 1]);
 
-	/** Whether one scheduled ACTIVITY is already marked done. */
-	// True once the day has any per-activity record at all: from then on, the
-	// absence of a block for one activity MEANS that activity is not done.
-	const temRegistroPorAtividade = $derived(
-		(dia.registro?.blocos ?? []).some((b) => !!b.atividadeId)
-	);
-
-	function feita(codigo: string, atividadeId: string): boolean {
-		const b = blocoDaAtividade(dia.registro, { id: atividadeId, disciplina: codigo }, dia.itens);
-
-		return atividadeFeita(b, temRegistroPorAtividade, dia.registro?.concluido);
-	}
-
-	// Only used by the special days, which still log at day level.
 	let logAberto = $state(false);
 
-	/**
-	 * The day's state is DERIVED from its activities, never set directly: it is
-	 * done when every activity in it is.
-	 */
-	const concluidoDerivado = $derived(
-		dia.itens.length > 0
-			? dia.itens.every((it) => feita(it.disciplina, it.id))
-			: (dia.registro?.concluido ?? false)
-	);
+	// A conclusão do dia vem DERIVADA do servidor, a partir das atividades dele.
+	const concluidoDerivado = $derived(dia.concluido);
 
 	/**
-	 * A day can be pushed forward while it still has work and nothing recorded.
-	 * Once something is logged the day is history, not schedule.
+	 * Um dia pode ser adiado enquanto ainda tem trabalho e nada foi lançado.
+	 * Depois do primeiro lançamento ele é história, não cronograma.
 	 */
 	const podeAdiar = $derived(
-		dia.itens.length > 0 && !concluidoDerivado && !dia.registro?.horas
+		dia.itens.length > 0 && !concluidoDerivado && !dia.horas
 	);
 
 	let adiando = $state(false);
@@ -100,17 +79,6 @@
 		const erro = await planoStore.adiarDia(dia.data);
 		if (erro) planoStore.erro = erro;
 		adiando = false;
-	}
-
-	/**
-	 * Brings a future activity forward to today. Only offered when everything
-	 * scheduled ABOVE it in the day is already finished — the point of
-	 * antecipar is "eu já cheguei aqui hoje", which only makes sense once
-	 * the earlier blocks are done.
-	 */
-	async function antecipar(id: string) {
-		const erro = await planoStore.anteciparAtividade(id, hojeISO());
-		if (erro) planoStore.erro = erro;
 	}
 
 	/** Which activity's form is open, by activity id. */
@@ -162,7 +130,7 @@
 	 * rather than closing over a change that did not land.
 	 */
 	async function salvarAtividade(
-		it: ItemDia,
+		it: Atividade,
 		v: {
 			horas: number | null;
 			questoes: number | null;
@@ -181,9 +149,10 @@
 		// Recording it on the day it was planned for would say the study happened
 		// in the future and leave nothing to move.
 		const hoje = hojeISO();
-		const quando = v.concluido && dia.data > hoje ? hoje : dia.data;
-
-		const msg = await planoStore.salvarAtividade(quando, it.id, it.disciplina, v);
+		// A antecipação é decidida no servidor: concluir uma matéria agendada para
+		// a frente traz ela para o dia de hoje e fecha o buraco. A tela não
+		// precisa mais escolher a data do lançamento.
+		const msg = await planoStore.salvarAtividade(it.id, v);
 
 		salvando = false;
 
@@ -267,7 +236,7 @@
 		</span>
 	</div>
 {:else}
-	<div class="dia" class:hoje class:revisao class:concluido={dia.registro?.concluido}>
+	<div class="dia" class:hoje class:revisao class:concluido={dia.concluido}>
 		<!-- The date plaque: weekday, number, month — read top to bottom, fixed
 		     width, so every card's content starts at the same x. -->
 		<div class="placa">
@@ -305,9 +274,8 @@
 				{:else}
 					<div class="atvs" role="list">
 						{#each dia.itens as it, i (it.id || i)}
-							{@const temAlvoAcimaNoDia = dia.itens.slice(0, i).some((x) => !feita(x.disciplina, x.id))}
-							{@const temAlvoAbaixoNoDia = dia.itens.slice(i + 1).some((x) => !feita(x.disciplina, x.id))}
-							{@const anterioresFeitos = dia.itens.slice(0, i).every((x) => feita(x.disciplina, x.id))}
+							{@const temAlvoAcimaNoDia = dia.itens.slice(0, i).some((x) => !atividadeFeita(x))}
+							{@const temAlvoAbaixoNoDia = dia.itens.slice(i + 1).some((x) => !atividadeFeita(x))}
 							<AtividadeItem
 								item={it}
 								data={dia.data}
@@ -318,8 +286,7 @@
 								{onMoverAcima}
 								{onMoverAbaixo}
 								minutos={minutosPorItem[i] ?? null}
-								concluida={feita(it.disciplina, it.id)}
-								onAntecipar={anterioresFeitos ? (id) => void antecipar(id) : undefined}
+								concluida={atividadeFeita(it)}
 								onRegistrar={(el) => {
 									gatilho = el;
 									erroForm = null;
@@ -395,7 +362,7 @@
 				item={it}
 				data={dia.data}
 				nome={nomeDe(it.disciplina)}
-				registro={blocoDaAtividade(dia.registro, it)}
+				registro={it}
 				cadernoUrl={planoStore.discIndex[it.disciplina]?.cadernoUrl ?? ''}
 				{salvando}
 				erro={erroForm}
