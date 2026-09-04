@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/port"
@@ -9,95 +10,93 @@ import (
 	"github.com/google/uuid"
 )
 
-// ConcursoService manages the concursos a user registers.
+// ConcursoService cadastra e edita o catálogo da prova, e conduz o assistente
+// de importação do edital.
 type ConcursoService struct {
 	repo      port.ConcursoRepository
 	processor port.EditalProcessor
 }
 
-func NewConcursoService(repo port.ConcursoRepository, processor port.EditalProcessor) *ConcursoService {
+func NewConcursoService(
+	repo port.ConcursoRepository,
+	processor port.EditalProcessor,
+) *ConcursoService {
 	return &ConcursoService{repo: repo, processor: processor}
 }
 
-// ImportacaoDisponivel reports whether the edital importer is wired.
+// ImportacaoDisponivel diz se o processador de editais está configurado. Sem
+// ele o cadastro manual continua funcionando normalmente.
 func (s *ConcursoService) ImportacaoDisponivel() bool {
 	return s.processor != nil && s.processor.Disponivel()
 }
 
-// AnalisarEdital is wizard step 1: uploads the edital to the processor and
-// returns the document handle plus the cargos. ownerRef binds the document to
-// this user for the later steps.
 func (s *ConcursoService) AnalisarEdital(
 	ctx context.Context,
-	ownerRef string,
+	dono string,
 	up port.EditalUpload,
-) (AnaliseResposta, error) {
-	res, err := s.processor.Analisar(ctx, ownerRef, up)
+) (AnaliseDoEdital, error) {
+	a, err := s.processor.Analisar(ctx, dono, up)
 	if err != nil {
-		return AnaliseResposta{}, err
+		return AnaliseDoEdital{}, err
 	}
 
-	return analiseParaResposta(res), nil
+	return analiseDoEdital(a), nil
 }
 
-// EstruturaDoCargo is wizard step 2: the groups, disciplines, exam basics and
-// schedule for the chosen cargo. Question counts the edital did not break down
-// stay nil — nothing is invented.
 func (s *ConcursoService) EstruturaDoCargo(
 	ctx context.Context,
-	ownerRef, documentoID, cargo string,
-) (EstruturaResposta, error) {
-	est, err := s.processor.Estrutura(ctx, ownerRef, documentoID, cargo)
+	dono, documentoID, cargo string,
+) (EstruturaDoEdital, error) {
+	e, err := s.processor.Estrutura(ctx, dono, documentoID, cargo)
 	if err != nil {
-		return EstruturaResposta{}, err
+		return EstruturaDoEdital{}, err
 	}
 
-	return estruturaParaResposta(est), nil
+	return estruturaDoEdital(e), nil
 }
 
-// ConteudoDoEdital is wizard step 3: the syllabus topics for the given
-// disciplines. A fresh upload is accepted (documentoID empty) so the edit
-// screen's "extract topics" flow keeps working without the wizard.
 func (s *ConcursoService) ConteudoDoEdital(
 	ctx context.Context,
-	ownerRef, documentoID, cargo string,
+	dono, documentoID, cargo string,
 	disciplinas []string,
 	up port.EditalUpload,
-) (ConteudoEditalResposta, error) {
-	res, err := s.processor.Conteudo(ctx, ownerRef, documentoID, cargo, disciplinas, up)
+) (ConteudoDoEdital, error) {
+	c, err := s.processor.Conteudo(ctx, dono, documentoID, cargo, disciplinas, up)
 	if err != nil {
-		return ConteudoEditalResposta{}, err
+		return ConteudoDoEdital{}, err
 	}
 
-	out := ConteudoEditalResposta{
-		Itens:   make([]ConteudoEditalDisc, 0, len(res.Itens)),
-		Alertas: editalAlertasParaResposta(res.Alertas),
-	}
-	for _, it := range res.Itens {
-		out.Itens = append(out.Itens, ConteudoEditalDisc{Nome: it.Nome, Temas: it.Temas})
+	itens := make([]DisciplinaComTemas, 0, len(c.Itens))
+	for _, it := range c.Itens {
+		itens = append(itens, DisciplinaComTemas{Nome: it.Nome, Temas: it.Temas})
 	}
 
-	return out, nil
+	return ConteudoDoEdital{Itens: itens, Alertas: alertasDoEdital(c.Alertas)}, nil
 }
 
-// Listar returns the user's concursos as picker rows.
-func (s *ConcursoService) Listar(ctx context.Context, userID uuid.UUID) ([]ConcursoResumo, error) {
-	items, err := s.repo.ListByOwner(ctx, userID)
+func (s *ConcursoService) Listar(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+) ([]ConcursoResumo, error) {
+	cs, err := s.repo.ListarPorDono(ctx, usuarioID)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]ConcursoResumo, 0, len(items))
-	for _, c := range items {
+	out := make([]ConcursoResumo, 0, len(cs))
+	for _, c := range cs {
 		out = append(out, resumoDe(c))
 	}
 
 	return out, nil
 }
 
-// Detalhe returns a concurso as the edit-form shape, checking ownership.
-func (s *ConcursoService) Detalhe(ctx context.Context, userID uuid.UUID, slug string) (ConcursoDetalhe, error) {
-	c, err := s.carregarDoDono(ctx, userID, slug)
+func (s *ConcursoService) Detalhe(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+) (ConcursoDetalhe, error) {
+	c, err := s.doDono(ctx, usuarioID, slug)
 	if err != nil {
 		return ConcursoDetalhe{}, err
 	}
@@ -105,84 +104,199 @@ func (s *ConcursoService) Detalhe(ctx context.Context, userID uuid.UUID, slug st
 	return detalheDe(c), nil
 }
 
-// PorSlug loads the full aggregate for a concurso the user owns. Used by
-// PlanoService.
-func (s *ConcursoService) PorSlug(ctx context.Context, userID uuid.UUID, slug string) (concurso.Concurso, error) {
-	return s.carregarDoDono(ctx, userID, slug)
+func (s *ConcursoService) PorSlug(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+) (concurso.Concurso, error) {
+	return s.doDono(ctx, usuarioID, slug)
 }
 
-// Criar validates and persists a new concurso.
-func (s *ConcursoService) Criar(ctx context.Context, userID uuid.UUID, in ConcursoInput) (ConcursoResumo, error) {
-	c, _ := concursoFromInput(in)
+func (s *ConcursoService) Criar(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	cmd ConcursoCommand,
+) (ConcursoResumo, []string, error) {
+	c, avisos := concursoDoComando(cmd)
+	c.DonoID = usuarioID
+	c.Slug = concurso.Slug(c.Nome)
+
+	c.Normalizar()
 
 	if err := c.Validar(); err != nil {
-		return ConcursoResumo{}, ErrValidacao{Msg: err.Error()}
+		return ConcursoResumo{}, nil, err
 	}
 
-	c.OwnerID = userID
-	c.Slug = slugify(c.Nome)
-
-	created, err := s.repo.CreateConcurso(ctx, c)
+	criado, err := s.repo.Criar(ctx, c)
 	if err != nil {
-		return ConcursoResumo{}, err
+		return ConcursoResumo{}, nil, err
 	}
 
-	return resumoDe(created), nil
+	return resumoDe(criado), avisos, nil
 }
 
-// Atualizar rewrites an existing concurso the user owns.
 func (s *ConcursoService) Atualizar(
 	ctx context.Context,
-	userID uuid.UUID,
+	usuarioID uuid.UUID,
 	slug string,
-	in ConcursoInput,
-) (ConcursoResumo, error) {
-	existente, err := s.carregarDoDono(ctx, userID, slug)
+	cmd ConcursoCommand,
+) (ConcursoResumo, []string, error) {
+	atual, err := s.doDono(ctx, usuarioID, slug)
 	if err != nil {
-		return ConcursoResumo{}, err
+		return ConcursoResumo{}, nil, err
 	}
 
-	c, _ := concursoFromInput(in)
+	c, avisos := concursoDoComando(cmd)
+	c.ID = atual.ID
+	c.DonoID = atual.DonoID
+	c.Slug = atual.Slug
+
+	// As disciplinas que o formulário devolveu com id são as que já existem, e
+	// elas guardam o código atual: assim uma matéria renomeada continua sendo a
+	// mesma matéria, e o cronograma e o histórico dela permanecem ligados.
+	preservarIdentidade(&c, atual)
+
+	c.Normalizar()
 
 	if err := c.Validar(); err != nil {
-		return ConcursoResumo{}, ErrValidacao{Msg: err.Error()}
+		return ConcursoResumo{}, nil, err
 	}
 
-	c.ID = existente.ID
-	c.OwnerID = userID
-	c.Slug = existente.Slug
-
-	updated, err := s.repo.UpdateConcurso(ctx, c)
+	atualizado, err := s.repo.Atualizar(ctx, c)
 	if err != nil {
-		return ConcursoResumo{}, err
+		return ConcursoResumo{}, nil, err
 	}
 
-	return resumoDe(updated), nil
+	return resumoDe(atualizado), avisos, nil
 }
 
-// Remover deletes a concurso and its plan.
-func (s *ConcursoService) Remover(ctx context.Context, userID uuid.UUID, slug string) error {
-	c, err := s.carregarDoDono(ctx, userID, slug)
+// preservarIdentidade casa as disciplinas que chegaram com as já gravadas,
+// mantendo id e código. Uma matéria sem id é nova e recebe os dois.
+func preservarIdentidade(novo *concurso.Concurso, atual concurso.Concurso) {
+	porID := make(map[uuid.UUID]concurso.Disciplina, len(atual.Disciplinas))
+	for _, d := range atual.Disciplinas {
+		porID[d.ID] = d
+	}
+
+	for i := range novo.Disciplinas {
+		d := &novo.Disciplinas[i]
+
+		if anterior, ok := porID[d.ID]; ok {
+			d.Codigo = anterior.Codigo
+		} else {
+			// Não é uma disciplina conhecida deste concurso: trate como nova.
+			d.ID = uuid.Nil
+			d.Codigo = ""
+		}
+	}
+}
+
+func (s *ConcursoService) Remover(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+) error {
+	c, err := s.doDono(ctx, usuarioID, slug)
 	if err != nil {
 		return err
 	}
 
-	return s.repo.DeleteConcurso(ctx, c.ID)
+	return s.repo.Remover(ctx, c.ID)
 }
 
-func (s *ConcursoService) carregarDoDono(
+func (s *ConcursoService) doDono(
 	ctx context.Context,
-	userID uuid.UUID,
+	usuarioID uuid.UUID,
 	slug string,
 ) (concurso.Concurso, error) {
-	c, err := s.repo.ConcursoBySlug(ctx, slug)
+	c, err := s.repo.PorSlug(ctx, slug)
 	if err != nil {
 		return concurso.Concurso{}, err
 	}
 
-	if c.OwnerID != userID {
-		return concurso.Concurso{}, concurso.ErrNotFound
+	if c.DonoID != usuarioID {
+		return concurso.Concurso{}, concurso.ErrNaoEncontrado
 	}
 
 	return c, nil
+}
+
+// concursoDoComando traduz o formulário para o domínio. A normalização e a
+// validação são do domínio; aqui só se converte o formato, e se acumulam os
+// avisos sobre o que o usuário deixou pela metade.
+func concursoDoComando(cmd ConcursoCommand) (concurso.Concurso, []string) {
+	avisos := []string{}
+
+	c := concurso.Concurso{
+		Nome:           cmd.Nome,
+		Banca:          cmd.Banca,
+		Cargo:          cmd.Cargo,
+		Emoji:          concurso.PrimeiroEmoji(cmd.Emoji),
+		Resumo:         cmd.Resumo,
+		RetaPadraoDias: cmd.RetaFinalDias,
+		Disciplinas:    make([]concurso.Disciplina, 0, len(cmd.Disciplinas)),
+		Marcos:         make([]concurso.Marco, 0, len(cmd.Marcos)),
+		Conteudo:       make([]concurso.ConteudoItem, 0, len(cmd.Conteudo)),
+	}
+
+	if prova, err := dataISO(cmd.Prova); err == nil {
+		c.ProvaPadrao = prova
+	} else if cmd.Prova != "" {
+		avisos = append(avisos, "não entendi a data da prova ("+cmd.Prova+") — confira")
+	}
+
+	for _, dc := range cmd.Disciplinas {
+		d := concurso.Disciplina{
+			Nome:           dc.Nome,
+			Bloco:          concurso.BlocoValido(dc.Bloco),
+			Peso:           dc.Peso,
+			QuestoesPadrao: dc.Questoes,
+			CadernoURL:     dc.CadernoURL,
+			Temas:          dc.Temas,
+		}
+
+		if id, err := uuid.Parse(dc.ID); err == nil {
+			d.ID = id
+		}
+
+		for _, fc := range dc.Fontes {
+			d.Fontes = append(d.Fontes, concurso.Fonte{
+				Titulo: fc.Titulo, URL: fc.URL, Tipo: fc.Tipo,
+			})
+		}
+
+		if d.QuestoesPadrao == 0 && strings.TrimSpace(d.Nome) != "" {
+			avisos = append(avisos,
+				`a disciplina "`+d.Nome+`" está sem número de questões — estime um valor`)
+		}
+
+		c.Disciplinas = append(c.Disciplinas, d)
+	}
+
+	for _, mc := range cmd.Marcos {
+		data, err := dataISO(mc.Data)
+		if err != nil {
+			continue
+		}
+
+		m := concurso.Marco{
+			DataInicio: data,
+			Titulo:     mc.Titulo,
+			ExigeAcao:  mc.ExigeAcao,
+		}
+
+		if fim, err := dataISO(mc.DataFim); err == nil {
+			m.DataFim = &fim
+		}
+
+		c.Marcos = append(c.Marcos, m)
+	}
+
+	for _, cc := range cmd.Conteudo {
+		c.Conteudo = append(c.Conteudo, concurso.ConteudoItem{
+			Tipo: cc.Tipo, Texto: cc.Texto,
+		})
+	}
+
+	return c, avisos
 }

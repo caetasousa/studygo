@@ -31,7 +31,7 @@ func NewJWTIssuer(secret string, ttl time.Duration) *JWTIssuer {
 	}
 }
 
-func (j *JWTIssuer) Issue(userID uuid.UUID) (string, time.Time, error) {
+func (j *JWTIssuer) Emitir(userID uuid.UUID) (string, time.Time, error) {
 	expiresAt := j.now().Add(j.ttl)
 
 	claims := jwt.RegisteredClaims{
@@ -48,7 +48,7 @@ func (j *JWTIssuer) Issue(userID uuid.UUID) (string, time.Time, error) {
 	return token, expiresAt, nil
 }
 
-func (j *JWTIssuer) Parse(token string) (uuid.UUID, error) {
+func (j *JWTIssuer) Ler(token string) (uuid.UUID, error) {
 	parsed, err := jwt.ParseWithClaims(
 		token,
 		&jwt.RegisteredClaims{},

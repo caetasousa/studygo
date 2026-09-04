@@ -1,19 +1,23 @@
 package concurso
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 )
 
-// Códigos are what the schedule shows on every activity chip, so they have to
-// be readable at a glance: "POR" and "DIRADM" say what they are, "D01" and
-// "D02" say only what order they were imported in.
+// O código de uma disciplina é o que o cronograma mostra em cada chip, então
+// precisa ser legível de relance: "POR" e "DIRAD" dizem o que são, "D01" e
+// "D02" dizem só a ordem em que foram importados.
 //
-// Sigla builds a short mnemonic from a discipline's name, and Siglas assigns a
-// unique one to each discipline of a concurso.
+// Esta é a ÚNICA implementação da regra no repositório. Ela já existiu três
+// vezes — aqui, numa função plpgsql de migration e outra vez no frontend, esta
+// última com resultado diferente ("DA" em vez de "DIRAD"), o que fazia a tela
+// discordar do que estava gravado. O frontend agora exibe o `codigo` que a API
+// manda, e a migration que reimplementava isso em SQL não existe mais.
 
-// palavrasIgnoradas are the connectives and generic qualifiers that carry no
-// identity: including them would turn every "Noções de X" into "NOC".
+// palavrasIgnoradas são os conectivos e qualificadores genéricos que não
+// carregam identidade: incluí-los transformaria todo "Noções de X" em "NOC".
 var palavrasIgnoradas = map[string]bool{
 	"de": true, "da": true, "do": true, "das": true, "dos": true,
 	"e": true, "em": true, "a": true, "o": true, "as": true, "os": true,
@@ -24,15 +28,15 @@ var palavrasIgnoradas = map[string]bool{
 	"básicas": true, "basicas": true, "introdução": true, "introducao": true,
 }
 
-// Sigla derives a mnemonic code from a discipline name.
+// Sigla deriva um mnemônico do nome de uma disciplina.
 //
-// One significant word gives its first three letters (Português -> POR); two or
-// more give three from the first plus two from the second (Direito
-// Administrativo -> DIRAD), which keeps sibling disciplines apart — the common
-// case of several "Direito ..." or "Noções de ..." in one edital.
+// Uma palavra significativa dá suas quatro primeiras letras (Português -> PORT);
+// duas ou mais dão três da primeira e duas da segunda (Direito Administrativo ->
+// DIRAD), o que separa disciplinas irmãs — o caso comum de vários "Direito ..."
+// ou "Noções de ..." no mesmo edital.
 //
-// The result is uppercase ASCII, at most 6 characters. An empty or
-// unusable name yields "", and the caller decides on a fallback.
+// O resultado é ASCII maiúsculo. Um nome vazio ou inaproveitável devolve "", e
+// quem chama decide o fallback.
 func Sigla(nome string) string {
 	palavras := significativas(nome)
 	if len(palavras) == 0 {
@@ -46,37 +50,40 @@ func Sigla(nome string) string {
 	return prefixo(palavras[0], 3) + prefixo(palavras[1], 2)
 }
 
-// Siglas assigns a unique código to every discipline, in slice order, and
-// returns them positionally.
-//
-// Uniqueness is resolved by appending a digit ("DIRAD", "DIRAD2"), never by
-// falling back to the positional scheme: a name that collides is still more
-// recognisable with a suffix than as "D07". A discipline whose name yields no
-// letters at all keeps the positional code, since there is nothing to build on.
+// CodigoUnico devolve um mnemônico para `nome` que ainda não esteja em
+// `usados`. Colisões ganham um sufixo numérico ("DIRAD", "DIRAD2") em vez de
+// cair no esquema posicional: um nome que colide continua mais reconhecível com
+// sufixo do que como "D07". Um nome sem letra nenhuma usa a posição, porque não
+// há o que aproveitar.
+func CodigoUnico(nome string, posicao int, usados map[string]bool) string {
+	base := Sigla(nome)
+	if base == "" {
+		base = "D" + doisDigitos(posicao+1)
+	}
+
+	codigo := base
+	for n := 2; usados[codigo]; n++ {
+		codigo = base + strconv.Itoa(n)
+	}
+
+	return codigo
+}
+
+// Siglas atribui um código único a cada nome, na ordem recebida.
 func Siglas(nomes []string) []string {
 	out := make([]string, len(nomes))
 	usados := make(map[string]bool, len(nomes))
 
 	for i, nome := range nomes {
-		base := Sigla(nome)
-		if base == "" {
-			base = "D" + doisDigitos(i+1)
-		}
-
-		codigo := base
-		for n := 2; usados[codigo]; n++ {
-			codigo = base + itoa(n)
-		}
-
-		usados[codigo] = true
-		out[i] = codigo
+		out[i] = CodigoUnico(nome, i, usados)
+		usados[out[i]] = true
 	}
 
 	return out
 }
 
-// significativas splits a name into the words that carry identity, with accents
-// folded away so "Órgão" and "Orgao" behave alike.
+// significativas quebra um nome nas palavras que carregam identidade, com os
+// acentos dobrados para ASCII, de modo que "Órgão" e "Orgao" se comportem igual.
 func significativas(nome string) []string {
 	campos := strings.FieldsFunc(nome, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
@@ -93,8 +100,8 @@ func significativas(nome string) []string {
 		out = append(out, limpo)
 	}
 
-	// A name made entirely of ignored words ("Noções Gerais") still has to yield
-	// something, so fall back to using them.
+	// Um nome feito só de palavras ignoradas ("Noções Gerais") ainda precisa
+	// render alguma coisa, então elas voltam a valer.
 	if len(out) == 0 {
 		for _, c := range campos {
 			if limpo := semAcento(strings.ToLower(c)); limpo != "" {
@@ -115,8 +122,8 @@ func prefixo(s string, n int) string {
 	return strings.ToUpper(string(r))
 }
 
-// semAcento folds the Latin-1 accented letters Portuguese actually uses down to
-// ASCII, so a código never carries a diacritic.
+// semAcento dobra para ASCII as letras acentuadas que o português usa, para que
+// um código nunca carregue diacrítico.
 func semAcento(s string) string {
 	var b strings.Builder
 
@@ -146,22 +153,8 @@ func semAcento(s string) string {
 
 func doisDigitos(n int) string {
 	if n < 10 {
-		return "0" + itoa(n)
+		return "0" + strconv.Itoa(n)
 	}
 
-	return itoa(n)
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-
-	return string(b)
+	return strconv.Itoa(n)
 }

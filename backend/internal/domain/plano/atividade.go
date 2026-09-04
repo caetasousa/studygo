@@ -3,26 +3,30 @@ package plano
 import (
 	"errors"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-// Errors a move can fail with. They are distinct so the API can turn each into
-// a message that says what to do next, rather than a generic refusal.
+// Erros que um movimento pode devolver. São distintos para que a API traduza
+// cada um numa mensagem que diga o que fazer em seguida, em vez de uma recusa
+// genérica.
 var (
-	// ErrAtividadeNaoEncontrada: no activity with that id in the plan.
+	// ErrAtividadeNaoEncontrada: nenhuma atividade com esse id no plano.
 	ErrAtividadeNaoEncontrada = errors.New("atividade não encontrada")
-	// ErrDestinoInvalido: the target date is not a day that can hold content
-	// (outside the plan, or a fixed day such as the simulado or the eve).
+	// ErrDestinoInvalido: a data de destino não é um dia que aceita conteúdo
+	// (fora do plano, ou um dia fixo como o simulado e a véspera).
 	ErrDestinoInvalido = errors.New("dia de destino não aceita atividades")
-	// ErrDiaConcluido: the source or target day is already marked done, so
-	// moving would rewrite history.
+	// ErrDiaConcluido: o dia de destino já está concluído, então mover
+	// reescreveria o que foi estudado.
 	ErrDiaConcluido = errors.New("dia já concluído")
+	// ErrAtividadeConcluida: a própria atividade já foi concluída.
+	ErrAtividadeConcluida = errors.New("atividade já concluída")
 )
 
-// TipoAtividade is what a scheduled activity asks of the student. It is
-// deliberately separate from Tipo (which classifies a whole day): a single day
-// can hold a theory block and a question block at once.
+// TipoAtividade é o que uma atividade agendada pede do estudante. É
+// deliberadamente separado de Tipo (que classifica o dia inteiro): um mesmo dia
+// pode ter um bloco de teoria e um de questões ao mesmo tempo.
 type TipoAtividade string
 
 const (
@@ -31,38 +35,46 @@ const (
 	AtividadeQuestoes   TipoAtividade = "questoes"
 	AtividadeSimulado   TipoAtividade = "simulado"
 	AtividadeDiscursiva TipoAtividade = "discursiva"
+	AtividadeVespera    TipoAtividade = "vespera"
 )
 
-// Atividade is one movable unit of the schedule: a subject+topic to study, a
-// review, a block of questions. It is the planning side only — what the student
-// actually did lives in Registro, so moving an activity never rewrites history.
-type Atividade struct {
-	ID         string
-	Data       time.Time
-	Posicao    int
-	Disciplina string // discipline codigo; empty for whole-day activities
-	Tema       string
-	Passada    int
-	Tipo       TipoAtividade
-	DuracaoMin int // 0 = use the plan's default block length
-
-	// Where the engine had put it, so a regeneration can distinguish an activity
-	// the user moved from one it merely regenerated differently.
-	OrigemDia *time.Time
-	OrigemPos *int
-}
-
-// Movida reports whether the user has moved this activity away from where the
-// engine originally placed it.
-func (a Atividade) Movida() bool {
-	if a.OrigemDia == nil || a.OrigemPos == nil {
+// DeDiaInteiro diz se a atividade ocupa o dia todo em vez de uma matéria. Essas
+// não apontam para disciplina nenhuma, e o cronograma não as move: são o
+// esqueleto do plano.
+func (t TipoAtividade) DeDiaInteiro() bool {
+	switch t {
+	case AtividadeSimulado, AtividadeDiscursiva, AtividadeVespera, AtividadeRevisao:
+		return true
+	default:
 		return false
 	}
-
-	return !sameDay(*a.OrigemDia, a.Data) || *a.OrigemPos != a.Posicao
 }
 
-// Duracao resolves the planned length, falling back to the plan's block size.
+// Atividade é uma unidade agendada do cronograma: uma matéria e o tema dela, uma
+// revisão, um simulado.
+//
+// O cronograma é MATERIALIZADO: toda atividade de todo dia existe desde a
+// criação do plano, com id próprio. Não há atividade "derivada" nem id
+// sintético — o que está na tela é o que está gravado, e é por isso que um
+// registro de estudo pode ter chave estrangeira de verdade para cá.
+type Atividade struct {
+	ID           uuid.UUID
+	Data         time.Time
+	Posicao      int
+	DisciplinaID *uuid.UUID // nil nas atividades de dia inteiro
+	Disciplina   string     // código da disciplina, vazio nas de dia inteiro
+	Tema         string
+	Passada      int
+	Tipo         TipoAtividade
+	DuracaoMin   int // 0 = usar a duração padrão do bloco no plano
+
+	// Movida marca a atividade que o estudante colocou onde ela está. Um
+	// replanejamento do futuro não a arrasta de volta: a escolha dele vale mais
+	// que a do motor.
+	Movida bool
+}
+
+// Duracao resolve a duração planejada, caindo na do bloco padrão.
 func (a Atividade) Duracao(padraoMin int) int {
 	if a.DuracaoMin > 0 {
 		return a.DuracaoMin
@@ -71,45 +83,233 @@ func (a Atividade) Duracao(padraoMin int) int {
 	return padraoMin
 }
 
-// DestinoValido reports whether a date can receive activities: it must be a day
-// the plan actually contains, and one that carries content rather than a fixed
-// fixture (simulado, discursiva, véspera).
+// DestinoValido diz se uma data pode receber atividades: precisa ser um dia que
+// o plano de fato contém, e que carrega conteúdo em vez de um dia fixo
+// (simulado, discursiva, véspera).
 func DestinoValido(dias []Dia, dt time.Time) bool {
 	d := findDia(dias, dt)
 	if d == nil {
 		return false
 	}
 
-	// Only days that actually carry study items can receive one; the fixed
-	// fixtures (simulado, discursiva, véspera) are the plan's skeleton.
 	return d.Tipo == TipoEstudo || d.Tipo == TipoRevisaoDirigida || d.Tipo == TipoRevisaoSemanal
 }
 
-// TrocarAtividades swaps one activity with whatever occupies (destino, posicao),
-// instead of inserting alongside it. This is what "move Português from the 31st
-// to the 2nd" usually means when the 2nd is already full: the two subjects
-// exchange places and neither day changes size.
+// Materializar transforma os dias que o motor gerou nas atividades que serão
+// gravadas. É o passo que fecha a lacuna entre "plano calculado" e "plano
+// existente": depois dele, todo bloco da tela tem uma linha no banco.
 //
-// When the target slot is empty (the day has fewer activities than posicao),
-// there is nothing to swap with and this degrades to a plain move.
-func TrocarAtividades(
+// Os dias fixos também viram atividade, para que um simulado possa receber
+// registro como qualquer outra coisa que se faz num dia.
+func Materializar(dias []Dia, porCodigo map[string]uuid.UUID) []Atividade {
+	out := make([]Atividade, 0, len(dias)*2)
+
+	for _, d := range dias {
+		data := day(d.Data)
+
+		if len(d.Itens) == 0 {
+			// Dia fixo: uma atividade só, do dia inteiro.
+			out = append(out, Atividade{
+				ID:      uuid.New(),
+				Data:    data,
+				Posicao: 0,
+				Tema:    d.Tema,
+				Passada: 1,
+				Tipo:    tipoDaAtividade(d.Tipo),
+			})
+
+			continue
+		}
+
+		for i, it := range d.Itens {
+			a := Atividade{
+				ID:      uuid.New(),
+				Data:    data,
+				Posicao: i,
+				Tema:    it.Tema,
+				Passada: it.Passada,
+				Tipo:    tipoDaAtividade(d.Tipo),
+			}
+
+			// Só o que é de uma matéria aponta para uma disciplina. Um dia de
+			// revisão semanal percorre o ciclo inteiro, não uma matéria — ligá-lo
+			// a uma faria a estatística creditar horas de revisão geral a ela.
+			if !a.Tipo.DeDiaInteiro() {
+				a.Disciplina = it.Disciplina
+				if id, ok := porCodigo[it.Disciplina]; ok {
+					a.DisciplinaID = &id
+				}
+			}
+
+			out = append(out, a)
+		}
+	}
+
+	return out
+}
+
+// Replanejar recalcula o cronograma dos dias que ainda estão por vir,
+// preservando o que não pode ser mexido.
+//
+// A regra que o estudante espera: o que já passou, o que está concluído e o que
+// ele arrumou à mão fica onde está; os dias à frente seguem a configuração nova.
+// Uma atividade é preservada quando QUALQUER uma dessas condições vale, e as
+// demais dão lugar às recém-geradas.
+//
+// É isto que substitui a antiga reconciliação: em vez de casar slots gerados
+// com linhas guardadas a cada leitura, o replanejamento acontece uma vez, quando
+// a configuração muda, e grava o resultado.
+func Replanejar(
+	atuais []Atividade,
+	novas []Atividade,
+	desde time.Time,
+	concluida func(uuid.UUID) bool,
+) []Atividade {
+	desde = day(desde)
+
+	preservadas := make([]Atividade, 0, len(atuais))
+	ocupadas := map[time.Time]map[int]bool{}
+
+	marcarOcupada := func(a Atividade) {
+		dt := day(a.Data)
+		if ocupadas[dt] == nil {
+			ocupadas[dt] = map[int]bool{}
+		}
+
+		ocupadas[dt][a.Posicao] = true
+	}
+
+	// Um dia que teve QUALQUER atividade preservada fica inteiro como está.
+	//
+	// Sem isso, um dia já estudado recebia também a leva recém-gerada e passava a
+	// mostrar a mesma matéria duas vezes — metade concluída, metade não. O
+	// replanejamento é sobre os dias que ainda estão em aberto; um dia em que o
+	// estudante já mexeu não é um deles.
+	intocados := map[time.Time]bool{}
+
+	for _, a := range atuais {
+		dt := day(a.Data)
+
+		if dt.Before(desde) || concluida(a.ID) || a.Movida {
+			preservadas = append(preservadas, a)
+			marcarOcupada(a)
+			intocados[dt] = true
+		}
+	}
+
+	// As atividades novas entram só nos dias que o replanejamento alcança.
+	for _, n := range novas {
+		dt := day(n.Data)
+		if dt.Before(desde) || intocados[dt] {
+			continue
+		}
+
+		pos := n.Posicao
+		for ocupadas[dt][pos] {
+			pos++
+		}
+
+		n.Posicao = pos
+		preservadas = append(preservadas, n)
+		marcarOcupada(n)
+	}
+
+	ordenar(preservadas)
+
+	return preservadas
+}
+
+// Mover leva uma atividade para (data, posicao) e devolve a ordenação nova de
+// todos os dias que ela tocou, para que quem chama grave as posições densas e
+// de uma vez.
+//
+// Nunca mexe em registro: o plano muda, a história do que foi estudado não.
+func Mover(
 	atividades []Atividade,
 	dias []Dia,
-	id string,
+	id uuid.UUID,
 	destino time.Time,
 	posicao int,
 	concluido func(time.Time) bool,
 ) ([]Atividade, error) {
-	idx := -1
+	idx := indiceDe(atividades, id)
+	if idx < 0 {
+		return nil, ErrAtividadeNaoEncontrada
+	}
 
-	for i := range atividades {
-		if atividades[i].ID == id {
-			idx = i
+	origem := day(atividades[idx].Data)
+	destino = day(destino)
 
-			break
+	if !DestinoValido(dias, destino) {
+		return nil, ErrDestinoInvalido
+	}
+
+	// Só o destino é protegido aqui: se a atividade EM SI está concluída é
+	// decisão de quem chama, que enxerga os registros. Recusar todo movimento
+	// para fora de um dia que guarda trabalho concluído congelaria também as
+	// outras matérias daquele dia.
+	if DestinoBloqueado(dias, destino, concluido) {
+		return nil, ErrDiaConcluido
+	}
+
+	movida := atividades[idx]
+	movida.Data = destino
+	movida.Movida = true
+
+	restantes := make([]Atividade, 0, len(atividades))
+	restantes = append(restantes, atividades[:idx]...)
+	restantes = append(restantes, atividades[idx+1:]...)
+
+	destinoLista := doDia(restantes, destino)
+	posicao = min(max(posicao, 0), len(destinoLista))
+
+	saida := make([]Atividade, 0, len(atividades))
+	for _, a := range restantes {
+		if !sameDay(a.Data, destino) {
+			saida = append(saida, a)
 		}
 	}
 
+	// O dia de destino é reconstruído explicitamente, inserindo em `posicao`.
+	// Só empurrar a posição da movida não basta: as que ela desloca manteriam os
+	// números antigos e uma ordenação estável a deixaria atrás delas.
+	novaOrdem := make([]Atividade, 0, len(destinoLista)+1)
+	novaOrdem = append(novaOrdem, destinoLista[:posicao]...)
+	novaOrdem = append(novaOrdem, movida)
+	novaOrdem = append(novaOrdem, destinoLista[posicao:]...)
+
+	for i := range novaOrdem {
+		novaOrdem[i].Posicao = i
+	}
+
+	saida = append(saida, novaOrdem...)
+
+	// O dia de origem perdeu um item; feche o buraco que ele deixou.
+	if !sameDay(origem, destino) {
+		renumerar(saida, map[time.Time]bool{origem: true})
+	}
+
+	ordenar(saida)
+
+	return saida, nil
+}
+
+// Trocar troca uma atividade com quem ocupa (destino, posicao), em vez de
+// inserir ao lado. É o que "levar Português do dia 31 para o dia 2" costuma
+// significar quando o dia 2 já está cheio: as duas matérias trocam de lugar e
+// nenhum dos dias muda de tamanho.
+//
+// Quando a vaga de destino está vazia não há com quem trocar, e isto vira um
+// movimento simples.
+func Trocar(
+	atividades []Atividade,
+	dias []Dia,
+	id uuid.UUID,
+	destino time.Time,
+	posicao int,
+	concluido func(time.Time) bool,
+) ([]Atividade, error) {
+	idx := indiceDe(atividades, id)
 	if idx < 0 {
 		return nil, ErrAtividadeNaoEncontrada
 	}
@@ -122,27 +322,20 @@ func TrocarAtividades(
 		return nil, ErrDestinoInvalido
 	}
 
-	// Only the destination is guarded here: whether the activity ITSELF is
-	// finished is decided by the caller, which can see the records. Refusing
-	// every move out of a day that holds finished work would freeze that day's
-	// other subjects too. See DestinoBloqueado: a content day's own flag does
-	// not lock it either, since it is derived from a snapshot that is about to
-	// change anyway.
 	if DestinoBloqueado(dias, destino, concluido) {
 		return nil, ErrDiaConcluido
 	}
 
-	// Same slot: nothing to do, and swapping with itself would be a no-op that
-	// still rewrote every position.
+	// Mesma vaga: nada a fazer, e trocar consigo mesma reescreveria todas as
+	// posições por nada.
 	if sameDay(origem, destino) && posOrigem == posicao {
 		return append([]Atividade(nil), atividades...), nil
 	}
 
 	destinoLista := doDia(atividades, destino)
 
-	// No occupant at that slot — a swap has no counterpart, so this is a move.
 	if posicao < 0 || posicao >= len(destinoLista) {
-		return MoverAtividade(atividades, dias, id, destino, posicao, concluido)
+		return Mover(atividades, dias, id, destino, posicao, concluido)
 	}
 
 	alvoID := destinoLista[posicao].ID
@@ -157,220 +350,78 @@ func TrocarAtividades(
 		case id:
 			saida[i].Data = destino
 			saida[i].Posicao = posicao
+			saida[i].Movida = true
 		case alvoID:
 			saida[i].Data = origem
 			saida[i].Posicao = posOrigem
+			saida[i].Movida = true
 		}
 	}
+
+	ordenar(saida)
 
 	return saida, nil
 }
 
-// prefixoDerivado marks an id the engine synthesised for an activity that has
-// never been stored. It is deliberately not a uuid: the repository rejects it,
-// which is what stops a synthetic id from reaching the database by accident.
-const prefixoDerivado = "gen:"
-
-// IDDerivado is the stable id of a generated (never-moved) activity: its slot
-// in the plan. It lets the UI address an activity on the very first load,
-// before any move has been persisted, without turning GET into a write.
-//
-// It is stable only while the plan is not rearranged, which is exactly its
-// lifetime: the first move materialises every activity with a real uuid.
-func IDDerivado(data time.Time, posicao int) string {
-	return prefixoDerivado + day(data).Format("2006-01-02") + ":" + itoa(posicao)
+// AtividadesDoDia é a lista ordenada que o cartão de um dia renderiza.
+func AtividadesDoDia(atividades []Atividade, dt time.Time) []Atividade {
+	return doDia(atividades, dt)
 }
 
-// EhIDDerivado reports whether an id is a synthetic slot id rather than a
-// stored activity's uuid.
-func EhIDDerivado(id string) bool {
-	return strings.HasPrefix(id, prefixoDerivado)
+// PorID localiza uma atividade pelo id.
+func PorID(atividades []Atividade, id uuid.UUID) (Atividade, bool) {
+	if i := indiceDe(atividades, id); i >= 0 {
+		return atividades[i], true
+	}
+
+	return Atividade{}, false
 }
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
+// MinutosPlanejados soma os minutos planejados de um dia.
+func MinutosPlanejados(atividades []Atividade, dt time.Time, padraoMin int) int {
+	total := 0
+	for _, a := range doDia(atividades, dt) {
+		total += a.Duracao(padraoMin)
 	}
 
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-
-	return string(b)
+	return total
 }
 
-// AtividadesFaltantes returns activities for the items of a reconciled plan that
-// have no stored counterpart yet — the ones still carrying a synthetic slot id.
-//
-// This is what lets a plan be materialised incrementally: the whole schedule on
-// the first move, and afterwards just the blocks a raised blocosPorDia added,
-// without disturbing the activities the user has already arranged.
-//
-// `dias` must have been through AplicarAtividades, so every item carries the id
-// it was reconciled to.
-func AtividadesFaltantes(dias []Dia, existentes []Atividade) []Atividade {
-	ocupadas := map[string]map[int]bool{}
-
-	for _, a := range existentes {
-		k := day(a.Data).Format("2006-01-02")
-		if ocupadas[k] == nil {
-			ocupadas[k] = map[int]bool{}
-		}
-
-		ocupadas[k][a.Posicao] = true
+// AplicarNosDias preenche os itens de cada dia a partir do cronograma gravado.
+// É a única direção que existe agora: o que está guardado descreve o dia, sem
+// reconciliação com nada.
+func AplicarNosDias(dias []Dia, atividades []Atividade) {
+	porDia := map[time.Time][]Atividade{}
+	for _, a := range atividades {
+		k := day(a.Data)
+		porDia[k] = append(porDia[k], a)
 	}
 
-	out := []Atividade{}
+	for i := range dias {
+		lista := porDia[day(dias[i].Data)]
 
-	for _, d := range dias {
-		data := day(d.Data)
-		chave := data.Format("2006-01-02")
+		sort.SliceStable(lista, func(x, y int) bool { return lista[x].Posicao < lista[y].Posicao })
 
-		for pos, it := range d.Itens {
-			if !EhIDDerivado(it.AtividadeID) {
+		itens := make([]ItemDia, 0, len(lista))
+
+		for _, a := range lista {
+			if a.Tipo.DeDiaInteiro() {
 				continue
 			}
 
-			// Position must not collide with an activity already stored for that
-			// day: the unique (plano, data, posicao) index would reject it.
-			livre := pos
-			for ocupadas[chave][livre] {
-				livre++
-			}
-
-			if ocupadas[chave] == nil {
-				ocupadas[chave] = map[int]bool{}
-			}
-
-			ocupadas[chave][livre] = true
-
-			origemDia, origemPos := data, pos
-			out = append(out, Atividade{
-				Data:       data,
-				Posicao:    livre,
-				Disciplina: it.Disciplina,
-				Tema:       it.Tema,
-				Passada:    it.Passada,
-				Tipo:       tipoDaAtividade(d.Tipo),
-				OrigemDia:  &origemDia,
-				OrigemPos:  &origemPos,
+			itens = append(itens, ItemDia{
+				Disciplina:  a.Disciplina,
+				Tema:        a.Tema,
+				Passada:     a.Passada,
+				AtividadeID: a.ID,
 			})
 		}
-	}
 
-	return out
+		dias[i].Itens = itens
+	}
 }
 
-// ResolverIDDerivado maps a synthetic slot id back to the stored activity that
-// now occupies that slot, which is how the first move of a never-arranged plan
-// finds its target.
-func ResolverIDDerivado(atividades []Atividade, id string) (string, bool) {
-	if !EhIDDerivado(id) {
-		return id, true
-	}
-
-	for _, a := range atividades {
-		if IDDerivado(a.Data, a.Posicao) == id {
-			return a.ID, true
-		}
-	}
-
-	return "", false
-}
-
-// MoverAtividade moves one activity to (data, posicao) and returns the full new
-// ordering of every day it touched, so the caller can persist positions
-// densely and atomically.
-//
-// It never touches Registro: the plan changes, the history of what was studied
-// does not. concluido reports whether a date is already marked done.
-func MoverAtividade(
-	atividades []Atividade,
-	dias []Dia,
-	id string,
-	destino time.Time,
-	posicao int,
-	concluido func(time.Time) bool,
-) ([]Atividade, error) {
-	idx := -1
-
-	for i := range atividades {
-		if atividades[i].ID == id {
-			idx = i
-
-			break
-		}
-	}
-
-	if idx < 0 {
-		return nil, ErrAtividadeNaoEncontrada
-	}
-
-	origem := atividades[idx].Data
-	destino = day(destino)
-
-	if !DestinoValido(dias, destino) {
-		return nil, ErrDestinoInvalido
-	}
-
-	// See TrocarAtividades: the origin is not guarded, only the destination —
-	// and see DestinoBloqueado for what actually locks it. A day whose
-	// "concluído" only describes the items it happened to hold a moment ago
-	// (any content day) does not lock; one whose "concluído" is the student's
-	// own word for the whole day (a weekly review with nothing to point at)
-	// does.
-	if DestinoBloqueado(dias, destino, concluido) {
-		return nil, ErrDiaConcluido
-	}
-
-	movida := atividades[idx]
-	restantes := make([]Atividade, 0, len(atividades))
-	restantes = append(restantes, atividades[:idx]...)
-	restantes = append(restantes, atividades[idx+1:]...)
-
-	destinoLista := doDia(restantes, destino)
-	if posicao < 0 {
-		posicao = 0
-	}
-
-	if posicao > len(destinoLista) {
-		posicao = len(destinoLista)
-	}
-
-	movida.Data = destino
-
-	// Rebuild the destination day explicitly, inserting at `posicao`. Bumping the
-	// moved item's position alone is not enough: the ones it displaces would keep
-	// their old numbers and a stable sort would leave it behind them.
-	saida := make([]Atividade, 0, len(atividades))
-	for _, a := range restantes {
-		if !sameDay(a.Data, destino) {
-			saida = append(saida, a)
-		}
-	}
-
-	novaOrdem := make([]Atividade, 0, len(destinoLista)+1)
-	novaOrdem = append(novaOrdem, destinoLista[:posicao]...)
-	novaOrdem = append(novaOrdem, movida)
-	novaOrdem = append(novaOrdem, destinoLista[posicao:]...)
-
-	for i := range novaOrdem {
-		novaOrdem[i].Posicao = i
-	}
-
-	saida = append(saida, novaOrdem...)
-
-	// The source day lost one item, so close the gap it left behind.
-	if !sameDay(origem, destino) {
-		renumerar(saida, map[time.Time]bool{day(origem): true})
-	}
-
-	return saida, nil
-}
-
-// doDia returns the activities of one day, ordered by position.
+// doDia devolve as atividades de um dia, ordenadas por posição.
 func doDia(atividades []Atividade, dt time.Time) []Atividade {
 	out := []Atividade{}
 
@@ -385,161 +436,42 @@ func doDia(atividades []Atividade, dt time.Time) []Atividade {
 	return out
 }
 
-// renumerar rewrites positions 0..n-1 for each affected day, in place.
+// renumerar reescreve as posições 0..n-1 de cada dia afetado, no lugar.
 func renumerar(atividades []Atividade, dias map[time.Time]bool) {
+	porID := make(map[uuid.UUID]int, len(atividades))
+	for i := range atividades {
+		porID[atividades[i].ID] = i
+	}
+
 	for dt := range dias {
-		ordenadas := doDia(atividades, dt)
-		for i, a := range ordenadas {
-			for j := range atividades {
-				if atividades[j].ID == a.ID {
-					atividades[j].Posicao = i
-
-					break
-				}
+		for i, a := range doDia(atividades, dt) {
+			if j, ok := porID[a.ID]; ok {
+				atividades[j].Posicao = i
 			}
 		}
 	}
 }
 
-// AtividadesDoDia is the ordered view one day's card renders.
-func AtividadesDoDia(atividades []Atividade, dt time.Time) []Atividade {
-	return doDia(atividades, dt)
+// ordenar deixa o cronograma em ordem de (data, posição), que é como o
+// repositório o devolve e como a tela o lê.
+func ordenar(atividades []Atividade) {
+	sort.SliceStable(atividades, func(i, j int) bool {
+		if !atividades[i].Data.Equal(atividades[j].Data) {
+			return atividades[i].Data.Before(atividades[j].Data)
+		}
+
+		return atividades[i].Posicao < atividades[j].Posicao
+	})
 }
 
-// MinutosPlanejados totals a day's planned minutes.
-func MinutosPlanejados(atividades []Atividade, dt time.Time, padraoMin int) int {
-	total := 0
-	for _, a := range doDia(atividades, dt) {
-		total += a.Duracao(padraoMin)
-	}
-
-	return total
-}
-
-// DerivarAtividades turns the engine's generated days into activities. Used to
-// seed the override table the first time the user moves something, so what they
-// see is exactly what they were already looking at.
-func DerivarAtividades(dias []Dia) []Atividade {
-	out := []Atividade{}
-
-	for _, d := range dias {
-		for i, it := range d.Itens {
-			dia, pos := d.Data, i
-			out = append(out, Atividade{
-				ID:         IDDerivado(d.Data, i),
-				Data:       day(d.Data),
-				Posicao:    i,
-				Disciplina: it.Disciplina,
-				Tema:       it.Tema,
-				Passada:    it.Passada,
-				Tipo:       tipoDaAtividade(d.Tipo),
-				OrigemDia:  &dia,
-				OrigemPos:  &pos,
-			})
+func indiceDe(atividades []Atividade, id uuid.UUID) int {
+	for i := range atividades {
+		if atividades[i].ID == id {
+			return i
 		}
 	}
 
-	return out
-}
-
-// MesclarAtividadesGeradas adds slots introduced by a later configuration
-// change to an already materialised layout. A stored activity claims its
-// original slot even after it has moved elsewhere, which is what prevents the
-// engine from recreating it in the source day.
-func MesclarAtividadesGeradas(dias []Dia, armazenadas []Atividade) []Atividade {
-	saida := append([]Atividade(nil), armazenadas...)
-	reivindicadas := origensReivindicadas(armazenadas)
-	quantidadePorDia := map[time.Time]int{}
-
-	for _, a := range armazenadas {
-		quantidadePorDia[day(a.Data)]++
-	}
-
-	for _, d := range dias {
-		data := day(d.Data)
-		for pos, it := range d.Itens {
-			chave := chaveOrigem(data, pos)
-			if reivindicadas[chave] {
-				continue
-			}
-
-			origemDia, origemPos := data, pos
-			saida = append(saida, Atividade{
-				ID:         IDDerivado(data, pos),
-				Data:       data,
-				Posicao:    quantidadePorDia[data],
-				Disciplina: it.Disciplina,
-				Tema:       it.Tema,
-				Passada:    it.Passada,
-				Tipo:       tipoDaAtividade(d.Tipo),
-				OrigemDia:  &origemDia,
-				OrigemPos:  &origemPos,
-			})
-			quantidadePorDia[data]++
-			reivindicadas[chave] = true
-		}
-	}
-
-	return saida
-}
-
-// RestaurarAtividades returns every materialised activity to its engine slot.
-// IDs stay unchanged, so study records linked to an activity remain intact.
-func RestaurarAtividades(atividades []Atividade) []Atividade {
-	saida := append([]Atividade(nil), atividades...)
-
-	for i := range saida {
-		if saida[i].OrigemDia == nil || saida[i].OrigemPos == nil {
-			continue
-		}
-
-		saida[i].Data = day(*saida[i].OrigemDia)
-		saida[i].Posicao = *saida[i].OrigemPos
-	}
-
-	return saida
-}
-
-// ReterAoMudarRitmo keeps only the activities that a change to the day's rhythm
-// (blocosPorDia, minutosBloco) must not disturb, dropping the rest so the engine
-// regenerates them under the new configuration.
-//
-// The rule the student expects: what is already behind them, or done, or that
-// they arranged by hand, stays put; the days still ahead follow the new setting.
-// So an activity is kept when ANY of these holds:
-//
-//   - it sits on a day before `desde` (history);
-//   - its day is `concluido` (already closed);
-//   - the student moved it — `Movida()`, or it was carried into a day it did not
-//     originate in.
-//
-// Everything else — an untouched, unfinished, future block — is dropped. With no
-// stored activity claiming those slots, montar's AplicarAtividades falls through
-// to the freshly generated layout for those days, which is exactly "only the
-// days ahead change".
-func ReterAoMudarRitmo(
-	atividades []Atividade,
-	desde time.Time,
-	concluido func(time.Time) bool,
-) []Atividade {
-	desde = day(desde)
-	out := make([]Atividade, 0, len(atividades))
-
-	for _, a := range atividades {
-		dt := day(a.Data)
-
-		manter := dt.Before(desde) ||
-			concluido(dt) ||
-			a.Movida() ||
-			a.OrigemDia == nil ||
-			!sameDay(*a.OrigemDia, dt)
-
-		if manter {
-			out = append(out, a)
-		}
-	}
-
-	return out
+	return -1
 }
 
 func tipoDaAtividade(t Tipo) TipoAtividade {
@@ -550,140 +482,9 @@ func tipoDaAtividade(t Tipo) TipoAtividade {
 		return AtividadeSimulado
 	case TipoDiscursiva:
 		return AtividadeDiscursiva
+	case TipoVespera:
+		return AtividadeVespera
 	default:
 		return AtividadeConteudo
 	}
-}
-
-// AplicarAtividades reconciles the generated days with the persisted activity
-// layout. Stored activities win. A generated slot is appended only when no
-// stored activity claims that original slot, even if its activity currently
-// lives on another day.
-func AplicarAtividades(dias []Dia, atividades []Atividade) {
-	porDia := map[time.Time][]Atividade{}
-	for _, a := range atividades {
-		k := day(a.Data)
-		porDia[k] = append(porDia[k], a)
-	}
-
-	reivindicadas := origensReivindicadas(atividades)
-
-	for i := range dias {
-		data := day(dias[i].Data)
-		lista := porDia[data]
-
-		sort.SliceStable(lista, func(x, y int) bool { return lista[x].Posicao < lista[y].Posicao })
-
-		itensGerados := dias[i].Itens
-		itens := make([]ItemDia, 0, len(lista)+len(itensGerados))
-		for _, a := range lista {
-			itens = append(itens, ItemDia{
-				Disciplina:  a.Disciplina,
-				Tema:        a.Tema,
-				Passada:     a.Passada,
-				AtividadeID: a.ID,
-			})
-		}
-
-		for pos, it := range itensGerados {
-			if reivindicadas[chaveOrigem(data, pos)] {
-				continue
-			}
-
-			it.AtividadeID = IDDerivado(data, pos)
-			itens = append(itens, it)
-		}
-
-		// A discipline with few topics but many daily slots has the same topic
-		// repeated by reparte; collapse the run so the day reads once and, just
-		// as important, AtividadesFaltantes never materialises the pile.
-		dias[i].Itens = MesclarItensIguais(itens)
-	}
-}
-
-// DeduplicarAtividades drops stored activities that trace back to the same
-// engine-generated day and repeat the same discipline and topic there, keeping
-// only the earliest slot.
-//
-// This heals a plan whose activity table was seeded from a reparte pile: a
-// one-topic discipline the engine gave a dozen slots on a single day, each
-// materialised as its own row. A later reorganisation (compacting empty days,
-// spreading finished-early topics forward) can scatter those rows across many
-// later days — each still pointing at the SAME origin day and topic, which is
-// what marks them as one pile rather than legitimate separate visits. Keying on
-// the CURRENT day would miss this, since the copies no longer share one.
-//
-// A row the student individually rearranged away from where reorganisation put
-// it — its own OrigemDia/OrigemPos no longer describing the pile — is never
-// touched: only rows still carrying the same original slot are duplicates of
-// each other.
-func DeduplicarAtividades(atividades []Atividade) []Atividade {
-	// The earliest (by OrigemPos) activity seen so far for each pile key.
-	sobrevivente := map[string]int{} // pile key -> index into `atividades`
-
-	for i, a := range atividades {
-		if a.OrigemDia == nil || a.OrigemPos == nil {
-			continue
-		}
-
-		chave := day(*a.OrigemDia).Format(time.DateOnly) + "\x00" + a.Disciplina + "\x00" + a.Tema
-
-		atual, ok := sobrevivente[chave]
-		if !ok || *a.OrigemPos < *atividades[atual].OrigemPos {
-			sobrevivente[chave] = i
-		}
-	}
-
-	mantido := make(map[int]bool, len(sobrevivente))
-	for _, i := range sobrevivente {
-		mantido[i] = true
-	}
-
-	out := make([]Atividade, 0, len(atividades))
-	// A day never stores the same topic twice, whatever slot each row came from:
-	// bringing a subject forward onto a day that already teaches it would leave
-	// two rows the screen merges away, and the store would grow a pile nobody
-	// can see. The first row wins, so the one already settled there keeps its id
-	// and its record.
-	noDia := map[string]int{} // chave do dia+tema -> índice em `out`
-
-	for i, a := range atividades {
-		if a.OrigemDia != nil && a.OrigemPos != nil && !mantido[i] {
-			continue
-		}
-
-		chave := chaveTema(day(a.Data), a.Disciplina, a.Tema)
-
-		if _, repetida := noDia[chave]; repetida && a.Disciplina != "" {
-			continue
-		}
-
-		noDia[chave] = len(out)
-
-		out = append(out, a)
-	}
-
-	return out
-}
-
-func origensReivindicadas(atividades []Atividade) map[string]bool {
-	out := make(map[string]bool, len(atividades))
-
-	for _, a := range atividades {
-		if a.OrigemDia == nil || a.OrigemPos == nil {
-			continue
-		}
-
-		out[chaveOrigem(day(*a.OrigemDia), *a.OrigemPos)] = true
-	}
-
-	return out
-}
-
-func chaveOrigem(data time.Time, posicao int) string {
-	return data.Format(time.DateOnly) + ":" + itoa(posicao)
-}
-
-func chaveTema(data time.Time, disciplina, tema string) string {
-	return data.Format(time.DateOnly) + "\x00" + disciplina + "\x00" + tema
 }

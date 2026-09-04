@@ -51,3 +51,14 @@ func DiffDays(a, b time.Time) int {
 func AddDays(t time.Time, n int) time.Time {
 	return addDays(t, n)
 }
+
+// findDia localiza o dia do plano numa data, ou nil.
+func findDia(dias []Dia, dt time.Time) *Dia {
+	for i := range dias {
+		if sameDay(dias[i].Data, dt) {
+			return &dias[i]
+		}
+	}
+
+	return nil
+}

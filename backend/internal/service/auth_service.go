@@ -10,161 +10,175 @@ import (
 	"fmt"
 	"time"
 
-	"studygo/internal/domain/user"
+	"studygo/internal/domain/usuario"
 	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )
 
-// TokenPair is what a successful register/login/refresh returns.
-type TokenPair struct {
-	AccessToken     string
-	AccessExpiresAt time.Time
-	RefreshToken    string
+// ParDeTokens é o que um cadastro, login ou refresh bem-sucedido devolve.
+type ParDeTokens struct {
+	AccessToken    string
+	AccessExpiraEm time.Time
+	RefreshToken   string
 }
 
-// AuthService implements registration, login and refresh-token rotation.
+// AuthService cuida de cadastro, login e rotação de refresh token.
 type AuthService struct {
-	users      port.UserRepository
-	hasher     port.PasswordHasher
+	usuarios   port.UsuarioRepository
+	hasher     port.HasherDeSenha
 	tokens     port.TokenIssuer
-	clock      port.Clock
+	relogio    port.Clock
 	refreshTTL time.Duration
 }
 
 func NewAuthService(
-	users port.UserRepository,
-	hasher port.PasswordHasher,
+	usuarios port.UsuarioRepository,
+	hasher port.HasherDeSenha,
 	tokens port.TokenIssuer,
-	clock port.Clock,
+	relogio port.Clock,
 	refreshTTL time.Duration,
 ) *AuthService {
 	return &AuthService{
-		users:      users,
+		usuarios:   usuarios,
 		hasher:     hasher,
 		tokens:     tokens,
-		clock:      clock,
+		relogio:    relogio,
 		refreshTTL: refreshTTL,
 	}
 }
 
-func (s *AuthService) Register(ctx context.Context, email, nome, senha string) (user.User, TokenPair, error) {
-	if err := user.ValidateRegistration(email, nome, senha); err != nil {
-		return user.User{}, TokenPair{}, err
+func (s *AuthService) Cadastrar(
+	ctx context.Context,
+	email, nome, senha string,
+) (usuario.Usuario, ParDeTokens, error) {
+	if err := usuario.ValidarCadastro(email, nome, senha); err != nil {
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
 	hash, err := s.hasher.Hash(senha)
 	if err != nil {
-		return user.User{}, TokenPair{}, fmt.Errorf("hashing password: %w", err)
+		return usuario.Usuario{}, ParDeTokens{}, fmt.Errorf("gerando hash da senha: %w", err)
 	}
 
-	created, err := s.users.CreateUser(ctx, user.User{
-		Email:        user.NormalizeEmail(email),
-		Nome:         nome,
-		PasswordHash: hash,
+	criado, err := s.usuarios.Criar(ctx, usuario.Usuario{
+		Email:     usuario.NormalizarEmail(email),
+		Nome:      nome,
+		SenhaHash: hash,
+		TemaUI:    usuario.TemaPadrao,
 	})
 	if err != nil {
-		return user.User{}, TokenPair{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
-	pair, err := s.issuePair(ctx, created.ID)
+	par, err := s.emitirPar(ctx, criado.ID)
 	if err != nil {
-		return user.User{}, TokenPair{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
-	return created, pair, nil
+	return criado, par, nil
 }
 
-func (s *AuthService) Login(ctx context.Context, email, senha string) (user.User, TokenPair, error) {
-	found, err := s.users.UserByEmail(ctx, user.NormalizeEmail(email))
-	if errors.Is(err, user.ErrNotFound) {
-		return user.User{}, TokenPair{}, user.ErrInvalidCredentials
+func (s *AuthService) Entrar(
+	ctx context.Context,
+	email, senha string,
+) (usuario.Usuario, ParDeTokens, error) {
+	achado, err := s.usuarios.PorEmail(ctx, usuario.NormalizarEmail(email))
+
+	// Conta inexistente e senha errada devolvem a mesma coisa: distinguir as
+	// duas diria a um atacante quais e-mails estão cadastrados.
+	if errors.Is(err, usuario.ErrNaoEncontrado) {
+		return usuario.Usuario{}, ParDeTokens{}, usuario.ErrCredenciaisInvalidas
 	}
 
 	if err != nil {
-		return user.User{}, TokenPair{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
-	ok, err := s.hasher.Verify(senha, found.PasswordHash)
+	ok, err := s.hasher.Conferir(senha, achado.SenhaHash)
 	if err != nil {
-		return user.User{}, TokenPair{}, fmt.Errorf("verifying password: %w", err)
+		return usuario.Usuario{}, ParDeTokens{}, fmt.Errorf("conferindo senha: %w", err)
 	}
 
 	if !ok {
-		return user.User{}, TokenPair{}, user.ErrInvalidCredentials
+		return usuario.Usuario{}, ParDeTokens{}, usuario.ErrCredenciaisInvalidas
 	}
 
-	pair, err := s.issuePair(ctx, found.ID)
+	par, err := s.emitirPar(ctx, achado.ID)
 	if err != nil {
-		return user.User{}, TokenPair{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
-	return found, pair, nil
+	return achado, par, nil
 }
 
-// Refresh rotates the token: the presented refresh token is revoked and a fresh
-// pair is issued.
-func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (TokenPair, error) {
-	hash := hashToken(refreshToken)
+// Renovar gira o token: o refresh apresentado é revogado e um par novo é
+// emitido.
+func (s *AuthService) Renovar(ctx context.Context, refreshToken string) (ParDeTokens, error) {
+	hash := hashDoToken(refreshToken)
 
-	userID, err := s.users.RefreshTokenValid(ctx, hash)
-	if errors.Is(err, user.ErrInvalidCredentials) {
-		return TokenPair{}, user.ErrInvalidCredentials
-	}
-
+	usuarioID, err := s.usuarios.RefreshTokenValido(ctx, hash)
 	if err != nil {
-		return TokenPair{}, err
+		return ParDeTokens{}, err
 	}
 
-	if err := s.users.RevokeRefreshToken(ctx, hash); err != nil {
-		return TokenPair{}, err
+	if err := s.usuarios.RevogarRefreshToken(ctx, hash); err != nil {
+		return ParDeTokens{}, err
 	}
 
-	return s.issuePair(ctx, userID)
+	return s.emitirPar(ctx, usuarioID)
 }
 
-// Logout revokes a refresh token; unknown tokens are a no-op.
-func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	return s.users.RevokeRefreshToken(ctx, hashToken(refreshToken))
+// Sair revoga um refresh token; um token desconhecido não faz nada.
+func (s *AuthService) Sair(ctx context.Context, refreshToken string) error {
+	return s.usuarios.RevogarRefreshToken(ctx, hashDoToken(refreshToken))
 }
 
-func (s *AuthService) UserByID(ctx context.Context, id uuid.UUID) (user.User, error) {
-	return s.users.UserByID(ctx, id)
+func (s *AuthService) PorID(ctx context.Context, id uuid.UUID) (usuario.Usuario, error) {
+	return s.usuarios.PorID(ctx, id)
 }
 
-func (s *AuthService) issuePair(ctx context.Context, userID uuid.UUID) (TokenPair, error) {
-	access, accessExp, err := s.tokens.Issue(userID)
+// DefinirTema grava a preferência visual da conta.
+func (s *AuthService) DefinirTema(ctx context.Context, id uuid.UUID, tema string) error {
+	return s.usuarios.DefinirTema(ctx, id, usuario.TemaValido(tema))
+}
+
+func (s *AuthService) emitirPar(ctx context.Context, usuarioID uuid.UUID) (ParDeTokens, error) {
+	access, expiraEm, err := s.tokens.Emitir(usuarioID)
 	if err != nil {
-		return TokenPair{}, fmt.Errorf("issuing access token: %w", err)
+		return ParDeTokens{}, fmt.Errorf("emitindo access token: %w", err)
 	}
 
-	refresh, err := randomToken()
+	refresh, err := tokenAleatorio()
 	if err != nil {
-		return TokenPair{}, err
+		return ParDeTokens{}, err
 	}
 
-	expiresAt := s.clock.Now().Add(s.refreshTTL)
-	if err := s.users.StoreRefreshToken(ctx, userID, hashToken(refresh), expiresAt); err != nil {
-		return TokenPair{}, err
+	if err := s.usuarios.GuardarRefreshToken(
+		ctx, usuarioID, hashDoToken(refresh), s.relogio.Now().Add(s.refreshTTL),
+	); err != nil {
+		return ParDeTokens{}, err
 	}
 
-	return TokenPair{
-		AccessToken:     access,
-		AccessExpiresAt: accessExp,
-		RefreshToken:    refresh,
+	return ParDeTokens{
+		AccessToken:    access,
+		AccessExpiraEm: expiraEm,
+		RefreshToken:   refresh,
 	}, nil
 }
 
-func randomToken() (string, error) {
+func tokenAleatorio() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("generating token: %w", err)
+		return "", fmt.Errorf("gerando token: %w", err)
 	}
 
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func hashToken(token string) string {
+// hashDoToken guarda só o hash do refresh token: um vazamento do banco não
+// entrega sessões ativas.
+func hashDoToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 
 	return hex.EncodeToString(sum[:])

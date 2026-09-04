@@ -7,47 +7,47 @@ import (
 	"studygo/internal/domain/concurso"
 )
 
-// Config is the user's plan settings: the dates and rhythm plus the study method
-// itself. The artifact kept the method fixed; here every knob — how many blocks a
-// day, how long each one lasts, whether simulados matter, the spaced-review
-// intervals, the per-discipline weight — lives on the one struct the engine
-// consumes.
+// Config são as escolhas do usuário para o plano: as datas e o ritmo, mais o
+// método de estudo em si. Cada botão — quantos blocos por dia, quanto dura cada
+// um, se simulados entram, o peso extra por disciplina — mora nesta única struct
+// que o motor consome.
 //
-// The zero value is not usable — Normalizar fills every method field with a
-// sensible default, and Gerar calls it. A Simulados of "" is what marks the
-// method half of the struct as never filled in.
+// O valor zero não serve: Normalizar preenche cada campo de método com um padrão
+// razoável, e Gerar a chama. Um Simulados vazio é o que marca a metade "método"
+// da struct como nunca preenchida.
 type Config struct {
-	// Dates and rhythm.
+	// Datas e ritmo.
 	Inicio        time.Time
 	Prova         time.Time
-	HorasDia      float64 // daily budget the engine splits; derived from MinutosBloco when that is set
-	DiasEstudo    []int   // weekdays 0=Sun..6=Sat
+	HorasDia      float64 // orçamento diário que o motor divide; derivado de MinutosBloco quando ele existe
+	DiasEstudo    []int   // dias da semana, 0=domingo..6=sábado
 	DiaRevisao    int
 	RetaFinalDias int
-	Questoes      map[string]int // discipline codigo -> estimated questions
+	Questoes      map[string]int // código da disciplina -> questões estimadas
 
-	// Study method (was the separate Perfil).
-	BlocosPorDia int // how many disciplines a study day covers
-	MinutosBloco int // length of one normal block; 0 = derive from HorasDia
-	// MinutosRevisao is how long the day's review block lasts. It sits beside
-	// the content blocks with a length of its own, rather than eating a
-	// percentage of them; 0 means the day has no review block at all.
+	// Método de estudo.
+	BlocosPorDia int // quantas disciplinas um dia de estudo cobre
+	MinutosBloco int // duração de um bloco normal; 0 = derivar de HorasDia
+	// MinutosRevisao é quanto dura o bloco de revisão do dia. Ele fica ao lado
+	// dos blocos de conteúdo com duração própria, em vez de comer uma
+	// porcentagem deles; 0 significa que o dia não tem bloco de revisão.
 	MinutosRevisao int
-	Reforcos       map[string]float64 // extra weight per discipline codigo (1 = normal)
-	CicloRevisao   []concurso.RevItem // weekly-review rotation; empty = concurso's own, or RevCicloPadrao
-	// RevisaoSemanal reserves a whole day of the week for review. Off by
-	// default: review is a daily block (see MinutosRevisao), fed by the error
-	// notebook, so surrendering a full day to it costs content for no gain.
-	// Kept as a switch because some study methods really do want the day.
+	Reforcos       map[string]float64     // peso extra por disciplina (1 = normal)
+	CicloRevisao   []concurso.ItemRevisao // rotação da revisão semanal; vazia = RevCicloPadrao
+	// RevisaoSemanal reserva um dia inteiro da semana para revisão. Desligada
+	// por padrão: revisão é um bloco diário (ver MinutosRevisao), alimentado
+	// pelo caderno de erros, então entregar um dia inteiro a ela custa conteúdo
+	// sem ganho. Continua existindo como chave porque alguns métodos de estudo
+	// realmente querem o dia.
 	RevisaoSemanal bool
-	Simulados      Frequencia      // how often a full mock exam shows up in the reta final
-	Discursiva     bool            // reserve an essay day in the reta final
-	Modos          map[string]Modo // how each discipline is studied
-	PctQuestoes    float64         // slice of a study block spent on questions
-	LimiarFraco    int             // % below which a battery counts as weak
+	Simulados      Frequencia      // com que frequência um simulado completo aparece na reta final
+	Discursiva     bool            // reservar um dia de discursiva na reta final
+	Modos          map[string]Modo // como cada disciplina é estudada
+	PctQuestoes    float64         // fatia do bloco de estudo gasta em questões
+	LimiarFraco    int             // % abaixo do qual uma bateria conta como fraca
 }
 
-// Frequencia is how often a full mock exam shows up in the reta final.
+// Frequencia é com que frequência um simulado completo aparece na reta final.
 type Frequencia string
 
 const (
@@ -56,16 +56,16 @@ const (
 	SimuladoSemanal   Frequencia = "semanal"
 )
 
-// Modo is how one discipline is studied.
+// Modo é como uma disciplina é estudada.
 type Modo string
 
 const (
-	ModoCompleto Modo = "completo" // theory with a summary, then questions
-	ModoQuestoes Modo = "questoes" // questions only
-	ModoTeoria   Modo = "teoria"   // theory only
+	ModoCompleto Modo = "completo" // teoria com resumo, depois questões
+	ModoQuestoes Modo = "questoes" // só questões
+	ModoTeoria   Modo = "teoria"   // só teoria
 )
 
-// Limites of the tunable fields, shared with the service's validation.
+// Limites dos campos ajustáveis, compartilhados com a validação da aplicação.
 const (
 	BlocosMin       = 1
 	BlocosMax       = 6
@@ -75,10 +75,10 @@ const (
 	MinutosBlocoMax = 240
 )
 
-// ConfigPadrao returns the study-method defaults — the artifact's behaviour
-// exactly: a full mock exam on the last day of every reta-final week, an essay
-// the day before, the 24h / 7d / 30d review cycle, two blocks a day. The dates
-// and question counts are left zero for the caller to fill in.
+// ConfigPadrao devolve os padrões do método de estudo: um simulado completo no
+// último dia de cada semana da reta final, uma discursiva no dia anterior e dois
+// blocos por dia. As datas e a contagem de questões ficam zeradas para quem
+// chama preencher.
 func ConfigPadrao() Config {
 	return Config{
 		BlocosPorDia:   2,
@@ -93,22 +93,23 @@ func ConfigPadrao() Config {
 	}
 }
 
-// Normalizar clamps every method field to a usable value, so a config coming
-// from the database or an API payload can never produce a broken plan. It is
-// idempotent. The dates, study days and question map are validated by the
-// service and left untouched here.
+// Normalizar limita cada campo de método a um valor utilizável, para que uma
+// configuração vinda do banco ou de um payload da API nunca produza um plano
+// quebrado. É idempotente. As datas, os dias de estudo e o mapa de questões são
+// validados pela aplicação e não são tocados aqui.
 func (c Config) Normalizar() Config {
 	d := ConfigPadrao()
 
-	// Simulados == "" means the study method was never chosen: adopt the
-	// defaults. The one exception is BlocosPorDia — a saved, in-range value is
-	// the user's answer to "how many disciplines a day", and overwriting it here
-	// is what silently reverted 3 blocks back to 2 on the next load, so the
-	// schedule kept showing two disciplines a day.
+	// Simulados == "" significa que o método de estudo nunca foi escolhido:
+	// adote os padrões. A única exceção é BlocosPorDia — um valor salvo e dentro
+	// da faixa é a resposta do usuário a "quantas disciplinas por dia", e
+	// sobrescrevê-lo aqui era o que revertia 3 blocos para 2 na carga seguinte,
+	// deixando o cronograma mostrando duas disciplinas por dia.
 	//
-	// Booleans and percentages stay unconditional: their zero value is
-	// indistinguishable from "never set", so preserving them would freeze an
-	// unanswered question as an answer (Discursiva=false, for one).
+	// Booleanos e porcentagens continuam incondicionais: o zero deles é
+	// indistinguível de "nunca definido", então preservá-los congelaria uma
+	// pergunta não respondida como se fosse resposta (Discursiva=false, por
+	// exemplo).
 	if c.Simulados == "" {
 		modos, reforcos, ciclo := c.Modos, c.Reforcos, c.CicloRevisao
 		blocos := c.BlocosPorDia
@@ -124,8 +125,8 @@ func (c Config) Normalizar() Config {
 			c.BlocosPorDia = blocos
 		}
 
-		c.Modos = nonNilModos(modos)
-		c.Reforcos = nonNilReforcos(reforcos)
+		c.Modos = modosNaoNulos(modos)
+		c.Reforcos = reforcosNaoNulos(reforcos)
 		c.CicloRevisao = cicloValido(ciclo)
 		c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 		c.HorasDia = horasDiaEfetiva(c)
@@ -153,8 +154,8 @@ func (c Config) Normalizar() Config {
 
 	c.MinutosRevisao = minutosRevisaoValido(c.MinutosRevisao)
 
-	c.Modos = nonNilModos(c.Modos)
-	c.Reforcos = nonNilReforcos(c.Reforcos)
+	c.Modos = modosNaoNulos(c.Modos)
+	c.Reforcos = reforcosNaoNulos(c.Reforcos)
 	c.CicloRevisao = cicloValido(c.CicloRevisao)
 	c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 	c.HorasDia = horasDiaEfetiva(c)
@@ -162,7 +163,7 @@ func (c Config) Normalizar() Config {
 	return c
 }
 
-// ModoDe returns how a discipline is studied, defaulting to ModoCompleto.
+// ModoDe diz como uma disciplina é estudada, caindo em ModoCompleto.
 func (c Config) ModoDe(codigo string) Modo {
 	switch c.Modos[codigo] {
 	case ModoQuestoes:
@@ -174,9 +175,9 @@ func (c Config) ModoDe(codigo string) Modo {
 	}
 }
 
-// ReforcoDe is a discipline's extra weight, defaulting to 1 and clamped to a
-// range where the plan still makes sense. 2 makes it show up twice as often and
-// take twice the minutes when it does.
+// ReforcoDe é o peso extra de uma disciplina, com padrão 1 e limitado a uma
+// faixa em que o plano ainda faz sentido. 2 faz a matéria aparecer com o dobro
+// da frequência.
 func (c Config) ReforcoDe(codigo string) float64 {
 	r, ok := c.Reforcos[codigo]
 	if !ok || r == 0 {
@@ -186,8 +187,8 @@ func (c Config) ReforcoDe(codigo string) float64 {
 	return min(max(r, ReforcoMin), ReforcoMax)
 }
 
-// minutosRevisaoValido clamps the review block. Zero is legitimate — a day with
-// no review block at all — so only a negative or absurd value is corrected.
+// minutosRevisaoValido limita o bloco de revisão. Zero é legítimo — um dia sem
+// bloco de revisão nenhum — então só valor negativo ou absurdo é corrigido.
 func minutosRevisaoValido(m int) int {
 	switch {
 	case m <= 0:
@@ -199,17 +200,18 @@ func minutosRevisaoValido(m int) int {
 	}
 }
 
-// horasDiaEfetiva keeps HorasDia in step with MinutosBloco: when the user set a
-// block length, that plus BlocosPorDia and the review tail is what a day lasts.
-// MinutosBloco == 0 means "no explicit length" and HorasDia is used as given.
+// horasDiaEfetiva mantém HorasDia em sintonia com MinutosBloco: quando o usuário
+// define a duração do bloco, é isso, mais BlocosPorDia e a cauda de revisão, que
+// diz quanto dura o dia. MinutosBloco == 0 significa "sem duração explícita", e
+// HorasDia é usada como está.
 func horasDiaEfetiva(c Config) float64 {
 	if c.MinutosBloco <= 0 || c.BlocosPorDia <= 0 {
 		return c.HorasDia
 	}
 
-	// The day is simply what it holds: the content blocks plus the review block.
-	// It used to be content divided by (1 - pctRevisao), which meant the review
-	// slice moved every block's length as a side effect.
+	// O dia é simplesmente o que ele comporta: os blocos de conteúdo mais o de
+	// revisão. Antes era conteúdo dividido por (1 - pctRevisao), o que fazia a
+	// fatia de revisão mexer na duração de todo bloco como efeito colateral.
 	return float64(c.BlocosPorDia*c.MinutosBloco+c.MinutosRevisao) / 60
 }
 
@@ -226,7 +228,7 @@ func minutosBlocoValido(m int) int {
 	}
 }
 
-func nonNilModos(m map[string]Modo) map[string]Modo {
+func modosNaoNulos(m map[string]Modo) map[string]Modo {
 	if m == nil {
 		return map[string]Modo{}
 	}
@@ -234,7 +236,7 @@ func nonNilModos(m map[string]Modo) map[string]Modo {
 	return m
 }
 
-func nonNilReforcos(m map[string]float64) map[string]float64 {
+func reforcosNaoNulos(m map[string]float64) map[string]float64 {
 	if m == nil {
 		return map[string]float64{}
 	}
@@ -242,17 +244,17 @@ func nonNilReforcos(m map[string]float64) map[string]float64 {
 	return m
 }
 
-// cicloValido drops entries with no title, so a half-filled form cannot leave
-// the weekly review with a blank headline.
-func cicloValido(itens []concurso.RevItem) []concurso.RevItem {
-	out := make([]concurso.RevItem, 0, len(itens))
+// cicloValido descarta entradas sem título, para que um formulário preenchido
+// pela metade não deixe a revisão semanal com uma manchete em branco.
+func cicloValido(itens []concurso.ItemRevisao) []concurso.ItemRevisao {
+	out := make([]concurso.ItemRevisao, 0, len(itens))
 
 	for _, it := range itens {
 		if strings.TrimSpace(it.Titulo) == "" {
 			continue
 		}
 
-		out = append(out, concurso.RevItem{
+		out = append(out, concurso.ItemRevisao{
 			Ordem:    len(out),
 			Titulo:   strings.TrimSpace(it.Titulo),
 			Questoes: max(0, it.Questoes),
@@ -261,24 +263,6 @@ func cicloValido(itens []concurso.RevItem) []concurso.RevItem {
 
 	if len(out) == 0 {
 		return nil
-	}
-
-	return out
-}
-
-// intervalosValidos keeps the positive, strictly increasing entries — a review
-// cycle that goes backwards would re-queue a topic before its previous stage.
-func intervalosValidos(xs []int) []int {
-	out := make([]int, 0, len(xs))
-	ultimo := 0
-
-	for _, x := range xs {
-		if x <= ultimo || x > 3650 {
-			continue
-		}
-
-		out = append(out, x)
-		ultimo = x
 	}
 
 	return out

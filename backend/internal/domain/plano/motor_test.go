@@ -80,7 +80,7 @@ func loadConcurso(t *testing.T) concurso.Concurso {
 	}
 
 	for _, r := range fx.RevCiclo {
-		c.RevCiclo = append(c.RevCiclo, concurso.RevItem{
+		c.RevCiclo = append(c.RevCiclo, concurso.ItemRevisao{
 			Ordem:    r.Ordem,
 			Titulo:   r.Titulo,
 			Questoes: r.Questoes,

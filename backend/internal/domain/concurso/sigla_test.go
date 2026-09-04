@@ -89,3 +89,35 @@ func TestSiglas_NomeSemLetrasCaiNoPosicional(t *testing.T) {
 		t.Errorf("código = %q, quer PORT", got[1])
 	}
 }
+
+// O código de uma disciplina é o mnemônico que aparece em cada chip do
+// cronograma, e é o que o estudante aprende a reconhecer. Estes são os casos
+// que a regra precisa acertar — nomes reais de edital, incluindo os que colidem
+// no começo ("Direito Administrativo" e "Direito Constitucional").
+//
+// Mudar a regra é possível; mudar sem querer, não. Por isso os casos ficam aqui.
+func TestSigla_CasosDeEdital(t *testing.T) {
+	t.Parallel()
+
+	casos := map[string]string{
+		"Língua Portuguesa":            "LINPO",
+		"Direito Administrativo":       "DIRAD",
+		"Noções de Informática":        "INFO",
+		"Raciocínio Lógico-Matemático": "RACLO",
+		"Banco de Dados":               "BANDA",
+		"Introdução à Computação":      "COMP",
+		"Ética no Serviço Público":     "ETISE",
+		"Análise de Dados":             "ANADA",
+		"Matemática":                   "MATE",
+	}
+
+	for nome, quer := range casos {
+		t.Run(nome, func(t *testing.T) {
+			t.Parallel()
+
+			if got := concurso.Sigla(nome); got != quer {
+				t.Errorf("Sigla(%q) = %q, quer %q", nome, got, quer)
+			}
+		})
+	}
+}

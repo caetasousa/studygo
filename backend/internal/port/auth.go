@@ -4,30 +4,33 @@ import (
 	"context"
 	"time"
 
-	"studygo/internal/domain/user"
+	"studygo/internal/domain/usuario"
 
 	"github.com/google/uuid"
 )
 
-// UserRepository persists accounts and their refresh tokens.
-type UserRepository interface {
-	CreateUser(ctx context.Context, u user.User) (user.User, error)
-	UserByEmail(ctx context.Context, email string) (user.User, error)
-	UserByID(ctx context.Context, id uuid.UUID) (user.User, error)
+// UsuarioRepository persiste contas e seus refresh tokens.
+type UsuarioRepository interface {
+	Criar(ctx context.Context, u usuario.Usuario) (usuario.Usuario, error)
+	PorEmail(ctx context.Context, email string) (usuario.Usuario, error)
+	PorID(ctx context.Context, id uuid.UUID) (usuario.Usuario, error)
 
-	StoreRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error
-	RefreshTokenValid(ctx context.Context, tokenHash string) (uuid.UUID, error)
-	RevokeRefreshToken(ctx context.Context, tokenHash string) error
+	// DefinirTema grava a preferência visual da conta.
+	DefinirTema(ctx context.Context, id uuid.UUID, tema usuario.Tema) error
+
+	GuardarRefreshToken(ctx context.Context, usuarioID uuid.UUID, tokenHash string, expiraEm time.Time) error
+	RefreshTokenValido(ctx context.Context, tokenHash string) (uuid.UUID, error)
+	RevogarRefreshToken(ctx context.Context, tokenHash string) error
 }
 
-// PasswordHasher hashes and verifies passwords (argon2id).
-type PasswordHasher interface {
-	Hash(password string) (string, error)
-	Verify(password, encodedHash string) (bool, error)
+// HasherDeSenha gera e confere hashes de senha (argon2id).
+type HasherDeSenha interface {
+	Hash(senha string) (string, error)
+	Conferir(senha, hashCodificado string) (bool, error)
 }
 
-// TokenIssuer mints and parses short-lived access tokens (JWT).
+// TokenIssuer emite e lê os access tokens de vida curta (JWT).
 type TokenIssuer interface {
-	Issue(userID uuid.UUID) (token string, expiresAt time.Time, err error)
-	Parse(token string) (uuid.UUID, error)
+	Emitir(usuarioID uuid.UUID) (token string, expiraEm time.Time, err error)
+	Ler(token string) (uuid.UUID, error)
 }

@@ -4,6 +4,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Rescheduling: the two ways a real week diverges from the plan.
@@ -93,7 +95,7 @@ func AdiarDia(
 func AntecipouAtividade(
 	atividades []Atividade,
 	dias []Dia,
-	id string,
+	id uuid.UUID,
 	hoje time.Time,
 	concluido func(time.Time) bool,
 ) ([]Atividade, error) {

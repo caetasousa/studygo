@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"studygo/internal/domain/plano"
+
+	"github.com/google/uuid"
 )
 
 // Três dias de estudo seguidos, com duas atividades cada.
@@ -20,21 +22,28 @@ func diasReplan() []plano.Dia {
 
 func atividadesReplan() []plano.Atividade {
 	return []plano.Atividade{
-		{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
-		{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
-		{ID: "b1", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
-		{ID: "b2", Data: dia(2026, 9, 2), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
-		{ID: "c1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+		{ID: uid("a1"), Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+		{ID: uid("a2"), Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+		{ID: uid("b1"), Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+		{ID: uid("b2"), Data: dia(2026, 9, 2), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
+		{ID: uid("c1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
 	}
 }
 
-func idsDoDia(as []plano.Atividade, dt time.Time) []string {
-	out := []string{}
+func idsDoDia(as []plano.Atividade, dt time.Time) []uuid.UUID {
+	out := []uuid.UUID{}
 	for _, a := range plano.AtividadesDoDia(as, dt) {
 		out = append(out, a.ID)
 	}
 
 	return out
+}
+
+// uid transforma um rótulo legível ("a1", "c2") num uuid estável, para que os
+// testes continuem se lendo por nome enquanto o modelo usa identidade de
+// verdade.
+func uid(rotulo string) uuid.UUID {
+	return uuid.NewSHA1(uuid.Nil, []byte(rotulo))
 }
 
 func TestAdiarDia(t *testing.T) {
@@ -45,7 +54,7 @@ func TestAdiarDia(t *testing.T) {
 
 		// Perdi o dia 2: o que era dele vai para o 3, e o que era do 3 vai para o 4.
 		got, err := plano.AdiarDia(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 2), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 2), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AdiarDia: %v", err)
@@ -55,11 +64,11 @@ func TestAdiarDia(t *testing.T) {
 			t.Errorf("o dia adiado ficou com %v, devia esvaziar", ids)
 		}
 
-		if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 2 || ids[0] != "b1" {
+		if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 2 || ids[0] != uid("b1") {
 			t.Errorf("dia 3 = %v, quer [b1 b2]", ids)
 		}
 
-		if ids := idsDoDia(got, dia(2026, 9, 4)); len(ids) != 1 || ids[0] != "c1" {
+		if ids := idsDoDia(got, dia(2026, 9, 4)); len(ids) != 1 || ids[0] != uid("c1") {
 			t.Errorf("dia 4 = %v, quer [c1]", ids)
 		}
 	})
@@ -68,13 +77,13 @@ func TestAdiarDia(t *testing.T) {
 		t.Parallel()
 
 		got, err := plano.AdiarDia(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 2), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 2), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AdiarDia: %v", err)
 		}
 
-		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != "a1" {
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != uid("a1") {
 			t.Errorf("dia 1 = %v, devia seguir intacto", ids)
 		}
 	})
@@ -83,7 +92,7 @@ func TestAdiarDia(t *testing.T) {
 		t.Parallel()
 
 		got, err := plano.AdiarDia(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 2), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 2), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AdiarDia: %v", err)
@@ -108,7 +117,7 @@ func TestAdiarDia(t *testing.T) {
 	t.Run("recusa quando não há para onde empurrar", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := plano.AdiarDia(atividadesReplan(), diasReplan(), dia(2026, 9, 4), nadaConcluido)
+		_, err := plano.AdiarDia(atividadesReplan(), diasReplan(), dia(2026, 9, 4), semDiaConcluido)
 		if !errors.Is(err, plano.ErrDestinoInvalido) {
 			t.Errorf("erro = %v, quer ErrDestinoInvalido", err)
 		}
@@ -123,14 +132,14 @@ func TestAntecipouAtividade(t *testing.T) {
 
 		// Estou no dia 1 e terminei c1, que estava no dia 3.
 		got, err := plano.AntecipouAtividade(
-			atividadesReplan(), diasReplan(), "c1", dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), uid("c1"), dia(2026, 9, 1), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AntecipouAtividade: %v", err)
 		}
 
 		ids := idsDoDia(got, dia(2026, 9, 1))
-		if len(ids) != 3 || ids[2] != "c1" {
+		if len(ids) != 3 || ids[2] != uid("c1") {
 			t.Errorf("dia 1 = %v, quer c1 no fim", ids)
 		}
 
@@ -144,14 +153,14 @@ func TestAntecipouAtividade(t *testing.T) {
 
 		// Trago b1 (dia 2, posição 0): b2 sobe para a posição 0.
 		got, err := plano.AntecipouAtividade(
-			atividadesReplan(), diasReplan(), "b1", dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), uid("b1"), dia(2026, 9, 1), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AntecipouAtividade: %v", err)
 		}
 
 		restantes := plano.AtividadesDoDia(got, dia(2026, 9, 2))
-		if len(restantes) != 1 || restantes[0].ID != "b2" || restantes[0].Posicao != 0 {
+		if len(restantes) != 1 || restantes[0].ID != uid("b2") || restantes[0].Posicao != 0 {
 			t.Errorf("dia 2 = %+v, quer só b2 na posição 0", restantes)
 		}
 	})
@@ -160,7 +169,7 @@ func TestAntecipouAtividade(t *testing.T) {
 		t.Parallel()
 
 		got, err := plano.AntecipouAtividade(
-			atividadesReplan(), diasReplan(), "c1", dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), uid("c1"), dia(2026, 9, 1), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AntecipouAtividade: %v", err)
@@ -175,7 +184,7 @@ func TestAntecipouAtividade(t *testing.T) {
 		t.Parallel()
 
 		got, err := plano.AntecipouAtividade(
-			atividadesReplan(), diasReplan(), "a1", dia(2026, 9, 2), nadaConcluido,
+			atividadesReplan(), diasReplan(), uid("a1"), dia(2026, 9, 2), semDiaConcluido,
 		)
 		if err != nil {
 			t.Fatalf("AntecipouAtividade: %v", err)
@@ -190,7 +199,7 @@ func TestAntecipouAtividade(t *testing.T) {
 		t.Parallel()
 
 		_, err := plano.AntecipouAtividade(
-			atividadesReplan(), diasReplan(), "zzz", dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), uid("zzz"), dia(2026, 9, 1), semDiaConcluido,
 		)
 		if !errors.Is(err, plano.ErrAtividadeNaoEncontrada) {
 			t.Errorf("erro = %v, quer ErrAtividadeNaoEncontrada", err)
@@ -206,14 +215,14 @@ func TestCompactarAtividades(t *testing.T) {
 
 		// O dia 2 ficou vazio; o conteúdo dos dias 3 e 4 sobe.
 		ats := []plano.Atividade{
-			{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
-			{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
-			{ID: "c1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p2"},
-			{ID: "c2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
-			{ID: "d1", Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+			{ID: uid("a1"), Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: uid("a2"), Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+			{ID: uid("c1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+			{ID: uid("c2"), Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
+			{ID: uid("d1"), Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "POR", Tema: "p3"},
 		}
 
-		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), nadaConcluido)
+		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), semDiaConcluido)
 
 		if ids := idsDoDia(got, dia(2026, 9, 2)); len(ids) != 2 {
 			t.Errorf("dia 2 = %v, devia ter sido preenchido", ids)
@@ -228,14 +237,14 @@ func TestCompactarAtividades(t *testing.T) {
 		t.Parallel()
 
 		got := plano.CompactarAtividades(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 1), semDiaConcluido,
 		)
 
 		if len(got) != len(atividadesReplan()) {
 			t.Fatalf("total = %d, quer %d", len(got), len(atividadesReplan()))
 		}
 
-		vistos := map[string]bool{}
+		vistos := map[uuid.UUID]bool{}
 		for _, a := range got {
 			if vistos[a.ID] {
 				t.Fatalf("id duplicado: %s", a.ID)
@@ -249,15 +258,15 @@ func TestCompactarAtividades(t *testing.T) {
 		t.Parallel()
 
 		ats := []plano.Atividade{
-			{ID: "x1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p1"},
-			{ID: "x2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
-			{ID: "x3", Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "DIR", Tema: "d1"},
+			{ID: uid("x1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: uid("x2"), Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+			{ID: uid("x3"), Data: dia(2026, 9, 4), Posicao: 0, Disciplina: "DIR", Tema: "d1"},
 		}
 
-		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), nadaConcluido)
+		got := plano.CompactarAtividades(ats, diasReplan(), dia(2026, 9, 1), semDiaConcluido)
 
 		// Sobem para o dia 1 na mesma sequência em que estavam.
-		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) < 2 || ids[0] != "x1" || ids[1] != "x2" {
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) < 2 || ids[0] != uid("x1") || ids[1] != uid("x2") {
 			t.Errorf("dia 1 = %v, quer x1 antes de x2", ids)
 		}
 	})
@@ -271,7 +280,7 @@ func TestCompactarAtividades(t *testing.T) {
 			atividadesReplan(), diasReplan(), dia(2026, 9, 1), concluido,
 		)
 
-		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != "a1" {
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != uid("a1") {
 			t.Errorf("dia registrado = %v, devia seguir intacto", ids)
 		}
 	})
@@ -280,7 +289,7 @@ func TestCompactarAtividades(t *testing.T) {
 		t.Parallel()
 
 		got := plano.CompactarAtividades(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 1), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 1), semDiaConcluido,
 		)
 
 		for _, dt := range []time.Time{dia(2026, 9, 1), dia(2026, 9, 2), dia(2026, 9, 3)} {
@@ -296,10 +305,10 @@ func TestCompactarAtividades(t *testing.T) {
 		t.Parallel()
 
 		got := plano.CompactarAtividades(
-			atividadesReplan(), diasReplan(), dia(2026, 9, 2), nadaConcluido,
+			atividadesReplan(), diasReplan(), dia(2026, 9, 2), semDiaConcluido,
 		)
 
-		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != "a1" {
+		if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 2 || ids[0] != uid("a1") {
 			t.Errorf("dia anterior ao corte = %v, não devia mudar", ids)
 		}
 	})
@@ -318,12 +327,12 @@ func TestCompactarAtividades_NaoAtravessaAFase(t *testing.T) {
 	}
 
 	ats := []plano.Atividade{
-		{ID: "r1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "revisão"},
+		{ID: uid("r1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "revisão"},
 	}
 
-	got := plano.CompactarAtividades(ats, dias, dia(2026, 9, 1), nadaConcluido)
+	got := plano.CompactarAtividades(ats, dias, dia(2026, 9, 1), semDiaConcluido)
 
-	if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 1 || ids[0] != "r1" {
+	if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 1 || ids[0] != uid("r1") {
 		t.Errorf("a revisão da reta final saiu do lugar: %v", got)
 	}
 
@@ -349,8 +358,8 @@ func TestCompactarAtividades_DiaVazioNaoAncora(t *testing.T) {
 	// Os dois primeiros dias estão marcados como concluídos mas não têm nada:
 	// o que era deles foi adiantado e já está registrado noutro dia.
 	ats := []plano.Atividade{
-		{ID: "c1", Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
-		{ID: "c2", Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m3"},
+		{ID: uid("c1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+		{ID: uid("c2"), Data: dia(2026, 9, 3), Posicao: 1, Disciplina: "MAT", Tema: "m3"},
 	}
 
 	concluido := func(d time.Time) bool {
@@ -379,7 +388,7 @@ func TestCompactarAtividades_RevisaoSemanalConcluidaAncora(t *testing.T) {
 	}
 
 	ats := []plano.Atividade{
-		{ID: "b1", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+		{ID: uid("b1"), Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
 	}
 
 	concluido := func(d time.Time) bool { return d.Equal(dia(2026, 9, 1)) }
@@ -404,10 +413,10 @@ func diasComReta() []plano.Dia {
 // compactação empurrar a folga para a véspera da reta final.
 func atividadesComFolga() []plano.Atividade {
 	return []plano.Atividade{
-		{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
-		{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
-		{ID: "b1", Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
-		{ID: "b2", Data: dia(2026, 9, 2), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
+		{ID: uid("a1"), Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+		{ID: uid("a2"), Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+		{ID: uid("b1"), Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+		{ID: uid("b2"), Data: dia(2026, 9, 2), Posicao: 1, Disciplina: "MAT", Tema: "m2"},
 	}
 }
 
@@ -434,7 +443,7 @@ func TestPreencherVazios(t *testing.T) {
 		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
 			Fila:      fila,
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		temas := temasDoDia(got, dia(2026, 9, 3))
@@ -449,7 +458,7 @@ func TestPreencherVazios(t *testing.T) {
 		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
 			Fila:      fila,
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		if ids := idsDoDia(got, dia(2026, 9, 4)); len(ids) != 0 {
@@ -477,7 +486,7 @@ func TestPreencherVazios(t *testing.T) {
 		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
 			Fila:      fila[:1],
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		if temas := temasDoDia(got, dia(2026, 9, 3)); len(temas) != 1 {
@@ -490,7 +499,7 @@ func TestPreencherVazios(t *testing.T) {
 
 		got := plano.PreencherVazios(atividadesComFolga(), diasComReta(), plano.Reforco{
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		if len(got) != len(atividadesComFolga()) {
@@ -524,15 +533,15 @@ func TestPreencherVazios(t *testing.T) {
 		// estão livres, como se dois assuntos tivessem sido adiantados em
 		// momentos separados.
 		base := []plano.Atividade{
-			{ID: "a1", Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
-			{ID: "a2", Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
+			{ID: uid("a1"), Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "POR", Tema: "p1"},
+			{ID: uid("a2"), Data: dia(2026, 9, 1), Posicao: 1, Disciplina: "MAT", Tema: "m1"},
 		}
 
 		// Primeira chamada: preenche o dia 2 com os dois primeiros da fila.
 		primeira := plano.PreencherVazios(base, dias, plano.Reforco{
 			Fila:      filaLonga,
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		// Segunda chamada, como se fosse uma nova conclusão: parte do resultado
@@ -540,7 +549,7 @@ func TestPreencherVazios(t *testing.T) {
 		segunda := plano.PreencherVazios(primeira, dias, plano.Reforco{
 			Fila:      filaLonga,
 			Desde:     dia(2026, 9, 1),
-			Concluido: nadaConcluido,
+			Concluido: semDiaConcluido,
 		})
 
 		temas2 := temasDoDia(segunda, dia(2026, 9, 2))

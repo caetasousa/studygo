@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"studygo/internal/domain/user"
+	"studygo/internal/domain/usuario"
 	"studygo/internal/service"
 )
 
-// AuthHandler serves registration, login, refresh and the current-user lookup.
+// AuthHandler serve cadastro, login, renovação de token e a conta atual.
 type AuthHandler struct {
 	auth   *service.AuthService
 	logger *slog.Logger
@@ -42,19 +42,20 @@ type authResponse struct {
 }
 
 type usuarioResponse struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Nome  string `json:"nome"`
+	ID     string `json:"id"`
+	Email  string `json:"email"`
+	Nome   string `json:"nome"`
+	TemaUI string `json:"temaUi"`
 }
 
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	u, pair, err := h.auth.Register(r.Context(), req.Email, req.Nome, req.Senha)
+	u, pair, err := h.auth.Cadastrar(r.Context(), req.Email, req.Nome, req.Senha)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -63,14 +64,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusCreated, toAuthResponse(u, pair))
 }
 
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Entrar(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	u, pair, err := h.auth.Login(r.Context(), req.Email, req.Senha)
+	u, pair, err := h.auth.Entrar(r.Context(), req.Email, req.Senha)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -79,14 +80,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, toAuthResponse(u, pair))
 }
 
-func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Renovar(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
 	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	pair, err := h.auth.Refresh(r.Context(), req.RefreshToken)
+	pair, err := h.auth.Renovar(r.Context(), req.RefreshToken)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -94,19 +95,19 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, h.logger, http.StatusOK, map[string]any{
 		"accessToken":     pair.AccessToken,
-		"accessExpiresAt": pair.AccessExpiresAt,
+		"accessExpiresAt": pair.AccessExpiraEm,
 		"refreshToken":    pair.RefreshToken,
 	})
 }
 
-func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Sair(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
 	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	if err := h.auth.Logout(r.Context(), req.RefreshToken); err != nil {
+	if err := h.auth.Sair(r.Context(), req.RefreshToken); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
@@ -114,14 +115,14 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusNoContent, nil)
 }
 
-func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+func (h *AuthHandler) Eu(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 
-	u, err := h.auth.UserByID(r.Context(), id)
+	u, err := h.auth.PorID(r.Context(), id)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -130,19 +131,57 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
 }
 
-func toAuthResponse(u user.User, pair service.TokenPair) authResponse {
+func toAuthResponse(u usuario.Usuario, pair service.ParDeTokens) authResponse {
 	return authResponse{
 		Usuario:         toUsuarioResponse(u),
 		AccessToken:     pair.AccessToken,
-		AccessExpiresAt: pair.AccessExpiresAt,
+		AccessExpiresAt: pair.AccessExpiraEm,
 		RefreshToken:    pair.RefreshToken,
 	}
 }
 
-func toUsuarioResponse(u user.User) usuarioResponse {
+func toUsuarioResponse(u usuario.Usuario) usuarioResponse {
 	return usuarioResponse{
-		ID:    u.ID.String(),
-		Email: u.Email,
-		Nome:  u.Nome,
+		ID:     u.ID.String(),
+		Email:  u.Email,
+		Nome:   u.Nome,
+		TemaUI: string(u.TemaUI),
 	}
+}
+
+type temaRequest struct {
+	TemaUI string `json:"temaUi"`
+}
+
+// DefinirTema grava a preferência visual da conta. Ela é do USUÁRIO, não do
+// plano: quem estuda para dois concursos não quer dois temas.
+func (h *AuthHandler) DefinirTema(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+
+		return
+	}
+
+	var req temaRequest
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	if err := h.auth.DefinirTema(r.Context(), id, req.TemaUI); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	u, err := h.auth.PorID(r.Context(), id)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
 }

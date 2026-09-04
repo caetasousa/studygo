@@ -23,7 +23,7 @@ const (
 
 // RevCicloPadrao is the weekly-review cycle used when a concurso has none of its
 // own registered. It mirrors the four-week rotation from the original artifact.
-var RevCicloPadrao = []concurso.RevItem{
+var RevCicloPadrao = []concurso.ItemRevisao{
 	{Ordem: 0, Titulo: "Revisão ativa da semana + caderno de erros", Questoes: 30},
 	{Ordem: 1, Titulo: "Bateria mista de questões no peso da prova", Questoes: 60},
 	{Ordem: 2, Titulo: "Treino da prova discursiva, com autocorreção", Questoes: 0},
@@ -55,13 +55,15 @@ func construir(
 		totalCal = 1
 	}
 
-	revCiclo := c.RevCiclo
+	// A rotação da revisão semanal, em ordem de precedência: a escolha do
+	// plano, depois a que o edital sugere, e por fim a rotação padrão.
+	revCiclo := cfg.CicloRevisao
 	if len(revCiclo) == 0 {
-		revCiclo = RevCicloPadrao
+		revCiclo = c.RevCiclo
 	}
 
-	if len(cfg.CicloRevisao) > 0 {
-		revCiclo = cfg.CicloRevisao
+	if len(revCiclo) == 0 {
+		revCiclo = RevCicloPadrao
 	}
 
 	vesp := addDays(cfg.Prova, -1)

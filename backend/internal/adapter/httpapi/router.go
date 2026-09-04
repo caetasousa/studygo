@@ -7,7 +7,7 @@ import (
 	"studygo/internal/port"
 )
 
-// Handlers bundles every HTTP handler the router wires.
+// Handlers reúne os handlers que o router liga.
 type Handlers struct {
 	Health   *HealthHandler
 	Auth     *AuthHandler
@@ -15,62 +15,73 @@ type Handlers struct {
 	Plano    *PlanoHandler
 }
 
-// NewRouter builds the API mux. Protected routes are individually wrapped with
-// Authenticate; cross-cutting middleware (recover, logging, CORS) is applied by
-// the caller.
+// NewRouter monta o mux da API. As rotas protegidas são embrulhadas
+// individualmente com Autenticar; o middleware transversal (recover, log, CORS)
+// é aplicado por quem chama.
 func NewRouter(
 	h Handlers,
 	tokens port.TokenIssuer,
-	presence UserPresence,
+	contas ContaExiste,
 	logger *slog.Logger,
 ) http.Handler {
 	mux := http.NewServeMux()
-	requireAuth := Authenticate(tokens, presence, logger)
+	exigirAuth := Autenticar(tokens, contas, logger)
 
-	guard := func(pattern string, fn http.HandlerFunc) {
-		mux.Handle(pattern, requireAuth(fn))
+	protegida := func(padrao string, fn http.HandlerFunc) {
+		mux.Handle(padrao, exigirAuth(fn))
 	}
 
 	mux.Handle("GET /health", h.Health)
 
-	mux.HandleFunc("POST /api/auth/register", h.Auth.Register)
-	mux.HandleFunc("POST /api/auth/login", h.Auth.Login)
-	mux.HandleFunc("POST /api/auth/refresh", h.Auth.Refresh)
-	mux.HandleFunc("POST /api/auth/logout", h.Auth.Logout)
+	mux.HandleFunc("POST /api/auth/register", h.Auth.Cadastrar)
+	mux.HandleFunc("POST /api/auth/login", h.Auth.Entrar)
+	mux.HandleFunc("POST /api/auth/refresh", h.Auth.Renovar)
+	mux.HandleFunc("POST /api/auth/logout", h.Auth.Sair)
 
-	guard("GET /api/me", h.Auth.Me)
+	protegida("GET /api/me", h.Auth.Eu)
+	protegida("PUT /api/me/tema", h.Auth.DefinirTema)
 
-	guard("GET /api/concursos", h.Concurso.List)
-	guard("POST /api/concursos", h.Concurso.Criar)
-	guard("POST /api/editais/analisar", h.Concurso.AnalisarEdital)
-	guard("POST /api/editais/estrutura", h.Concurso.EstruturaEdital)
-	guard("POST /api/editais/conteudo", h.Concurso.ConteudoEdital)
-	guard("GET /api/concursos/{slug}", h.Concurso.Get)
-	guard("PUT /api/concursos/{slug}", h.Concurso.Atualizar)
-	guard("DELETE /api/concursos/{slug}", h.Concurso.Remover)
+	protegida("GET /api/concursos", h.Concurso.List)
+	protegida("POST /api/concursos", h.Concurso.Criar)
+	protegida("POST /api/editais/analisar", h.Concurso.AnalisarEdital)
+	protegida("POST /api/editais/estrutura", h.Concurso.EstruturaEdital)
+	protegida("POST /api/editais/conteudo", h.Concurso.ConteudoEdital)
+	protegida("GET /api/concursos/{slug}", h.Concurso.Get)
+	protegida("PUT /api/concursos/{slug}", h.Concurso.Atualizar)
+	protegida("DELETE /api/concursos/{slug}", h.Concurso.Remover)
 
-	guard("GET /api/concursos/{slug}/plano", h.Plano.Get)
-	guard("PUT /api/concursos/{slug}/plano", h.Plano.Salvar)
-	guard("DELETE /api/concursos/{slug}/plano/registros", h.Plano.LimparRegistros)
-	guard("PATCH /api/concursos/{slug}/plano/registros/{data}", h.Plano.RegistrarDia)
-	guard("PATCH /api/concursos/{slug}/plano/revisoes/{data}", h.Plano.RegistrarRevisao)
-	guard("PUT /api/concursos/{slug}/plano/marcos/{id}", h.Plano.MarcarMarco)
-	guard("POST /api/concursos/{slug}/plano/tec/preview", h.Plano.PreviewTEC)
-	guard("POST /api/concursos/{slug}/plano/tec", h.Plano.ImportarTEC)
-	guard("PATCH /api/concursos/{slug}/plano/disciplinas/{codigo}/caderno", h.Plano.AtualizarCadernoDisciplina)
-	guard("POST /api/concursos/{slug}/plano/reordenar", h.Plano.Reordenar)
-	guard("POST /api/concursos/{slug}/plano/atividades/mover", h.Plano.MoverAtividade)
-	guard("POST /api/concursos/{slug}/plano/atividades/antecipar", h.Plano.Antecipar)
-	guard("POST /api/concursos/{slug}/plano/dias/{data}/adiar", h.Plano.AdiarDia)
-	guard("POST /api/concursos/{slug}/plano/compactar", h.Plano.CompactarPlano)
-	guard("POST /api/concursos/{slug}/plano/restaurar-ordem", h.Plano.RestaurarOrdem)
-	guard("GET /api/concursos/{slug}/plano/estatisticas", h.Plano.Estatisticas)
-	guard("GET /api/concursos/{slug}/plano/caderno", h.Plano.Caderno)
-	guard("GET /api/concursos/{slug}/plano/dossie", h.Plano.Dossie)
-	guard("POST /api/concursos/{slug}/plano/anotacoes", h.Plano.CriarAnotacao)
-	guard("PATCH /api/concursos/{slug}/plano/anotacoes/{id}", h.Plano.AtualizarAnotacao)
-	guard("DELETE /api/concursos/{slug}/plano/anotacoes/{id}", h.Plano.RemoverAnotacao)
-	guard("GET /api/concursos/{slug}/plano/export.csv", h.Plano.ExportarCSV)
+	const base = "/api/concursos/{slug}/plano"
+
+	protegida("GET "+base, h.Plano.Obter)
+	protegida("PUT "+base, h.Plano.Salvar)
+
+	// O registro é por ATIVIDADE: é a unidade de trabalho, e é dela que a
+	// conclusão do dia é derivada.
+	protegida("PUT "+base+"/atividades/{id}/registro", h.Plano.Registrar)
+	protegida("PATCH "+base+"/dias/{data}", h.Plano.RegistrarDia)
+	protegida("DELETE "+base+"/registros", h.Plano.LimparRegistros)
+
+	protegida("PUT "+base+"/marcos/{id}", h.Plano.MarcarMarco)
+	protegida("PATCH "+base+"/disciplinas/{codigo}/caderno", h.Plano.AtualizarCadernoDisciplina)
+
+	protegida("POST "+base+"/atividades/mover", h.Plano.Mover)
+	protegida("POST "+base+"/atividades/antecipar", h.Plano.Antecipar)
+	protegida("POST "+base+"/dias/{data}/adiar", h.Plano.AdiarDia)
+	protegida("POST "+base+"/compactar", h.Plano.Compactar)
+	protegida("POST "+base+"/restaurar-ordem", h.Plano.RestaurarOrdem)
+
+	protegida("GET "+base+"/estatisticas", h.Plano.Estatisticas)
+
+	protegida("GET "+base+"/caderno", h.Plano.Caderno)
+	protegida("POST "+base+"/anotacoes", h.Plano.CriarAnotacao)
+	protegida("PATCH "+base+"/anotacoes/{id}", h.Plano.AtualizarAnotacao)
+	protegida("DELETE "+base+"/anotacoes/{id}", h.Plano.RemoverAnotacao)
+
+	protegida("GET "+base+"/dossie", h.Plano.Dossie)
+	protegida("GET "+base+"/export.csv", h.Plano.ExportarCSV)
+
+	protegida("POST "+base+"/tec/preview", h.Plano.PreviewTEC)
+	protegida("POST "+base+"/tec", h.Plano.ImportarTEC)
 
 	return mux
 }

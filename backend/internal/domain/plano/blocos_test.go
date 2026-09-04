@@ -157,21 +157,6 @@ func TestMesclarItensIguais(t *testing.T) {
 	}
 }
 
-// The first item wins the merge, so its stored id survives and the block stays
-// movable.
-func TestMesclarItensIguais_PreservaPrimeiroID(t *testing.T) {
-	t.Parallel()
-
-	got := plano.MesclarItensIguais([]plano.ItemDia{
-		{Disciplina: "IA", Tema: "F", AtividadeID: "primeiro"},
-		{Disciplina: "IA", Tema: "F", AtividadeID: "segundo"},
-	})
-
-	if len(got) != 1 || got[0].AtividadeID != "primeiro" {
-		t.Fatalf("got %+v, quer um item com id 'primeiro'", got)
-	}
-}
-
 // O reforço faz a matéria aparecer em MAIS dias (ver TestGerar_reforcoDaMaisBlocos),
 // não estica um bloco. A tela de config chama minutosBloco de "tamanho de cada
 // atividade", então dois blocos no mesmo dia têm a mesma duração, com ou sem
@@ -479,7 +464,7 @@ func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
 	cfg.Questoes = map[string]int{"D01": 10}
 	// This is about the weekly-review DAY's content, which is opt-in now.
 	cfg.RevisaoSemanal = true
-	cfg.CicloRevisao = []concurso.RevItem{
+	cfg.CicloRevisao = []concurso.ItemRevisao{
 		{Ordem: 0, Titulo: "Minha revisão semanal", Questoes: 42},
 		{Ordem: 1, Titulo: "", Questoes: 10}, // sem título: descartado
 	}

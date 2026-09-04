@@ -1,29 +1,34 @@
-// Package plano is the plan engine: given a user's Config and the exam
-// catalogue, it builds the day-by-day study schedule — weighting each discipline
-// by its points, splitting days into two blocks, assigning weekly-review and
-// reta-final phases. It is a direct port of the artifact's construir() and is
-// pure: no time.Now, no I/O.
+// Package plano é o motor do cronograma: dada a Config do usuário e o catálogo
+// do concurso, monta o plano de estudo dia a dia — pesando cada disciplina pelos
+// seus pontos, dividindo o dia em blocos e atribuindo as fases de revisão
+// semanal e reta final.
+//
+// O pacote é puro: não lê relógio, não faz I/O e não conhece HTTP, JSON nem
+// banco. O que o motor produz é uma PROPOSTA de cronograma; quem a grava é a
+// aplicação, e o que está gravado é o cronograma de verdade (ver Atividade).
 package plano
 
 import (
 	"time"
 
 	"studygo/internal/domain/concurso"
+
+	"github.com/google/uuid"
 )
 
-// Tipo is the kind of a plan day.
+// Tipo é a natureza de um dia do plano.
 type Tipo string
 
 const (
-	TipoEstudo          Tipo = "est"     // two content blocks
-	TipoRevisaoDirigida Tipo = "revd"    // reta-final guided review
-	TipoSimulado        Tipo = "sim"     // full mock exam
-	TipoDiscursiva      Tipo = "disc"    // essay practice
-	TipoVespera         Tipo = "vespera" // eve of the exam
-	TipoRevisaoSemanal  Tipo = "rev"     // base-phase weekly review
+	TipoEstudo          Tipo = "est"     // blocos de conteúdo
+	TipoRevisaoDirigida Tipo = "revd"    // revisão dirigida da reta final
+	TipoSimulado        Tipo = "sim"     // simulado completo
+	TipoDiscursiva      Tipo = "disc"    // treino de discursiva
+	TipoVespera         Tipo = "vespera" // véspera da prova
+	TipoRevisaoSemanal  Tipo = "rev"     // revisão semanal da fase base
 )
 
-// Fase is base (first pass over the syllabus) or reta (final stretch).
+// Fase é base (primeira passada pelo edital) ou reta (reta final).
 type Fase string
 
 const (
@@ -31,45 +36,41 @@ const (
 	FaseReta Fase = "reta"
 )
 
-// ItemDia is one study block: a discipline and the specific topic for it.
+// ItemDia é um bloco de estudo: uma disciplina e o tema dela naquele dia.
 type ItemDia struct {
-	Disciplina string `json:"disciplina"` // discipline codigo
-	Tema       string `json:"tema"`
-	Passada    int    `json:"passada"` // 1 = first pass, 2 = second pass
-	// AtividadeID is filled when the generated schedule is reconciled with the
-	// persisted activity layout. It is runtime metadata, not part of the engine's
-	// golden JSON contract.
-	AtividadeID string `json:"-"`
+	Disciplina string // código da disciplina
+	Tema       string
+	Passada    int // 1 = primeira passada, 2 = segunda
+	// AtividadeID é a atividade gravada que este item representa. Fica zerado
+	// enquanto o cronograma é só uma proposta do motor, e é preenchido quando os
+	// dias são lidos a partir do cronograma materializado.
+	AtividadeID uuid.UUID
 }
 
-// Dia is a single day of the plan.
+// Dia é um dia do plano.
 type Dia struct {
-	N      int       `json:"n"`
-	Data   time.Time `json:"data"`
-	Semana int       `json:"semana"`
-	Fase   Fase      `json:"fase"`
-	Tipo   Tipo      `json:"tipo"`
-	Itens  []ItemDia `json:"itens"`
-	Tema   string    `json:"tema"` // headline for non-content days
-	Meta   int       `json:"meta"` // target number of questions
-
-	// Revisoes is filled in by the service from the persisted queue — the engine
+	N      int
+	Data   time.Time
+	Semana int
+	Fase   Fase
+	Tipo   Tipo
+	Itens  []ItemDia
+	Tema   string // manchete dos dias que não têm itens
+	Meta   int    // meta de questões do dia
 }
 
-// Config is defined in config.go: the dates and rhythm plus the study method.
-
-// Resultado is everything the engine produces: the days plus the intermediate
-// weightings the balanceamento view needs.
+// Resultado é tudo que o motor produz: os dias mais as ponderações
+// intermediárias que a tela de balanceamento precisa.
 type Resultado struct {
 	Dias       []Dia
-	Slots      map[string]int // content blocks per discipline
-	SlotsReta  map[string]int // reta-final blocks per discipline
-	Pontos     map[string]int // points per discipline (questoes * peso)
+	Slots      map[string]int // blocos de conteúdo por disciplina
+	SlotsReta  map[string]int // blocos da reta final por disciplina
+	Pontos     map[string]int // pontos por disciplina (questões × peso)
 	SomaPontos int
-	Simulado   Composicao // question split of a full mock exam
+	Simulado   Composicao // divisão de questões de um simulado completo
 }
 
-// Gerar builds the plan. It never returns nil slices/maps.
+// Gerar monta a proposta de cronograma. Nunca devolve slice ou map nulo.
 func Gerar(cfg Config, c *concurso.Concurso) Resultado {
 	cfg = cfg.Normalizar()
 
@@ -81,8 +82,8 @@ func Gerar(cfg Config, c *concurso.Concurso) Resultado {
 		codes = append(codes, d.Codigo)
 		pesos[d.Codigo] = d.Peso
 
-		// A discipline with no registered topics still gets study days — the
-		// day just headlines the discipline name instead of a specific topic.
+		// Uma disciplina sem temas cadastrados ainda ganha dias de estudo — o dia
+		// só mostra o nome dela no lugar de um tema específico.
 		if len(d.Temas) == 0 {
 			temas[d.Codigo] = []string{d.Nome}
 		} else {
@@ -106,8 +107,7 @@ func Gerar(cfg Config, c *concurso.Concurso) Resultado {
 		SomaPontos: soma,
 	}
 
-	dias := construir(cfg, c, codes, temas, pontos, soma, &res)
-	res.Dias = dias
+	res.Dias = construir(cfg, c, codes, temas, pontos, soma, &res)
 
 	return res
 }

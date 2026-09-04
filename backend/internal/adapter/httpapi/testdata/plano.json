@@ -1,0 +1,173 @@
+{
+  "alertas": [
+    {
+      "nivel": "string",
+      "texto": "string",
+      "titulo": "string"
+    }
+  ],
+  "balanceamento": [
+    {
+      "acertoPct": "number",
+      "bloco": "string",
+      "blocosConteudo": "number",
+      "blocosReta": "number",
+      "codigo": "string",
+      "cor": "number",
+      "delta": "number",
+      "desvio": "number",
+      "horasLancado": "number",
+      "horasPrevisto": "number",
+      "intervaloDias": "number",
+      "modo": "string",
+      "nome": "string",
+      "passadas": "number",
+      "pctIdeal": "number",
+      "peso": "number",
+      "pontos": "number",
+      "questoes": "number",
+      "questoesEdital": "number",
+      "revisoesGerais": "number",
+      "temas": "number",
+      "visitas": "number"
+    }
+  ],
+  "concurso": {
+    "banca": "string",
+    "cargo": "string",
+    "conteudo": [
+      {
+        "texto": "string",
+        "tipo": "string"
+      }
+    ],
+    "disciplinas": [
+      {
+        "bloco": "string",
+        "cadernoUrl": "string",
+        "codigo": "string",
+        "cor": "number",
+        "fontes": [
+          {
+            "tipo": "string",
+            "titulo": "string",
+            "url": "string"
+          }
+        ],
+        "nome": "string",
+        "peso": "number",
+        "temas": [
+          "string"
+        ]
+      }
+    ],
+    "emoji": "string",
+    "nome": "string",
+    "resumo": "string",
+    "slug": "string"
+  },
+  "config": {
+    "blocosPorDia": "number",
+    "cicloRevisao": [
+      {
+        "questoes": "number",
+        "titulo": "string"
+      }
+    ],
+    "diaRevisao": "number",
+    "diasEstudo": [
+      "number"
+    ],
+    "discursiva": "bool",
+    "horasDia": "number",
+    "inicio": "string",
+    "limiarFraco": "number",
+    "minutosBloco": "number",
+    "minutosRevisao": "number",
+    "modos": {
+      "LINPO": "string"
+    },
+    "pctQuestoes": "number",
+    "prova": "string",
+    "questoes": {
+      "LINPO": "number"
+    },
+    "reforcos": {
+      "LINPO": "number"
+    },
+    "retaFinalDias": "number",
+    "revisaoSemanal": "bool",
+    "simulados": "string",
+    "temaUi": "string"
+  },
+  "dias": [
+    {
+      "acertos": "number",
+      "blocos": [
+        {
+          "detalhe": "string",
+          "minutos": "number",
+          "titulo": "string"
+        }
+      ],
+      "concluido": "bool",
+      "data": "string",
+      "fase": "string",
+      "horas": "number",
+      "itens": [
+        {
+          "acertos": "number",
+          "concluido": "bool",
+          "disciplina": "string",
+          "erros": "number",
+          "horas": "number",
+          "id": "string",
+          "movida": "bool",
+          "nota": "string",
+          "passada": "number",
+          "questoes": "number",
+          "tema": "string"
+        }
+      ],
+      "meta": "number",
+      "n": "number",
+      "nota": "string",
+      "questoes": "number",
+      "revisao": {
+        "acertos": "number",
+        "disciplina": "string",
+        "observacao": "string",
+        "questoes": "number"
+      },
+      "rotulo": "string",
+      "semana": "number",
+      "tema": "string",
+      "tipo": "string"
+    }
+  ],
+  "geradoEm": "string",
+  "hojeIndex": "number",
+  "marcos": [
+    {
+      "cumprido": "bool",
+      "dataFim": "string",
+      "dataInicio": "string",
+      "eProva": "bool",
+      "exigeAcao": "bool",
+      "id": "string",
+      "rotulo": "number",
+      "titulo": "string"
+    }
+  ],
+  "props": {
+    "acertoPct": "number",
+    "diasConcluidos": "number",
+    "faltamDias": "number",
+    "horasAlvo": "number",
+    "horasTotal": "number",
+    "progresso": "number",
+    "totalDias": "number",
+    "voltasRevisao": "number"
+  },
+  "temMovimentacaoManual": "bool"
+}

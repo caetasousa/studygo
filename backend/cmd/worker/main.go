@@ -60,6 +60,7 @@ func run(logger *slog.Logger) error {
 
 	svc := service.NewNotificacaoService(
 		postgres.NewPlanoRepo(pool),
+		postgres.NewCronogramaRepo(pool),
 		postgres.NewConcursoRepo(pool),
 		notifier.NewSlogNotifier(logger),
 		port.SystemClock{},

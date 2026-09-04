@@ -1,0 +1,49 @@
+{
+  "acertoPct": "number",
+  "horasTotal": "number",
+  "porDisciplina": [
+    {
+      "acertoPct": null,
+      "bloco": "string",
+      "blocosConteudo": "number",
+      "blocosReta": "number",
+      "codigo": "string",
+      "cor": "number",
+      "delta": "number",
+      "desvio": "number",
+      "horasLancado": "number",
+      "horasPrevisto": "number",
+      "intervaloDias": "number",
+      "modo": "string",
+      "nome": "string",
+      "passadas": "number",
+      "pctIdeal": "number",
+      "peso": "number",
+      "pontos": "number",
+      "questoes": "number",
+      "questoesEdital": "number",
+      "revisoesGerais": "number",
+      "temas": "number",
+      "visitas": "number"
+    }
+  ],
+  "porSemana": [
+    {
+      "acertos": "number",
+      "horas": "number",
+      "horasPrevisto": "number",
+      "questoes": "number",
+      "semana": "number"
+    }
+  ],
+  "questoesTotal": "number",
+  "serie": [
+    {
+      "acertos": "number",
+      "data": "string",
+      "horas": "number",
+      "questoes": "number"
+    }
+  ],
+  "streak": "number"
+}

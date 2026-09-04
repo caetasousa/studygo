@@ -1,0 +1,50 @@
+{
+  "anotacoes": [
+    {
+      "data": "string",
+      "disciplina": "string",
+      "id": "string",
+      "origem": "string",
+      "resolvido": "bool",
+      "tema": "string",
+      "texto": "string",
+      "url": "string"
+    }
+  ],
+  "diasComNota": [
+    {
+      "data": "string",
+      "disciplinas": [
+        "string"
+      ],
+      "n": "number",
+      "nota": "string"
+    }
+  ],
+  "diasFracos": [
+    {
+      "acertos": "number",
+      "aprov": "number",
+      "data": "string",
+      "n": "number",
+      "questoes": "number"
+    }
+  ],
+  "porDisciplina": [
+    {
+      "codigo": "string",
+      "cor": "number",
+      "itens": [
+        {
+          "acertos": "number",
+          "aprov": "number",
+          "erros": "number",
+          "questoes": "number",
+          "tema": "string",
+          "ultimaData": "string"
+        }
+      ],
+      "nome": "string"
+    }
+  ]
+}

@@ -30,11 +30,11 @@ type fakeConcursoRepo struct {
 	criado concurso.Concurso
 }
 
-func (f *fakeConcursoRepo) ListByOwner(context.Context, uuid.UUID) ([]concurso.Concurso, error) {
+func (f *fakeConcursoRepo) ListarPorDono(context.Context, uuid.UUID) ([]concurso.Concurso, error) {
 	return nil, nil
 }
 
-func (f *fakeConcursoRepo) CreateConcurso(_ context.Context, c concurso.Concurso) (concurso.Concurso, error) {
+func (f *fakeConcursoRepo) Criar(_ context.Context, c concurso.Concurso) (concurso.Concurso, error) {
 	c.ID = uuid.New()
 	f.criado = c
 
@@ -89,7 +89,7 @@ func newHandler(an port.EditalProcessor) (*ConcursoHandler, *fakeConcursoRepo) {
 func ptrInt(n int) *int { return &n }
 
 func withUser(r *http.Request) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), userIDKey, uuid.New()))
+	return r.WithContext(context.WithValue(r.Context(), usuarioIDKey, uuid.New()))
 }
 
 func post(path, body, ct string) *http.Request {
@@ -142,7 +142,7 @@ func TestConcursoHandler_AnalisarEdital(t *testing.T) {
 			t.Error("o ownerRef não foi propagado")
 		}
 
-		var resp service.AnaliseResposta
+		var resp analiseDTO
 		decodeBody(t, rec, &resp)
 		if resp.DocumentoID != "doc-abc-123" {
 			t.Errorf("documentoId = %q", resp.DocumentoID)
@@ -271,7 +271,7 @@ func TestConcursoHandler_EstruturaEdital(t *testing.T) {
 		t.Errorf("docID=%q cargo=%q", p.gotDocID, p.gotCargo)
 	}
 
-	var resp service.EstruturaResposta
+	var resp estruturaDTO
 	decodeBody(t, rec, &resp)
 
 	if len(resp.Gerais) != 1 || len(resp.Especificas) != 1 {
@@ -328,7 +328,7 @@ func TestConcursoHandler_ConteudoEdital(t *testing.T) {
 		t.Errorf("docID=%q discs=%v", p.gotDocID, p.gotDiscs)
 	}
 
-	var resp service.ConteudoEditalResposta
+	var resp conteudoEditalDTO
 	decodeBody(t, rec, &resp)
 	if len(resp.Itens) != 2 || len(resp.Itens[0].Temas) != 2 {
 		t.Errorf("itens = %+v", resp.Itens)
@@ -397,11 +397,14 @@ func TestConcursoHandler_Criar(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
-	if repo.criado.Slug == "" || repo.criado.OwnerID == uuid.Nil {
+	if repo.criado.Slug == "" || repo.criado.DonoID == uuid.Nil {
 		t.Errorf("concurso criado sem slug/owner: %+v", repo.criado)
 	}
-	if repo.criado.Disciplinas[0].Codigo != "" {
-		t.Errorf("service não deveria atribuir codigo (é o repo): %q", repo.criado.Disciplinas[0].Codigo)
+	// O código é decisão de NEGÓCIO (o mnemônico que a tela exibe), então quem o
+	// atribui é o domínio, não o repositório. Enquanto isso morava no adapter,
+	// editar o concurso regerava todos os códigos e desligava o cronograma.
+	if got := repo.criado.Disciplinas[0].Codigo; got != "DIRCO" {
+		t.Errorf("codigo = %q, quer DIRCO atribuído pelo domínio", got)
 	}
 }
 

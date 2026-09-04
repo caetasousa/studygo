@@ -9,56 +9,69 @@ import (
 	"github.com/google/uuid"
 )
 
-// PlanoRepository persists a user's plan configuration and progress.
+// PlanoRepository persiste a configuração e o progresso do plano de um usuário.
+//
+// O cronograma é carregado à parte (CronogramaRepository): ele é grande, e nem
+// todo caso de uso precisa dele.
 type PlanoRepository interface {
-	// PlanoByUser returns the plan for (userID, concursoID) or plano.ErrNotFound.
-	PlanoByUser(ctx context.Context, userID, concursoID uuid.UUID) (plano.Salvo, error)
+	// PorUsuario devolve o plano de (usuarioID, concursoID) ou
+	// plano.ErrNaoEncontrado.
+	PorUsuario(ctx context.Context, usuarioID, concursoID uuid.UUID) (plano.Plano, error)
 
-	// UpsertPlano creates or updates the plano row plus its plano_questoes and
-	// reordenacoes (full replace), returning the stored aggregate.
-	UpsertPlano(ctx context.Context, s plano.Salvo) (plano.Salvo, error)
+	// Salvar cria ou atualiza o plano com sua configuração, devolvendo o
+	// agregado gravado.
+	Salvar(ctx context.Context, p plano.Plano) (plano.Plano, error)
 
-	// ReplaceReordenacoes deletes every reordenacao for the plan and inserts
-	// the given set.
-	ReplaceReordenacoes(ctx context.Context, planoID uuid.UUID, r map[time.Time]plano.Reordenacao) error
+	// MarcarMarco liga ou desliga um item do cronograma oficial.
+	MarcarMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error
 
-	// ListAtividades returns the plan's manually arranged activities, ordered by
-	// date and position. Empty when the user has never moved anything.
-	ListAtividades(ctx context.Context, planoID uuid.UUID) ([]plano.Atividade, error)
-
-	// ReplaceAtividades stores the full activity layout in one transaction, so a
-	// move that renumbers several days can never leave duplicate positions
-	// behind. It also marks the plan as manually arranged.
-	ReplaceAtividades(ctx context.Context, planoID uuid.UUID, as []plano.Atividade) error
-
-	UpsertRegistro(ctx context.Context, planoID uuid.UUID, r plano.Registro) error
-
-	// DeleteRegistro drops one day's log, blocks included. Used to clear a row
-	// left describing a day whose work has since moved elsewhere.
-	DeleteRegistro(ctx context.Context, planoID uuid.UUID, data time.Time) error
-
-	DeleteRegistros(ctx context.Context, planoID uuid.UUID) error
-
-	// UpsertRevisaoRegistro logs one day's review-tail result (see
-	// plano.RegistroRevisao) — keyed by date, since the review tail is not a
-	// stored activity.
-	UpsertRevisaoRegistro(ctx context.Context, planoID uuid.UUID, r plano.RegistroRevisao) error
-
-	SetMarco(ctx context.Context, planoID, marcoID uuid.UUID, cumprido bool) error
-
-	ListAnotacoes(ctx context.Context, planoID uuid.UUID) ([]plano.Anotacao, error)
-	CreateAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
-	UpdateAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
-	DeleteAnotacao(ctx context.Context, planoID, anotacaoID uuid.UUID) error
-
-	// ListPlanosParaLembrete returns every plan with its owner's email, for the
-	// spaced-review reminder worker.
-	ListPlanosParaLembrete(ctx context.Context) ([]PlanoComEmail, error)
+	// ParaLembrete devolve todo plano com o e-mail do dono, para o worker de
+	// lembretes.
+	ParaLembrete(ctx context.Context) ([]PlanoDoUsuario, error)
 }
 
-// PlanoComEmail pairs a stored plan with the owner's contact email.
-type PlanoComEmail struct {
-	Plano      plano.Salvo
+// CronogramaRepository persiste o cronograma materializado e o que foi
+// registrado nele.
+type CronogramaRepository interface {
+	// Atividades devolve o cronograma do plano, ordenado por (data, posição).
+	Atividades(ctx context.Context, planoID uuid.UUID) ([]plano.Atividade, error)
+
+	// SubstituirAtividades grava o cronograma inteiro numa transação, para que
+	// um movimento que renumera vários dias nunca deixe posições duplicadas.
+	//
+	// Uma atividade que sai do cronograma e ainda tem registro é recusada pelo
+	// banco (FK RESTRICT): apagar o que foi estudado é perda de história, não
+	// replanejamento.
+	SubstituirAtividades(ctx context.Context, planoID uuid.UUID, as []plano.Atividade) error
+
+	// Registros devolve o que foi lançado, indexado pela atividade.
+	Registros(ctx context.Context, planoID uuid.UUID) (plano.Registros, error)
+
+	// SalvarRegistro grava o lançamento de uma atividade.
+	SalvarRegistro(ctx context.Context, planoID uuid.UUID, r plano.RegistroAtividade) error
+
+	// ApagarRegistros limpa todo o histórico do plano.
+	ApagarRegistros(ctx context.Context, planoID uuid.UUID) error
+
+	// RegistrosDia devolve o que pertence ao dia e não a uma atividade.
+	RegistrosDia(ctx context.Context, planoID uuid.UUID) (map[time.Time]plano.RegistroDia, error)
+
+	// SalvarRegistroDia grava a anotação do dia e o resultado da cauda de
+	// revisão.
+	SalvarRegistroDia(ctx context.Context, planoID uuid.UUID, r plano.RegistroDia) error
+}
+
+// CadernoRepository persiste o caderno de erros.
+type CadernoRepository interface {
+	Anotacoes(ctx context.Context, planoID uuid.UUID) ([]plano.Anotacao, error)
+	CriarAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
+	AtualizarAnotacao(ctx context.Context, planoID uuid.UUID, a plano.Anotacao) (plano.Anotacao, error)
+	RemoverAnotacao(ctx context.Context, planoID, anotacaoID uuid.UUID) error
+}
+
+// PlanoDoUsuario junta um plano gravado ao contato do dono.
+type PlanoDoUsuario struct {
+	Plano      plano.Plano
 	ConcursoID uuid.UUID
 	Email      string
 	Nome       string

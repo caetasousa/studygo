@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"studygo/internal/domain/user"
+	"studygo/internal/domain/usuario"
 
 	"github.com/google/uuid"
 )
@@ -19,26 +19,26 @@ type fakeTokens struct {
 	err error
 }
 
-func (f fakeTokens) Issue(uuid.UUID) (string, time.Time, error) { return "", time.Time{}, nil }
-func (f fakeTokens) Parse(string) (uuid.UUID, error)            { return f.id, f.err }
+func (f fakeTokens) Emitir(uuid.UUID) (string, time.Time, error) { return "", time.Time{}, nil }
+func (f fakeTokens) Ler(string) (uuid.UUID, error)               { return f.id, f.err }
 
-type fakePresence struct {
+type fakeContas struct {
 	err error
 }
 
-func (f fakePresence) UserByID(context.Context, uuid.UUID) (user.User, error) {
-	return user.User{}, f.err
+func (f fakeContas) PorID(context.Context, uuid.UUID) (usuario.Usuario, error) {
+	return usuario.Usuario{}, f.err
 }
 
-func TestAuthenticate(t *testing.T) {
+func TestAutenticar(t *testing.T) {
 	t.Parallel()
 
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	uid := uuid.New()
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := userID(r.Context()); !ok {
-			t.Error("userID ausente no contexto de next")
+		if _, ok := usuarioID(r.Context()); !ok {
+			t.Error("usuarioID ausente no contexto de next")
 		}
 		w.WriteHeader(http.StatusTeapot)
 	})
@@ -47,14 +47,14 @@ func TestAuthenticate(t *testing.T) {
 		name       string
 		header     string
 		tokens     fakeTokens
-		presence   fakePresence
+		contas     fakeContas
 		wantStatus int
 	}{
 		{
 			name:       "ok",
 			header:     "Bearer abc",
 			tokens:     fakeTokens{id: uid},
-			presence:   fakePresence{},
+			contas:     fakeContas{},
 			wantStatus: http.StatusTeapot,
 		},
 		{
@@ -72,14 +72,14 @@ func TestAuthenticate(t *testing.T) {
 			name:       "usuário não existe mais (JWT válido, conta apagada)",
 			header:     "Bearer abc",
 			tokens:     fakeTokens{id: uid},
-			presence:   fakePresence{err: user.ErrNotFound},
+			contas:     fakeContas{err: usuario.ErrNaoEncontrado},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "erro de banco na checagem → 500",
 			header:     "Bearer abc",
 			tokens:     fakeTokens{id: uid},
-			presence:   fakePresence{err: errAnalisadorFalhou},
+			contas:     fakeContas{err: errAnalisadorFalhou},
 			wantStatus: http.StatusInternalServerError,
 		},
 	}
@@ -88,7 +88,7 @@ func TestAuthenticate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			h := Authenticate(tt.tokens, tt.presence, quiet)(next)
+			h := Autenticar(tt.tokens, tt.contas, quiet)(next)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
 			if tt.header != "" {

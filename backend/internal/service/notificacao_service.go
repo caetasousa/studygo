@@ -10,71 +10,61 @@ import (
 	"studygo/internal/port"
 )
 
-// NotificacaoService computes and dispatches each user's spaced-review reminder
-// for the current day. It is driven by cmd/worker.
+// NotificacaoService calcula e despacha o lembrete de revisão de cada usuário
+// no dia. Quem o aciona é o cmd/worker.
 type NotificacaoService struct {
-	planos    port.PlanoRepository
-	concursos port.ConcursoRepository
-	notifier  port.Notifier
-	clock     port.Clock
+	planos     port.PlanoRepository
+	cronograma port.CronogramaRepository
+	concursos  port.ConcursoRepository
+	notifier   port.Notifier
+	relogio    port.Clock
 }
 
 func NewNotificacaoService(
 	planos port.PlanoRepository,
+	cronograma port.CronogramaRepository,
 	concursos port.ConcursoRepository,
 	notifier port.Notifier,
-	clock port.Clock,
+	relogio port.Clock,
 ) *NotificacaoService {
 	return &NotificacaoService{
-		planos:    planos,
-		concursos: concursos,
-		notifier:  notifier,
-		clock:     clock,
+		planos:     planos,
+		cronograma: cronograma,
+		concursos:  concursos,
+		notifier:   notifier,
+		relogio:    relogio,
 	}
 }
 
-// EnviarLembretesDoDia walks every plan, works out which topics fall due for
-// review today, and hands each reminder to the notifier.
+// EnviarLembretesDoDia percorre cada plano, descobre o que vence hoje e entrega
+// o lembrete ao notifier.
 func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, error) {
-	planos, err := s.planos.ListPlanosParaLembrete(ctx)
+	planos, err := s.planos.ParaLembrete(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("listing planos: %w", err)
+		return 0, fmt.Errorf("listando planos: %w", err)
 	}
 
-	hoje := plano.DayOf(s.clock.Now())
+	hoje := plano.DayOf(s.relogio.Now())
 	enviados := 0
 
-	for _, pce := range planos {
-		// The notebook is built from what the plan scheduled, so the concurso has
-		// to be loaded before there is anything to remind about.
-		c, err := s.concursos.ConcursoByID(ctx, pce.ConcursoID)
+	for _, pu := range planos {
+		itens, dica, err := s.lembreteDe(ctx, pu, hoje)
 		if err != nil {
-			return enviados, fmt.Errorf("loading concurso %s: %w", pce.ConcursoID, err)
+			return enviados, err
 		}
 
-		res := plano.Gerar(pce.Plano.Config, &c)
-
-		itens := lembreteItens(pce.Plano, res.Dias, hoje)
 		if len(itens) == 0 {
 			continue
 		}
 
-		dica := ""
-		for _, it := range itens {
-			if d := c.DisciplinaByCodigo(it.Disciplina); d != nil && len(d.Fontes) > 0 {
-				dica = "ouça o Áudio Overview de " + d.Nome + " no NotebookLM durante o trajeto"
-				break
-			}
-		}
-
 		if err := s.notifier.EnviarLembrete(ctx, port.Lembrete{
-			Email:   pce.Email,
-			Nome:    pce.Nome,
-			DataISO: hoje.Format(isoDate),
+			Email:   pu.Email,
+			Nome:    pu.Nome,
+			DataISO: hoje.Format(formatoISO),
 			Itens:   itens,
 			Dica:    dica,
 		}); err != nil {
-			return enviados, fmt.Errorf("sending lembrete to %s: %w", pce.Email, err)
+			return enviados, fmt.Errorf("enviando lembrete para %s: %w", pu.Email, err)
 		}
 
 		enviados++
@@ -83,32 +73,71 @@ func (s *NotificacaoService) EnviarLembretesDoDia(ctx context.Context) (int, err
 	return enviados, nil
 }
 
-// lembreteItens is what the reminder chases: the error notebook.
+// lembreteDe monta o que um usuário deve revisar hoje: o caderno de erros dele.
 //
-// It used to be the spaced-review queue, which no longer exists — review is a
-// block of every study day now, drilling what went wrong. The reminder follows
-// the same rule, naming the topics the student has actually been missing.
-func lembreteItens(salvo plano.Salvo, dias []plano.Dia, hoje time.Time) []port.LembreteItem {
-	itens := []port.LembreteItem{}
+// Já foi a fila de revisão espaçada de intervalos fixos, que não existe mais —
+// revisão agora é um bloco de todo dia de estudo, focado no que deu errado. O
+// lembrete segue a mesma regra, nomeando os temas que o estudante vem errando.
+func (s *NotificacaoService) lembreteDe(
+	ctx context.Context,
+	pu port.PlanoDoUsuario,
+	hoje time.Time,
+) ([]port.ItemLembrete, string, error) {
+	c, err := s.concursos.PorID(ctx, pu.ConcursoID)
+	if err != nil {
+		return nil, "", fmt.Errorf("carregando concurso %s: %w", pu.ConcursoID, err)
+	}
 
-	cadernos := plano.Caderno(resultadosDoPlano(dias, salvo))
+	atividades, err := s.cronograma.Atividades(ctx, pu.Plano.ID)
+	if err != nil {
+		return nil, "", err
+	}
 
-	for _, disc := range ordenarChaves(cadernos) {
+	registros, err := s.cronograma.Registros(ctx, pu.Plano.ID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	res := plano.Gerar(pu.Plano.Config, &c)
+	plano.AplicarNosDias(res.Dias, atividades)
+
+	cx := contexto{
+		Concurso:   c,
+		Plano:      pu.Plano,
+		Atividades: atividades,
+		Registros:  registros,
+	}
+
+	cadernos := plano.Caderno(resultadosDoPlano(res.Dias, cx))
+
+	itens := []port.ItemLembrete{}
+
+	for _, disc := range chavesOrdenadas(cadernos) {
 		for _, it := range cadernos[disc] {
-			itens = append(itens, port.LembreteItem{
-				Distancia:  distanciaDe(it.UltimaData, hoje),
+			itens = append(itens, port.ItemLembrete{
+				Distancia:  diasDesde(it.UltimaData, hoje),
 				Disciplina: it.Disciplina,
 				Tema:       it.Tema,
 			})
 		}
 	}
 
-	return itens
+	dica := ""
+
+	for _, it := range itens {
+		if d := c.DisciplinaPorCodigo(it.Disciplina); d != nil && len(d.Fontes) > 0 {
+			dica = "ouça o Áudio Overview de " + d.Nome + " no NotebookLM durante o trajeto"
+
+			break
+		}
+	}
+
+	return itens, dica, nil
 }
 
-// ordenarChaves keeps the reminder's order stable across runs, which map
-// iteration would not.
-func ordenarChaves(m map[string][]plano.ItemCaderno) []string {
+// chavesOrdenadas mantém a ordem do lembrete estável entre execuções, o que a
+// iteração de um map não faria.
+func chavesOrdenadas(m map[string][]plano.ItemCaderno) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
 		out = append(out, k)
@@ -119,9 +148,9 @@ func ordenarChaves(m map[string][]plano.ItemCaderno) []string {
 	return out
 }
 
-// distanciaDe is how many days ago the topic was last answered.
-func distanciaDe(ultima string, hoje time.Time) int {
-	d, err := time.Parse(isoDate, ultima)
+// diasDesde é há quantos dias o tema foi respondido pela última vez.
+func diasDesde(ultima string, hoje time.Time) int {
+	d, err := time.Parse(formatoISO, ultima)
 	if err != nil {
 		return 0
 	}

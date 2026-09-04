@@ -10,12 +10,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var _ port.ConcursoRepository = (*ConcursoRepo)(nil)
 
-// ConcursoRepo persists the exam catalogue.
+// ConcursoRepo persiste o catálogo da prova.
 type ConcursoRepo struct {
 	pool *pgxpool.Pool
 }
@@ -24,71 +25,77 @@ func NewConcursoRepo(pool *pgxpool.Pool) *ConcursoRepo {
 	return &ConcursoRepo{pool: pool}
 }
 
-func (r *ConcursoRepo) ListByOwner(ctx context.Context, ownerID uuid.UUID) ([]concurso.Concurso, error) {
+const colunasConcurso = `id, dono_id, slug, nome, banca, cargo, emoji,
+	prova_padrao, reta_padrao_dias, resumo`
+
+func (r *ConcursoRepo) ListarPorDono(
+	ctx context.Context,
+	donoID uuid.UUID,
+) ([]concurso.Concurso, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, slug, nome, banca, cargo, emoji, prova_padrao, reta_padrao_dias, resumo
-		 FROM concursos WHERE owner_user_id = $1 ORDER BY prova_padrao`,
-		ownerID,
+		`SELECT `+colunasConcurso+` FROM concursos
+		  WHERE dono_id = $1 ORDER BY prova_padrao`,
+		donoID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("listing concursos: %w", err)
+		return nil, fmt.Errorf("listando concursos: %w", err)
 	}
 	defer rows.Close()
 
 	out := []concurso.Concurso{}
 
 	for rows.Next() {
-		var c concurso.Concurso
-		c.OwnerID = ownerID
-		if err := rows.Scan(
-			&c.ID, &c.Slug, &c.Nome, &c.Banca, &c.Cargo, &c.Emoji,
-			&c.ProvaPadrao, &c.RetaPadraoDias, &c.Resumo,
-		); err != nil {
-			return nil, fmt.Errorf("scanning concurso: %w", err)
+		c, err := escanearConcurso(rows)
+		if err != nil {
+			return nil, fmt.Errorf("lendo concurso: %w", err)
 		}
 
 		out = append(out, c)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating concursos: %w", err)
+		return nil, fmt.Errorf("iterando concursos: %w", err)
 	}
 
 	return out, nil
 }
 
-func (r *ConcursoRepo) ConcursoBySlug(ctx context.Context, slug string) (concurso.Concurso, error) {
-	return r.load(ctx, `WHERE slug = $1`, slug)
+func (r *ConcursoRepo) PorSlug(ctx context.Context, slug string) (concurso.Concurso, error) {
+	return r.carregar(ctx, `WHERE slug = $1`, slug)
 }
 
-func (r *ConcursoRepo) ConcursoByID(ctx context.Context, id uuid.UUID) (concurso.Concurso, error) {
-	return r.load(ctx, `WHERE id = $1`, id)
+func (r *ConcursoRepo) PorID(ctx context.Context, id uuid.UUID) (concurso.Concurso, error) {
+	return r.carregar(ctx, `WHERE id = $1`, id)
 }
 
-func (r *ConcursoRepo) load(ctx context.Context, where string, arg any) (concurso.Concurso, error) {
+func escanearConcurso(linha pgx.Row) (concurso.Concurso, error) {
 	var c concurso.Concurso
-	var owner uuid.NullUUID
 
-	err := r.pool.QueryRow(
-		ctx,
-		`SELECT id, owner_user_id, slug, nome, banca, cargo, emoji, prova_padrao, reta_padrao_dias, resumo
-		 FROM concursos `+where,
-		arg,
-	).Scan(
-		&c.ID, &owner, &c.Slug, &c.Nome, &c.Banca, &c.Cargo, &c.Emoji,
+	err := linha.Scan(
+		&c.ID, &c.DonoID, &c.Slug, &c.Nome, &c.Banca, &c.Cargo, &c.Emoji,
 		&c.ProvaPadrao, &c.RetaPadraoDias, &c.Resumo,
 	)
 
+	return c, err
+}
+
+func (r *ConcursoRepo) carregar(
+	ctx context.Context,
+	onde string,
+	arg any,
+) (concurso.Concurso, error) {
+	c, err := escanearConcurso(r.pool.QueryRow(
+		ctx, `SELECT `+colunasConcurso+` FROM concursos `+onde, arg,
+	))
+
 	if errors.Is(err, pgx.ErrNoRows) {
-		return concurso.Concurso{}, concurso.ErrNotFound
+		return concurso.Concurso{}, concurso.ErrNaoEncontrado
 	}
 
 	if err != nil {
-		return concurso.Concurso{}, fmt.Errorf("querying concurso: %w", err)
+		return concurso.Concurso{}, fmt.Errorf("consultando concurso: %w", err)
 	}
-
-	c.OwnerID = owner.UUID
 
 	if c.Disciplinas, err = r.disciplinas(ctx, c.ID); err != nil {
 		return concurso.Concurso{}, err
@@ -102,39 +109,38 @@ func (r *ConcursoRepo) load(ctx context.Context, where string, arg any) (concurs
 		return concurso.Concurso{}, err
 	}
 
-	if c.RevCiclo, err = r.revCiclo(ctx, c.ID); err != nil {
-		return concurso.Concurso{}, err
-	}
-
 	return c, nil
 }
 
-// CreateConcurso inserts the concurso and every child row in one transaction.
-func (r *ConcursoRepo) CreateConcurso(ctx context.Context, c concurso.Concurso) (concurso.Concurso, error) {
+func (r *ConcursoRepo) Criar(
+	ctx context.Context,
+	c concurso.Concurso,
+) (concurso.Concurso, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return concurso.Concurso{}, fmt.Errorf("begin: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
 
 	err = tx.QueryRow(
 		ctx,
 		`INSERT INTO concursos
-		   (owner_user_id, slug, nome, banca, cargo, emoji, prova_padrao, reta_padrao_dias, resumo)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		   (dono_id, slug, nome, banca, cargo, emoji, prova_padrao,
+		    reta_padrao_dias, resumo)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		 RETURNING id`,
-		c.OwnerID, c.Slug, c.Nome, c.Banca, c.Cargo, c.Emoji,
+		c.DonoID, c.Slug, c.Nome, c.Banca, c.Cargo, c.Emoji,
 		c.ProvaPadrao, c.RetaPadraoDias, c.Resumo,
 	).Scan(&c.ID)
 	if err != nil {
-		if isUniqueViolation(err) {
+		if violaUnique(err) {
 			return concurso.Concurso{}, fmt.Errorf("slug %q já existe", c.Slug)
 		}
 
-		return concurso.Concurso{}, fmt.Errorf("inserting concurso: %w", err)
+		return concurso.Concurso{}, fmt.Errorf("inserindo concurso: %w", err)
 	}
 
-	if err := inserirConteudoDoConcurso(ctx, tx, &c); err != nil {
+	if err := gravarFilhos(ctx, tx, &c); err != nil {
 		return concurso.Concurso{}, err
 	}
 
@@ -145,43 +151,47 @@ func (r *ConcursoRepo) CreateConcurso(ctx context.Context, c concurso.Concurso) 
 	return c, nil
 }
 
-// UpdateConcurso rewrites the concurso and all of its children. Disciplina
-// codigos are regenerated by order; per-discipline question overrides
-// (plano_questoes) cascade-delete and are re-seeded from questoes_padrao by the
-// plano service on the next read.
-func (r *ConcursoRepo) UpdateConcurso(ctx context.Context, c concurso.Concurso) (concurso.Concurso, error) {
+// Atualizar grava o concurso preservando a IDENTIDADE das disciplinas.
+//
+// Antes isto apagava todas as disciplinas e as reinseria com ids novos. Como o
+// cronograma e o histórico apontam para a disciplina, editar qualquer campo do
+// concurso desligava tudo que o estudante já tinha feito. Agora cada disciplina
+// que chega com id é atualizada no lugar; só as que sumiram da lista são
+// removidas, e aí o cascade é o comportamento correto.
+func (r *ConcursoRepo) Atualizar(
+	ctx context.Context,
+	c concurso.Concurso,
+) (concurso.Concurso, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return concurso.Concurso{}, fmt.Errorf("begin: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
 
 	ct, err := tx.Exec(
 		ctx,
 		`UPDATE concursos SET
-		   nome = $2, banca = $3, cargo = $4, emoji = $5,
-		   prova_padrao = $6, reta_padrao_dias = $7, resumo = $8
-		 WHERE id = $1 AND owner_user_id = $9`,
-		c.ID, c.Nome, c.Banca, c.Cargo, c.Emoji,
-		c.ProvaPadrao, c.RetaPadraoDias, c.Resumo, c.OwnerID,
+		   nome = $2, banca = $3, cargo = $4, emoji = $5, prova_padrao = $6,
+		   reta_padrao_dias = $7, resumo = $8, atualizado_em = now()
+		 WHERE id = $1 AND dono_id = $9`,
+		c.ID, c.Nome, c.Banca, c.Cargo, c.Emoji, c.ProvaPadrao,
+		c.RetaPadraoDias, c.Resumo, c.DonoID,
 	)
 	if err != nil {
-		return concurso.Concurso{}, fmt.Errorf("updating concurso: %w", err)
+		return concurso.Concurso{}, fmt.Errorf("atualizando concurso: %w", err)
 	}
 
 	if ct.RowsAffected() == 0 {
-		return concurso.Concurso{}, concurso.ErrNotFound
+		return concurso.Concurso{}, concurso.ErrNaoEncontrado
 	}
 
-	// marcos são atualizados no lugar (inserirConteudoDoConcurso), para que os
-	// "cumprido" de marco_checks sobrevivam à edição do concurso.
-	for _, table := range []string{"disciplinas", "conteudo_programatico"} {
-		if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE concurso_id = $1`, c.ID); err != nil {
-			return concurso.Concurso{}, fmt.Errorf("clearing %s: %w", table, err)
-		}
+	if _, err := tx.Exec(
+		ctx, `DELETE FROM conteudo_programatico WHERE concurso_id = $1`, c.ID,
+	); err != nil {
+		return concurso.Concurso{}, fmt.Errorf("limpando conteúdo: %w", err)
 	}
 
-	if err := inserirConteudoDoConcurso(ctx, tx, &c); err != nil {
+	if err := gravarFilhos(ctx, tx, &c); err != nil {
 		return concurso.Concurso{}, err
 	}
 
@@ -192,100 +202,149 @@ func (r *ConcursoRepo) UpdateConcurso(ctx context.Context, c concurso.Concurso) 
 	return c, nil
 }
 
-func (r *ConcursoRepo) DeleteConcurso(ctx context.Context, id uuid.UUID) error {
+func (r *ConcursoRepo) Remover(ctx context.Context, id uuid.UUID) error {
 	if _, err := r.pool.Exec(ctx, `DELETE FROM concursos WHERE id = $1`, id); err != nil {
-		return fmt.Errorf("deleting concurso: %w", err)
+		return fmt.Errorf("removendo concurso: %w", err)
 	}
 
 	return nil
 }
 
-func (r *ConcursoRepo) SetCadernoURL(
+func (r *ConcursoRepo) DefinirCadernoURL(
 	ctx context.Context,
 	concursoID uuid.UUID,
 	codigo, url string,
 ) error {
 	ct, err := r.pool.Exec(
 		ctx,
-		`UPDATE disciplinas SET caderno_url = $3 WHERE concurso_id = $1 AND codigo = $2`,
+		`UPDATE disciplinas SET caderno_url = $3
+		  WHERE concurso_id = $1 AND codigo = $2`,
 		concursoID, codigo, url,
 	)
 	if err != nil {
-		return fmt.Errorf("updating caderno_url: %w", err)
+		return fmt.Errorf("atualizando caderno_url: %w", err)
 	}
 
 	if ct.RowsAffected() == 0 {
-		return concurso.ErrNotFound
+		return concurso.ErrNaoEncontrado
 	}
 
 	return nil
 }
 
-// inserirConteudoDoConcurso inserts disciplinas (+ temas + fontes), marcos and
-// conteudo for c.ID. Codigos are mnemonics derived from each name (see
-// concurso.Siglas) because they are what the schedule shows on every activity
-// chip: "DIRAD" is readable where "D04" is not.
-func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
-	nomes := make([]string, len(c.Disciplinas))
-	for i := range c.Disciplinas {
-		nomes[i] = c.Disciplinas[i].Nome
+// gravarFilhos grava disciplinas (com temas e fontes), marcos e conteúdo.
+// Disciplinas e marcos que já existem são atualizados pelo id; os que saíram da
+// lista são removidos.
+func gravarFilhos(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
+	if err := gravarDisciplinas(ctx, tx, c); err != nil {
+		return err
 	}
 
-	codigos := concurso.Siglas(nomes)
+	if err := gravarMarcos(ctx, tx, c); err != nil {
+		return err
+	}
 
-	// Disciplinas are inserted one by one — RETURNING id feeds every tema and
-	// fonte below. Batching disciplinas would still leave that dependency to
-	// resolve, and the number of disciplinas is small (rarely past ~10), so this
-	// stays the boundary between per-row work and batched work.
+	return gravarConteudo(ctx, tx, c)
+}
+
+func gravarDisciplinas(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
+	sobrevivem := make([]uuid.UUID, 0, len(c.Disciplinas))
+
 	for i := range c.Disciplinas {
 		d := &c.Disciplinas[i]
-		d.Codigo = codigos[i]
-		d.Ordem = i
 
-		if err := tx.QueryRow(
+		// Disciplina nova: o banco gera o id. Disciplina existente: o id é a
+		// identidade e não muda, então o UPDATE encontra a linha e o cronograma
+		// continua apontando para a matéria certa.
+		if d.ID == uuid.Nil {
+			if err := tx.QueryRow(
+				ctx,
+				`INSERT INTO disciplinas
+				   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+				 RETURNING id`,
+				c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso,
+				d.QuestoesPadrao, d.Ordem, d.CadernoURL,
+			).Scan(&d.ID); err != nil {
+				return fmt.Errorf("inserindo disciplina %s: %w", d.Nome, err)
+			}
+		} else if _, err := tx.Exec(
 			ctx,
-			`INSERT INTO disciplinas
-			   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			 RETURNING id`,
-			c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso, d.QuestoesPadrao, d.Ordem, d.CadernoURL,
-		).Scan(&d.ID); err != nil {
-			return fmt.Errorf("inserting disciplina %s: %w", d.Nome, err)
+			`UPDATE disciplinas SET
+			   codigo = $3, nome = $4, bloco = $5, peso = $6,
+			   questoes_padrao = $7, ordem = $8, caderno_url = $9
+			 WHERE id = $1 AND concurso_id = $2`,
+			d.ID, c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso,
+			d.QuestoesPadrao, d.Ordem, d.CadernoURL,
+		); err != nil {
+			return fmt.Errorf("atualizando disciplina %s: %w", d.Nome, err)
 		}
+
+		sobrevivem = append(sobrevivem, d.ID)
 	}
 
-	// Temas and fontes go in ONE batch across every discipline: a real edital
-	// carries dozens of temas per subject, so one round-trip beats one per row.
-	temasBatch := &pgx.Batch{}
-	fontesBatch := &pgx.Batch{}
+	// Só as disciplinas que o usuário de fato removeu saem — e aí levar junto o
+	// que estava agendado nelas é o comportamento certo.
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM disciplinas WHERE concurso_id = $1 AND NOT (id = ANY($2))`,
+		c.ID, sobrevivem,
+	); err != nil {
+		return fmt.Errorf("removendo disciplinas que saíram: %w", err)
+	}
+
+	// Temas e fontes são listas pequenas, completas e sem identidade própria:
+	// recriá-las é mais simples e mais correto que diferenciar.
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM temas WHERE disciplina_id = ANY($1)`, sobrevivem,
+	); err != nil {
+		return fmt.Errorf("limpando temas: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM fontes WHERE disciplina_id = ANY($1)`, sobrevivem,
+	); err != nil {
+		return fmt.Errorf("limpando fontes: %w", err)
+	}
+
+	// Um edital real traz dezenas de temas por matéria, então tudo vai num lote
+	// só em vez de uma ida ao banco por linha.
+	lote := &pgx.Batch{}
+
 	for i := range c.Disciplinas {
 		d := &c.Disciplinas[i]
+
 		for j, tema := range d.Temas {
-			temasBatch.Queue(
-				`INSERT INTO temas (disciplina_id, ordem, texto) VALUES ($1, $2, $3)`,
+			lote.Queue(
+				`INSERT INTO temas (disciplina_id, ordem, texto) VALUES ($1,$2,$3)`,
 				d.ID, j, tema,
 			)
 		}
+
 		for j := range d.Fontes {
 			f := d.Fontes[j]
-			fontesBatch.Queue(
-				`INSERT INTO fontes (disciplina_id, ordem, titulo, url, tipo) VALUES ($1, $2, $3, $4, $5)`,
-				d.ID, j, f.Titulo, f.URL, tipoFonte(f.Tipo),
+			lote.Queue(
+				`INSERT INTO fontes (disciplina_id, ordem, titulo, url, tipo)
+				 VALUES ($1,$2,$3,$4,$5)`,
+				d.ID, j, f.Titulo, f.URL, f.Tipo,
 			)
 		}
 	}
-	if temasBatch.Len() > 0 {
-		if err := tx.SendBatch(ctx, temasBatch).Close(); err != nil {
-			return fmt.Errorf("inserting temas: %w", err)
-		}
-	}
-	if fontesBatch.Len() > 0 {
-		if err := tx.SendBatch(ctx, fontesBatch).Close(); err != nil {
-			return fmt.Errorf("inserting fontes: %w", err)
+
+	if lote.Len() > 0 {
+		if err := tx.SendBatch(ctx, lote).Close(); err != nil {
+			return fmt.Errorf("gravando temas e fontes: %w", err)
 		}
 	}
 
-	// Marcos also carry a RETURNING id we need, so they stay per-row.
+	return nil
+}
+
+// gravarMarcos atualiza os marcos no lugar, para que os "cumprido" de
+// marco_checks sobrevivam à edição do concurso.
+func gravarMarcos(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
 	for i := range c.Marcos {
 		m := &c.Marcos[i]
 		m.Ordem = i
@@ -294,16 +353,18 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		if err := tx.QueryRow(
 			ctx,
 			`INSERT INTO marcos
-			   (concurso_id, ordem, rotulo, data_inicio, data_fim, titulo, exige_acao, e_prova)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			   (concurso_id, ordem, rotulo, data_inicio, data_fim, titulo,
+			    exige_acao, e_prova)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 			 ON CONFLICT (concurso_id, ordem) DO UPDATE SET
 			   rotulo = EXCLUDED.rotulo, data_inicio = EXCLUDED.data_inicio,
 			   data_fim = EXCLUDED.data_fim, titulo = EXCLUDED.titulo,
 			   exige_acao = EXCLUDED.exige_acao, e_prova = EXCLUDED.e_prova
 			 RETURNING id`,
-			c.ID, m.Ordem, m.Rotulo, m.DataInicio, m.DataFim, m.Titulo, m.ExigeAcao, m.EProva,
+			c.ID, m.Ordem, m.Rotulo, m.DataInicio, m.DataFim, m.Titulo,
+			m.ExigeAcao, m.EProva,
 		).Scan(&m.ID); err != nil {
-			return fmt.Errorf("inserting marco: %w", err)
+			return fmt.Errorf("gravando marco: %w", err)
 		}
 	}
 
@@ -312,169 +373,176 @@ func inserirConteudoDoConcurso(ctx context.Context, tx pgx.Tx, c *concurso.Concu
 		`DELETE FROM marcos WHERE concurso_id = $1 AND ordem >= $2`,
 		c.ID, len(c.Marcos),
 	); err != nil {
-		return fmt.Errorf("trimming marcos: %w", err)
-	}
-
-	if len(c.Conteudo) > 0 {
-		conteudoBatch := &pgx.Batch{}
-		for i, item := range c.Conteudo {
-			conteudoBatch.Queue(
-				`INSERT INTO conteudo_programatico (concurso_id, ordem, tipo, texto) VALUES ($1, $2, $3, $4)`,
-				c.ID, i, item.Tipo, item.Texto,
-			)
-		}
-		if err := tx.SendBatch(ctx, conteudoBatch).Close(); err != nil {
-			return fmt.Errorf("inserting conteudo: %w", err)
-		}
+		return fmt.Errorf("removendo marcos que saíram: %w", err)
 	}
 
 	return nil
 }
 
-func tipoFonte(t string) string {
-	switch t {
-	case "lei", "jurisprudencia", "material", "questoes", "link":
-		return t
-	default:
-		return "link"
+func gravarConteudo(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) error {
+	if len(c.Conteudo) == 0 {
+		return nil
 	}
+
+	lote := &pgx.Batch{}
+
+	for i, item := range c.Conteudo {
+		lote.Queue(
+			`INSERT INTO conteudo_programatico (concurso_id, ordem, tipo, texto)
+			 VALUES ($1,$2,$3,$4)`,
+			c.ID, i, item.Tipo, item.Texto,
+		)
+	}
+
+	if err := tx.SendBatch(ctx, lote).Close(); err != nil {
+		return fmt.Errorf("gravando conteúdo: %w", err)
+	}
+
+	return nil
 }
 
-func (r *ConcursoRepo) disciplinas(ctx context.Context, concursoID uuid.UUID) ([]concurso.Disciplina, error) {
+func (r *ConcursoRepo) disciplinas(
+	ctx context.Context,
+	concursoID uuid.UUID,
+) ([]concurso.Disciplina, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url
-		 FROM disciplinas WHERE concurso_id = $1 ORDER BY ordem`,
+		   FROM disciplinas WHERE concurso_id = $1 ORDER BY ordem`,
 		concursoID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying disciplinas: %w", err)
+		return nil, fmt.Errorf("consultando disciplinas: %w", err)
 	}
 	defer rows.Close()
 
-	discs := []concurso.Disciplina{}
+	out := []concurso.Disciplina{}
 	ids := []uuid.UUID{}
 
 	for rows.Next() {
-		var d concurso.Disciplina
-		var bloco string
+		var (
+			d     concurso.Disciplina
+			bloco string
+		)
+
 		if err := rows.Scan(
-			&d.ID, &d.Codigo, &d.Nome, &bloco, &d.Peso, &d.QuestoesPadrao, &d.Ordem, &d.CadernoURL,
+			&d.ID, &d.Codigo, &d.Nome, &bloco, &d.Peso,
+			&d.QuestoesPadrao, &d.Ordem, &d.CadernoURL,
 		); err != nil {
-			return nil, fmt.Errorf("scanning disciplina: %w", err)
+			return nil, fmt.Errorf("lendo disciplina: %w", err)
 		}
 
 		d.Bloco = concurso.Bloco(bloco)
-		d.Temas = []string{}
-		d.Fontes = []concurso.Fonte{}
-		discs = append(discs, d)
+		out = append(out, d)
 		ids = append(ids, d.ID)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating disciplinas: %w", err)
+		return nil, fmt.Errorf("iterando disciplinas: %w", err)
 	}
 
-	temasPorDisc, err := r.temas(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	fontesPorDisc, err := r.fontes(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range discs {
-		if t, ok := temasPorDisc[discs[i].ID]; ok {
-			discs[i].Temas = t
-		}
-
-		if f, ok := fontesPorDisc[discs[i].ID]; ok {
-			discs[i].Fontes = f
-		}
-	}
-
-	return discs, nil
-}
-
-func (r *ConcursoRepo) temas(ctx context.Context, discIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
-	out := map[uuid.UUID][]string{}
-	if len(discIDs) == 0 {
+	if len(out) == 0 {
 		return out, nil
 	}
 
+	temas, err := r.temas(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	fontes, err := r.fontes(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range out {
+		out[i].Temas = temas[out[i].ID]
+		out[i].Fontes = fontes[out[i].ID]
+	}
+
+	return out, nil
+}
+
+// temas e fontes carregam TODAS as disciplinas de uma vez (WHERE ... = ANY),
+// em vez de uma consulta por matéria.
+func (r *ConcursoRepo) temas(
+	ctx context.Context,
+	ids []uuid.UUID,
+) (map[uuid.UUID][]string, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT disciplina_id, texto FROM temas
-		 WHERE disciplina_id = ANY($1) ORDER BY disciplina_id, ordem`,
-		discIDs,
+		  WHERE disciplina_id = ANY($1) ORDER BY disciplina_id, ordem`,
+		ids,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying temas: %w", err)
+		return nil, fmt.Errorf("consultando temas: %w", err)
 	}
 	defer rows.Close()
 
+	out := map[uuid.UUID][]string{}
+
 	for rows.Next() {
-		var id uuid.UUID
-		var texto string
+		var (
+			id    uuid.UUID
+			texto string
+		)
+
 		if err := rows.Scan(&id, &texto); err != nil {
-			return nil, fmt.Errorf("scanning tema: %w", err)
+			return nil, fmt.Errorf("lendo tema: %w", err)
 		}
 
 		out[id] = append(out[id], texto)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating temas: %w", err)
-	}
-
-	return out, nil
+	return out, rows.Err()
 }
 
-func (r *ConcursoRepo) fontes(ctx context.Context, discIDs []uuid.UUID) (map[uuid.UUID][]concurso.Fonte, error) {
-	out := map[uuid.UUID][]concurso.Fonte{}
-	if len(discIDs) == 0 {
-		return out, nil
-	}
-
+func (r *ConcursoRepo) fontes(
+	ctx context.Context,
+	ids []uuid.UUID,
+) (map[uuid.UUID][]concurso.Fonte, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT disciplina_id, ordem, titulo, url, tipo FROM fontes
-		 WHERE disciplina_id = ANY($1) ORDER BY disciplina_id, ordem`,
-		discIDs,
+		  WHERE disciplina_id = ANY($1) ORDER BY disciplina_id, ordem`,
+		ids,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying fontes: %w", err)
+		return nil, fmt.Errorf("consultando fontes: %w", err)
 	}
 	defer rows.Close()
 
+	out := map[uuid.UUID][]concurso.Fonte{}
+
 	for rows.Next() {
-		var id uuid.UUID
-		var f concurso.Fonte
+		var (
+			id uuid.UUID
+			f  concurso.Fonte
+		)
+
 		if err := rows.Scan(&id, &f.Ordem, &f.Titulo, &f.URL, &f.Tipo); err != nil {
-			return nil, fmt.Errorf("scanning fonte: %w", err)
+			return nil, fmt.Errorf("lendo fonte: %w", err)
 		}
 
 		out[id] = append(out[id], f)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating fontes: %w", err)
-	}
-
-	return out, nil
+	return out, rows.Err()
 }
 
-func (r *ConcursoRepo) marcos(ctx context.Context, concursoID uuid.UUID) ([]concurso.Marco, error) {
+func (r *ConcursoRepo) marcos(
+	ctx context.Context,
+	concursoID uuid.UUID,
+) ([]concurso.Marco, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT id, ordem, rotulo, data_inicio, data_fim, titulo, exige_acao, e_prova
-		 FROM marcos WHERE concurso_id = $1 ORDER BY ordem`,
+		   FROM marcos WHERE concurso_id = $1 ORDER BY ordem`,
 		concursoID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying marcos: %w", err)
+		return nil, fmt.Errorf("consultando marcos: %w", err)
 	}
 	defer rows.Close()
 
@@ -482,79 +550,52 @@ func (r *ConcursoRepo) marcos(ctx context.Context, concursoID uuid.UUID) ([]conc
 
 	for rows.Next() {
 		var m concurso.Marco
+
 		if err := rows.Scan(
 			&m.ID, &m.Ordem, &m.Rotulo, &m.DataInicio, &m.DataFim,
 			&m.Titulo, &m.ExigeAcao, &m.EProva,
 		); err != nil {
-			return nil, fmt.Errorf("scanning marco: %w", err)
+			return nil, fmt.Errorf("lendo marco: %w", err)
 		}
 
 		out = append(out, m)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating marcos: %w", err)
-	}
-
-	return out, nil
+	return out, rows.Err()
 }
 
-func (r *ConcursoRepo) conteudo(ctx context.Context, concursoID uuid.UUID) ([]concurso.ConteudoItem, error) {
+func (r *ConcursoRepo) conteudo(
+	ctx context.Context,
+	concursoID uuid.UUID,
+) ([]concurso.ConteudoItem, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT ordem, tipo, texto FROM conteudo_programatico
-		 WHERE concurso_id = $1 ORDER BY ordem`,
+		  WHERE concurso_id = $1 ORDER BY ordem`,
 		concursoID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("querying conteudo: %w", err)
+		return nil, fmt.Errorf("consultando conteúdo: %w", err)
 	}
 	defer rows.Close()
 
 	out := []concurso.ConteudoItem{}
 
 	for rows.Next() {
-		var item concurso.ConteudoItem
-		if err := rows.Scan(&item.Ordem, &item.Tipo, &item.Texto); err != nil {
-			return nil, fmt.Errorf("scanning conteudo: %w", err)
+		var it concurso.ConteudoItem
+
+		if err := rows.Scan(&it.Ordem, &it.Tipo, &it.Texto); err != nil {
+			return nil, fmt.Errorf("lendo item de conteúdo: %w", err)
 		}
 
-		out = append(out, item)
+		out = append(out, it)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating conteudo: %w", err)
-	}
-
-	return out, nil
+	return out, rows.Err()
 }
 
-func (r *ConcursoRepo) revCiclo(ctx context.Context, concursoID uuid.UUID) ([]concurso.RevItem, error) {
-	rows, err := r.pool.Query(
-		ctx,
-		`SELECT ordem, titulo, questoes FROM rev_ciclo
-		 WHERE concurso_id = $1 ORDER BY ordem`,
-		concursoID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("querying rev_ciclo: %w", err)
-	}
-	defer rows.Close()
+func violaUnique(err error) bool {
+	var pgErr *pgconn.PgError
 
-	out := []concurso.RevItem{}
-
-	for rows.Next() {
-		var item concurso.RevItem
-		if err := rows.Scan(&item.Ordem, &item.Titulo, &item.Questoes); err != nil {
-			return nil, fmt.Errorf("scanning rev_ciclo: %w", err)
-		}
-
-		out = append(out, item)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rev_ciclo: %w", err)
-	}
-
-	return out, nil
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

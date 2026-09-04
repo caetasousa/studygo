@@ -14,7 +14,8 @@ import (
 
 const maxEditalPDF = 20 << 20 // 20 MiB
 
-// ConcursoHandler serves the CRUD for a user's registered concursos.
+// ConcursoHandler serve o cadastro dos concursos do usuário e o assistente de
+// importação de edital.
 type ConcursoHandler struct {
 	concursos *service.ConcursoService
 	logger    *slog.Logger
@@ -25,9 +26,9 @@ func NewConcursoHandler(concursos *service.ConcursoService, logger *slog.Logger)
 }
 
 func (h *ConcursoHandler) List(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 
@@ -37,17 +38,22 @@ func (h *ConcursoHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, map[string]any{
-		"concursos":        items,
-		"importacaoEdital": h.concursos.ImportacaoDisponivel(),
+	resumos := make([]concursoResumoDTO, 0, len(items))
+	for _, it := range items {
+		resumos = append(resumos, resumoParaDTO(it))
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, listaConcursosDTO{
+		Concursos:        resumos,
+		ImportacaoEdital: h.concursos.ImportacaoDisponivel(),
 	})
 }
 
 // guardaImport is the common preamble for the wizard endpoints: auth check,
 // availability check, and a longer write deadline for the LLM round-trip.
 func (h *ConcursoHandler) guardaImport(w http.ResponseWriter, r *http.Request) bool {
-	if _, ok := userID(r.Context()); !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+	if _, ok := usuarioID(r.Context()); !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return false
 	}
 
@@ -77,7 +83,7 @@ func (h *ConcursoHandler) AnalisarEdital(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if up.Vazia() {
-		writeError(w, r, h.logger, errBadRequest)
+		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
 
@@ -87,7 +93,7 @@ func (h *ConcursoHandler) AnalisarEdital(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, resp)
+	writeJSON(w, h.logger, http.StatusOK, analiseParaDTO(resp))
 }
 
 // EstruturaEdital — wizard step 2. Takes {"documentoId", "cargo"}.
@@ -106,17 +112,19 @@ func (h *ConcursoHandler) EstruturaEdital(w http.ResponseWriter, r *http.Request
 	}
 
 	if strings.TrimSpace(body.DocumentoID) == "" || strings.TrimSpace(body.Cargo) == "" {
-		writeError(w, r, h.logger, errBadRequest)
+		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
 
-	resp, err := h.concursos.EstruturaDoCargo(r.Context(), ownerRefDe(r), body.DocumentoID, body.Cargo)
+	resp, err := h.concursos.EstruturaDoCargo(
+		r.Context(), ownerRefDe(r), body.DocumentoID, body.Cargo,
+	)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, resp)
+	writeJSON(w, h.logger, http.StatusOK, estruturaParaDTO(resp))
 }
 
 // ConteudoEdital — wizard step 3, and the edit screen's "extract topics". Takes
@@ -134,11 +142,11 @@ func (h *ConcursoHandler) ConteudoEdital(w http.ResponseWriter, r *http.Request)
 	}
 
 	if len(extras.Disciplinas) == 0 {
-		writeError(w, r, h.logger, errBadRequest)
+		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
 	if extras.DocumentoID == "" && up.Vazia() {
-		writeError(w, r, h.logger, errBadRequest)
+		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
 
@@ -150,7 +158,7 @@ func (h *ConcursoHandler) ConteudoEdital(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, resp)
+	writeJSON(w, h.logger, http.StatusOK, conteudoEditalParaDTO(resp))
 }
 
 // editalExtras are the per-step fields that travel next to a fresh upload.
@@ -163,7 +171,7 @@ type editalExtras struct {
 // ownerRefDe returns the opaque per-user handle the processor binds documents
 // to. The user id is fine — it never leaves the compose network.
 func ownerRefDe(r *http.Request) string {
-	if id, ok := userID(r.Context()); ok {
+	if id, ok := usuarioID(r.Context()); ok {
 		return id.String()
 	}
 	return ""
@@ -176,14 +184,14 @@ func lerUploadEdital(r *http.Request) (port.EditalUpload, editalExtras, error) {
 
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := r.ParseMultipartForm(maxEditalPDF); err != nil {
-			return port.EditalUpload{}, extras, errBadRequest
+			return port.EditalUpload{}, extras, errRequisicaoInvalida
 		}
 
 		extras.DocumentoID = r.FormValue("documentoId")
 		extras.Cargo = r.FormValue("cargo")
 		if ds := r.FormValue("disciplinas"); ds != "" {
 			if err := json.Unmarshal([]byte(ds), &extras.Disciplinas); err != nil {
-				return port.EditalUpload{}, extras, errBadRequest
+				return port.EditalUpload{}, extras, errRequisicaoInvalida
 			}
 		}
 
@@ -200,7 +208,7 @@ func lerUploadEdital(r *http.Request) (port.EditalUpload, editalExtras, error) {
 
 		data, err := io.ReadAll(io.LimitReader(file, maxEditalPDF))
 		if err != nil {
-			return port.EditalUpload{}, extras, errBadRequest
+			return port.EditalUpload{}, extras, errRequisicaoInvalida
 		}
 
 		mime := header.Header.Get("Content-Type")
@@ -229,9 +237,9 @@ func lerUploadEdital(r *http.Request) (port.EditalUpload, editalExtras, error) {
 }
 
 func (h *ConcursoHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 
@@ -241,57 +249,71 @@ func (h *ConcursoHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, detalhe)
+	writeJSON(w, h.logger, http.StatusOK, concursoDetalheDTO{
+		Slug:   detalhe.Slug,
+		Dados:  comandoParaConcurso(detalhe.Dados),
+		Avisos: detalhe.Avisos,
+	})
 }
 
 func (h *ConcursoHandler) Criar(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 
-	var in service.ConcursoInput
-	if err := decode(r, &in); err != nil {
+	var req concursoRequest
+	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	resumo, err := h.concursos.Criar(r.Context(), id, in)
+	resumo, avisos, err := h.concursos.Criar(r.Context(), id, concursoParaComando(req))
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusCreated, resumo)
+	writeJSON(w, h.logger, http.StatusCreated, concursoDetalheDTO{
+		Slug:   resumo.Slug,
+		Dados:  req,
+		Avisos: avisos,
+	})
 }
 
 func (h *ConcursoHandler) Atualizar(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 
-	var in service.ConcursoInput
-	if err := decode(r, &in); err != nil {
+	var req concursoRequest
+	if err := decode(r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	resumo, err := h.concursos.Atualizar(r.Context(), id, r.PathValue("slug"), in)
+	resumo, avisos, err := h.concursos.Atualizar(
+		r.Context(), id, r.PathValue("slug"), concursoParaComando(req),
+	)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, resumo)
+	writeJSON(w, h.logger, http.StatusOK, concursoDetalheDTO{
+		Slug:   resumo.Slug,
+		Dados:  req,
+		Avisos: avisos,
+	})
 }
 
 func (h *ConcursoHandler) Remover(w http.ResponseWriter, r *http.Request) {
-	id, ok := userID(r.Context())
+	id, ok := usuarioID(r.Context())
 	if !ok {
-		writeError(w, r, h.logger, errUnauthorized)
+		writeError(w, r, h.logger, errNaoAutenticado)
 		return
 	}
 

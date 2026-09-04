@@ -58,9 +58,11 @@ func run(logger *slog.Logger) error {
 	hasher := crypto.NewArgon2Hasher(cfg.Argon2)
 	tokens := crypto.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTTL)
 
-	userRepo := postgres.NewUserRepo(pool)
+	usuarioRepo := postgres.NewUsuarioRepo(pool)
 	concursoRepo := postgres.NewConcursoRepo(pool)
 	planoRepo := postgres.NewPlanoRepo(pool)
+	cronogramaRepo := postgres.NewCronogramaRepo(pool)
+	cadernoRepo := postgres.NewCadernoRepo(pool)
 
 	var editalProc port.EditalProcessor = editalproc.Indisponivel{}
 	if cfg.EditalProcessorURL != "" {
@@ -68,13 +70,35 @@ func run(logger *slog.Logger) error {
 		logger.Info("edital import enabled", slog.String("processor", cfg.EditalProcessorURL))
 	}
 
-	authService := service.NewAuthService(userRepo, hasher, tokens, clock, cfg.RefreshTTL)
+	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
+
+	// Os seis casos de uso do plano compartilham as mesmas dependências.
+	deps := service.Dependencias{
+		Planos:     planoRepo,
+		Cronograma: cronogramaRepo,
+		Concursos:  concursoRepo,
+		Caderno:    cadernoRepo,
+		Usuarios:   usuarioRepo,
+		Relogio:    clock,
+	}
 
 	handlers := httpapi.Handlers{
-		Health:   httpapi.NewHealthHandler(service.NewHealthService(pool), logger),
-		Auth:     httpapi.NewAuthHandler(authService, logger),
-		Concurso: httpapi.NewConcursoHandler(service.NewConcursoService(concursoRepo, editalProc), logger),
-		Plano:    httpapi.NewPlanoHandler(service.NewPlanoService(planoRepo, concursoRepo, clock), logger),
+		Health: httpapi.NewHealthHandler(service.NewHealthService(pool), logger),
+		Auth:   httpapi.NewAuthHandler(authService, logger),
+		Concurso: httpapi.NewConcursoHandler(
+			service.NewConcursoService(concursoRepo, editalProc), logger,
+		),
+		Plano: httpapi.NewPlanoHandler(
+			service.NewPlanoService(deps),
+			service.NewCronogramaService(deps),
+			service.NewRegistroService(deps),
+			service.NewEstatisticaService(deps),
+			service.NewCadernoService(deps),
+			service.NewDossieService(deps),
+			service.NewExportacaoService(deps),
+			service.NewImportacaoTECService(deps),
+			logger,
+		),
 	}
 
 	router := httpapi.NewRouter(handlers, tokens, authService, logger)

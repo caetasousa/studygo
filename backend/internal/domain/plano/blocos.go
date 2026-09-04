@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-// Bloco is one time slice of a day's routine: minutes, a label, and what to do.
+// Bloco é uma fatia de tempo da rotina do dia: minutos, um rótulo e o que fazer.
 type Bloco struct {
-	Minutos int    `json:"minutos"`
-	Titulo  string `json:"titulo"`
-	Detalhe string `json:"detalhe"`
-	// Disciplina is set only on the review tail (see caudaRevisao), once the
-	// queue actually has something to name — the codigo, not the display
-	// name, so a caller can key a record or a caderno link on it without
-	// reverse-engineering it back out of Titulo.
-	Disciplina string `json:"-"`
+	Minutos int
+	Titulo  string
+	Detalhe string
+	// Disciplina só é preenchida na cauda de revisão (ver caudaRevisao), depois
+	// que a fila tem o que nomear — o código, não o nome exibido, para que quem
+	// chama possa indexar um registro ou o link do caderno sem tentar
+	// reconstruí-lo a partir do Titulo.
+	Disciplina string
 }
 
 // BlocoCtx carries everything the breakdown needs beyond the day itself.

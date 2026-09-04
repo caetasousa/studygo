@@ -16,12 +16,12 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-var _ port.PasswordHasher = (*Argon2Hasher)(nil)
+var _ port.HasherDeSenha = (*Argon2Hasher)(nil)
 
 // ErrIncompatibleHash is returned when an encoded hash cannot be parsed.
 var ErrIncompatibleHash = errors.New("hash de senha em formato incompatível")
 
-// Argon2Hasher implements port.PasswordHasher with argon2id and the standard
+// Argon2Hasher implements port.HasherDeSenha with argon2id and the standard
 // PHC string encoding.
 type Argon2Hasher struct {
 	params config.Argon2Params
@@ -59,7 +59,7 @@ func (h *Argon2Hasher) Hash(password string) (string, error) {
 	return encoded, nil
 }
 
-func (h *Argon2Hasher) Verify(password, encodedHash string) (bool, error) {
+func (h *Argon2Hasher) Conferir(password, encodedHash string) (bool, error) {
 	params, salt, hash, err := decodeHash(encodedHash)
 	if err != nil {
 		return false, err
