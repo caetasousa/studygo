@@ -1,11 +1,21 @@
-# Rodar localmente
+# 🚀 Rodar localmente
 
-## Pré-requisitos
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
+![Node](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white)
 
-- **Docker + Docker Compose** (jeito recomendado — sobe tudo)
-- Opcional, só para desenvolver com hot-reload: **Go 1.27+** e **Node 24+**
+Do zero ao app rodando em três comandos.
 
-## 1. Subir o stack com Docker
+---
+
+## 📋 Pré-requisitos
+
+- 🐳 **Docker + Docker Compose** — o jeito recomendado, sobe tudo
+- 🐹 **Go 1.27+** e 🟢 **Node 24+** — opcional, só para hot-reload fora do Docker
+
+---
+
+## 1️⃣ Subir o stack com Docker
 
 Na raiz do repositório:
 
@@ -17,12 +27,13 @@ docker compose up -d --build
 
 Sobe quatro serviços:
 
-| Serviço | Porta | Papel |
-|---|---|---|
-| `frontend` | `5173` | SPA (SvelteKit) + nginx que faz proxy de `/api` para o backend |
-| `backend` | `8080` | API Go; roda as migrations no boot |
-| `worker` | — | recalcula os lembretes de revisão espaçada (intervalo em `LEMBRETE_INTERVALO`) |
-| `postgres` | `5432` | banco |
+| | Serviço | Porta | Papel |
+|---|---|---|---|
+| 🧡 | `frontend` | `5173` | SPA (SvelteKit) + nginx que faz proxy de `/api` |
+| 🐹 | `backend` | `8080` | API Go; roda as migrations no boot |
+| 🔔 | `worker` | — | lembretes de revisão (intervalo em `LEMBRETE_INTERVALO`) |
+| 🐘 | `postgres` | `5432` | banco |
+| 🐍 | `edital-processor` | — | PDF → prévia estruturada (interno, sem porta no host) |
 
 Abra **http://localhost:5173**, crie uma conta e cadastre seu primeiro concurso.
 O plano de estudos é gerado na hora.
@@ -36,7 +47,9 @@ docker compose down -v            # parar e apagar o banco (recomeçar do zero)
 docker compose up -d --build      # subir de novo depois de mudar código
 ```
 
-### Variáveis do `.env`
+---
+
+### 🔑 Variáveis do `.env`
 
 | Variável | Obrigatória | Default | Para quê |
 |---|---|---|---|
@@ -48,7 +61,9 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
 | `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
 
-## 2. Desenvolvimento com hot-reload
+---
+
+## 2️⃣ Desenvolvimento com hot-reload
 
 Deixe o Postgres e o backend rodando pelo Compose e rode o frontend em modo dev:
 
@@ -71,15 +86,26 @@ JWT_SECRET="dev" \
 go run ./cmd/server
 ```
 
-## 3. Checagens
+---
+
+## 3️⃣ Checagens
 
 ```bash
-cd backend  && go test ./... && go vet ./...   # inclui o golden test do motor do plano
-cd frontend && npm run check                    # type-check (svelte-check)
+make check      # backend + frontend + edital-processor — sem Docker, < 1 s
+make check-db   # migrations, repositories e fluxos verticais — exige Docker
 ```
 
-## Problemas comuns
+> [!TIP]
+> `make check-db` sobe PostgreSQL **efêmero** (Testcontainers) e dá a cada teste
+> um database próprio. Ele não lê o `.env`, não usa a porta 5432 e **não toca no
+> seu banco local** — pode rodar com o Compose de pé ou desligado, tanto faz.
 
-- **`address already in use :8080`** — outra instância (ou um `go run` antigo) está na porta. `docker compose down` e mate processos `server` órfãos.
-- **backend reiniciando com erro de `planos` / relation does not exist** — o worker subiu antes das migrations. Ele se recupera sozinho no próximo tick; ou `docker compose restart worker`.
-- **mudou a estrutura de uma migration** — `docker compose down -v` para recriar o banco.
+---
+
+## 🩺 Problemas comuns
+
+- ⚠️ **`address already in use :8080`** — outra instância (ou um `go run` antigo) está na porta. `docker compose down` e mate processos `server` órfãos.
+- ⚠️ **backend reiniciando com erro de `planos` / relation does not exist** — o worker subiu antes das migrations. Ele se recupera sozinho no próximo tick; ou `docker compose restart worker`.
+- ⚠️ **mudou a estrutura da migration** — `make reset` (ou `docker compose down -v`)
+  para recriar o banco. Como há uma baseline só, editar o schema em
+  desenvolvimento significa recriar, não acrescentar migration.

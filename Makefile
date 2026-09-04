@@ -22,7 +22,7 @@ ANSIBLE_DIR := ansible
 REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
-        check check-backend check-frontend check-processor fmt \
+        check check-backend check-frontend check-processor check-db fmt \
         status commit deploy deploy-fast provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
@@ -75,6 +75,16 @@ check-frontend: ## svelte-check + vitest
 
 check-processor: ## ruff + mypy --strict + pytest
 	cd edital-processor && uv run ruff check . && uv run mypy --strict app && uv run pytest
+
+# Os testes que exigem PostgreSQL de verdade: migrations, repositories e alguns
+# fluxos verticais.
+#
+# Cada pacote sobe seu próprio container efêmero (Testcontainers) e cada teste
+# ganha um database exclusivo dentro dele. Nada aqui toca no banco local: não há
+# URL montada à mão, credencial do .env nem porta fixa — e por isso também não há
+# `-p 1`, já que os testes não disputam schema nenhum.
+check-db: ## Testes de integração com PostgreSQL efêmero (exige Docker)
+	cd backend && go test -tags=integration ./...
 
 fmt: ## Formata o código Go e o Python do processor
 	cd backend && gofmt -w .

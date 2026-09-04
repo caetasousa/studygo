@@ -31,10 +31,10 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   **cada matéria**, não do dia inteiro: um dia pode estar meio feito, e a mesma
   disciplina agendada duas vezes no mesmo dia tem registros independentes. O dia
   conclui sozinho quando todas as suas matérias concluem.
-- **Reorganizar arrastando** — arraste uma matéria para outro dia; se o destino
-  já estiver ocupado as duas trocam de lugar, se estiver vazio ela só se move.
-  No celular vale segurar e arrastar. Só uma matéria já concluída não se move —
-  isso reescreveria o que foi estudado.
+- **Reorganizar o cronograma** — mova uma matéria para outro dia; se o destino já
+  estiver ocupado as duas trocam de lugar. Só uma matéria já concluída não se
+  move — isso reescreveria o que foi estudado. Terminou algo antes da hora? A
+  matéria vem para o dia de hoje e o buraco se fecha sozinho.
 - **Balanceamento** — quanto do seu tempo foi para cada disciplina _vs_ o ideal.
 - **Estatísticas** — série de horas/acertos, streak de dias, evolução por
   disciplina.
@@ -55,8 +55,8 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
 |---|---|---|
 | 🐹 | **Go 1.27** | backend hexagonal (`domain / port / service / adapter`), `net/http` puro, sem framework. Motor do plano em `internal/domain/plano` |
 | 🧡 | **SvelteKit 2 · Svelte 5** | frontend SPA (`adapter-static`, sem SSR), runes, tokens de design copiados do artefato |
-| 🐘 | **PostgreSQL 18** | banco — modelo genérico `concurso → disciplinas → temas → marcos`, sem ORM |
-| 📜 | **SQL à mão** | migrations `NNNNNN_nome.up/down.sql`, runner próprio (embed + `schema_migrations` + advisory lock) |
+| 🐘 | **PostgreSQL 18** | banco — `concurso → disciplinas → temas → marcos` e `plano → atividades → registros`, sem ORM |
+| 📜 | **SQL à mão** | uma baseline de migration, runner próprio (embed + `schema_migrations` + advisory lock) |
 | 🔐 | **argon2id + JWT** | hash de senha (PHC) e auth com refresh rotativo |
 | 🤖 | **Gemini API** | importação opcional do concurso a partir do edital (`GEMINI_API_KEY`) |
 | 🔔 | **worker** | `cmd/worker` — lembretes diários de revisão espaçada |
@@ -78,8 +78,11 @@ flowchart LR
     B -. edital .-> G["🤖 Gemini API"]
 ```
 
-Um hexágono só, sem bounded contexts — simples de propósito. Convenções de
-código, camadas e regras do projeto: **[CLAUDE.md](CLAUDE.md)**.
+Um hexágono só, sem bounded contexts — simples de propósito. O cronograma é
+**materializado**: o motor propõe, o banco guarda, e cada bloco da tela é uma
+linha com id próprio. As decisões estruturais estão em
+**[docs/arquitetura.md](docs/arquitetura.md)**; as convenções para contribuir,
+em **[CLAUDE.md](CLAUDE.md)**.
 
 ---
 
@@ -93,14 +96,21 @@ open http://localhost:5173
 ```
 
 `make` sozinho lista todos os atalhos — `make check` roda os testes dos três
-serviços, `make deploy` publica.
+serviços (rápido, sem Docker), `make check-db` a suíte de integração com
+PostgreSQL efêmero, e `make deploy` publica.
 
 Salvou um arquivo, a mudança chega ao navegador (ou reinicia a API em ~5s) sem
 rebuild — o `docker-compose.override.yml` é carregado sozinho pelo Compose e
 aponta frontend e backend para os estágios `dev`. `--build` só quando mudar
 dependência.
 
-- **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** — o caminho de uma mudança: `make check` → `make commit` → `make deploy`
-- **[docs/rodar-local.md](docs/rodar-local.md)** — rodar e desenvolver localmente, variáveis do `.env`, hot-reload, checagens
-- **[docs/deploy.md](docs/deploy.md)** — provisionar a VPS pela primeira vez (Ansible)
-- **[CLAUDE.md](CLAUDE.md)** — arquitetura e convenções para contribuir
+## 📚 Documentação
+
+| | Documento | Para quê |
+|---|---|---|
+| 📐 | **[docs/arquitetura.md](docs/arquitetura.md)** | camadas, modelo de dados, contrato HTTP e vocabulário |
+| 🔄 | **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** | o caminho de uma mudança: `check` → `commit` → `deploy` |
+| 🚀 | **[docs/rodar-local.md](docs/rodar-local.md)** | rodar localmente, `.env`, hot-reload, checagens |
+| 🚢 | **[docs/deploy.md](docs/deploy.md)** | provisionar a VPS pela primeira vez (Ansible) |
+| 🔍 | **[docs/auditoria-testes.md](docs/auditoria-testes.md)** | por que a suíte de testes é como é |
+| 🤖 | **[CLAUDE.md](CLAUDE.md)** | convenções para contribuir (e para a IA seguir) |

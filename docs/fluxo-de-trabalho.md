@@ -1,4 +1,6 @@
-# Fluxo de trabalho: alterar → verificar → commitar → publicar
+# 🔄 Fluxo de trabalho
+
+**alterar → verificar → commitar → publicar**
 
 Todo o caminho de uma mudança, do editor até o ar, passa por `make`. Rode `make`
 sozinho na raiz para ver a lista completa de alvos.
@@ -21,7 +23,9 @@ editar código
 
 ---
 
-## 1. Desenvolver
+---
+
+## 1️⃣ Desenvolver
 
 ```bash
 make up                  # sobe tudo com hot reload → http://localhost:5173
@@ -50,7 +54,9 @@ que roda na VPS):
 make prod-local
 ```
 
-## 2. Verificar
+---
+
+## 2️⃣ Verificar
 
 ```bash
 make check
@@ -58,18 +64,41 @@ make check
 
 Roda os três, na ordem, e para no primeiro que falhar:
 
-| Alvo | O que roda | Onde |
-|---|---|---|
-| `make check-backend` | `go build ./...` · `go vet ./...` · `go test ./...` | `backend/` |
-| `make check-frontend` | `npm run check` (svelte-check) · `npm test` (vitest) | `frontend/` |
-| `make check-processor` | `ruff check` · `mypy --strict` · `pytest` | `edital-processor/` |
+| | Alvo | O que roda | Onde |
+|---|---|---|---|
+| 🐹 | `make check-backend` | `go build` · `go vet` · `go test` | `backend/` |
+| 🧡 | `make check-frontend` | `npm run check` · `npm test` | `frontend/` |
+| 🐍 | `make check-processor` | `ruff` · `mypy --strict` · `pytest` | `edital-processor/` |
+| 🐘 | `make check-db` | migrations + repositories + fluxos (Testcontainers) | `backend/` |
+
+Os testes que precisam de um PostgreSQL de verdade — migrations, repositories e
+os fluxos verticais — ficam fora do `make check`, para que ele não exija Docker:
+
+```bash
+make check-db
+```
+
+> [!WARNING]
+> Eles rodam contra containers efêmeros, um database por teste, e nunca tocam no
+> banco local. Sem Docker a suíte **falha** em vez de pular — verde sem ter
+> testado nada é pior que vermelho.
+
+Um teste que precise de banco leva a build tag `integration`; um que só leia
+arquivos, não.
+
+Mudou o **contrato HTTP**? O snapshot em
+`backend/internal/adapter/httpapi/testdata` falha e mostra o que mudou. Regrave
+com `ATUALIZAR_CONTRATO=1 go test ./internal/adapter/httpapi` e diga no commit
+qual campo mudou — `frontend/src/lib/types.ts` muda junto.
 
 `make fmt` formata o Go (`gofmt`) e o Python (`ruff format`) antes de commitar.
 
 > Os testes marcados `integration` e `gemini` do `edital-processor` são pulados
 > fora do container / sem chave real — é esperado ver `5 skipped`.
 
-## 3. Commitar
+---
+
+## 3️⃣ Commitar
 
 ```bash
 git add backend/internal/domain/plano/replanejar.go   # você escolhe o que entra
@@ -85,29 +114,31 @@ git push
 4. roda `make check`;
 5. só então commita.
 
-**Ele não roda `git add -A` de propósito.** Já aconteceu de um par de chaves SSH
-gerado sem querer aparecer solto na raiz do repo — com `add -A` isso entra no
-commit sem ninguém ver. Você escolhe o que entra; o make garante que o que entra
-passa nos checks.
+> [!IMPORTANT]
+> **Ele não roda `git add -A` de propósito.** > Já aconteceu de um par de chaves SSH gerado sem querer aparecer solto na raiz
+> do repo — com `add -A` isso entra no commit sem ninguém ver. Você escolhe o que
+> entra; o make garante que o que entra passa nos checks.
 
 A mensagem segue [Conventional Commits](https://www.conventionalcommits.org/):
 `tipo(escopo): descrição no imperativo, minúscula, sem ponto final`.
 
-| Tipo | Quando |
-|---|---|
-| `feat` | funcionalidade nova |
-| `fix` | correção de bug |
-| `refactor` | reorganização sem mudar comportamento |
-| `test` | só testes |
-| `docs` | só documentação |
-| `chore`, `ci`, `build`, `style`, `perf` | o resto |
+| | Tipo | Quando |
+|---|---|---|
+| ✨ | `feat` | funcionalidade nova |
+| 🐛 | `fix` | correção de bug |
+| ♻️ | `refactor` | reorganização sem mudar comportamento |
+| 🧪 | `test` | só testes |
+| 📝 | `docs` | só documentação |
+| 🔧 | `chore`, `ci`, `build`, `style`, `perf` | o resto |
 
 Escopos usados aqui: `backend`, `frontend`, `ansible`, `docker`, `nginx`,
 `claude`. Omita o escopo só quando a mudança atravessa o repo inteiro.
 
 **O `git push` é sempre seu** — nenhum alvo do Makefile empurra para o remoto.
 
-## 4. Publicar
+---
+
+## 4️⃣ Publicar
 
 ```bash
 make deploy    # checks + build das imagens + envia + sobe o stack na VPS
@@ -137,7 +168,7 @@ make deploy-logs svc=backend    # últimas 80 linhas
 make deploy-logs svc=edital-processor
 ```
 
-### O que o deploy faz
+### 📦 O que o deploy faz
 
 As imagens são buildadas **na sua máquina**, salvas em tarball, copiadas e
 carregadas na VPS — o código-fonte nunca vai para o servidor. As migrations
@@ -147,7 +178,9 @@ junto). Repetir o deploy é seguro.
 O passo a passo do **primeiro** deploy de um servidor novo (bootstrap, lockdown,
 provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 
-## Resumo dos alvos
+---
+
+## 📖 Resumo dos alvos
 
 | Alvo | Para quê |
 |---|---|

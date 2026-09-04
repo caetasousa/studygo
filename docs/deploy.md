@@ -1,4 +1,8 @@
-# Deploy numa VPS
+# 🚢 Deploy numa VPS
+
+![Ansible](https://img.shields.io/badge/Ansible-deploy-EE0000?logo=ansible&logoColor=white)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)
+![nginx](https://img.shields.io/badge/nginx-TLS-009639?logo=nginx&logoColor=white)
 
 O deploy roda numa VPS Ubuntu (o projeto usa uma Hostinger com Ubuntu 24.04 LTS),
 provisionada e atualizada por **Ansible**. As imagens Docker são **buildadas na
@@ -15,18 +19,24 @@ sua máquina                                   VPS
                                         └──────────────────────────────────┘
 ```
 
-Tudo mora em `ansible/`. Detalhes de cada playbook e role estão em
-[CLAUDE.md](../CLAUDE.md#infrastructure-ansible).
+Tudo mora em `ansible/`: um playbook por tarefa (`bootstrap`, `lockdown`,
+`site`, `deploy`) e uma role por peça da infra (`common`, `docker`, `nginx`,
+`certbot`).
 
-## Pré-requisitos na sua máquina
+---
+
+## 📋 Pré-requisitos na sua máquina
 
 - **Ansible**
 - **Docker** (para buildar as imagens localmente)
 - `sshpass` — só no primeiro acesso à VPS
 - Uma VPS Ubuntu com IP público e um domínio apontando para ela
 
-## Primeira vez (por servidor)
+---
 
+## 1️⃣ Primeira vez (por servidor)
+
+> [!NOTE]
 > A única coisa que você digita à parte é a **senha de root da VPS** (a que o
 > provedor gera). Ela é usada só no `bootstrap`/`lockdown` e nunca é salva.
 
@@ -63,7 +73,9 @@ ansible-playbook deploy.yml
 
 Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
 
-## Atualizações
+---
+
+## 🔁 Atualizações
 
 `bootstrap.yml` e `lockdown.yml` rodam **uma vez** por servidor. O dia a dia
 depois disso é pelo `make`, da raiz do repositório:
@@ -82,18 +94,24 @@ verificar, commitar, publicar) está em
 `deploy.yml` roda as migrations no boot do backend (advisory-lock, então o
 worker pode subir junto sem corrida) e é seguro repetir.
 
-## Segredos e variáveis
+---
 
-| Onde | Arquivo | Contém |
-|---|---|---|
-| Inventário | `ansible/inventory/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
-| Segredos | `ansible/inventory/group_vars/vps/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token` |
-| Não-secreto | `ansible/inventory/group_vars/vps/main.yml` (versionado) | `app_domain`, portas, nome do banco |
+## 🔑 Segredos e variáveis
 
-## Avisos
+| | Onde | Arquivo | Contém |
+|---|---|---|---|
+| 🗒️ | Inventário | `ansible/inventory/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
+| 🔐 | Segredos | `ansible/inventory/group_vars/vps/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token` |
+| 📄 | Não-secreto | `ansible/inventory/group_vars/vps/main.yml` (versionado) | `app_domain`, portas, nome do banco |
 
-- **Nunca** rode `ssh-keygen` sobrescrevendo `~/.ssh/annygo_deploy`. O root SSH
-  está desativado; se a chave for perdida, a recuperação é só pelo console web do
-  provedor.
-- O `docker-compose.yml` da raiz é só para desenvolvimento local. Em produção o
-  Ansible gera o seu a partir de `ansible/templates/docker-compose.prod.yml.j2`.
+---
+
+## ⚠️ Avisos
+
+> [!CAUTION]
+> **Nunca** rode `ssh-keygen` sobrescrevendo `~/.ssh/annygo_deploy`. O root SSH
+> está desativado; se a chave for perdida, a recuperação é só pelo console web do
+> provedor.
+
+ℹ️ O `docker-compose.yml` da raiz é só para desenvolvimento local. Em produção o
+Ansible gera o seu a partir de `ansible/templates/docker-compose.prod.yml.j2`.
