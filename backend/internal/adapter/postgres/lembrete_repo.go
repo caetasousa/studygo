@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"studygo/internal/domain/plano"
 	"studygo/internal/port"
@@ -185,4 +186,54 @@ func (r *PlanoRepo) espalharCiclo(
 	}
 
 	return rows.Err()
+}
+
+// ComAtraso encontra os planos com dia vencido cujas atividades ninguém
+// registrou.
+//
+// Uma consulta só, com EXISTS: o interesse é saber SE o plano tem atraso, não
+// quanto — parar no primeiro acerto evita varrer o cronograma inteiro de quem
+// está em dia. O replanejamento em si é do domínio; aqui só se decide quem
+// precisa dele.
+//
+// A atividade conta como atrasada quando não há registro OU o registro existe
+// mas não marca conclusão: um dia aberto pela metade continua sendo um dia que
+// não aconteceu.
+func (r *PlanoRepo) ComAtraso(ctx context.Context, hoje time.Time) ([]port.PlanoAtrasado, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT p.usuario_id, c.slug
+		   FROM planos p
+		   JOIN concursos c ON c.id = p.concurso_id
+		  WHERE EXISTS (
+		        SELECT 1
+		          FROM atividades a
+		     LEFT JOIN registros_atividade ra ON ra.atividade_id = a.id
+		         WHERE a.plano_id = p.id
+		           AND a.data < $1
+		           AND COALESCE(ra.concluido, false) = false
+		        )`,
+		hoje,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listando planos com atraso: %w", err)
+	}
+	defer rows.Close()
+
+	saida := []port.PlanoAtrasado{}
+
+	for rows.Next() {
+		var p port.PlanoAtrasado
+		if err := rows.Scan(&p.UsuarioID, &p.Slug); err != nil {
+			return nil, fmt.Errorf("lendo plano com atraso: %w", err)
+		}
+
+		saida = append(saida, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterando planos com atraso: %w", err)
+	}
+
+	return saida, nil
 }

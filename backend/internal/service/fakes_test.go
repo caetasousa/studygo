@@ -106,6 +106,11 @@ func (f *fakeConcursos) DefinirCadernoURL(
 
 type fakePlanos struct {
 	p plano.Plano
+
+	// O que a varredura diária vê. Vazio por padrão: a maioria dos testes de
+	// orquestração não passa por ela.
+	comAtraso     []port.PlanoAtrasado
+	erroComAtraso error
 }
 
 func (f *fakePlanos) PorUsuario(context.Context, uuid.UUID, uuid.UUID) (plano.Plano, error) {
@@ -138,6 +143,13 @@ func (f *fakePlanos) MarcarMarco(_ context.Context, _, marcoID uuid.UUID, cumpri
 
 func (f *fakePlanos) ParaLembrete(context.Context) ([]port.PlanoDoUsuario, error) {
 	return nil, nil
+}
+
+// A varredura diária pergunta ao banco quem está atrasado. Os testes de
+// orquestração chamam AbsorverAtraso direto, com o plano que montaram, então
+// aqui basta devolver o que o teste puser em comAtraso.
+func (f *fakePlanos) ComAtraso(context.Context, time.Time) ([]port.PlanoAtrasado, error) {
+	return f.comAtraso, f.erroComAtraso
 }
 
 type fakeCronograma struct {

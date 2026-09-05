@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"studygo/internal/domain/plano"
@@ -227,6 +228,118 @@ func (s *CronogramaService) RestaurarOrdem(
 	return s.gravarEMontar(
 		ctx, c, plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida),
 	)
+}
+
+// AbsorverAtraso redistribui o currículo pelos dias que sobraram quando o
+// estudante perdeu dias de estudo.
+//
+// O que ele resolve: até aqui, um dia não estudado ficava parado no passado
+// segurando suas matérias, e o cronograma seguia prometendo um tempo que não
+// existe mais. Adiar dia a dia era possível, mas manual — e ninguém volta ao
+// app para arrumar o que não estudou.
+//
+// A escolha aqui é RECALCULAR, não empurrar: o motor gera de novo a partir de
+// hoje, com a prova no mesmo lugar, e o currículo inteiro se redistribui pelos
+// dias restantes. Com menos dias o plano dá menos voltas, e o que não couber
+// fica de fora — é o AlertaCobertura que conta isso, em voz alta. Empurrar dia
+// a dia faria o último dia acumular carga dupla, um dia impossível de cumprir.
+//
+// Os dias vencidos ficam vazios, que é a verdade deles. O que tem registro não
+// se mexe: é história.
+//
+// Devolve o plano remontado e quantos dias estavam atrasados. Zero significa
+// que não havia nada a absorver e nada foi gravado.
+func (s *CronogramaService) AbsorverAtraso(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+) (PlanoMontado, int, error) {
+	c, err := s.carregar(ctx, usuarioID, slug)
+	if err != nil {
+		return PlanoMontado{}, 0, err
+	}
+
+	hoje := plano.DayOf(s.relogio.Now())
+
+	atrasados := plano.DiasAtrasados(c.Atividades, hoje, c.Registros.Concluida)
+	if len(atrasados) == 0 {
+		return PlanoMontado{}, 0, nil
+	}
+
+	// Depois da prova não há o que redistribuir: o plano acabou, e recalcular
+	// só produziria um cronograma vazio por cima do histórico.
+	if !hoje.Before(plano.DayOf(c.Plano.Config.Prova)) {
+		return PlanoMontado{}, 0, nil
+	}
+
+	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Concluida)
+
+	// A marca de "movida" vale contra o motor, não contra o calendário: quando
+	// o plano encolhe, manter posições escolhidas à mão travaria justamente as
+	// vagas que precisam ceder.
+	for i := range atuais {
+		if !plano.DayOf(atuais[i].Data).Before(hoje) {
+			atuais[i].Movida = false
+		}
+	}
+
+	// Gerar a partir de HOJE é o que faz o currículo caber em menos dias. Com o
+	// Inicio original o motor devolveria exatamente os mesmos dias de antes, e
+	// o conteúdo do dia perdido simplesmente sumiria.
+	cfg := c.Plano.Config
+	cfg.Inicio = hoje
+
+	res := plano.Gerar(cfg, &c.Concurso)
+	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
+
+	montado, err := s.gravarEMontar(
+		ctx, c, plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida),
+	)
+	if err != nil {
+		return PlanoMontado{}, 0, err
+	}
+
+	return montado, len(atrasados), nil
+}
+
+// AbsorverAtrasosDoDia passa por todos os planos que ficaram para trás e
+// redistribui o que não foi estudado. É o que o worker chama uma vez por dia.
+//
+// Só os planos com atraso são carregados: a pergunta "quem está atrasado?" é do
+// banco, e quem está em dia nem sai de lá. Sem isso a varredura custaria uma
+// carga completa por plano, todo dia, para na maioria não fazer nada.
+//
+// Um plano que falha não interrompe os outros — perder o replanejamento de
+// todos por causa de um é pior que registrar o erro e seguir. Devolve quantos
+// planos foram replanejados e o primeiro erro encontrado.
+func (s *CronogramaService) AbsorverAtrasosDoDia(ctx context.Context) (int, error) {
+	hoje := plano.DayOf(s.relogio.Now())
+
+	atrasados, err := s.planos.ComAtraso(ctx, hoje)
+	if err != nil {
+		return 0, fmt.Errorf("listando planos com atraso: %w", err)
+	}
+
+	replanejados := 0
+
+	var primeiro error
+
+	for _, pa := range atrasados {
+		_, dias, err := s.AbsorverAtraso(ctx, pa.UsuarioID, pa.Slug)
+		if err != nil {
+			if primeiro == nil {
+				primeiro = fmt.Errorf("replanejando %s: %w", pa.Slug, err)
+			}
+
+			continue
+		}
+
+		if dias > 0 {
+			replanejados++
+		}
+	}
+
+	return replanejados, primeiro
 }
 
 // TemMovimentacaoManual diz se o estudante rearranjou alguma coisa — é o que

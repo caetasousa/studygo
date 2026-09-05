@@ -1,5 +1,6 @@
-// Command worker dispatches the daily spaced-review reminders. It shares the
-// domain engine and repositories with the server; only the entrypoint differs.
+// Command worker runs the two daily chores: rescheduling the plans that fell
+// behind and dispatching the spaced-review reminders. It shares the domain
+// engine and repositories with the server; only the entrypoint differs.
 package main
 
 import (
@@ -58,17 +59,30 @@ func run(logger *slog.Logger) error {
 		}
 	}
 
+	planos := postgres.NewPlanoRepo(pool)
+	cronogramas := postgres.NewCronogramaRepo(pool)
+	concursos := postgres.NewConcursoRepo(pool)
+
 	svc := service.NewNotificacaoService(
-		postgres.NewPlanoRepo(pool),
-		postgres.NewCronogramaRepo(pool),
-		postgres.NewConcursoRepo(pool),
+		planos,
+		cronogramas,
+		concursos,
 		notifier.NewSlogNotifier(logger),
 		port.SystemClock{},
 	)
 
+	replanejamento := service.NewCronogramaService(service.Dependencias{
+		Planos:     planos,
+		Cronograma: cronogramas,
+		Concursos:  concursos,
+		Caderno:    postgres.NewCadernoRepo(pool),
+		Usuarios:   postgres.NewUsuarioRepo(pool),
+		Relogio:    port.SystemClock{},
+	})
+
 	logger.Info("worker starting", slog.Duration("intervalo", intervalo))
 
-	tick(ctx, logger, svc)
+	tick(ctx, logger, svc, replanejamento)
 
 	ticker := time.NewTicker(intervalo)
 	defer ticker.Stop()
@@ -79,12 +93,30 @@ func run(logger *slog.Logger) error {
 			logger.Info("worker stopped")
 			return nil
 		case <-ticker.C:
-			tick(ctx, logger, svc)
+			tick(ctx, logger, svc, replanejamento)
 		}
 	}
 }
 
-func tick(ctx context.Context, logger *slog.Logger, svc *service.NotificacaoService) {
+// O replanejamento vem ANTES do lembrete de propósito: o lembrete conta o que
+// estudar hoje, e hoje só está certo depois que os dias perdidos foram
+// absorvidos. Na ordem inversa o estudante receberia a agenda de ontem.
+func tick(
+	ctx context.Context,
+	logger *slog.Logger,
+	svc *service.NotificacaoService,
+	replanejamento *service.CronogramaService,
+) {
+	replanejados, err := replanejamento.AbsorverAtrasosDoDia(ctx)
+	if err != nil {
+		// Erro num plano não impede o lembrete dos outros.
+		logger.ErrorContext(ctx, "absorvendo atrasos", slog.Any("error", err))
+	}
+
+	if replanejados > 0 {
+		logger.InfoContext(ctx, "planos replanejados", slog.Int("planos", replanejados))
+	}
+
 	enviados, err := svc.EnviarLembretesDoDia(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "dispatching lembretes", slog.Any("error", err))

@@ -603,3 +603,78 @@ func TestFilaDeReforco(t *testing.T) {
 		}
 	}
 }
+
+// Um dia vencido só conta como atrasado se ninguém o estudou: dia cumprido é
+// história, e dia de hoje ainda está correndo.
+func TestDiasAtrasados(t *testing.T) {
+	as := atividadesReplan()
+	hoje := dia(2026, 9, 3)
+
+	casos := []struct {
+		nome      string
+		concluida func(uuid.UUID) bool
+		quer      []time.Time
+	}{
+		{
+			nome:      "nada estudado deixa os dois dias vencidos atrasados",
+			concluida: func(uuid.UUID) bool { return false },
+			quer:      []time.Time{dia(2026, 9, 1), dia(2026, 9, 2)},
+		},
+		{
+			nome: "dia inteiro estudado sai da lista",
+			concluida: func(id uuid.UUID) bool {
+				return id == uid("a1") || id == uid("a2")
+			},
+			quer: []time.Time{dia(2026, 9, 2)},
+		},
+		{
+			nome:      "dia pela metade continua atrasado",
+			concluida: func(id uuid.UUID) bool { return id == uid("a1") },
+			quer:      []time.Time{dia(2026, 9, 1), dia(2026, 9, 2)},
+		},
+		{
+			nome:      "tudo estudado não deixa atraso",
+			concluida: func(uuid.UUID) bool { return true },
+			quer:      []time.Time{},
+		},
+	}
+
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			got := plano.DiasAtrasados(as, hoje, c.concluida)
+
+			if len(got) != len(c.quer) {
+				t.Fatalf("dias atrasados = %v, quer %v", got, c.quer)
+			}
+
+			for i := range got {
+				if !got[i].Equal(c.quer[i]) {
+					t.Errorf("dia[%d] = %s, quer %s", i, got[i], c.quer[i])
+				}
+			}
+		})
+	}
+}
+
+// O dia perdido fica vazio; hoje, o futuro e o que tem registro continuam.
+func TestSemAtrasadas(t *testing.T) {
+	as := atividadesReplan()
+	hoje := dia(2026, 9, 2)
+
+	// a1 foi estudada no dia 1; a2 não.
+	concluida := func(id uuid.UUID) bool { return id == uid("a1") }
+
+	got := plano.SemAtrasadas(as, hoje, concluida)
+
+	if ids := idsDoDia(got, dia(2026, 9, 1)); len(ids) != 1 || ids[0] != uid("a1") {
+		t.Errorf("dia perdido = %v, quer só a atividade com registro (a1)", ids)
+	}
+
+	if ids := idsDoDia(got, dia(2026, 9, 2)); len(ids) != 2 {
+		t.Errorf("hoje = %v, quer as duas intactas", ids)
+	}
+
+	if ids := idsDoDia(got, dia(2026, 9, 3)); len(ids) != 1 {
+		t.Errorf("futuro = %v, quer intacto", ids)
+	}
+}

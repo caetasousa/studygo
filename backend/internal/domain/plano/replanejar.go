@@ -591,3 +591,64 @@ func cargaTipica(porDia map[time.Time][]Atividade, uteis []time.Time) int {
 
 	return melhor
 }
+
+// DiasAtrasados são os dias já vencidos que ainda seguram atividade que ninguém
+// estudou.
+//
+// Um dia assim é o sintoma de um plano que a vida não seguiu: a data passou, o
+// conteúdo continua lá, e o cronograma segue prometendo um tempo que não existe
+// mais. Ele é diferente de um dia vazio (nada foi planejado) e de um dia
+// cumprido pela metade (parte tem registro, e registro é história).
+//
+// A data de hoje não entra: o dia ainda está correndo.
+func DiasAtrasados(
+	atividades []Atividade,
+	hoje time.Time,
+	concluida func(uuid.UUID) bool,
+) []time.Time {
+	hoje = day(hoje)
+	vencidos := map[time.Time]bool{}
+
+	for _, a := range atividades {
+		dt := day(a.Data)
+		if !dt.Before(hoje) || concluida(a.ID) {
+			continue
+		}
+
+		vencidos[dt] = true
+	}
+
+	saida := make([]time.Time, 0, len(vencidos))
+	for dt := range vencidos {
+		saida = append(saida, dt)
+	}
+
+	sort.Slice(saida, func(i, j int) bool { return saida[i].Before(saida[j]) })
+
+	return saida
+}
+
+// SemAtrasadas devolve o cronograma sem as atividades vencidas que ninguém
+// estudou, deixando o dia perdido vazio.
+//
+// Vazio é a verdade daquele dia: não houve estudo. Manter a matéria lá faria o
+// passado continuar cobrando, e é o que a redistribuição vai desfazer adiante.
+// O que tem registro fica — é história, não cronograma.
+func SemAtrasadas(
+	atividades []Atividade,
+	hoje time.Time,
+	concluida func(uuid.UUID) bool,
+) []Atividade {
+	hoje = day(hoje)
+	saida := make([]Atividade, 0, len(atividades))
+
+	for _, a := range atividades {
+		if day(a.Data).Before(hoje) && !concluida(a.ID) {
+			continue
+		}
+
+		saida = append(saida, a)
+	}
+
+	return saida
+}

@@ -28,6 +28,24 @@ type PlanoRepository interface {
 	// ParaLembrete devolve todo plano com o e-mail do dono, para o worker de
 	// lembretes.
 	ParaLembrete(ctx context.Context) ([]PlanoDoUsuario, error)
+
+	// ComAtraso devolve os planos que têm dia vencido segurando atividade sem
+	// registro — os únicos que o replanejamento diário precisa carregar.
+	//
+	// A pergunta é do banco de propósito: varrer todos os planos por completo
+	// para descobrir que a maioria está em dia custaria uma carga inteira por
+	// plano, todo dia.
+	ComAtraso(ctx context.Context, hoje time.Time) ([]PlanoAtrasado, error)
+}
+
+// PlanoAtrasado identifica um plano que precisa absorver dias perdidos.
+//
+// Carrega só o par que o caso de uso usa para chamar o replanejamento: o dono e
+// o slug do CONCURSO, que é como o plano é endereçado em toda a aplicação — o
+// plano em si não tem slug próprio.
+type PlanoAtrasado struct {
+	UsuarioID uuid.UUID
+	Slug      string
 }
 
 // CronogramaRepository persiste o cronograma materializado e o que foi
