@@ -1,102 +1,136 @@
 ---
+# Promove um artefato já construído e testado pela pipeline. Este playbook NÃO
+# compila nada: recebe digests imutáveis, faz pull deles do Registry e sobe a
+# stack. Se ele pudesse construir, o que roda em produção deixaria de ser
+# necessariamente o que passou nos testes.
+#
+# Uso (a pipeline preenche isto; veja templates/app-pipeline.yml):
+#   ansible-playbook deploy.yml -i inventory/production/hosts.ini \
+#     -e "backend_image=registry.gitlab.com/.../backend@sha256:..." \
+#     -e ...
 - name: Deploy studygo (backend + worker + frontend)
-  hosts: vps
+  hosts: app
   become: true
   gather_facts: false
 
   vars:
-    backend_image: "studygo-backend:latest"
-    frontend_image: "studygo-frontend:latest"
-    edital_processor_image: "studygo-edital-processor:latest"
-    # Deliberately still /opt/annygo: this is where the running stack and its
-    # Postgres volume live on the VPS. Renaming it here would deploy into a new
-    # empty directory and leave the old one running with the data. To move it,
-    # stop the stack, mv the directory and change this in the same window.
-    remote_app_dir: /opt/annygo
-    backend_tarball: /tmp/studygo-backend.tar
-    frontend_tarball: /tmp/studygo-frontend.tar
-    edital_processor_tarball: /tmp/studygo-edital-processor.tar
+    # Diretório da stack em execução na VPS. Ainda /opt/annygo em produção, do
+    # nome antigo do projeto: mudar aqui implantaria num diretório novo e vazio,
+    # deixando a stack antiga rodando com os dados.
+    remote_app_dir: "{{ app_dir | default('/opt/annygo') }}"
+    previous_state_file: "{{ remote_app_dir }}/.deploy-anterior"
+
+  pre_tasks:
+    # Digest, não tag. Uma tag pode ser reapontada; o digest identifica bytes.
+    - name: Exigir os digests aprovados pela pipeline
+      ansible.builtin.assert:
+        that:
+          - backend_image is defined and backend_image | length > 0
+          - frontend_image is defined and frontend_image | length > 0
+          - edital_processor_image is defined and edital_processor_image | length > 0
+        fail_msg: >-
+          Faltam os digests das imagens. Este playbook só promove artefatos já
+          publicados — rode a pipeline em vez de invocá-lo direto.
+
+    - name: Recusar imagem identificada por tag mutável
+      ansible.builtin.assert:
+        that:
+          - "'@sha256:' in backend_image"
+          - "'@sha256:' in frontend_image"
+          - "'@sha256:' in edital_processor_image"
+        fail_msg: >-
+          As imagens precisam vir por digest (repo@sha256:...). Uma tag como
+          :latest não garante que o que sobe é o que foi testado.
+
+    - name: Verificar conectividade antes de mudar qualquer coisa
+      ansible.builtin.ping:
+
+    - name: Verificar espaço em disco
+      ansible.builtin.shell: df --output=avail -BM / | tail -1 | tr -dc '0-9'
+      register: espaco_livre
+      changed_when: false
+
+    - name: Exigir espaço mínimo para o pull
+      ansible.builtin.assert:
+        that: espaco_livre.stdout | int > 2048
+        fail_msg: "Menos de 2 GB livres em / — o pull das imagens pode falhar."
 
   tasks:
-    - name: Build images locally
-      command: "docker build -t {{ item.image }} {{ item.context }}"
-      args:
-        chdir: "{{ playbook_dir }}/.."
-      loop:
-        - { image: "{{ backend_image }}", context: "backend" }
-        - { image: "{{ frontend_image }}", context: "frontend" }
-        - { image: "{{ edital_processor_image }}", context: "edital-processor" }
-      delegate_to: localhost
-      become: false
-
-    - name: Save images to tarballs locally
-      command: "docker save -o {{ item.tar }} {{ item.image }}"
-      loop:
-        - { image: "{{ backend_image }}", tar: "{{ backend_tarball }}" }
-        - { image: "{{ frontend_image }}", tar: "{{ frontend_tarball }}" }
-        - { image: "{{ edital_processor_image }}", tar: "{{ edital_processor_tarball }}" }
-      delegate_to: localhost
-      become: false
-
-    - name: Copy image tarballs to the VPS
-      copy:
-        src: "{{ item }}"
-        dest: "{{ item }}"
-        mode: '0644'
-      loop:
-        - "{{ backend_tarball }}"
-        - "{{ frontend_tarball }}"
-        - "{{ edital_processor_tarball }}"
-
-    - name: Load images on the VPS
-      command: "docker load -i {{ item }}"
-      loop:
-        - "{{ backend_tarball }}"
-        - "{{ frontend_tarball }}"
-        - "{{ edital_processor_tarball }}"
-
-    - name: Remove tarballs from the VPS
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ backend_tarball }}"
-        - "{{ frontend_tarball }}"
-        - "{{ edital_processor_tarball }}"
-
-    - name: Remove local tarballs
-      file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ backend_tarball }}"
-        - "{{ frontend_tarball }}"
-        - "{{ edital_processor_tarball }}"
-      delegate_to: localhost
-      become: false
-
-    - name: Ensure remote app directory exists
-      file:
+    - name: Garantir o diretório da aplicação
+      ansible.builtin.file:
         path: "{{ remote_app_dir }}"
         state: directory
         mode: '0750'
 
-    - name: Deploy production docker-compose file
-      template:
+    # Guardado ANTES de sobrescrever o compose: é o que permite rollback sem
+    # rebuild, já que registra os digests que estavam de pé.
+    - name: Registrar a versão atual para rollback
+      ansible.builtin.shell: |
+        if [ -f "{{ remote_app_dir }}/docker-compose.yml" ]; then
+          grep -E 'image:.*@sha256:' "{{ remote_app_dir }}/docker-compose.yml" \
+            > "{{ previous_state_file }}" || true
+        fi
+      changed_when: false
+      failed_when: false
+
+    - name: Autenticar no Container Registry
+      ansible.builtin.shell:
+        cmd: >-
+          echo '{{ registry_password }}' |
+          docker login -u '{{ registry_user }}' --password-stdin '{{ registry_host }}'
+      no_log: true
+      changed_when: false
+
+    - name: Baixar as imagens aprovadas (por digest)
+      community.docker.docker_image:
+        name: "{{ item }}"
+        source: pull
+        force_source: false
+      loop:
+        - "{{ backend_image }}"
+        - "{{ frontend_image }}"
+        - "{{ edital_processor_image }}"
+
+    - name: Instalar o compose de produção
+      ansible.builtin.template:
         src: "{{ playbook_dir }}/templates/docker-compose.prod.yml.j2"
         dest: "{{ remote_app_dir }}/docker-compose.yml"
         mode: '0640'
 
-    - name: Start/refresh the stack
-      command: docker compose up -d
+    - name: Subir/atualizar a stack
+      ansible.builtin.command: docker compose up -d --remove-orphans
       args:
         chdir: "{{ remote_app_dir }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stderr or 'Recreated' in compose_up.stderr"
 
-    - name: Verify the app responds through nginx
-      uri:
+    - name: Encerrar a sessão do Registry
+      ansible.builtin.command: "docker logout {{ registry_host }}"
+      changed_when: false
+
+  post_tasks:
+    - name: Aguardar a aplicação responder
+      ansible.builtin.uri:
         url: "https://{{ app_domain }}/health"
         status_code: 200
-      retries: 5
-      delay: 4
+      retries: 10
+      delay: 5
+      register: health
+      until: health.status == 200
       delegate_to: localhost
       become: false
+
+    # Confirma que o que está rodando é exatamente o digest aprovado — sem isso
+    # o playbook poderia reportar sucesso com a versão anterior ainda de pé.
+    - name: Ler o digest do backend em execução
+      ansible.builtin.shell: |
+        docker inspect --format='{{ '{{' }}.Image{{ '}}' }}' \
+          $(docker compose -f {{ remote_app_dir }}/docker-compose.yml ps -q backend)
+      register: digest_rodando
+      changed_when: false
+
+    - name: Confirmar que o digest implantado é o aprovado
+      ansible.builtin.debug:
+        msg: >-
+          Implantado: {{ backend_image }}
+          (pipeline {{ deploy_pipeline_id | default('n/d') }})

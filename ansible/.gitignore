@@ -1,5 +1,13 @@
+# O repositório é público: inventários reais carregam IP de servidor e
+# secrets.yml carrega credenciais. Só os *.example são versionados.
 .env
 *.retry
 .vault_pass
+
 inventory/hosts.ini
+inventory/*/hosts.ini
+!inventory/*/hosts.ini.example
+
 inventory/group_vars/vps/secrets.yml
+inventory/*/group_vars/app/secrets.yml
+!inventory/*/group_vars/app/secrets.yml.example

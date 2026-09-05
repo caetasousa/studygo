@@ -1,0 +1,13 @@
+---
+# Staging: mesma VPS que produção, mas isolado em tudo que guarda estado —
+# outro diretório, outro banco, outro volume, outro subdomínio e outras portas.
+# Compartilha o host, então compartilha o domínio de falha: uma sobrecarga aqui
+# afeta produção. Documentado como risco aceito.
+app_domain: staging.cronograma.caetasousa.tech
+app_domain_www: staging.cronograma.caetasousa.tech
+app_dir: /opt/studygo-staging
+backend_port: 18080
+frontend_port: 15173
+
+postgres_user: studygo_staging
+postgres_db: studygo_staging

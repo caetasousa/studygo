@@ -16,7 +16,7 @@ editar código
      ├── make commit m="..." . roda os checks de novo e commita
      ├── git push ........... você, sempre
      │
-     └── make deploy ........ checks + build das imagens + VPS
+     └── git push/tag ....... pipeline testa, publica e implanta
               │
               └── make health  confirma no ar
 ```
@@ -141,17 +141,14 @@ Escopos usados aqui: `backend`, `frontend`, `ansible`, `docker`, `nginx`,
 ## 4️⃣ Publicar
 
 ```bash
-make deploy    # checks + build das imagens + envia + sobe o stack na VPS
-make health    # GET https://<app_domain>/health → {"status":"ok"}
+git push                      # main → pipeline implanta em staging sozinha
+git tag v1.2.3 && git push --tags   # libera o botão manual de produção
+make health                   # GET https://<app_domain>/health → {"status":"ok"}
 ```
 
-`make deploy` roda `make check` antes de qualquer coisa: uma versão que não
-compila não chega no ar por esquecimento. Se você acabou de rodar os checks e
-quer pular essa parte:
-
-```bash
-make deploy-fast
-```
+Quem publica é a pipeline, não a sua máquina: ela roda os mesmos checks, constrói
+a imagem **uma vez**, testa a imagem de pé e promove esse mesmo digest para
+staging e produção. Detalhes e rollback em [ci-cd.md](ci-cd.md).
 
 Quando a mudança for de **infraestrutura** (nginx, firewall, certificado), e não
 de código:
@@ -163,9 +160,10 @@ make provision
 Depois do deploy, para olhar a VPS sem abrir SSH na mão:
 
 ```bash
-make deploy-status              # docker compose ps remoto
-make deploy-logs svc=backend    # últimas 80 linhas
-make deploy-logs svc=edital-processor
+make deploy-status                       # docker compose ps remoto (produção)
+make deploy-status env=staging           # o mesmo, em staging
+make deploy-logs svc=backend             # últimas 80 linhas
+make deploy-logs svc=backend env=staging
 ```
 
 ### 📦 O que o deploy faz
@@ -190,5 +188,5 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
 | `make fmt` | formatação |
 | `make status` `commit` | git |
-| `make deploy` `deploy-fast` `provision` | publicar |
+| `git push` · `git tag v*` · `make provision` | publicar e mexer na infra |
 | `make deploy-status` `deploy-logs` `health` | olhar a produção |

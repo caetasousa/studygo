@@ -1,0 +1,9 @@
+# A esteira inteira vem do template central, fixado por tag: uma mudança lá só
+# alcança este projeto quando o ref abaixo subir deliberadamente.
+#
+# Estágios, garantias e variáveis exigidas: veja o README do ci-templates.
+
+include:
+  - project: 'caetasousa/ci-templates'
+    ref: 'v1.0.0'
+    file: '/templates/app-pipeline.yml'

@@ -18,3 +18,7 @@ design-directions/
 
 # local design scratch (canvas artboards)
 .design-cronograma/
+
+# Guia de configuração com segredos — local, nunca versionar
+GUIA-GITLAB.md
+PARTE-7-VARIAVEIS.md

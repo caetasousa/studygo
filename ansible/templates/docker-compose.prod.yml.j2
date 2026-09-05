@@ -1,3 +1,11 @@
+{#
+  As imagens chegam por digest (repo@sha256:...), vindas do job publish. É o que
+  garante que staging e produção rodam exatamente os bytes que passaram nos
+  testes — uma tag poderia ser reapontada entre um deploy e outro.
+
+  Os nomes de projeto/volume derivam de app_dir, então staging e produção
+  coexistem na mesma VPS sem disputar volume nem container.
+#}
 services:
   frontend:
     image: "{{ frontend_image }}"
@@ -21,7 +29,7 @@ services:
       postgres:
         condition: service_healthy
 
-  # Internal only — no published port.
+  # Interno — sem porta publicada.
   edital-processor:
     image: "{{ edital_processor_image }}"
     restart: unless-stopped
@@ -43,6 +51,7 @@ services:
     environment:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
+      LEMBRETE_INTERVALO: "{{ lembrete_intervalo | default('24h') }}"
     depends_on:
       postgres:
         condition: service_healthy

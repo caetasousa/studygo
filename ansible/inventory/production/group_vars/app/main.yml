@@ -1,0 +1,12 @@
+---
+# Produção. Estes valores apontam para os dados REAIS na VPS.
+app_domain: cronograma.caetasousa.tech
+app_domain_www: cronograma.caetasousa.tech
+app_dir: /opt/annygo
+backend_port: 8080
+frontend_port: 5173
+
+# Ainda `annygo`, do nome antigo do projeto: este é o banco vivo. Trocar aqui
+# apontaria a aplicação para um banco novo e vazio, deixando o real intocado.
+postgres_user: annygo
+postgres_db: annygo

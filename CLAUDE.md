@@ -25,6 +25,7 @@ Evite duplicar informações destes arquivos:
 | 🚀 | `docs/rodar-local.md` | ambiente local e variáveis |
 | 🔄 | `docs/fluxo-de-trabalho.md` | desenvolvimento, checks e commits |
 | 🚢 | `docs/deploy.md` | VPS, Ansible e produção |
+| 🔁 | `docs/ci-cd.md` | pipeline, runners, digest e rollback |
 | 📌 | manifests, lockfiles, Dockerfiles | versões das dependências |
 
 Quando documentação e código divergirem, investigue a implementação e atualize
@@ -139,9 +140,10 @@ com `ATUALIZAR_CONTRATO=1 go test ./internal/adapter/httpapi` e diga no commit
 qual campo mudou e por quê — o frontend depende disso.
 
 > [!CAUTION]
-> `make reset` apaga o banco local. `make deploy`, `make deploy-fast`,
-> `make provision`, `bootstrap.yml` e `lockdown.yml` afetam dados ou
-> infraestrutura: execute somente mediante pedido explícito.
+> `make reset` apaga o banco local. `make provision`, `bootstrap.yml` e
+> `lockdown.yml` afetam dados ou infraestrutura: execute somente mediante
+> pedido explícito. O deploy saiu do Makefile — quem publica é a pipeline
+> (`docs/ci-cd.md`); o Ansible só promove digests já testados.
 
 ## 🔐 Segurança e produção
 

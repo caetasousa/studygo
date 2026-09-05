@@ -1,6 +1,6 @@
 ---
 - name: Lock down root SSH access
-  hosts: vps
+  hosts: app
   gather_facts: false
   vars:
     ansible_user: root

@@ -4,8 +4,9 @@
 # própria linha, então a ajuda nunca sai de sincronia com os alvos de verdade.
 #
 # Os três checks (backend, frontend, edital-processor) são os mesmos que o
-# CLAUDE.md manda rodar; `make deploy` roda todos antes de subir, para que uma
-# versão quebrada não chegue no ar por esquecimento.
+# CLAUDE.md manda rodar, e os mesmos que a pipeline executa. O deploy saiu daqui:
+# quem publica é o GitLab CI, para que o artefato implantado seja sempre o que
+# passou nos testes (ver docs/ci-cd.md).
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -23,7 +24,7 @@ REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
         check check-backend check-frontend check-processor check-db fmt \
-        status commit deploy deploy-fast provision deploy-status deploy-logs health
+        status commit deploy provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
 	@echo "studygo — make <alvo>"
@@ -115,22 +116,28 @@ endif
 
 # ---------------------------------------------------------------------- deploy
 
-deploy: check ## Checks + build das imagens + sobe na VPS
-	cd $(ANSIBLE_DIR) && ansible-playbook deploy.yml
-
-deploy-fast: ## Deploy SEM rodar os checks (use quando já rodou)
-	cd $(ANSIBLE_DIR) && ansible-playbook deploy.yml
+deploy: ## O deploy é da pipeline — veja docs/ci-cd.md
+	@echo "O deploy agora roda no GitLab CI, não daqui."
+	@echo
+	@echo "  staging:  push na main → deploy automático"
+	@echo "  produção: git tag v1.2.3 && git push --tags → botão manual na pipeline"
+	@echo
+	@echo "Motivo: o artefato implantado precisa ser o mesmo que passou nos"
+	@echo "testes. Compilar na máquina de quem faz o deploy desfaz essa garantia."
+	@exit 1
 
 provision: ## Reaplica a infra da VPS (nginx, firewall, TLS)
-	cd $(ANSIBLE_DIR) && ansible-playbook site.yml
+	cd $(ANSIBLE_DIR) && ansible-playbook site.yml -i inventory/production/hosts.ini
 
-deploy-status: ## Status dos containers na VPS
-	cd $(ANSIBLE_DIR) && ansible vps -b -a "docker compose -f $(REMOTE_APP_DIR)/docker-compose.yml ps"
+deploy-status: ## Status dos containers (env=production|staging)
+	cd $(ANSIBLE_DIR) && ansible app -i inventory/$(or $(env),production)/hosts.ini -b \
+		-a "docker compose -f $(if $(filter staging,$(env)),/opt/studygo-staging,$(REMOTE_APP_DIR))/docker-compose.yml ps"
 
-deploy-logs: ## Últimas linhas de log na VPS (svc=backend)
-	cd $(ANSIBLE_DIR) && ansible vps -b -a "docker compose -f $(REMOTE_APP_DIR)/docker-compose.yml logs --tail 80 $(svc)"
+deploy-logs: ## Últimas linhas de log (svc=backend env=production|staging)
+	cd $(ANSIBLE_DIR) && ansible app -i inventory/$(or $(env),production)/hosts.ini -b \
+		-a "docker compose -f $(if $(filter staging,$(env)),/opt/studygo-staging,$(REMOTE_APP_DIR))/docker-compose.yml logs --tail 80 $(svc)"
 
-health: ## Bate no /health do domínio de produção
-	@domain=$$(grep '^app_domain:' $(ANSIBLE_DIR)/inventory/group_vars/vps/main.yml | awk '{print $$2}'); \
+health: ## Bate no /health (env=production|staging)
+	@domain=$$(grep '^app_domain:' $(ANSIBLE_DIR)/inventory/$(or $(env),production)/group_vars/app/main.yml | awk '{print $$2}'); \
 	echo "GET https://$$domain/health"; \
 	curl -fsS "https://$$domain/health" && echo

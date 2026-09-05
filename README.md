@@ -97,7 +97,7 @@ open http://localhost:5173
 
 `make` sozinho lista todos os atalhos — `make check` roda os testes dos três
 serviços (rápido, sem Docker), `make check-db` a suíte de integração com
-PostgreSQL efêmero, e `make deploy` publica.
+PostgreSQL efêmero, e a pipeline do GitLab publica (`docs/ci-cd.md`).
 
 Salvou um arquivo, a mudança chega ao navegador (ou reinicia a API em ~5s) sem
 rebuild — o `docker-compose.override.yml` é carregado sozinho pelo Compose e

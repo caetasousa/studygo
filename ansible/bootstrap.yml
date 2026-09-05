@@ -5,7 +5,7 @@
 # playbook out of the live VPS, recoverable only through the hosting provider's
 # browser console. Rename it only alongside a deliberate re-provision.
 - name: Bootstrap VPS - create sudo user for automation
-  hosts: vps
+  hosts: app
   gather_facts: true
   vars:
     ansible_user: root

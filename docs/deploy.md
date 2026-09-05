@@ -5,19 +5,26 @@
 ![nginx](https://img.shields.io/badge/nginx-TLS-009639?logo=nginx&logoColor=white)
 
 O deploy roda numa VPS Ubuntu (o projeto usa uma Hostinger com Ubuntu 24.04 LTS),
-provisionada e atualizada por **Ansible**. As imagens Docker são **buildadas na
-sua máquina** e enviadas prontas — o código-fonte nunca vai para a VPS.
+provisionada por **Ansible**. As imagens Docker são construídas **pela pipeline**
+e a VPS as baixa do Container Registry por digest — o código-fonte nunca vai
+para a VPS.
 
 ```
-sua máquina                                   VPS
-┌───────────────┐   docker save + scp   ┌──────────────────────────────────┐
-│ docker build  │ ────────────────────► │ nginx (borda, HTTPS)             │
-│ backend +     │                       │   └─► frontend  (SPA + proxy /api)│
-│ frontend      │                       │        └─► backend ─► postgres    │
+GitLab.com                                    VPS
+┌───────────────┐    docker pull        ┌──────────────────────────────────┐
+│ Registry      │    (por digest)       │ nginx (borda, HTTPS)             │
+│ imagens       │ ────────────────────► │   └─► frontend  (SPA + proxy /api)│
+│ testadas      │                       │        └─► backend ─► postgres    │
 └───────────────┘                       │             worker ─┘            │
                                         │  certbot renova o cert           │
                                         └──────────────────────────────────┘
 ```
+
+> [!IMPORTANT]
+> Este documento cobre o **provisionamento** do servidor (`bootstrap`,
+> `lockdown`, `site`). A publicação da aplicação é da pipeline: veja
+> [ci-cd.md](ci-cd.md). O `deploy.yml` não constrói imagem nenhuma — ele recusa
+> rodar sem receber um digest já publicado.
 
 Tudo mora em `ansible/`: um playbook por tarefa (`bootstrap`, `lockdown`,
 `site`, `deploy`) e uma role por peça da infra (`common`, `docker`, `nginx`,
@@ -28,7 +35,6 @@ Tudo mora em `ansible/`: um playbook por tarefa (`bootstrap`, `lockdown`,
 ## 📋 Pré-requisitos na sua máquina
 
 - **Ansible**
-- **Docker** (para buildar as imagens localmente)
 - `sshpass` — só no primeiro acesso à VPS
 - Uma VPS Ubuntu com IP público e um domínio apontando para ela
 
@@ -67,8 +73,8 @@ ansible-playbook lockdown.yml -e ansible_user=root --ask-pass
 # 5. provisiona a box: firewall, Docker, nginx, certificado HTTPS
 ansible-playbook site.yml
 
-# 6. builda as imagens, envia e sobe o stack
-ansible-playbook deploy.yml
+# 6. a aplicação sobe pela pipeline — veja ci-cd.md
+#    (o deploy.yml exige um digest já publicado e recusa rodar sem ele)
 ```
 
 Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
@@ -81,14 +87,13 @@ Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
 depois disso é pelo `make`, da raiz do repositório:
 
 ```bash
-make deploy     # checks + build das imagens + nova versão no ar
 make provision  # mudou infra (nginx, firewall, cert…)
 make health     # confirma que respondeu
 ```
 
-Equivalem a `ansible-playbook deploy.yml` / `site.yml` dentro de `ansible/`, com
-os checks dos três serviços rodando antes. O fluxo completo (desenvolver,
-verificar, commitar, publicar) está em
+Publicar a aplicação é da pipeline: push na `main` implanta em staging, e uma
+tag `v*` libera o botão manual de produção. Veja [ci-cd.md](ci-cd.md). O fluxo
+completo (desenvolver, verificar, commitar, publicar) está em
 [fluxo-de-trabalho.md](fluxo-de-trabalho.md).
 
 `deploy.yml` roda as migrations no boot do backend (advisory-lock, então o
