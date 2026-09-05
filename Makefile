@@ -17,6 +17,12 @@ SHELL := /bin/bash
 COMPOSE      := docker compose
 PROD_COMPOSE := docker compose -f docker-compose.yml
 
+# Este clone tem dois remotes e o nome não é o esperado: `gitlab` é o GitLab
+# (onde a pipeline roda) e `origin` é o GitHub (espelho). Ficam em variável para
+# o alvo `push` não depender de decorar qual é qual.
+REMOTE_CI     := gitlab
+REMOTE_MIRROR := origin
+
 ANSIBLE_DIR := ansible
 # Onde o stack vive na VPS. Ainda /opt/annygo, do nome antigo do projeto — é o
 # diretório com o volume do Postgres em produção (ver CLAUDE.md).
@@ -24,7 +30,7 @@ REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
         check check-backend check-frontend check-processor check-db fmt \
-        status commit deploy provision deploy-status deploy-logs health
+        status commit push deploy provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
 	@echo "studygo — make <alvo>"
@@ -112,7 +118,28 @@ endif
 	$(MAKE) check
 	git commit -m "$(m)"
 	@echo
-	@echo "commitado. o push é seu: git push"
+	@echo "commitado. para publicar: make push"
+
+# Publica nos dois remotes. O do GitLab vai primeiro porque é ele que dispara a
+# pipeline; o GitHub é espelho e não roda nada.
+#
+# Tags NÃO sobem aqui, e isso é de propósito: uma tag habilita o job de produção
+# na pipeline. Publicar produção é decisão consciente, não efeito colateral de
+# um push — quando for a hora, `git push $(REMOTE_CI) v1.2.3`.
+push: ## Envia o branch atual para o GitLab (dispara a pipeline) e para o GitHub
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	for r in $(REMOTE_CI) $(REMOTE_MIRROR); do \
+		git remote get-url $$r >/dev/null 2>&1 || { echo "remote '$$r' não existe neste clone"; exit 1; }; \
+	done; \
+	echo "--- $$branch → $(REMOTE_CI) ($$(git remote get-url $(REMOTE_CI))) ---"; \
+	git log --oneline $(REMOTE_CI)/$$branch..HEAD 2>/dev/null || echo "  (branch novo no remote)"; \
+	echo "-------------------------------------------------------------"; \
+	git push $(REMOTE_CI) $$branch || exit 1; \
+	echo; \
+	echo "--- espelhando em $(REMOTE_MIRROR) ($$(git remote get-url $(REMOTE_MIRROR))) ---"; \
+	git push $(REMOTE_MIRROR) $$branch || { echo; echo "AVISO: o GitLab recebeu, o espelho não. Rode 'git push $(REMOTE_MIRROR) $$branch' depois."; exit 1; }; \
+	echo; \
+	echo "✓ publicado nos dois. a pipeline do GitLab já está rodando."
 
 # ---------------------------------------------------------------------- deploy
 
