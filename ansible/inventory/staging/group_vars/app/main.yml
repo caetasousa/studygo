@@ -11,3 +11,17 @@ frontend_port: 15173
 
 postgres_user: studygo_staging
 postgres_db: studygo_staging
+
+# Arquivo próprio: os dois ambientes dividem o mesmo nginx, e um nome comum
+# faria o provisionamento de um sobrescrever o vhost do outro.
+vhost_file: studygo-staging.conf
+
+# Tetos de memória. A VPS tem 3,8 GB e produção usa ~1,1 GB; homologação fica
+# contida em ~1 GB para nunca causar OOM no ambiente real.
+mem_limit_backend: 256m
+mem_limit_postgres: 384m
+mem_limit_processor: 512m
+
+# Certificado usado pelo vhost de recusa. É sempre o de produção: esse vhost é
+# único no servidor e precisa de um certificado que exista de fato.
+default_cert_domain: cronograma.caetasousa.tech

@@ -1,0 +1,42 @@
+{#
+  Vhost padrão (default_server): responde a qualquer nome que não tenha vhost
+  próprio.
+
+  Sem ele o nginx entrega o PRIMEIRO vhost configurado quando não reconhece o
+  Host — foi assim que staging.cronograma, sem stack provisionada, acabou
+  servindo a produção. Um subdomínio novo apontado para este IP não pode cair
+  na aplicação real por omissão.
+
+  444 fecha a conexão sem responder nada: não confirma que o host existe.
+#}
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # Deixa o certbot renovar por HTTP-01 mesmo em nome ainda não configurado.
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 444;
+    }
+}
+
+{% if letsencrypt_cert_exists %}
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+
+    # Este vhost é ÚNICO no servidor, não um por ambiente: usa sempre o
+    # certificado do domínio principal. Referenciar {{ '{{' }} app_domain {{ '}}' }} faria o
+    # provisionamento de staging reescrevê-lo apontando para um certificado que
+    # pode não existir — e aí o nginx inteiro não recarrega.
+    ssl_certificate     /etc/letsencrypt/live/{{ default_cert_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ default_cert_domain }}/privkey.pem;
+
+    return 444;
+}
+{% endif %}

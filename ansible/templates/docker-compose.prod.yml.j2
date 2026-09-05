@@ -18,6 +18,11 @@ services:
   backend:
     image: "{{ backend_image }}"
     restart: unless-stopped
+{% if mem_limit_backend is defined %}
+    # Teto de memória: os dois ambientes dividem a mesma VPS, e sem limite um
+    # vazamento em homologação derruba a produção por OOM.
+    mem_limit: "{{ mem_limit_backend }}"
+{% endif %}
     environment:
       SERVER_ADDR: ":8080"
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
@@ -33,6 +38,9 @@ services:
   edital-processor:
     image: "{{ edital_processor_image }}"
     restart: unless-stopped
+{% if mem_limit_processor is defined %}
+    mem_limit: "{{ mem_limit_processor }}"
+{% endif %}
     environment:
       EP_SERVICE_TOKEN: "{{ edital_processor_token }}"
       EP_GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
@@ -59,6 +67,9 @@ services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+{% if mem_limit_postgres is defined %}
+    mem_limit: "{{ mem_limit_postgres }}"
+{% endif %}
     environment:
       POSTGRES_USER: "{{ postgres_user }}"
       POSTGRES_PASSWORD: "{{ postgres_password }}"

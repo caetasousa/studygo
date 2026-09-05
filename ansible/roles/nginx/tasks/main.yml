@@ -15,13 +15,33 @@
     path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
   register: nginx_cert_check
 
-# The vhost file is still annygo.conf, from the project's old name: renaming it
-# would leave the old file enabled in sites-enabled alongside the new one, and
-# nginx would serve whichever it read first. Rename both together, or not at all.
+# Recusa qualquer Host sem vhost próprio. Sem isto o nginx entrega o primeiro
+# vhost que encontra, e um subdomínio novo apontado para o IP cai na aplicação
+# real — foi o que aconteceu com staging.cronograma antes de ser provisionado.
+- name: Deploy default vhost that refuses unknown hosts
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/default-deny.conf.j2"
+    dest: /etc/nginx/sites-available/000-default-deny.conf
+    mode: '0644'
+  vars:
+    letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
+  notify: reload nginx
+
+- name: Enable default deny vhost
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/000-default-deny.conf
+    dest: /etc/nginx/sites-enabled/000-default-deny.conf
+    state: link
+  notify: reload nginx
+
+# Um arquivo por ambiente. Com nome fixo, provisionar staging sobrescreveria o
+# vhost de produção — os dois ambientes dividem este nginx.
+# Produção continua em annygo.conf, do nome antigo do projeto: renomear deixaria
+# os dois habilitados ao mesmo tempo, servindo o que o nginx lesse primeiro.
 - name: Deploy studygo vhost
   template:
     src: "{{ playbook_dir }}/templates/app.conf.j2"
-    dest: /etc/nginx/sites-available/annygo.conf
+    dest: /etc/nginx/sites-available/{{ vhost_file }}
     mode: '0644'
   vars:
     letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
@@ -29,8 +49,8 @@
 
 - name: Enable studygo vhost
   file:
-    src: /etc/nginx/sites-available/annygo.conf
-    dest: /etc/nginx/sites-enabled/annygo.conf
+    src: /etc/nginx/sites-available/{{ vhost_file }}
+    dest: /etc/nginx/sites-enabled/{{ vhost_file }}
     state: link
   notify: reload nginx
 

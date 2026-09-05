@@ -10,3 +10,12 @@ frontend_port: 5173
 # apontaria a aplicação para um banco novo e vazio, deixando o real intocado.
 postgres_user: annygo
 postgres_db: annygo
+
+# Continua annygo.conf: é o vhost já habilitado na VPS. Mudar o nome deixaria
+# os dois em sites-enabled ao mesmo tempo, e o nginx serviria o que lesse
+# primeiro.
+vhost_file: annygo.conf
+
+# Certificado usado pelo vhost de recusa. É sempre o de produção: esse vhost é
+# único no servidor e precisa de um certificado que exista de fato.
+default_cert_domain: cronograma.caetasousa.tech
