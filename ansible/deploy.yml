@@ -56,81 +56,144 @@
         fail_msg: "Menos de 2 GB livres em / — o pull das imagens pode falhar."
 
   tasks:
-    - name: Garantir o diretório da aplicação
-      ansible.builtin.file:
-        path: "{{ remote_app_dir }}"
-        state: directory
-        mode: '0750'
+    # block/rescue: se QUALQUER passo abaixo falhar — incluindo o health check —
+    # o rescue devolve a versão anterior. Sem isso um deploy que quebra no meio
+    # deixa o ambiente no ar, quebrado, até alguém perceber.
+    - name: Implantar a versão aprovada
+      block:
+        - name: Garantir o diretório da aplicação
+          ansible.builtin.file:
+            path: "{{ remote_app_dir }}"
+            state: directory
+            mode: '0750'
 
-    # Guardado ANTES de sobrescrever o compose: é o que permite rollback sem
-    # rebuild, já que registra os digests que estavam de pé.
-    - name: Registrar a versão atual para rollback
-      ansible.builtin.shell: |
-        if [ -f "{{ remote_app_dir }}/docker-compose.yml" ]; then
-          grep -E 'image:.*@sha256:' "{{ remote_app_dir }}/docker-compose.yml" \
-            > "{{ previous_state_file }}" || true
-        fi
-      changed_when: false
-      failed_when: false
+        # Guardado ANTES de sobrescrever o compose: é o que o rescue usa para
+        # voltar, e é o que permite rollback sem rebuild.
+        - name: Guardar o compose atual para rollback
+          ansible.builtin.copy:
+            src: "{{ remote_app_dir }}/docker-compose.yml"
+            dest: "{{ previous_state_file }}"
+            remote_src: true
+            mode: '0640'
+          failed_when: false
+          register: backup_anterior
 
-    - name: Autenticar no Container Registry
-      ansible.builtin.shell:
-        cmd: >-
-          echo '{{ registry_password }}' |
-          docker login -u '{{ registry_user }}' --password-stdin '{{ registry_host }}'
-      no_log: true
-      changed_when: false
+        - name: Autenticar no Container Registry
+          ansible.builtin.shell:
+            cmd: >-
+              echo '{{ registry_password }}' |
+              docker login -u '{{ registry_user }}' --password-stdin '{{ registry_host }}'
+          no_log: true
+          changed_when: false
 
-    - name: Baixar as imagens aprovadas (por digest)
-      community.docker.docker_image:
-        name: "{{ item }}"
-        source: pull
-        force_source: false
-      loop:
-        - "{{ backend_image }}"
-        - "{{ frontend_image }}"
-        - "{{ edital_processor_image }}"
+        - name: Baixar as imagens aprovadas (por digest)
+          community.docker.docker_image:
+            name: "{{ item }}"
+            source: pull
+            force_source: false
+          loop:
+            - "{{ backend_image }}"
+            - "{{ frontend_image }}"
+            - "{{ edital_processor_image }}"
 
-    - name: Instalar o compose de produção
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/templates/docker-compose.prod.yml.j2"
-        dest: "{{ remote_app_dir }}/docker-compose.yml"
-        mode: '0640'
+        - name: Instalar o compose desta versão
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/templates/docker-compose.prod.yml.j2"
+            dest: "{{ remote_app_dir }}/docker-compose.yml"
+            mode: '0640'
 
-    - name: Subir/atualizar a stack
-      ansible.builtin.command: docker compose up -d --remove-orphans
-      args:
-        chdir: "{{ remote_app_dir }}"
-      register: compose_up
-      changed_when: "'Started' in compose_up.stderr or 'Recreated' in compose_up.stderr"
+        - name: Subir/atualizar a stack
+          ansible.builtin.command: docker compose up -d --remove-orphans
+          args:
+            chdir: "{{ remote_app_dir }}"
+          register: compose_up
+          changed_when: "'Started' in compose_up.stderr or 'Recreated' in compose_up.stderr"
+
+        # Dentro do block de propósito: se a aplicação não responder, isto falha
+        # e dispara o rescue. Em post_tasks o rollback nunca aconteceria.
+        - name: Exigir que a aplicação responda
+          ansible.builtin.uri:
+            url: "https://{{ app_domain }}/health"
+            status_code: 200
+          retries: 10
+          delay: 5
+          register: health
+          until: health.status == 200
+          delegate_to: localhost
+          become: false
+
+        - name: Confirmar a versão implantada
+          ansible.builtin.debug:
+            msg: >-
+              OK - {{ backend_image }}
+              (pipeline {{ deploy_pipeline_id | default('n/d') }})
+
+      rescue:
+        - name: Avisar que o deploy falhou
+          ansible.builtin.debug:
+            msg: >-
+              FALHA no deploy de {{ app_domain }}. Restaurando a versão anterior.
+
+        - name: Verificar se existe versão anterior
+          ansible.builtin.stat:
+            path: "{{ previous_state_file }}"
+          register: anterior
+
+        # Primeiro deploy do ambiente: não há para onde voltar. Derrubar a stack
+        # é mais honesto que deixar meia versão de pé se passando por saudável.
+        - name: Derrubar a stack incompleta (sem versão anterior)
+          ansible.builtin.command: docker compose down
+          args:
+            chdir: "{{ remote_app_dir }}"
+          when: not anterior.stat.exists
+          failed_when: false
+
+        - name: Restaurar o compose da versão anterior
+          ansible.builtin.copy:
+            src: "{{ previous_state_file }}"
+            dest: "{{ remote_app_dir }}/docker-compose.yml"
+            remote_src: true
+            mode: '0640'
+          when: anterior.stat.exists
+
+        - name: Subir de volta a versão anterior
+          ansible.builtin.command: docker compose up -d --remove-orphans
+          args:
+            chdir: "{{ remote_app_dir }}"
+          when: anterior.stat.exists
+          failed_when: false
+
+        - name: Conferir se a versão anterior respondeu
+          ansible.builtin.uri:
+            url: "https://{{ app_domain }}/health"
+            status_code: 200
+          retries: 10
+          delay: 5
+          register: health_rollback
+          until: health_rollback.status == 200
+          when: anterior.stat.exists
+          failed_when: false
+          delegate_to: localhost
+          become: false
+
+        - name: Encerrar a sessão do Registry
+          ansible.builtin.command: "docker logout {{ registry_host }}"
+          changed_when: false
+          failed_when: false
+
+        # O job precisa terminar vermelho: um rollback bem-sucedido conserta o
+        # ambiente, não a versão. Se o playbook saísse verde, a pipeline seguiria
+        # para produção com um artefato que já falhou em homologação.
+        - name: Falhar o deploy mesmo com o rollback feito
+          ansible.builtin.fail:
+            msg: >-
+              Deploy revertido.
+              {% if anterior.stat.exists %}
+              A versão anterior está de pé{% if health_rollback.status | default(0) == 200 %} e respondendo{% else %} MAS NÃO RESPONDEU - verifique o servidor{% endif %}.
+              {% else %}
+              Não havia versão anterior; a stack foi derrubada.
+              {% endif %}
 
     - name: Encerrar a sessão do Registry
       ansible.builtin.command: "docker logout {{ registry_host }}"
       changed_when: false
-
-  post_tasks:
-    - name: Aguardar a aplicação responder
-      ansible.builtin.uri:
-        url: "https://{{ app_domain }}/health"
-        status_code: 200
-      retries: 10
-      delay: 5
-      register: health
-      until: health.status == 200
-      delegate_to: localhost
-      become: false
-
-    # Confirma que o que está rodando é exatamente o digest aprovado — sem isso
-    # o playbook poderia reportar sucesso com a versão anterior ainda de pé.
-    - name: Ler o digest do backend em execução
-      ansible.builtin.shell: |
-        docker inspect --format='{{ '{{' }}.Image{{ '}}' }}' \
-          $(docker compose -f {{ remote_app_dir }}/docker-compose.yml ps -q backend)
-      register: digest_rodando
-      changed_when: false
-
-    - name: Confirmar que o digest implantado é o aprovado
-      ansible.builtin.debug:
-        msg: >-
-          Implantado: {{ backend_image }}
-          (pipeline {{ deploy_pipeline_id | default('n/d') }})
