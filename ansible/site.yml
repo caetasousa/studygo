@@ -4,11 +4,18 @@
   become: true
   gather_facts: true
 
+  # Cada role carrega sua tag: este playbook mexe numa VPS que roda produção,
+  # e `common` faz upgrade de pacotes. Poder rodar só `--tags certbot` evita
+  # que emitir um certificado arraste um upgrade do sistema junto.
   roles:
-    - common
-    - docker
-    - nginx
-    - certbot
+    - role: common
+      tags: [common]
+    - role: docker
+      tags: [docker]
+    - role: nginx
+      tags: [nginx]
+    - role: certbot
+      tags: [certbot]
 
   post_tasks:
     - name: Verify nginx/TLS is responding
