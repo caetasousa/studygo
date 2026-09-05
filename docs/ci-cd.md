@@ -159,19 +159,19 @@ Settings → CI/CD → Variables, todas **protegidas** e (exceto `SSH_KNOWN_HOST
 | `CI_DEPLOY_USER` / `CI_DEPLOY_PASSWORD` | deploy token do Registry |
 | `ANSIBLE_VAULT_PASSWORD` | senha do Ansible Vault |
 
-## Rodar o Ansible à mão
+## Não existe deploy à mão
 
-Possível, mas ele **recusa** deploy sem digest:
+Todo deploy passa por aqui, e sempre nesta ordem: **staging primeiro, produção
+depois**. Não há atalho, e não é para criar um.
 
-```bash
-cd ansible
-ansible-playbook deploy.yml -i inventory/staging/hosts.ini \
-  -e "backend_image=registry.gitlab.com/.../backend@sha256:..." \
-  ...
-```
+O playbook até recusa sozinho o que não for rastreável — sem digest, ou com
+`:latest`, ele falha na verificação inicial. Mas a recusa é a última linha de
+defesa, não o procedimento: rodar o Ansible da sua máquina implanta um artefato
+que ninguém testou naquela combinação, e pula o `smoke_test` que é justamente
+quem autoriza produção.
 
-Sem os digests, ou com `:latest`, o playbook falha na verificação inicial. Isso é
-proposital: é a garantia de que nada não rastreável chega a um servidor.
+Precisa voltar atrás rápido? `rollback_production`, na pipeline, promove um
+digest anterior sem reconstruir nada.
 
 ## Arquitetura
 

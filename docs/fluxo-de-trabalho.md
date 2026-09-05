@@ -161,8 +161,12 @@ Quando a mudança for de **infraestrutura** (nginx, firewall, certificado), e n�
 de código:
 
 ```bash
-make provision
+make provision env=staging     # ensaie aqui primeiro
+make provision env=production  # e só então no ambiente real
 ```
+
+`env` é obrigatório: os dois ambientes dividem a mesma VPS. Use `tags=nginx`
+(ou `certbot`) para não arrastar o `apt upgrade` da role `common` junto.
 
 Depois do deploy, para olhar a VPS sem abrir SSH na mão:
 
@@ -195,5 +199,6 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
 | `make fmt` | formatação |
 | `make status` `commit` | git |
-| `git push` · `git tag v*` · `make provision` | publicar e mexer na infra |
+| `make push` · `git tag v*` | publicar (staging, depois produção) |
+| `make provision env=…` | mexer na infra |
 | `make deploy-status` `deploy-logs` `health` | olhar a produção |

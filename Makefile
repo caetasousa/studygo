@@ -144,17 +144,31 @@ push: ## Envia o branch atual para o GitLab (dispara a pipeline) e para o GitHub
 # ---------------------------------------------------------------------- deploy
 
 deploy: ## O deploy é da pipeline — veja docs/ci-cd.md
-	@echo "O deploy agora roda no GitLab CI, não daqui."
+	@echo "Não há deploy manual. Todo deploy passa pela pipeline do GitLab,"
+	@echo "e sempre nesta ordem: staging primeiro, produção depois."
 	@echo
-	@echo "  staging:  push na main → deploy automático"
-	@echo "  produção: git tag v1.2.3 && git push --tags → botão manual na pipeline"
+	@echo "  staging:  make push → deploy automático"
+	@echo "  produção: git tag v1.2.3 && git push gitlab v1.2.3"
+	@echo "            → botão manual na pipeline, liberado só depois do smoke_test"
 	@echo
 	@echo "Motivo: o artefato implantado precisa ser o mesmo que passou nos"
-	@echo "testes. Compilar na máquina de quem faz o deploy desfaz essa garantia."
+	@echo "testes. Compilar na máquina de quem publica desfaz essa garantia, e"
+	@echo "ir direto para produção pula quem autoriza a ida — o smoke_test."
+	@echo
+	@echo "Voltar atrás: rollback_production, na pipeline."
 	@exit 1
 
-provision: ## Reaplica a infra da VPS (nginx, firewall, TLS)
-	cd $(ANSIBLE_DIR) && ansible-playbook site.yml -i inventory/production/hosts.ini
+# Infra, não aplicação: nginx, firewall, Docker, TLS. A aplicação nunca sobe
+# por aqui — quem publica é a pipeline.
+#
+# `env` é obrigatório de propósito. Este playbook mexe numa VPS que roda
+# produção, e um padrão silencioso convidava a acertá-la sem querer.
+provision: ## Reaplica a infra da VPS (env=staging|production, tags=nginx,certbot)
+ifndef env
+	$(error use: make provision env=staging  — ou env=production, conscientemente)
+endif
+	cd $(ANSIBLE_DIR) && ansible-playbook site.yml -i inventory/$(env)/hosts.ini \
+		$(if $(tags),--tags $(tags),)
 
 deploy-status: ## Status dos containers (env=production|staging)
 	cd $(ANSIBLE_DIR) && ansible app -i inventory/$(or $(env),production)/hosts.ini -b \

@@ -95,9 +95,18 @@ Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
 depois disso é pelo `make`, da raiz do repositório:
 
 ```bash
-make provision  # mudou infra (nginx, firewall, cert…)
-make health     # confirma que respondeu
+make provision env=staging               # mudou infra (nginx, firewall, cert…)
+make provision env=production            # o mesmo, no ambiente real
+make provision env=production tags=nginx # só uma peça, sem tocar no resto
+make health env=production               # confirma que respondeu
 ```
+
+`env` é obrigatório: os dois ambientes dividem a mesma VPS, e um padrão
+silencioso convidava a acertar produção sem querer. `tags` limita o alcance —
+sem ela, `site.yml` roda tudo, inclusive o `apt upgrade` da role `common`.
+
+A **aplicação** não sobe por aqui em nenhuma hipótese: quem publica é a
+pipeline, staging primeiro e produção depois ([ci-cd.md](ci-cd.md)).
 
 Publicar a aplicação é da pipeline: push na `main` implanta em staging, e uma
 tag `v*` libera o botão manual de produção. Veja [ci-cd.md](ci-cd.md). O fluxo

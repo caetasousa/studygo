@@ -143,8 +143,25 @@ qual campo mudou e por quê — o frontend depende disso.
 > [!CAUTION]
 > `make reset` apaga o banco local. `make provision`, `bootstrap.yml` e
 > `lockdown.yml` afetam dados ou infraestrutura: execute somente mediante
-> pedido explícito. O deploy saiu do Makefile — quem publica é a pipeline
-> (`docs/ci-cd.md`); o Ansible só promove digests já testados.
+> pedido explícito.
+
+## 🚢 Deploy
+
+**Todo deploy passa pela pipeline do GitLab, sempre nesta ordem: staging
+primeiro, produção depois. Nunca direto.**
+
+- `staging` recebe o push na `main`, automaticamente.
+- `produção` só é liberada por tag, com aprovação manual na pipeline, e só
+  depois de o `smoke_test` de staging passar.
+- Não existe caminho manual. Não crie um: nem alvo de Makefile, nem script,
+  nem `ansible-playbook deploy.yml` na mão. Se aparecer um, remova.
+- O Ansible não constrói nada — ele promove digests que a pipeline já testou.
+  Compilar na máquina de quem publica desfaz a garantia de que o que subiu é
+  o que passou nos testes.
+
+Precisa de uma correção urgente em produção? Ela também passa por staging.
+Para voltar atrás sem esperar, use o `rollback_production` da pipeline, que
+promove um digest anterior sem reconstruir.
 
 ## 🔐 Segurança e produção
 
