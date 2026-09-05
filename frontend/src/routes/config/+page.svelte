@@ -640,22 +640,24 @@
 		font-weight: 600;
 		margin: 20px 0 8px;
 	}
+	/* Uma grade só para a lista inteira, com as linhas entrando por
+	   `display: contents`. Cada linha era um flex independente, então a coluna
+	   dos botões começava onde o nome daquela linha terminava — e nome curto e
+	   nome longo empurravam os grupos para lugares diferentes. Na grade as três
+	   colunas são as mesmas para todas as linhas. */
 	.modos {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) max-content max-content;
+		align-items: center;
+		gap: 6px 12px;
 	}
 	.modo-linha {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		flex-wrap: wrap;
+		display: contents;
 	}
 	.modo-nome {
 		display: flex;
 		align-items: baseline;
 		gap: 4px;
-		flex: 1 1 200px;
 		min-width: 0;
 		font-size: 13.5px;
 	}
@@ -680,16 +682,30 @@
 		background: var(--warn-soft);
 		color: var(--warn);
 	}
-	/* The método/reforço button groups sit on their own line once the row
-	   wraps (narrow screens): without this, a squeezed .day-sel shrank its
-	   BUTTONS instead, and "teoria + questões" broke onto two lines while its
-	   neighbours stayed on one — the uneven row heights that read as
-	   misaligned. Wrapping lets a whole button drop to the next line instead. */
-	.modo-linha .day-sel {
-		flex-wrap: wrap;
-	}
+	/* max-content nas colunas de botão já impede o encolhimento que quebrava
+	   "teoria + questões" em duas linhas; o nowrap garante isso mesmo se a
+	   grade for apertada por um container menor. */
 	.modo-linha .day-sel button {
 		white-space: nowrap;
+	}
+
+	/* Sem largura para três colunas, cada matéria vira um bloco: nome em cima,
+	   os dois grupos de botões embaixo, ainda alinhados entre si. */
+	@media (max-width: 720px) {
+		.modos {
+			grid-template-columns: 1fr;
+			gap: 4px;
+		}
+		.modo-linha {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 4px;
+			padding: 6px 0;
+			border-bottom: 1px solid var(--border);
+		}
+		.modo-linha .day-sel {
+			flex-wrap: wrap;
+		}
 	}
 	.ciclo {
 		display: flex;

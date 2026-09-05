@@ -315,8 +315,20 @@ func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) 
 		cfg.LimiarFraco = *cmd.LimiarFraco
 	}
 
+	// Os dois mapas abaixo chegam como REMENDO, não como valor completo: a tela
+	// manda uma matéria por clique. Trocar o mapa inteiro apagava o método das
+	// demais — mexer numa matéria zerava a de baixo.
+	//
+	// É também o que o resto deste método já faz: todo campo escalar só é
+	// tocado quando vem preenchido.
+	// Mapa novo em vez de escrever no recebido: quem chamou guarda a config
+	// ANTERIOR para comparar, e mapa em Go é referência — mutar no lugar faria
+	// o "antes" mudar junto com o "depois".
 	if cmd.Modos != nil {
-		modos := map[string]plano.Modo{}
+		modos := make(map[string]plano.Modo, len(cfg.Modos)+len(cmd.Modos))
+		for codigo, m := range cfg.Modos {
+			modos[codigo] = m
+		}
 
 		for codigo, m := range cmd.Modos {
 			if cur.DisciplinaPorCodigo(codigo) != nil {
@@ -328,7 +340,10 @@ func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) 
 	}
 
 	if cmd.Reforcos != nil {
-		reforcos := map[string]float64{}
+		reforcos := make(map[string]float64, len(cfg.Reforcos)+len(cmd.Reforcos))
+		for codigo, v := range cfg.Reforcos {
+			reforcos[codigo] = v
+		}
 
 		for codigo, v := range cmd.Reforcos {
 			if cur.DisciplinaPorCodigo(codigo) != nil {
