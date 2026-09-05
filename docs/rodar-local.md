@@ -38,7 +38,7 @@ Sobe quatro serviços:
 |---|---|---|---|
 | 🧡 | `frontend` | `5173` | SPA (SvelteKit) + nginx que faz proxy de `/api` |
 | 🐹 | `backend` | `8080` | API Go; roda as migrations no boot |
-| 🔔 | `worker` | — | lembretes de revisão (intervalo em `LEMBRETE_INTERVALO`) |
+| 🔔 | `worker` | — | na virada do dia: replaneja quem perdeu dias e manda os lembretes de revisão |
 | 🐘 | `postgres` | `5432` | banco |
 | 🐍 | `edital-processor` | — | PDF → prévia estruturada (interno, sem porta no host) |
 
@@ -64,7 +64,8 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `POSTGRES_USER` / `_PASSWORD` / `_DB` / `_PORT` | | `studygo` / `studygo` / `studygo` / `5432` | credenciais do Postgres. Um `.env` anterior ao nome novo aponta para `annygo` — mantenha assim, ou o app sobe contra um banco vazio |
 | `SERVER_PORT` / `FRONTEND_PORT` | | `8080` / `5173` | portas expostas no host |
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
-| `LEMBRETE_INTERVALO` | | `24h` | de quanto em quanto tempo o worker roda |
+| `LEMBRETE_INTERVALO` | | `24h` | força intervalo fixo em vez de acordar na virada do dia. Existe para desenvolver sem esperar a meia-noite; em produção fica vazio |
+| `WORKER_TZ` | | `UTC` | fuso da virada. UTC casa com o domínio, que trata data em UTC — num fuso negativo a varredura roda depois de o dia já ter virado para o sistema |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
 | `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
 

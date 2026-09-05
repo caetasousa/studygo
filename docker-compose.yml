@@ -45,7 +45,11 @@ services:
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
+      # Sem LEMBRETE_INTERVALO o worker roda na virada do dia. Aqui ele fica
+      # curto de propósito: esperar a meia-noite para ver o worker agir
+      # inviabiliza o desenvolvimento.
       LEMBRETE_INTERVALO: "${LEMBRETE_INTERVALO:-24h}"
+      WORKER_TZ: "${WORKER_TZ:-}"
     depends_on:
       postgres:
         condition: service_healthy

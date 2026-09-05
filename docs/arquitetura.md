@@ -181,7 +181,7 @@ baseline à mão em desenvolvimento; o runner nunca o executa.
 | | Serviço | Responsabilidade |
 |---|---|---|
 | 📋 | `PlanoService` | obter o plano montado, salvar configuração, marcos, link do caderno |
-| 🗓️ | `CronogramaService` | mover, trocar, adiar, antecipar, compactar, restaurar ordem |
+| 🗓️ | `CronogramaService` | mover, trocar, adiar, antecipar, compactar, restaurar ordem, absorver atraso |
 | ✍️ | `RegistroService` | registrar atividade, registrar dia, limpar histórico |
 | 📕 | `CadernoService` | caderno de erros e anotações |
 | 📊 | `EstatisticaService` | série histórica, resumo por semana, balanceamento |
@@ -191,6 +191,10 @@ baseline à mão em desenvolvimento; o runner nunca o executa.
 | 🏛️ | `ConcursoService` | catálogo e assistente de edital |
 | 🔐 | `AuthService` | cadastro, login, rotação de token, tema |
 | 🔔 | `NotificacaoService` | lembretes diários (worker) |
+
+O worker roda duas tarefas na virada do dia, nesta ordem: `CronogramaService`
+absorve os dias perdidos e `NotificacaoService` manda os lembretes — o lembrete
+conta o que estudar hoje, e hoje só está certo depois do replanejamento.
 
 Nenhum deles tem interface: os handlers dependem do tipo concreto. Uma interface
 com uma implementação só seria indireção sem ganho.

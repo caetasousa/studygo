@@ -59,7 +59,13 @@ services:
     environment:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
-      LEMBRETE_INTERVALO: "{{ lembrete_intervalo | default('24h') }}"
+      # Sem intervalo fixo: em produção o worker acorda na virada do dia, que
+      # é quando o replanejamento precisa acontecer. Definir lembrete_intervalo
+      # volta ao modo de intervalo — útil só para depurar.
+{% if lembrete_intervalo is defined %}
+      LEMBRETE_INTERVALO: "{{ lembrete_intervalo }}"
+{% endif %}
+      WORKER_TZ: "{{ worker_tz | default('UTC') }}"
     depends_on:
       postgres:
         condition: service_healthy

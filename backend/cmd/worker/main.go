@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -35,11 +36,21 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	intervalo := 24 * time.Hour
-	if v := os.Getenv("LEMBRETE_INTERVALO"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			intervalo = d
+	// Onde a virada do dia acontece. O domínio inteiro trata data em UTC
+	// (plano.DayOf trunca em UTC), então UTC é o padrão: assim a varredura roda
+	// exatamente quando o "hoje" do domínio avança, e não três horas antes ou
+	// depois dele.
+	//
+	// WORKER_TZ existe para quem precisar casar a virada com a meia-noite local
+	// — ver o aviso em proximaVirada.
+	local := time.UTC
+	if v := os.Getenv("WORKER_TZ"); v != "" {
+		loc, err := time.LoadLocation(v)
+		if err != nil {
+			return fmt.Errorf("WORKER_TZ inválido (%q): %w", v, err)
 		}
+
+		local = loc
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -80,22 +91,74 @@ func run(logger *slog.Logger) error {
 		Relogio:    port.SystemClock{},
 	})
 
-	logger.Info("worker starting", slog.Duration("intervalo", intervalo))
+	// Override de desenvolvimento: esperar a meia-noite para ver o worker rodar
+	// torna o ciclo de trabalho impraticável. O nome é legado de quando ele só
+	// mandava lembrete — trocá-lo quebraria os .env que já existem.
+	var intervaloFixo time.Duration
 
+	if v := os.Getenv("LEMBRETE_INTERVALO"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("LEMBRETE_INTERVALO inválido (%q): %w", v, err)
+		}
+
+		intervaloFixo = d
+	}
+
+	logger.Info(
+		"worker starting",
+		slog.String("fuso", local.String()),
+		slog.Bool("intervalo_fixo", intervaloFixo > 0),
+	)
+
+	// Uma passada agora, antes de esperar a virada: se o processo ficou fora do
+	// ar durante uma meia-noite, o atraso daquele dia continua lá esperando.
 	tick(ctx, logger, svc, replanejamento)
 
-	ticker := time.NewTicker(intervalo)
-	defer ticker.Stop()
-
 	for {
+		espera := proximaVirada(time.Now().In(local))
+		if intervaloFixo > 0 {
+			espera = intervaloFixo
+		}
+
+		logger.Info(
+			"aguardando a virada do dia",
+			slog.Duration("em", espera.Truncate(time.Second)),
+		)
+
+		timer := time.NewTimer(espera)
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			logger.Info("worker stopped")
+
 			return nil
-		case <-ticker.C:
+		case <-timer.C:
 			tick(ctx, logger, svc, replanejamento)
 		}
 	}
+}
+
+// proximaVirada é quanto falta para as 00:00 do dia seguinte, no fuso dado.
+//
+// Recalculado a cada volta em vez de um ticker de 24h: um ticker que começa às
+// 15h dispara às 15h para sempre, e num fuso com horário de verão ele iria
+// derivando uma hora por mudança. Somar um dia de calendário e zerar acerta a
+// meia-noite sempre.
+//
+// Cuidado com o descasamento: o domínio decide o que é "hoje" em UTC. Apontar
+// WORKER_TZ para um fuso negativo faz a varredura rodar depois de o domínio já
+// ter virado o dia — para America/Sao_Paulo, o domínio vira às 21:00 locais e a
+// varredura só às 00:00. Quem estuda de madrugada ganha a noite inteira; em
+// compensação, das 21:00 à meia-noite o app já mostra o dia seguinte.
+func proximaVirada(agora time.Time) time.Duration {
+	meiaNoite := time.Date(
+		agora.Year(), agora.Month(), agora.Day()+1,
+		0, 0, 0, 0, agora.Location(),
+	)
+
+	return meiaNoite.Sub(agora)
 }
 
 // O replanejamento vem ANTES do lembrete de propósito: o lembrete conta o que
