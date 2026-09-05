@@ -1,0 +1,17 @@
+---
+# Coleções que os playbooks usam. Sem instalá-las, o CI falha com
+# "couldn't resolve module/action" — a máquina local já as tem instaladas há
+# tempos, mas o container do job começa vazio.
+#
+# Instale com: ansible-galaxy collection install -r requirements.yml
+collections:
+  # docker_image: usado pelo deploy para baixar as imagens por digest.
+  - name: community.docker
+    version: ">=3.13.0"
+
+  # ufw: usado pela role common para o firewall da VPS.
+  - name: community.general
+    version: ">=9.0.0"
+
+  - name: ansible.posix
+    version: ">=1.5.0"
