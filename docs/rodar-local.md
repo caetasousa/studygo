@@ -4,6 +4,13 @@
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
 ![Node](https://img.shields.io/badge/Node-24-339933?logo=nodedotjs&logoColor=white)
 
+
+> **Em uma frase:** rode `make up` e abra http://localhost:5173.
+>
+> Isso liga as quatro peças do sistema no seu computador, dentro de caixas
+> isoladas (containers), sem instalar nada permanentemente. Para desligar,
+> `make down`. Novo por aqui? Leia [como-funciona.md](como-funciona.md) antes.
+
 Do zero ao app rodando em três comandos.
 
 ---

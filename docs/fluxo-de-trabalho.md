@@ -1,5 +1,12 @@
 # 🔄 Fluxo de trabalho
 
+
+> **Em uma frase:** escreva o código, rode `make check`, faça o commit e
+> `git push gitlab main`.
+>
+> O `make check` roda os mesmos testes que a esteira vai rodar — se passar aqui,
+> tem boa chance de passar lá. Novo por aqui? Leia
+> [como-funciona.md](como-funciona.md) antes.
 **alterar → verificar → commitar → publicar**
 
 Todo o caminho de uma mudança, do editor até o ar, passa por `make`. Rode `make`

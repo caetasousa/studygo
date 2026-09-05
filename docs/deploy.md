@@ -4,6 +4,14 @@
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)
 ![nginx](https://img.shields.io/badge/nginx-TLS-009639?logo=nginx&logoColor=white)
 
+
+> **Em uma frase:** este documento é sobre PREPARAR o servidor, não sobre
+> publicar o sistema.
+>
+> Publicar é assunto de [ci-cd.md](ci-cd.md). Aqui está o que se faz uma única
+> vez por servidor: instalar o Docker, configurar o endereço do site e o
+> cadeado de segurança (HTTPS). Novo por aqui? Leia
+> [como-funciona.md](como-funciona.md) antes.
 O deploy roda numa VPS Ubuntu (o projeto usa uma Hostinger com Ubuntu 24.04 LTS),
 provisionada por **Ansible**. As imagens Docker são construídas **pela pipeline**
 e a VPS as baixa do Container Registry por digest — o código-fonte nunca vai

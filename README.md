@@ -108,9 +108,10 @@ dependência.
 
 | | Documento | Para quê |
 |---|---|---|
+| 🐣 | **[docs/como-funciona.md](docs/como-funciona.md)** | **comece por aqui** — o projeto explicado sem jargão |
 | 📐 | **[docs/arquitetura.md](docs/arquitetura.md)** | camadas, modelo de dados, contrato HTTP e vocabulário |
 | 🔄 | **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** | o caminho de uma mudança: `check` → `commit` → `deploy` |
 | 🚀 | **[docs/rodar-local.md](docs/rodar-local.md)** | rodar localmente, `.env`, hot-reload, checagens |
 | 🚢 | **[docs/deploy.md](docs/deploy.md)** | provisionar a VPS pela primeira vez (Ansible) |
-| 🔍 | **[docs/auditoria-testes.md](docs/auditoria-testes.md)** | por que a suíte de testes é como é |
+| 🔁 | **[docs/ci-cd.md](docs/ci-cd.md)** | a esteira: publicar, promover por digest e voltar atrás |
 | 🤖 | **[CLAUDE.md](CLAUDE.md)** | convenções para contribuir (e para a IA seguir) |

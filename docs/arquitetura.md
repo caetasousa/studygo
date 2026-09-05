@@ -5,6 +5,11 @@
 ![Hexágono](https://img.shields.io/badge/hexágono-único-8A2BE2)
 ![Sem ORM](https://img.shields.io/badge/SQL-à%20mão-lightgrey)
 
+
+> **Documento técnico.** Se você quer entender o projeto pela primeira vez,
+> comece por [como-funciona.md](como-funciona.md), que explica a mesma coisa
+> sem jargão. Este aqui é a referência detalhada das decisões e do modelo de
+> dados.
 Este documento descreve o produto **como ele é hoje**: as decisões estruturais
 que valem, o modelo de dados e o vocabulário. Ele não conta a história de como se
 chegou aqui — quando uma decisão substituiu outra, o motivo está registrado

@@ -21,6 +21,7 @@ Evite duplicar informações destes arquivos:
 |---|---|---|
 | 🛠️ | `Makefile` | comandos disponíveis |
 | 📖 | `README.md` | produto e visão geral da stack |
+| 🐣 | `docs/como-funciona.md` | o projeto sem jargão, para quem chega agora |
 | 📐 | `docs/arquitetura.md` | decisões estruturais, modelo de dados e vocabulário |
 | 🚀 | `docs/rodar-local.md` | ambiente local e variáveis |
 | 🔄 | `docs/fluxo-de-trabalho.md` | desenvolvimento, checks e commits |

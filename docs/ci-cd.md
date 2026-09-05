@@ -1,7 +1,41 @@
-# CI/CD
+# Publicar uma versão nova
 
-O deploy não acontece mais da sua máquina. Quem publica é a pipeline do
-GitLab.com, e o Ansible só promove artefatos que já passaram nos testes.
+> **Em uma frase:** você envia o código, a máquina testa sozinha, e você clica
+> num botão para colocar no ar.
+
+## O básico, sem termos técnicos
+
+**Antes**, publicar era assim: você rodava um comando e o seu computador montava
+o programa e mandava para o servidor.
+
+O problema: o programa era montado na *sua* máquina. Se você tivesse uma versão
+diferente de alguma ferramenta, ou tivesse esquecido de salvar um arquivo, o que
+ia para o ar não era exatamente o que você testou.
+
+**Agora**, um computador neutro faz isso: monta o programa uma vez, testa, e
+guarda essa versão exata. Essa mesma versão — os mesmos bytes — é a que vai para
+teste e depois para produção. Nada é montado de novo no caminho.
+
+É como a diferença entre mandar a receita do bolo (cada um faz o seu, e sai
+diferente) e mandar o bolo pronto (todo mundo recebe o mesmo).
+
+### Os comandos que você precisa saber
+
+```bash
+# 1. publica no ambiente de TESTE (staging)
+git push gitlab main
+
+# 2. prepara uma versão para PRODUÇÃO
+git tag v1.2.3
+git push gitlab v1.2.3
+```
+
+Depois do segundo, vá ao site do GitLab e clique no botão de publicar. Produção
+sempre exige esse clique — nada vai para o ar sozinho.
+
+---
+
+## Detalhes técnicos
 
 ## Por que mudou
 
