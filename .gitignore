@@ -10,12 +10,9 @@
 # Real edital PDFs — never commit to the public repo (only synthetic fixtures)
 *.pdf
 
-# Local design canvas exports — working material, not part of the app
-design-directions/
-
 # Per-machine MCP server config
 .mcp.json
 
-# local design scratch (canvas artboards)
-.design-cronograma/
-
+# Cobertura gerada pelos testes do backend
+backend/coverage.out
+backend/cover.html
