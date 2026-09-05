@@ -12,8 +12,8 @@
 
 ## 0️⃣ Estado do Git (preservado)
 
-156 arquivos staged da refatoração arquitetural + 2 modificados + 2 untracked
-(`alerta_test.go`, `concurso-tcego-backup.json`). Nada de reset/checkout.
+156 arquivos staged da refatoração arquitetural + 2 modificados + 2 untracked.
+Nada de reset/checkout.
 
 ---
 
