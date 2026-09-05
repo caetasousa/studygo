@@ -65,7 +65,6 @@ services:
 {% if lembrete_intervalo is defined %}
       LEMBRETE_INTERVALO: "{{ lembrete_intervalo }}"
 {% endif %}
-      WORKER_TZ: "{{ worker_tz | default('UTC') }}"
     depends_on:
       postgres:
         condition: service_healthy

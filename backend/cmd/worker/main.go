@@ -36,23 +36,6 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	// Onde a virada do dia acontece. O domínio inteiro trata data em UTC
-	// (plano.DayOf trunca em UTC), então UTC é o padrão: assim a varredura roda
-	// exatamente quando o "hoje" do domínio avança, e não três horas antes ou
-	// depois dele.
-	//
-	// WORKER_TZ existe para quem precisar casar a virada com a meia-noite local
-	// — ver o aviso em proximaVirada.
-	local := time.UTC
-	if v := os.Getenv("WORKER_TZ"); v != "" {
-		loc, err := time.LoadLocation(v)
-		if err != nil {
-			return fmt.Errorf("WORKER_TZ inválido (%q): %w", v, err)
-		}
-
-		local = loc
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
@@ -107,7 +90,7 @@ func run(logger *slog.Logger) error {
 
 	logger.Info(
 		"worker starting",
-		slog.String("fuso", local.String()),
+		slog.String("fuso", port.Fuso.String()),
 		slog.Bool("intervalo_fixo", intervaloFixo > 0),
 	)
 
@@ -116,7 +99,7 @@ func run(logger *slog.Logger) error {
 	tick(ctx, logger, svc, replanejamento)
 
 	for {
-		espera := proximaVirada(time.Now().In(local))
+		espera := proximaVirada(time.Now().In(port.Fuso))
 		if intervaloFixo > 0 {
 			espera = intervaloFixo
 		}
@@ -147,11 +130,8 @@ func run(logger *slog.Logger) error {
 // derivando uma hora por mudança. Somar um dia de calendário e zerar acerta a
 // meia-noite sempre.
 //
-// Cuidado com o descasamento: o domínio decide o que é "hoje" em UTC. Apontar
-// WORKER_TZ para um fuso negativo faz a varredura rodar depois de o domínio já
-// ter virado o dia — para America/Sao_Paulo, o domínio vira às 21:00 locais e a
-// varredura só às 00:00. Quem estuda de madrugada ganha a noite inteira; em
-// compensação, das 21:00 à meia-noite o app já mostra o dia seguinte.
+// O fuso é o mesmo de port.Fuso, que é onde o domínio decide o que é "hoje":
+// a varredura roda no instante exato em que o dia vira para o cronograma.
 func proximaVirada(agora time.Time) time.Duration {
 	meiaNoite := time.Date(
 		agora.Year(), agora.Month(), agora.Day()+1,

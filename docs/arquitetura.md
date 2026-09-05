@@ -159,6 +159,23 @@ Regras que o schema carrega:
   renumera o dia inteiro dentro de uma transação, passando por estados
   intermediários que colidiriam.
 
+### O dia vira em Brasília
+
+O cronograma é feito de **datas**, não de instantes: "o que estudo hoje" tem que
+responder o mesmo às 8h e às 22h da mesma terça. Por isso `port.Fuso` fixa
+America/São Paulo, e é dele que sai todo `Now()` que o domínio consome —
+`plano.DayOf` extrai o dia já no fuso certo.
+
+Com o relógio em UTC o dia virava às 21:00 locais: quem estudasse à noite via o
+cronograma de amanhã, e quem estudasse de madrugada tinha o dia anterior dado
+como perdido pelo replanejamento.
+
+O fuso é fixo e não configurável. Um valor por instalação seria mentira assim
+que dois usuários estivessem em fusos diferentes — a resposta certa para isso é
+o fuso viajar com o usuário, o que é mudança de modelo, não de variável.
+Registro de auditoria (`atualizado_em`) continua em `timestamptz` gerado pelo
+banco, e o JWT usa relógio próprio: nenhum dos dois passa por aqui.
+
 ---
 
 ## 📜 Migrations

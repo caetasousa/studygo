@@ -49,7 +49,6 @@ services:
       # curto de propósito: esperar a meia-noite para ver o worker agir
       # inviabiliza o desenvolvimento.
       LEMBRETE_INTERVALO: "${LEMBRETE_INTERVALO:-24h}"
-      WORKER_TZ: "${WORKER_TZ:-}"
     depends_on:
       postgres:
         condition: service_healthy

@@ -65,7 +65,6 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `SERVER_PORT` / `FRONTEND_PORT` | | `8080` / `5173` | portas expostas no host |
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | força intervalo fixo em vez de acordar na virada do dia. Existe para desenvolver sem esperar a meia-noite; em produção fica vazio |
-| `WORKER_TZ` | | `UTC` | fuso da virada. UTC casa com o domínio, que trata data em UTC — num fuso negativo a varredura roda depois de o dia já ter virado para o sistema |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
 | `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
 
