@@ -25,10 +25,13 @@
     path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
   register: cert_check_after
 
+# O nome vem de vhost_file, como na role nginx: fixar annygo.conf aqui fazia o
+# provisionamento de staging sobrescrever o vhost de produção — os dois
+# ambientes dividem o mesmo nginx.
 - name: Re-render nginx vhost now that certificate exists
   template:
     src: "{{ playbook_dir }}/templates/app.conf.j2"
-    dest: /etc/nginx/sites-available/annygo.conf
+    dest: "/etc/nginx/sites-available/{{ vhost_file }}"
     mode: '0644'
   vars:
     letsencrypt_cert_exists: "{{ cert_check_after.stat.exists }}"
