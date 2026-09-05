@@ -51,19 +51,12 @@ type ConfigCommand struct {
 	MinutosBloco   *int
 	MinutosRevisao *int
 	Reforcos       map[string]float64
-	CicloRevisao   *[]ItemCicloCommand
 	RevisaoSemanal *bool
 	Simulados      *string
 	Discursiva     *bool
 	Modos          map[string]string
 	PctQuestoes    *float64
 	LimiarFraco    *int
-}
-
-// ItemCicloCommand é uma semana da rotação de revisão.
-type ItemCicloCommand struct {
-	Titulo   string
-	Questoes int
 }
 
 // Salvar valida e grava a configuração nova, replanejando o futuro quando o
@@ -354,19 +347,6 @@ func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) 
 		cfg.Reforcos = reforcos
 	}
 
-	if cmd.CicloRevisao != nil {
-		ciclo := make([]concurso.ItemRevisao, 0, len(*cmd.CicloRevisao))
-
-		for _, it := range *cmd.CicloRevisao {
-			ciclo = append(ciclo, concurso.ItemRevisao{
-				Ordem:    len(ciclo),
-				Titulo:   it.Titulo,
-				Questoes: it.Questoes,
-			})
-		}
-
-		cfg.CicloRevisao = ciclo
-	}
 }
 
 // questoesValidas mantém só as disciplinas que o concurso tem, para que uma

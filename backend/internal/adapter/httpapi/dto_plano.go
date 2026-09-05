@@ -82,18 +82,12 @@ type configDTO struct {
 	MinutosBloco   int                `json:"minutosBloco"`
 	MinutosRevisao int                `json:"minutosRevisao"`
 	Reforcos       map[string]float64 `json:"reforcos"`
-	CicloRevisao   []itemCicloDTO     `json:"cicloRevisao"`
 	RevisaoSemanal bool               `json:"revisaoSemanal"`
 	Simulados      string             `json:"simulados"`
 	Discursiva     bool               `json:"discursiva"`
 	Modos          map[string]string  `json:"modos"`
 	PctQuestoes    float64            `json:"pctQuestoes"`
 	LimiarFraco    int                `json:"limiarFraco"`
-}
-
-type itemCicloDTO struct {
-	Titulo   string `json:"titulo"`
-	Questoes int    `json:"questoes"`
 }
 
 type diaDTO struct {
@@ -353,11 +347,6 @@ func concursoDoPlanoParaDTO(c service.ConcursoDoPlano) concursoDoPlanoDTO {
 }
 
 func configParaDTO(c service.ConfigDoPlano) configDTO {
-	ciclo := make([]itemCicloDTO, 0, len(c.CicloRevisao))
-	for _, it := range c.CicloRevisao {
-		ciclo = append(ciclo, itemCicloDTO{Titulo: it.Titulo, Questoes: it.Questoes})
-	}
-
 	return configDTO{
 		Inicio:         c.Inicio,
 		Prova:          c.Prova,
@@ -371,7 +360,6 @@ func configParaDTO(c service.ConfigDoPlano) configDTO {
 		MinutosBloco:   c.MinutosBloco,
 		MinutosRevisao: c.MinutosRevisao,
 		Reforcos:       c.Reforcos,
-		CicloRevisao:   ciclo,
 		RevisaoSemanal: c.RevisaoSemanal,
 		Simulados:      c.Simulados,
 		Discursiva:     c.Discursiva,

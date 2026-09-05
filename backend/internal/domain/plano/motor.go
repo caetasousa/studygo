@@ -55,13 +55,10 @@ func construir(
 		totalCal = 1
 	}
 
-	// A rotação da revisão semanal, em ordem de precedência: a escolha do
-	// plano, depois a que o edital sugere, e por fim a rotação padrão.
-	revCiclo := cfg.CicloRevisao
-	if len(revCiclo) == 0 {
-		revCiclo = c.RevCiclo
-	}
-
+	// A rotação da revisão semanal: a que o edital sugere, ou a padrão. O plano
+	// já não tem uma própria — o roteiro editável por semana saiu, e o dia de
+	// revisão vale pelo que ele é, não por um texto que ninguém mantinha.
+	revCiclo := c.RevCiclo
 	if len(revCiclo) == 0 {
 		revCiclo = RevCicloPadrao
 	}

@@ -50,9 +50,8 @@ func TestContratoHTTP_Plano(t *testing.T) {
 			DiasEstudo: []int{1}, DiaRevisao: 5, RetaFinalDias: 30,
 			TemaUI: "dark", Questoes: map[string]int{"LINPO": 15},
 			BlocosPorDia: 2, MinutosBloco: 60, MinutosRevisao: 20,
-			Reforcos:     map[string]float64{"LINPO": 1},
-			CicloRevisao: []service.ItemDoCiclo{{Titulo: "t", Questoes: 30}},
-			Simulados:    "semanal", Discursiva: true,
+			Reforcos:  map[string]float64{"LINPO": 1},
+			Simulados: "semanal", Discursiva: true,
 			Modos: map[string]string{"LINPO": "completo"}, PctQuestoes: 0.5, LimiarFraco: 70,
 		},
 		Dias: []service.DiaDoPlano{{

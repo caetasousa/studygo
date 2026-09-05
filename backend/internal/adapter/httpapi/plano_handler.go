@@ -107,7 +107,6 @@ type configRequest struct {
 	MinutosBloco   *int               `json:"minutosBloco"`
 	MinutosRevisao *int               `json:"minutosRevisao"`
 	Reforcos       map[string]float64 `json:"reforcos"`
-	CicloRevisao   *[]itemCicloDTO    `json:"cicloRevisao"`
 	RevisaoSemanal *bool              `json:"revisaoSemanal"`
 	Simulados      *string            `json:"simulados"`
 	Discursiva     *bool              `json:"discursiva"`
@@ -149,17 +148,6 @@ func (h *PlanoHandler) Salvar(w http.ResponseWriter, r *http.Request) {
 		Modos:          req.Modos,
 		PctQuestoes:    req.PctQuestoes,
 		LimiarFraco:    req.LimiarFraco,
-	}
-
-	if req.CicloRevisao != nil {
-		ciclo := make([]service.ItemCicloCommand, 0, len(*req.CicloRevisao))
-		for _, it := range *req.CicloRevisao {
-			ciclo = append(ciclo, service.ItemCicloCommand{
-				Titulo: it.Titulo, Questoes: it.Questoes,
-			})
-		}
-
-		cmd.CicloRevisao = &ciclo
 	}
 
 	p, err := h.planos.Salvar(r.Context(), id, slug, cmd)

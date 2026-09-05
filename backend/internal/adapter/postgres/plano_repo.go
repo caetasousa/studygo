@@ -90,10 +90,6 @@ func (r *PlanoRepo) PorUsuario(
 		return plano.Plano{}, err
 	}
 
-	if err := r.carregarCiclo(ctx, &p); err != nil {
-		return plano.Plano{}, err
-	}
-
 	if err := r.carregarMarcos(ctx, &p); err != nil {
 		return plano.Plano{}, err
 	}
@@ -137,29 +133,6 @@ func (r *PlanoRepo) carregarDisciplinas(ctx context.Context, p *plano.Plano) err
 	return rows.Err()
 }
 
-func (r *PlanoRepo) carregarCiclo(ctx context.Context, p *plano.Plano) error {
-	rows, err := r.pool.Query(
-		ctx,
-		`SELECT ordem, titulo, questoes FROM plano_ciclo WHERE plano_id = $1 ORDER BY ordem`,
-		p.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("consultando plano_ciclo: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var it itemCiclo
-		if err := rows.Scan(&it.Ordem, &it.Titulo, &it.Questoes); err != nil {
-			return fmt.Errorf("lendo item do ciclo: %w", err)
-		}
-
-		p.Config.CicloRevisao = append(p.Config.CicloRevisao, it.paraDominio())
-	}
-
-	return rows.Err()
-}
-
 func (r *PlanoRepo) carregarMarcos(ctx context.Context, p *plano.Plano) error {
 	rows, err := r.pool.Query(
 		ctx,
@@ -187,9 +160,9 @@ func (r *PlanoRepo) carregarMarcos(ctx context.Context, p *plano.Plano) error {
 	return rows.Err()
 }
 
-// Salvar grava o plano e substitui por inteiro seus ajustes por disciplina e o
-// ciclo de revisão — são listas pequenas e completas, então recriá-las é mais
-// simples e mais correto que diferenciar.
+// Salvar grava o plano e substitui por inteiro seus ajustes por disciplina —
+// é uma lista pequena e completa, então recriá-la é mais simples e mais
+// correto que diferenciar.
 func (r *PlanoRepo) Salvar(ctx context.Context, p plano.Plano) (plano.Plano, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -234,10 +207,6 @@ func (r *PlanoRepo) Salvar(ctx context.Context, p plano.Plano) (plano.Plano, err
 		return plano.Plano{}, err
 	}
 
-	if err := substituirCicloDoPlano(ctx, tx, p); err != nil {
-		return plano.Plano{}, err
-	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return plano.Plano{}, fmt.Errorf("commit: %w", err)
 	}
@@ -277,31 +246,6 @@ func substituirDisciplinasDoPlano(ctx context.Context, tx pgx.Tx, p plano.Plano)
 
 	if err := tx.SendBatch(ctx, lote).Close(); err != nil {
 		return fmt.Errorf("gravando plano_disciplinas: %w", err)
-	}
-
-	return nil
-}
-
-func substituirCicloDoPlano(ctx context.Context, tx pgx.Tx, p plano.Plano) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM plano_ciclo WHERE plano_id = $1`, p.ID); err != nil {
-		return fmt.Errorf("limpando plano_ciclo: %w", err)
-	}
-
-	if len(p.Config.CicloRevisao) == 0 {
-		return nil
-	}
-
-	lote := &pgx.Batch{}
-
-	for _, it := range p.Config.CicloRevisao {
-		lote.Queue(
-			`INSERT INTO plano_ciclo (plano_id, ordem, titulo, questoes) VALUES ($1,$2,$3,$4)`,
-			p.ID, it.Ordem, it.Titulo, it.Questoes,
-		)
-	}
-
-	if err := tx.SendBatch(ctx, lote).Close(); err != nil {
-		return fmt.Errorf("gravando plano_ciclo: %w", err)
 	}
 
 	return nil

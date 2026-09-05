@@ -84,19 +84,12 @@ type ConfigDoPlano struct {
 	MinutosBloco   int
 	MinutosRevisao int
 	Reforcos       map[string]float64
-	CicloRevisao   []ItemDoCiclo
 	RevisaoSemanal bool
 	Simulados      string
 	Discursiva     bool
 	Modos          map[string]string
 	PctQuestoes    float64
 	LimiarFraco    int
-}
-
-// ItemDoCiclo é uma semana da rotação de revisão.
-type ItemDoCiclo struct {
-	Titulo   string
-	Questoes int
 }
 
 // DiaDoPlano é um dia do cronograma com o que foi registrado nele.

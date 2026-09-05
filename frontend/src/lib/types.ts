@@ -189,10 +189,6 @@ export interface ConcursoInfo {
 export type Simulados = 'nunca' | 'quinzenal' | 'semanal';
 export type Modo = 'completo' | 'questoes' | 'teoria';
 
-export interface CicloItem {
-	titulo: string;
-	questoes: number;
-}
 
 // Config is the whole plan configuration — dates, rhythm and the study method,
 // flat (the old nested `perfil` object is gone).
@@ -211,7 +207,6 @@ export interface Config {
 	/** Length of the day's review block, in minutes. 0 = no review block. */
 	minutosRevisao: number;
 	reforcos: Record<string, number>;
-	cicloRevisao: CicloItem[];
 	/** Reserve a whole day of the week for review. Off by default: review is a
 	 *  daily slice fed by the error notebook. */
 	revisaoSemanal: boolean;
@@ -370,7 +365,6 @@ export interface ConfigInput {
 	minutosBloco?: number;
 	minutosRevisao?: number;
 	reforcos?: Record<string, number>;
-	cicloRevisao?: CicloItem[];
 	revisaoSemanal?: boolean;
 	simulados?: Simulados;
 	discursiva?: boolean;

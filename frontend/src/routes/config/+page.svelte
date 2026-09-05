@@ -74,15 +74,6 @@
 		{ v: 3, r: 'triplo' }
 	];
 
-	// O motor usa este ciclo quando o plano não tem um próprio — mostrado como
-	// ponto de partida editável.
-	const CICLO_PADRAO = [
-		{ titulo: 'Revisão ativa da semana + caderno de erros', questoes: 30 },
-		{ titulo: 'Bateria mista de questões no peso da prova', questoes: 60 },
-		{ titulo: 'Treino da prova discursiva, com autocorreção', questoes: 0 },
-		{ titulo: 'Simulado parcial cronometrado + correção comentada', questoes: 45 }
-	];
-
 	// Intervalos de revisão editados como rascunho local, enviados ao sair do campo.
 	// Turning the block off must not forget how long it was, or turning it back
 	// on would silently reset to the default.
@@ -117,41 +108,6 @@
 
 
 
-
-	// Ciclo semanal como rascunho local — enviado ao sair do campo, para não
-	// regerar o plano a cada tecla.
-	let cicloDraft = $state<{ titulo: string; questoes: number }[] | null>(null);
-	const ciclo = $derived(
-		cicloDraft ??
-			(cfg?.cicloRevisao.length
-				? cfg.cicloRevisao.map((c) => ({ ...c }))
-				: CICLO_PADRAO.map((c) => ({ ...c })))
-	);
-
-	function editarCiclo(i: number, campo: 'titulo' | 'questoes', valor: string) {
-		const copia = ciclo.map((c) => ({ ...c }));
-		if (campo === 'titulo') copia[i].titulo = valor;
-		else copia[i].questoes = Math.max(0, parseInt(valor, 10) || 0);
-		cicloDraft = copia;
-	}
-
-	function commitCiclo() {
-		if (!cicloDraft) return;
-		const limpo = cicloDraft.filter((c) => c.titulo.trim());
-		cicloDraft = null;
-		salvar({ cicloRevisao: limpo });
-	}
-
-	function addSemana() {
-		cicloDraft = [...ciclo.map((c) => ({ ...c })), { titulo: '', questoes: 30 }];
-	}
-
-	function rmSemana(i: number) {
-		const copia = ciclo.map((c) => ({ ...c }));
-		copia.splice(i, 1);
-		cicloDraft = copia;
-		commitCiclo();
-	}
 
 	// Quantas vezes mais uma matéria aparece que uma básica (peso 1, reforço 1).
 	function frequenciaRelativa(codigo: string): number {
@@ -547,45 +503,6 @@
 					{/each}
 				</div>
 
-				<h3 class="modos-t">Ciclo de revisão semanal</h3>
-				<p class="page-sub" style="margin:0 0 10px;font-size:12px">
-					Um dia de cada semana da fase de conteúdo, em rodízio — sempre focado em resolver
-					questões. É independente dos simulados da reta final.
-				</p>
-				<div class="ciclo">
-					{#each ciclo as c, i (i)}
-						<div class="ciclo-linha">
-							<span class="ciclo-n">sem. {i + 1}</span>
-							<input
-								type="text"
-								value={c.titulo}
-								placeholder="o que fazer nesta semana"
-								oninput={(e) => editarCiclo(i, 'titulo', e.currentTarget.value)}
-								onblur={commitCiclo}
-							/>
-							<input
-								type="number"
-								min="0"
-								max="300"
-								class="ciclo-q"
-								value={c.questoes}
-								oninput={(e) => editarCiclo(i, 'questoes', e.currentTarget.value)}
-								onblur={commitCiclo}
-							/>
-							<button
-								type="button"
-								class="mv-btn"
-								aria-label="Remover semana"
-								disabled={ciclo.length <= 1}
-								onclick={() => rmSemana(i)}>remover</button
-							>
-						</div>
-					{/each}
-					<button type="button" class="btn" style="margin-top:8px" onclick={addSemana}
-						>+ semana</button
-					>
-				</div>
-
 				<h2 class="sec">Reordenação manual</h2>
 				<p class="page-sub" style="margin-top:0">
 					No Cronograma, cada matéria é movida sozinha: use as setas para mudá-la de
@@ -699,37 +616,6 @@
 		}
 		.modo-linha .day-sel {
 			flex-wrap: wrap;
-		}
-	}
-
-	.ciclo {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-	.ciclo-linha {
-		display: grid;
-		grid-template-columns: 58px minmax(0, 1fr) 72px 30px;
-		align-items: center;
-		gap: 8px;
-	}
-	.ciclo-n {
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		color: var(--text-faint);
-	}
-	.ciclo-linha input {
-		width: 100%;
-	}
-	.ciclo-q {
-		text-align: right;
-	}
-	@media (max-width: 560px) {
-		.ciclo-linha {
-			grid-template-columns: minmax(0, 1fr) 68px 30px;
-		}
-		.ciclo-n {
-			grid-column: 1 / -1;
 		}
 	}
 </style>

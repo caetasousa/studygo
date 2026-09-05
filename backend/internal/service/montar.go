@@ -205,11 +205,6 @@ func montarConfig(cfg plano.Config, tema string) ConfigDoPlano {
 		reforcos[codigo] = cfg.ReforcoDe(codigo)
 	}
 
-	ciclo := make([]ItemDoCiclo, 0, len(cfg.CicloRevisao))
-	for _, it := range cfg.CicloRevisao {
-		ciclo = append(ciclo, ItemDoCiclo{Titulo: it.Titulo, Questoes: it.Questoes})
-	}
-
 	// MinutosBloco é o que a tela de ajustes edita. Quando o plano nunca teve
 	// duração explícita, informa a implícita em HorasDia, para que a tela mostre
 	// um número real e o primeiro save o solidifique.
@@ -231,7 +226,6 @@ func montarConfig(cfg plano.Config, tema string) ConfigDoPlano {
 		MinutosBloco:   minutos,
 		MinutosRevisao: cfg.MinutosRevisao,
 		Reforcos:       reforcos,
-		CicloRevisao:   ciclo,
 		RevisaoSemanal: cfg.RevisaoSemanal,
 		Simulados:      string(cfg.Simulados),
 		Discursiva:     cfg.Discursiva,

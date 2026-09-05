@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
 	"studygo/internal/port"
 
@@ -24,18 +23,6 @@ type CronogramaRepo struct {
 
 func NewCronogramaRepo(pool *pgxpool.Pool) *CronogramaRepo {
 	return &CronogramaRepo{pool: pool}
-}
-
-// itemCiclo é a linha de plano_ciclo. Existe para dar nome ao que as duas
-// pontas trocam; o domínio não conhece a tabela.
-type itemCiclo struct {
-	Ordem    int
-	Titulo   string
-	Questoes int
-}
-
-func (i itemCiclo) paraDominio() concurso.ItemRevisao {
-	return concurso.ItemRevisao{Ordem: i.Ordem, Titulo: i.Titulo, Questoes: i.Questoes}
 }
 
 // Atividades devolve o cronograma do plano. O código da disciplina vem por

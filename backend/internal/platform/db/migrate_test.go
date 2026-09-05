@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"slices"
 	"sync"
@@ -23,6 +24,24 @@ import (
 // Roda contra um container efêmero — nunca contra um banco que já exista na
 // máquina.
 
+// quantasMigrations conta os .up.sql do bundle. Contar em vez de fixar um
+// número faz este teste continuar valendo quando uma migration nova entra —
+// o que ele afirma é "aplicou cada uma UMA vez", não "existem N".
+func quantasMigrations(t *testing.T) int {
+	t.Helper()
+
+	entradas, err := fs.Glob(migrations.FS, "*.up.sql")
+	if err != nil {
+		t.Fatalf("listando migrations: %v", err)
+	}
+
+	if len(entradas) == 0 {
+		t.Fatal("nenhuma migration no bundle")
+	}
+
+	return len(entradas)
+}
+
 func TestMain(m *testing.M) {
 	codigo := m.Run()
 	pgtest.Encerrar()
@@ -41,7 +60,7 @@ func TestMigrate_CriaSchemaAPartirDeBancoVazio(t *testing.T) {
 
 	esperadas := []string{
 		"anotacoes", "atividades", "concursos", "conteudo_programatico",
-		"disciplinas", "fontes", "marco_checks", "marcos", "plano_ciclo",
+		"disciplinas", "fontes", "marco_checks", "marcos",
 		"plano_disciplinas", "planos", "refresh_tokens", "registros_atividade",
 		"registros_dia", "schema_migrations", "temas", "usuarios",
 	}
@@ -72,8 +91,8 @@ func TestMigrate_EIdempotente(t *testing.T) {
 		t.Fatalf("contando migrations: %v", err)
 	}
 
-	if aplicadas != 1 {
-		t.Errorf("schema_migrations tem %d linhas, quer 1 (a baseline)", aplicadas)
+	if quer := quantasMigrations(t); aplicadas != quer {
+		t.Errorf("schema_migrations tem %d linhas, quer %d (uma por migration)", aplicadas, quer)
 	}
 }
 
@@ -120,10 +139,10 @@ func TestMigrate_ConcorrenteNaoDuplica(t *testing.T) {
 		t.Fatalf("contando migrations: %v", err)
 	}
 
-	if aplicadas != 1 {
+	if quer := quantasMigrations(t); aplicadas != quer {
 		t.Errorf(
-			"schema_migrations tem %d linhas depois de %d migrações concorrentes, quer 1",
-			aplicadas, processos,
+			"schema_migrations tem %d linhas depois de %d migrações concorrentes, quer %d",
+			aplicadas, processos, quer,
 		)
 	}
 }

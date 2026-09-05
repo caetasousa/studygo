@@ -96,10 +96,6 @@ func (r *PlanoRepo) ParaLembrete(ctx context.Context) ([]port.PlanoDoUsuario, er
 		return nil, err
 	}
 
-	if err := r.espalharCiclo(ctx, ids, porID); err != nil {
-		return nil, err
-	}
-
 	out := make([]port.PlanoDoUsuario, 0, len(linhas))
 	for _, l := range linhas {
 		out = append(out, port.PlanoDoUsuario{
@@ -148,40 +144,6 @@ func (r *PlanoRepo) espalharDisciplinas(
 			p.Config.Questoes[codigo] = questoes
 			p.Config.Modos[codigo] = plano.Modo(modo)
 			p.Config.Reforcos[codigo] = reforco
-		}
-	}
-
-	return rows.Err()
-}
-
-func (r *PlanoRepo) espalharCiclo(
-	ctx context.Context,
-	ids []uuid.UUID,
-	porID map[uuid.UUID]*plano.Plano,
-) error {
-	rows, err := r.pool.Query(
-		ctx,
-		`SELECT plano_id, ordem, titulo, questoes
-		   FROM plano_ciclo WHERE plano_id = ANY($1) ORDER BY plano_id, ordem`,
-		ids,
-	)
-	if err != nil {
-		return fmt.Errorf("consultando plano_ciclo em lote: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			planoID uuid.UUID
-			it      itemCiclo
-		)
-
-		if err := rows.Scan(&planoID, &it.Ordem, &it.Titulo, &it.Questoes); err != nil {
-			return fmt.Errorf("lendo item do ciclo em lote: %w", err)
-		}
-
-		if p, ok := porID[planoID]; ok {
-			p.Config.CicloRevisao = append(p.Config.CicloRevisao, it.paraDominio())
 		}
 	}
 

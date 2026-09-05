@@ -1,10 +1,7 @@
 package plano
 
 import (
-	"strings"
 	"time"
-
-	"studygo/internal/domain/concurso"
 )
 
 // Config são as escolhas do usuário para o plano: as datas e o ritmo, mais o
@@ -32,8 +29,7 @@ type Config struct {
 	// dos blocos de conteúdo com duração própria, em vez de comer uma
 	// porcentagem deles; 0 significa que o dia não tem bloco de revisão.
 	MinutosRevisao int
-	Reforcos       map[string]float64     // peso extra por disciplina (1 = normal)
-	CicloRevisao   []concurso.ItemRevisao // rotação da revisão semanal; vazia = RevCicloPadrao
+	Reforcos       map[string]float64 // peso extra por disciplina (1 = normal)
 	// RevisaoSemanal reserva um dia inteiro da semana para revisão. Desligada
 	// por padrão: revisão é um bloco diário (ver MinutosRevisao), alimentado
 	// pelo caderno de erros, então entregar um dia inteiro a ela custa conteúdo
@@ -111,7 +107,7 @@ func (c Config) Normalizar() Config {
 	// pergunta não respondida como se fosse resposta (Discursiva=false, por
 	// exemplo).
 	if c.Simulados == "" {
-		modos, reforcos, ciclo := c.Modos, c.Reforcos, c.CicloRevisao
+		modos, reforcos := c.Modos, c.Reforcos
 		blocos := c.BlocosPorDia
 
 		c.BlocosPorDia = d.BlocosPorDia
@@ -127,7 +123,6 @@ func (c Config) Normalizar() Config {
 
 		c.Modos = modosNaoNulos(modos)
 		c.Reforcos = reforcosNaoNulos(reforcos)
-		c.CicloRevisao = cicloValido(ciclo)
 		c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 		c.HorasDia = horasDiaEfetiva(c)
 
@@ -156,7 +151,6 @@ func (c Config) Normalizar() Config {
 
 	c.Modos = modosNaoNulos(c.Modos)
 	c.Reforcos = reforcosNaoNulos(c.Reforcos)
-	c.CicloRevisao = cicloValido(c.CicloRevisao)
 	c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 	c.HorasDia = horasDiaEfetiva(c)
 
@@ -242,28 +236,4 @@ func reforcosNaoNulos(m map[string]float64) map[string]float64 {
 	}
 
 	return m
-}
-
-// cicloValido descarta entradas sem título, para que um formulário preenchido
-// pela metade não deixe a revisão semanal com uma manchete em branco.
-func cicloValido(itens []concurso.ItemRevisao) []concurso.ItemRevisao {
-	out := make([]concurso.ItemRevisao, 0, len(itens))
-
-	for _, it := range itens {
-		if strings.TrimSpace(it.Titulo) == "" {
-			continue
-		}
-
-		out = append(out, concurso.ItemRevisao{
-			Ordem:    len(out),
-			Titulo:   strings.TrimSpace(it.Titulo),
-			Questoes: max(0, it.Questoes),
-		})
-	}
-
-	if len(out) == 0 {
-		return nil
-	}
-
-	return out
 }

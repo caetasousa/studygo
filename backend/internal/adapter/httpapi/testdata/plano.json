@@ -68,12 +68,6 @@
   },
   "config": {
     "blocosPorDia": "number",
-    "cicloRevisao": [
-      {
-        "questoes": "number",
-        "titulo": "string"
-      }
-    ],
     "diaRevisao": "number",
     "diasEstudo": [
       "number"

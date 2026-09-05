@@ -443,14 +443,19 @@ func TestGerar_simuladoNaoMexeNoCicloDeRevisao(t *testing.T) {
 	}
 }
 
-func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
+func TestGerar_cicloDeRevisaoVemDoEdital(t *testing.T) {
 	t.Parallel()
 
+	// O plano não tem mais rotação própria — o roteiro editável por semana saiu.
+	// Sobra a que o edital sugere e, na falta dela, a padrão.
 	c := concurso.Concurso{
 		Nome:        "X",
 		ProvaPadrao: dia(2026, 8, 14),
 		Disciplinas: []concurso.Disciplina{
 			{Codigo: "D01", Nome: "A", Bloco: concurso.BlocoGeral, Peso: 1, Temas: []string{"a1"}},
+		},
+		RevCiclo: []concurso.ItemRevisao{
+			{Ordem: 0, Titulo: "Revisão do edital", Questoes: 42},
 		},
 	}
 
@@ -462,12 +467,7 @@ func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
 	cfg.DiaRevisao = 5
 	cfg.RetaFinalDias = 28
 	cfg.Questoes = map[string]int{"D01": 10}
-	// This is about the weekly-review DAY's content, which is opt-in now.
 	cfg.RevisaoSemanal = true
-	cfg.CicloRevisao = []concurso.ItemRevisao{
-		{Ordem: 0, Titulo: "Minha revisão semanal", Questoes: 42},
-		{Ordem: 1, Titulo: "", Questoes: 10}, // sem título: descartado
-	}
 
 	res := plano.Gerar(cfg, &c)
 
@@ -480,8 +480,8 @@ func TestGerar_cicloDeRevisaoCustomizado(t *testing.T) {
 
 		achou = true
 
-		if d.Tema != "Minha revisão semanal" || d.Meta != 42 {
-			t.Fatalf("revisão semanal = %q/%d, queria o ciclo customizado", d.Tema, d.Meta)
+		if d.Tema != "Revisão do edital" || d.Meta != 42 {
+			t.Fatalf("revisão semanal = %q/%d, queria a rotação do edital", d.Tema, d.Meta)
 		}
 	}
 

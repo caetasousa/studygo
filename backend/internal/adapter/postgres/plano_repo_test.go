@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
 
 	"github.com/google/uuid"
@@ -42,9 +41,6 @@ func TestPlanoRepo_RoundTripDaConfiguracao(t *testing.T) {
 	p.Config.Questoes = map[string]int{"LINPO": 15, "BANDA": 20}
 	p.Config.Modos = map[string]plano.Modo{"LINPO": plano.ModoQuestoes}
 	p.Config.Reforcos = map[string]float64{"BANDA": 2}
-	p.Config.CicloRevisao = []concurso.ItemRevisao{
-		{Ordem: 0, Titulo: "Revisão ativa", Questoes: 30},
-	}
 	p.Config = p.Config.Normalizar()
 
 	salvo, err := r.planos.Salvar(t.Context(), p)
@@ -99,9 +95,6 @@ func TestPlanoRepo_RoundTripDaConfiguracao(t *testing.T) {
 		t.Errorf("reforço de BANDA = %v, quer 2", cfg.Reforcos["BANDA"])
 	}
 
-	if len(cfg.CicloRevisao) != 1 || cfg.CicloRevisao[0].Titulo != "Revisão ativa" {
-		t.Errorf("ciclo = %+v", cfg.CicloRevisao)
-	}
 }
 
 // Salvar de novo ATUALIZA o mesmo plano: a UNIQUE (usuario_id, concurso_id)

@@ -113,3 +113,4 @@ func TestAbsorverAtrasosDoDia_VarreOsPlanosApontados(t *testing.T) {
 		t.Errorf("planos replanejados = %d, quer 1", n)
 	}
 }
+
