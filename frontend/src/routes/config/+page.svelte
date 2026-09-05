@@ -640,36 +640,42 @@
 		font-weight: 600;
 		margin: 20px 0 8px;
 	}
-	/* Uma grade só para a lista inteira, com as linhas entrando por
-	   `display: contents`. Cada linha era um flex independente, então a coluna
-	   dos botões começava onde o nome daquela linha terminava — e nome curto e
-	   nome longo empurravam os grupos para lugares diferentes. Na grade as três
-	   colunas são as mesmas para todas as linhas. */
+	/* Cada matéria é um bloco de duas linhas: o NOME ocupa a largura toda em
+	   cima, os dois grupos de botões vêm embaixo.
+	   
+	   Antes o nome dividia a linha com os oito botões e sobravam ~200px para
+	   ele — "Engenharia de Software Assistida por Inteligência Artificial"
+	   virava "E...", e o estudante não sabia em que matéria estava clicando.
+	   
+	   Os grupos se alinham entre matérias sem esforço: os rótulos são os
+	   mesmos em toda linha, então `max-content` dá a mesma largura a todas. */
 	.modos {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) max-content max-content;
-		align-items: center;
-		gap: 6px 12px;
+		display: flex;
+		flex-direction: column;
 	}
 	.modo-linha {
-		display: contents;
+		display: grid;
+		grid-template-columns: max-content max-content;
+		justify-content: start;
+		align-items: center;
+		gap: 5px 10px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.modo-linha:last-child {
+		border-bottom: none;
 	}
 	.modo-nome {
+		grid-column: 1 / -1;
 		display: flex;
 		align-items: baseline;
-		gap: 4px;
+		gap: 6px;
 		min-width: 0;
 		font-size: 13.5px;
 	}
-	/* Only the discipline NAME truncates. Before this it shared one ellipsis
-	   with the peso tag, so a long name (common in "específicas") could clip
-	   the tag down to nothing rather than the name — the number that matters
-	   was the one that disappeared. */
 	.modo-nome-txt {
 		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		font-weight: 500;
 	}
 	.peso-tag {
 		flex: none;
@@ -682,31 +688,20 @@
 		background: var(--warn-soft);
 		color: var(--warn);
 	}
-	/* max-content nas colunas de botão já impede o encolhimento que quebrava
-	   "teoria + questões" em duas linhas; o nowrap garante isso mesmo se a
-	   grade for apertada por um container menor. */
 	.modo-linha .day-sel button {
 		white-space: nowrap;
 	}
 
-	/* Sem largura para três colunas, cada matéria vira um bloco: nome em cima,
-	   os dois grupos de botões embaixo, ainda alinhados entre si. */
-	@media (max-width: 720px) {
-		.modos {
-			grid-template-columns: 1fr;
-			gap: 4px;
-		}
+	/* Sem largura para os dois grupos lado a lado, o de reforço desce. */
+	@media (max-width: 560px) {
 		.modo-linha {
-			display: grid;
 			grid-template-columns: 1fr;
-			gap: 4px;
-			padding: 6px 0;
-			border-bottom: 1px solid var(--border);
 		}
 		.modo-linha .day-sel {
 			flex-wrap: wrap;
 		}
 	}
+
 	.ciclo {
 		display: flex;
 		flex-direction: column;
