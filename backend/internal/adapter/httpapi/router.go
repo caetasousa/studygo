@@ -67,6 +67,7 @@ func NewRouter(
 	protegida("POST "+base+"/atividades/mover", h.Plano.Mover)
 	protegida("POST "+base+"/atividades/antecipar", h.Plano.Antecipar)
 	protegida("POST "+base+"/dias/{data}/adiar", h.Plano.AdiarDia)
+	protegida("POST "+base+"/dias/{data}/reorganizar", h.Plano.Reorganizar)
 	protegida("POST "+base+"/compactar", h.Plano.Compactar)
 	protegida("POST "+base+"/restaurar-ordem", h.Plano.RestaurarOrdem)
 

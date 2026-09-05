@@ -201,6 +201,7 @@ class PlanoStore {
 	};
 	restaurarOrdem = () => this.run((s) => api.restaurarOrdem(s));
 	compactarPlano = () => this.run((s) => api.compactarPlano(s));
+	reorganizarDesde = (data: string) => this.run((s) => api.reorganizarDesde(s, data));
 
 	/**
 	 * Sets one discipline's error-notebook link, from the schedule. Discipline-

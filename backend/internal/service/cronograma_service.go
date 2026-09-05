@@ -302,6 +302,70 @@ func (s *CronogramaService) AbsorverAtraso(
 	return montado, len(atrasados), nil
 }
 
+// ReorganizarDesde redistribui o conteúdo a partir de uma data escolhida.
+//
+// É o AbsorverAtraso com a data na mão do estudante em vez de "hoje". Serve a
+// quem vai recadastrar dias já vividos: registra o que de fato estudou e então
+// manda o motor rearrumar dali para frente, em vez de arrastar matéria por
+// matéria.
+//
+// O que tem registro fica onde está, sempre — inclusive dentro da janela
+// reorganizada. Reorganizar é sobre o que ainda vai acontecer naquele trecho,
+// não sobre reescrever o que aconteceu.
+//
+// A data é normalizada para o dia e recusada fora do plano: antes do início não
+// há cronograma para mexer, e a partir da prova não há para onde distribuir.
+func (s *CronogramaService) ReorganizarDesde(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug, dataISOTexto string,
+) (PlanoMontado, error) {
+	c, err := s.carregar(ctx, usuarioID, slug)
+	if err != nil {
+		return PlanoMontado{}, err
+	}
+
+	desde, err := dataISO(dataISOTexto)
+	if err != nil {
+		return PlanoMontado{}, err
+	}
+
+	desde = plano.DayOf(desde)
+	cfg := c.Plano.Config
+
+	if desde.Before(plano.DayOf(cfg.Inicio)) {
+		desde = plano.DayOf(cfg.Inicio)
+	}
+
+	if !desde.Before(plano.DayOf(cfg.Prova)) {
+		return PlanoMontado{}, plano.ErrDestinoInvalido
+	}
+
+	atuais := make([]plano.Atividade, len(c.Atividades))
+	copy(atuais, c.Atividades)
+
+	// A escolha manual vale contra o motor, não contra um pedido explícito de
+	// reorganizar: quem clicou aqui está pedindo justamente que o motor decida
+	// de novo neste trecho.
+	for i := range atuais {
+		if !plano.DayOf(atuais[i].Data).Before(desde) {
+			atuais[i].Movida = false
+		}
+	}
+
+	// Gerar a partir da data escolhida: o currículo se redistribui pelos dias
+	// que restam dali até a prova, e o que não couber fica de fora — o
+	// AlertaCobertura conta isso.
+	cfg.Inicio = desde
+
+	res := plano.Gerar(cfg, &c.Concurso)
+	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
+
+	return s.gravarEMontar(
+		ctx, c, plano.Replanejar(atuais, novas, desde, c.Registros.Concluida),
+	)
+}
+
 // AbsorverAtrasosDoDia passa por todos os planos que ficaram para trás e
 // redistribui o que não foi estudado. É o que o worker chama uma vez por dia.
 //

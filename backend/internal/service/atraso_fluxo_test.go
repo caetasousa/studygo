@@ -114,3 +114,53 @@ func TestAbsorverAtrasosDoDia_VarreOsPlanosApontados(t *testing.T) {
 	}
 }
 
+// Reorganizar a partir de uma data é o que serve a quem recadastra dias já
+// vividos: registra o que estudou e manda o motor rearrumar dali para frente.
+func TestReorganizarDesde_RefazODaDataEmDiante(t *testing.T) {
+	ce := novoCenario(t)
+	ce.obter(t)
+
+	svc := NewCronogramaService(ce.deps)
+	desde := ce.hoje.AddDate(0, 0, 3)
+
+	antes := len(ce.cronograma.atividades)
+
+	if _, err := svc.ReorganizarDesde(
+		context.Background(), ce.usuario, ce.slug, desde.Format("2006-01-02"),
+	); err != nil {
+		t.Fatalf("ReorganizarDesde: %v", err)
+	}
+
+	if len(ce.cronograma.atividades) == 0 {
+		t.Fatalf("o cronograma ficou vazio (tinha %d)", antes)
+	}
+
+	// O que é anterior à data escolhida não se mexe.
+	for _, a := range ce.cronograma.atividades {
+		if plano.DayOf(a.Data).Before(desde) && a.Data.IsZero() {
+			t.Error("atividade anterior à data perdeu a data")
+		}
+	}
+}
+
+// Data fora do plano não reorganiza nada: depois da prova não há para onde
+// distribuir.
+func TestReorganizarDesde_RecusaDepoisDaProva(t *testing.T) {
+	ce := novoCenario(t)
+	p := ce.obter(t)
+
+	svc := NewCronogramaService(ce.deps)
+
+	prova, err := time.Parse("2006-01-02", p.Config.Prova)
+	if err != nil {
+		t.Fatalf("data da prova %q: %v", p.Config.Prova, err)
+	}
+
+	_, err = svc.ReorganizarDesde(
+		context.Background(), ce.usuario, ce.slug,
+		prova.AddDate(0, 0, 1).Format("2006-01-02"),
+	)
+	if err == nil {
+		t.Error("reorganizou a partir de uma data depois da prova, quer recusa")
+	}
+}

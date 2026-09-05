@@ -205,6 +205,8 @@ export const api = {
 		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}/adiar`, { method: 'POST' }),
 
 	/** Fecha os buracos deixados por matérias terminadas antes da hora. */
+	reorganizarDesde: (slug: string, data: string) =>
+		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}/reorganizar`, { method: 'POST' }),
 	compactarPlano: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/compactar`, { method: 'POST' }),
 

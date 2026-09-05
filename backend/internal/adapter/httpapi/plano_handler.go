@@ -379,6 +379,20 @@ func (h *PlanoHandler) AdiarDia(w http.ResponseWriter, r *http.Request) {
 	h.responderPlano(w, r, p, err)
 }
 
+// Reorganizar redistribui o conteúdo a partir da data no caminho. Serve a quem
+// recadastrou dias já vividos e quer o motor rearrumando dali para frente.
+func (h *PlanoHandler) Reorganizar(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.contexto(r)
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+
+		return
+	}
+
+	p, err := h.cronograma.ReorganizarDesde(r.Context(), id, slug, r.PathValue("data"))
+	h.responderPlano(w, r, p, err)
+}
+
 func (h *PlanoHandler) RestaurarOrdem(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.contexto(r)
 	if !ok {

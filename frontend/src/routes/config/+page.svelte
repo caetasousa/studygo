@@ -99,6 +99,25 @@
 		compactando = false;
 	}
 
+	// Reorganizar a partir de uma data. Serve a quem registrou dias já vividos e
+	// quer o motor rearrumando dali para frente, em vez de arrastar matéria por
+	// matéria. Começa no início do plano, que é o caso de quem está pondo o
+	// histórico em dia.
+	let reorganizarData = $state('');
+	let reorganizando = $state(false);
+
+	$effect(() => {
+		if (!reorganizarData && cfg?.inicio) reorganizarData = cfg.inicio;
+	});
+
+	async function reorganizar() {
+		if (reorganizando || !reorganizarData) return;
+
+		reorganizando = true;
+		await planoStore.reorganizarDesde(reorganizarData);
+		reorganizando = false;
+	}
+
 	const semanalDesc = $derived(
 		cfg?.revisaoSemanal
 			? 'Ligado: um dia inteiro por semana sai do conteúdo e vira revisão. São ~11 dias de matéria nova a menos num ciclo.'
@@ -527,6 +546,28 @@
 							? 'Há matérias que você reposicionou à mão.'
 							: 'Nenhuma troca manual ainda.'}
 					</span>
+				</div>
+
+				<p class="page-sub" style="margin:14px 0 8px">
+					Registrou dias que já passaram e quer o cronograma refeito dali para a
+					frente? Escolha a data: o que tem registro fica onde está, e o resto é
+					redistribuído pelos dias que sobram até a prova.
+				</p>
+				<div class="form-grid">
+					<input
+						type="date"
+						aria-label="Reorganizar a partir de"
+						bind:value={reorganizarData}
+						min={cfg.inicio}
+						max={cfg.prova}
+					/>
+					<button
+						class="btn"
+						onclick={reorganizar}
+						disabled={reorganizando || !reorganizarData}
+					>
+						{reorganizando ? 'Reorganizando…' : '⇅ Reorganizar dali em diante'}
+					</button>
 				</div>
 
 				<h2 class="sec">Este concurso</h2>
