@@ -47,10 +47,15 @@ type LinhaPlanilha struct {
 	Concluido  *bool
 }
 
-// LinhaCasada é uma linha que encontrou sua atividade no cronograma.
+// LinhaCasada é uma linha que encontrou onde entrar.
+//
+// Criada diz que a atividade não existia e foi reconstruída a partir da própria
+// linha: é o caso de quem traz o histórico de outra instalação, onde o
+// cronograma daqueles dias foi outro.
 type LinhaCasada struct {
 	Linha    LinhaPlanilha
 	Registro RegistroAtividade
+	Criada   bool
 }
 
 // LinhaRecusada é uma linha que não encontrou onde entrar, com o motivo em
@@ -61,9 +66,26 @@ type LinhaRecusada struct {
 }
 
 // ResultadoPlanilha é o que a importação faria, antes de fazer.
+//
+// Novas são as atividades que precisam existir para as linhas Criadas terem
+// onde se apoiar — um registro é sempre de UMA atividade, e sem ela não há onde
+// gravar o que a planilha diz que aconteceu.
 type ResultadoPlanilha struct {
 	Casadas   []LinhaCasada
 	Recusadas []LinhaRecusada
+	Novas     []Atividade
+}
+
+// JanelaDaPlanilha é o trecho do calendário em que a importação pode
+// reconstruir história.
+//
+// Começa no início do plano porque um dia anterior a ele não existe no
+// cronograma: a atividade criada lá não apareceria em tela nenhuma. Termina
+// hoje porque o futuro é do motor — uma planilha não agenda o que ainda não
+// aconteceu.
+type JanelaDaPlanilha struct {
+	Inicio time.Time
+	Hoje   time.Time
 }
 
 // colunas mapeia cada campo aos cabeçalhos aceitos. O primeiro é o que o export
@@ -152,51 +174,110 @@ func LerPlanilha(r io.Reader) ([]LinhaPlanilha, error) {
 // mesma vaga seriam duas verdades sobre o mesmo estudo.
 func CasarPlanilha(
 	atividades []Atividade,
+	dias []Dia,
 	linhas []LinhaPlanilha,
 	cur concurso.Concurso,
+	janela JanelaDaPlanilha,
 ) ResultadoPlanilha {
-	out := ResultadoPlanilha{Casadas: []LinhaCasada{}, Recusadas: []LinhaRecusada{}}
+	out := ResultadoPlanilha{
+		Casadas:   []LinhaCasada{},
+		Recusadas: []LinhaRecusada{},
+		Novas:     []Atividade{},
+	}
 	usadas := map[uuid.UUID]bool{}
+	// Quantas atividades cada dia já tem, contando as que esta importação criou:
+	// é daí que sai a posição da próxima.
+	ocupacao := map[time.Time]int{}
+
+	for _, a := range atividades {
+		ocupacao[day(a.Data)]++
+	}
 
 	for _, l := range linhas {
-		doDia := AtividadesDoDia(atividades, l.Data)
-		if len(doDia) == 0 {
-			out.Recusadas = append(out.Recusadas, LinhaRecusada{
-				Linha:  l,
-				Motivo: "o plano não tem nada agendado em " + l.Data.Format("02/01/2006"),
+		alvo, ok := escolher(daMateria(AtividadesDoDia(atividades, l.Data), l, cur), l, usadas)
+		if ok {
+			usadas[alvo.ID] = true
+			out.Casadas = append(out.Casadas, LinhaCasada{
+				Linha:    l,
+				Registro: registroDaLinha(alvo.ID, l),
 			})
 
 			continue
 		}
 
-		candidatas := daMateria(doDia, l, cur)
-		if len(candidatas) == 0 {
-			out.Recusadas = append(out.Recusadas, LinhaRecusada{
-				Linha:  l,
-				Motivo: materiaDaLinha(l) + " não está agendada em " + l.Data.Format("02/01/2006"),
-			})
+		// Nada agendado ali para esta matéria. Se o dia já passou e está dentro do
+		// plano, a planilha é a fonte: a atividade é reconstruída para o registro
+		// ter onde se apoiar.
+		nova, motivo := reconstruir(l, dias, cur, janela, ocupacao)
+		if motivo != "" {
+			out.Recusadas = append(out.Recusadas, LinhaRecusada{Linha: l, Motivo: motivo})
 
 			continue
 		}
 
-		alvo, ok := escolher(candidatas, l, usadas)
-		if !ok {
-			out.Recusadas = append(out.Recusadas, LinhaRecusada{
-				Linha:  l,
-				Motivo: "todas as ocorrências de " + materiaDaLinha(l) + " neste dia já receberam uma linha",
-			})
-
-			continue
-		}
-
-		usadas[alvo.ID] = true
+		ocupacao[day(l.Data)]++
+		usadas[nova.ID] = true
+		out.Novas = append(out.Novas, nova)
 		out.Casadas = append(out.Casadas, LinhaCasada{
 			Linha:    l,
-			Registro: registroDaLinha(alvo.ID, l),
+			Registro: registroDaLinha(nova.ID, l),
+			Criada:   true,
 		})
 	}
 
 	return out
+}
+
+// reconstruir monta a atividade que a linha descreve, ou diz por que não dá.
+//
+// O motivo é a mensagem que a tela mostra ao lado do número da linha, então ele
+// tem de dizer o que fazer em seguida — não só que deu errado.
+func reconstruir(
+	l LinhaPlanilha,
+	dias []Dia,
+	cur concurso.Concurso,
+	janela JanelaDaPlanilha,
+	ocupacao map[time.Time]int,
+) (Atividade, string) {
+	data := day(l.Data)
+
+	if !janela.Inicio.IsZero() && data.Before(janela.Inicio) {
+		return Atividade{}, "a linha é de " + data.Format("02/01/2006") +
+			" e o plano começa em " + janela.Inicio.Format("02/01/2006") +
+			" — mude a data de início do plano em Ajustes para trazer esse período"
+	}
+
+	if !janela.Hoje.IsZero() && data.After(janela.Hoje) {
+		return Atividade{}, data.Format("02/01/2006") +
+			" ainda não chegou — a planilha traz o que já foi estudado"
+	}
+
+	// Um dia que o plano não estuda não aparece no cronograma, e a atividade
+	// criada ali seria invisível: existiria no banco e em tela nenhuma.
+	if !DestinoValido(dias, data) {
+		return Atividade{}, data.Format("02/01/2006") +
+			" não é um dia de estudo deste plano — ajuste os dias da semana em Ajustes"
+	}
+
+	d := disciplinaDaLinha(l, cur)
+	if d == nil {
+		return Atividade{}, materiaDaLinha(l) + " não é uma matéria deste concurso"
+	}
+
+	id := d.ID
+
+	return Atividade{
+		ID:           uuid.New(),
+		Data:         data,
+		Posicao:      ocupacao[data],
+		DisciplinaID: &id,
+		Disciplina:   d.Codigo,
+		Tema:         l.Tema,
+		Passada:      1,
+		Tipo:         AtividadeConteudo,
+		// Foi o estudante quem pôs isto aqui, ao dizer que estudou naquele dia.
+		Movida: true,
+	}, ""
 }
 
 // HorasDeMinutos converte o tempo digitado em minutos para as horas que o
@@ -250,14 +331,14 @@ func daMateria(doDia []Atividade, l LinhaPlanilha, cur concurso.Concurso) []Ativ
 
 	for _, a := range doDia {
 		if a.Disciplina != "" {
-			if codigo != "" && strings.EqualFold(a.Disciplina, codigo) {
+			if codigo != "" && chave(a.Disciplina) == chave(codigo) {
 				out = append(out, a)
 			}
 
 			continue
 		}
 
-		if codigo == "" && strings.EqualFold(string(a.Tipo), strings.TrimSpace(l.Disciplina)) {
+		if codigo == "" && chave(string(a.Tipo)) == chave(l.Disciplina) {
 			out = append(out, a)
 		}
 	}
@@ -272,7 +353,7 @@ func escolher(candidatas []Atividade, l LinhaPlanilha, usadas map[uuid.UUID]bool
 
 	if tema != "" {
 		for _, a := range candidatas {
-			if !usadas[a.ID] && strings.EqualFold(strings.TrimSpace(a.Tema), tema) {
+			if !usadas[a.ID] && chave(a.Tema) == chave(tema) {
 				return a, true
 			}
 		}
@@ -287,19 +368,41 @@ func escolher(candidatas []Atividade, l LinhaPlanilha, usadas map[uuid.UUID]bool
 	return Atividade{}, false
 }
 
+// codigoPorNome acha a matéria pelo nome como ele veio na planilha — ou pelo
+// próprio código, quando foi ele que a coluna trouxe.
 func codigoPorNome(cur concurso.Concurso, nome string) string {
-	nome = strings.TrimSpace(nome)
-	if nome == "" {
+	k := chave(nome)
+	if k == "" {
 		return ""
 	}
 
 	for _, d := range cur.Disciplinas {
-		if strings.EqualFold(d.Nome, nome) || strings.EqualFold(d.Codigo, nome) {
+		if chave(d.Nome) == k || chave(d.Codigo) == k {
 			return d.Codigo
 		}
 	}
 
 	return ""
+}
+
+// disciplinaDaLinha resolve a matéria da linha pelo código ou pelo nome.
+func disciplinaDaLinha(l LinhaPlanilha, cur concurso.Concurso) *concurso.Disciplina {
+	codigo := strings.TrimSpace(l.Codigo)
+	if codigo == "" {
+		codigo = codigoPorNome(cur, l.Disciplina)
+	}
+
+	if codigo == "" {
+		return nil
+	}
+
+	for i := range cur.Disciplinas {
+		if chave(cur.Disciplinas[i].Codigo) == chave(codigo) {
+			return &cur.Disciplinas[i]
+		}
+	}
+
+	return nil
 }
 
 func materiaDaLinha(l LinhaPlanilha) string {
@@ -339,7 +442,7 @@ func mapearColunas(cabecalho []string) map[string]int {
 	idx := map[string]int{}
 
 	for i, col := range cabecalho {
-		chave := chaveDeColuna(col)
+		chave := chave(col)
 
 		for campo, apelidos := range colunas {
 			if _, achado := idx[campo]; achado {
@@ -359,9 +462,21 @@ func mapearColunas(cabecalho []string) map[string]int {
 	return idx
 }
 
-// chaveDeColuna reduz um cabeçalho ao que dá para comparar: minúsculas, sem
-// acento e sem pontuação.
-func chaveDeColuna(s string) string {
+// chave reduz um texto ao que dá para comparar entre duas instalações:
+// minúsculas, sem acento, sem pontuação e sem espaço.
+//
+// Serve aos cabeçalhos e, principalmente, ao NOME da matéria. Dois planos do
+// mesmo edital escrevem o mesmo nome de formas que não são o mesmo texto: o
+// acento pode vir composto (í) ou decomposto (i + ´) conforme o sistema que
+// gerou o arquivo, a vírgula da enumeração aparece ou não, o hífen troca de
+// lugar. Comparar byte a byte fazia "Língua Portuguesa" não ser "Língua
+// Portuguesa", e a planilha inteira era recusada com a mensagem mais confusa
+// possível: a matéria que está na tela "não é uma matéria deste concurso".
+//
+// Descartar o que não é letra nem dígito resolve os três casos de uma vez: o
+// acento decomposto vira a letra base (a marca combinante cai), a pontuação
+// some e o espaço não conta.
+func chave(s string) string {
 	var b strings.Builder
 
 	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
@@ -487,7 +602,7 @@ var afirmativos = map[string]bool{"sim": true, "s": true, "true": true, "1": tru
 var negativos = map[string]bool{"nao": true, "n": true, "false": true, "0": true, "": false}
 
 func boolOuNil(s string) *bool {
-	chave := chaveDeColuna(s)
+	chave := chave(s)
 	if chave == "" {
 		return nil
 	}

@@ -152,7 +152,9 @@ type temaRevisaoDTO struct {
 type importacaoDTO struct {
 	Aplicadas []linhaImportadaDTO `json:"aplicadas"`
 	Recusadas []linhaRecusadaDTO  `json:"recusadas"`
-	Gravadas  int                 `json:"gravadas"`
+	// Criadas: quantas linhas reconstroem a atividade que faltava naquele dia.
+	Criadas  int `json:"criadas"`
+	Gravadas int `json:"gravadas"`
 }
 
 type linhaImportadaDTO struct {
@@ -164,6 +166,7 @@ type linhaImportadaDTO struct {
 	Questoes   *int   `json:"questoes"`
 	Acertos    *int   `json:"acertos"`
 	Concluido  bool   `json:"concluido"`
+	Criada     bool   `json:"criada"`
 }
 
 type linhaRecusadaDTO struct {
@@ -177,6 +180,7 @@ func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
 	out := importacaoDTO{
 		Aplicadas: make([]linhaImportadaDTO, 0, len(r.Aplicadas)),
 		Recusadas: make([]linhaRecusadaDTO, 0, len(r.Recusadas)),
+		Criadas:   r.Criadas,
 		Gravadas:  r.Gravadas,
 	}
 
@@ -184,7 +188,7 @@ func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
 		out.Aplicadas = append(out.Aplicadas, linhaImportadaDTO{
 			Linha: l.Linha, Data: l.Data, Disciplina: l.Disciplina, Tema: l.Tema,
 			Minutos: l.Minutos, Questoes: l.Questoes, Acertos: l.Acertos,
-			Concluido: l.Concluido,
+			Concluido: l.Concluido, Criada: l.Criada,
 		})
 	}
 

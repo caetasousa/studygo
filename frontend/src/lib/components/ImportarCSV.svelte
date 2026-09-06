@@ -91,8 +91,10 @@
 <h2 class="sec">Importar registros de uma planilha</h2>
 <p class="page-sub" style="margin-top:0">
 	Exporte o CSV do outro plano e envie aqui: volta só o que foi <b>estudado</b> — tempo,
-	questões, acertos e conclusão. O cronograma desta conta não é alterado; cada linha
-	procura a matéria daquele dia. O que não achar onde entrar é listado, não gravado.
+	questões, acertos e conclusão. Cada linha procura a matéria daquele dia; quando o dia
+	já passou e a matéria não está lá, a atividade é <b>reconstruída</b> a partir da
+	planilha, porque é ela que sabe o que aconteceu. O cronograma futuro não é tocado, e
+	o que não achar onde entrar é listado com o motivo, não gravado.
 </p>
 
 {#if erro}<div class="form-error" style="margin-bottom:12px">{erro}</div>{/if}
@@ -102,7 +104,8 @@
 		<span class="em"><NavIcon name="info" /></span>
 		<div>
 			<b>{resultado.gravadas}</b>
-			{resultado.gravadas === 1 ? 'linha importada' : 'linhas importadas'}.
+			{resultado.gravadas === 1 ? 'linha importada' : 'linhas importadas'}{#if resultado.criadas > 0}, {resultado.criadas}
+				com a atividade reconstruída no dia{/if}.
 			{#if resultado.recusadas.length > 0}
 				{resultado.recusadas.length} ficaram de fora.
 			{/if}
@@ -115,9 +118,17 @@
 			{previa.aplicadas.length}
 			{previa.aplicadas.length === 1 ? 'linha entra' : 'linhas entram'}
 		</b>
-		{#if previa.recusadas.length > 0}
-			<span>{previa.recusadas.length} sem lugar no cronograma</span>
-		{/if}
+		<span>
+			{#if previa.criadas > 0}
+				{previa.criadas}
+				{previa.criadas === 1 ? 'reconstrói o dia' : 'reconstroem o dia'}{#if previa.recusadas.length > 0}
+					·
+				{/if}
+			{/if}
+			{#if previa.recusadas.length > 0}
+				{previa.recusadas.length} sem lugar
+			{/if}
+		</span>
 	</div>
 
 	{#if previa.aplicadas.length > 0}
@@ -130,7 +141,10 @@
 					{#each previa.aplicadas.slice(0, MAX_LINHAS_MOSTRADAS) as l (l.linha)}
 						<tr>
 							<td>{l.data.split('-').reverse().slice(0, 2).join('/')}</td>
-							<td class="materia">{l.disciplina}{l.tema ? ` · ${l.tema}` : ''}</td>
+							<td class="materia">
+								{l.disciplina}{l.tema ? ` · ${l.tema}` : ''}
+								{#if l.criada}<span class="nova" title="A atividade não existe nesse dia e vai ser criada">nova</span>{/if}
+							</td>
 							<td>{tempo(l.minutos)}</td>
 							<td>{l.questoes ?? '—'}</td>
 							<td>{l.acertos ?? '—'}</td>
@@ -197,6 +211,14 @@
 	.materia {
 		color: var(--text-muted);
 		font-size: 12.5px;
+	}
+	.nova {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--warn);
+		margin-left: 6px;
 	}
 	.btn.primario {
 		border-color: var(--accent);

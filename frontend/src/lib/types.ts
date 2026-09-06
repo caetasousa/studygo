@@ -102,6 +102,8 @@ export interface LinhaImportada {
 	questoes: number | null;
 	acertos: number | null;
 	concluido: boolean;
+	/** A atividade não existia naquele dia e vai ser reconstruída pela planilha. */
+	criada: boolean;
 }
 
 /** Uma linha que não entrou, com o motivo em português. */
@@ -116,6 +118,8 @@ export interface LinhaRecusada {
 export interface ImportacaoCSV {
 	aplicadas: LinhaImportada[];
 	recusadas: LinhaRecusada[];
+	/** Quantas linhas reconstroem a atividade que faltava no dia. */
+	criadas: number;
 	/** 0 na prévia; quantas linhas foram gravadas na importação confirmada. */
 	gravadas: number;
 }

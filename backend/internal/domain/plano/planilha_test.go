@@ -35,6 +35,35 @@ func atividade(cur concurso.Concurso, i int, data time.Time, pos int, tema strin
 
 const cabecalho = "dia,data,semana,fase,tipo,codigo,disciplina,tema,meta_questoes,minutos,questoes,acertos,concluido,anotacao\n"
 
+// diasDoPlano é um setembro de dias de estudo, de segunda a sexta: é o que
+// decide onde a planilha pode reconstruir uma atividade.
+func diasDoPlano() []plano.Dia {
+	dias := []plano.Dia{}
+
+	for d := 1; d <= 30; d++ {
+		data := dia(2026, time.September, d)
+		if wd := data.Weekday(); wd == time.Saturday || wd == time.Sunday {
+			continue
+		}
+
+		dias = append(dias, plano.Dia{
+			N: len(dias) + 1, Data: data, Semana: (d-1)/7 + 1,
+			Fase: plano.FaseBase, Tipo: plano.TipoEstudo,
+		})
+	}
+
+	return dias
+}
+
+// A janela dos testes: o plano começa em 01/09 e hoje é 30/09, então setembro
+// inteiro é passado e pode ser reconstruído.
+func janela() plano.JanelaDaPlanilha {
+	return plano.JanelaDaPlanilha{
+		Inicio: dia(2026, time.September, 1),
+		Hoje:   dia(2026, time.September, 30),
+	}
+}
+
 func TestLerPlanilha_LeAsColunasDoExport(t *testing.T) {
 	t.Parallel()
 
@@ -161,7 +190,7 @@ func TestCasarPlanilha_CasaODiaFixoPeloTipo(t *testing.T) {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha([]plano.Atividade{simulado}, linhas, cur)
+	res := plano.CasarPlanilha([]plano.Atividade{simulado}, diasDoPlano(), linhas, cur, janela())
 
 	if len(res.Casadas) != 1 {
 		t.Fatalf("casadas = %d (recusadas: %+v), quer 1", len(res.Casadas), res.Recusadas)
@@ -198,7 +227,7 @@ func TestCasarPlanilha_CasaPorDiaEMateria(t *testing.T) {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, linhas, cur)
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
 
 	if len(res.Casadas) != 1 || len(res.Recusadas) != 0 {
 		t.Fatalf("casadas=%d recusadas=%d", len(res.Casadas), len(res.Recusadas))
@@ -239,7 +268,7 @@ func TestCasarPlanilha_TemaDesempataOcorrencias(t *testing.T) {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, linhas, cur)
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
 
 	if len(res.Casadas) != 2 {
 		t.Fatalf("casadas = %d, quer 2", len(res.Casadas))
@@ -254,7 +283,11 @@ func TestCasarPlanilha_TemaDesempataOcorrencias(t *testing.T) {
 	}
 }
 
-func TestCasarPlanilha_RecusaComMotivo(t *testing.T) {
+// Uma planilha de OUTRA instalação traz dias que este cronograma não tem: foi
+// outro plano que gerou aqueles dias. Dentro da janela — do início do plano até
+// hoje — a atividade é reconstruída, porque o registro precisa de uma atividade
+// para existir e a planilha é a fonte do que aconteceu.
+func TestCasarPlanilha_ReconstroiODiaQueFaltava(t *testing.T) {
 	t.Parallel()
 
 	cur := cursoDeTeste()
@@ -262,33 +295,87 @@ func TestCasarPlanilha_RecusaComMotivo(t *testing.T) {
 	atividades := []plano.Atividade{atividade(cur, 0, d1, 0, "Crase")}
 
 	csv := cabecalho +
-		// dia que o plano não tem
-		"1,20/12/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,30,,,sim,\n" +
-		// matéria que não está naquele dia
-		"1,01/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,SQL,20,30,,,sim,\n" +
-		// segunda linha para a mesma vaga
-		"1,01/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,30,,,sim,\n" +
-		"1,01/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,30,,,sim,\n"
+		// matéria que não está agendada naquele dia
+		"1,01/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,SQL,20,30,10,9,sim,\n" +
+		// dia que o plano não tem atividade nenhuma
+		"2,03/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Regência,20,45,,,sim,\n"
 
 	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, linhas, cur)
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
 
-	if len(res.Casadas) != 1 {
-		t.Fatalf("casadas = %d, quer 1", len(res.Casadas))
+	if len(res.Casadas) != 2 || len(res.Recusadas) != 0 {
+		t.Fatalf("casadas=%d recusadas=%+v", len(res.Casadas), res.Recusadas)
+	}
+
+	if len(res.Novas) != 2 {
+		t.Fatalf("novas = %d, quer 2", len(res.Novas))
+	}
+
+	for _, c := range res.Casadas {
+		if !c.Criada {
+			t.Errorf("linha %d devia estar marcada como criada", c.Linha.Numero)
+		}
+	}
+
+	// A que entra no dia já ocupado vai para a vaga seguinte, não por cima.
+	nova := res.Novas[0]
+	if !nova.Data.Equal(d1) || nova.Posicao != 1 || nova.Disciplina != "BANDA" {
+		t.Errorf("atividade reconstruída = %+v", nova)
+	}
+
+	if nova.Tema != "SQL" || nova.DisciplinaID == nil || *nova.DisciplinaID != cur.Disciplinas[1].ID {
+		t.Errorf("a atividade reconstruída não descreve a linha: %+v", nova)
+	}
+
+	if !nova.Movida {
+		t.Error("quem pôs a atividade ali foi o estudante — Movida devia estar ligada")
+	}
+}
+
+// Fora da janela ninguém reconstrói nada, e o motivo diz o que fazer.
+func TestCasarPlanilha_RecusaForaDaJanela(t *testing.T) {
+	t.Parallel()
+
+	cur := cursoDeTeste()
+	atividades := []plano.Atividade{}
+
+	csv := cabecalho +
+		// antes do início do plano
+		"1,20/08/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,30,,,sim,\n" +
+		// depois de hoje
+		"2,20/12/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,30,,,sim,\n" +
+		// matéria que não existe neste concurso
+		"3,03/09/2026,1,Conteúdo,est,,Astronomia,Estrelas,20,30,,,sim,\n"
+
+	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("LerPlanilha: %v", err)
+	}
+
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+
+	if len(res.Casadas) != 0 || len(res.Novas) != 0 {
+		t.Fatalf("nada devia entrar: casadas=%d novas=%d", len(res.Casadas), len(res.Novas))
 	}
 
 	if len(res.Recusadas) != 3 {
 		t.Fatalf("recusadas = %d, quer 3", len(res.Recusadas))
 	}
 
-	for _, r := range res.Recusadas {
-		if r.Motivo == "" {
-			t.Errorf("linha %d recusada sem motivo", r.Linha.Numero)
-		}
+	if !strings.Contains(res.Recusadas[0].Motivo, "início do plano") {
+		t.Errorf("motivo do dia anterior ao plano = %q", res.Recusadas[0].Motivo)
+	}
+
+	if !strings.Contains(res.Recusadas[1].Motivo, "ainda não chegou") {
+		t.Errorf("motivo do dia futuro = %q", res.Recusadas[1].Motivo)
+	}
+
+	if !strings.Contains(res.Recusadas[2].Motivo, "matéria deste concurso") {
+		t.Errorf("motivo da matéria desconhecida = %q", res.Recusadas[2].Motivo)
 	}
 }
 
@@ -308,7 +395,7 @@ func TestCasarPlanilha_SemColunaDeConclusao(t *testing.T) {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, linhas, cur)
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
 
 	if len(res.Casadas) != 1 || !res.Casadas[0].Registro.Concluido {
 		t.Fatalf("resultado = %+v, quer uma linha concluída", res)
@@ -322,5 +409,55 @@ func TestHorasDeMinutos_VoltaComoFoiDigitado(t *testing.T) {
 		if got := plano.MinutosDeHoras(plano.HorasDeMinutos(min)); got != min {
 			t.Fatalf("%d minutos viraram %d na volta", min, got)
 		}
+	}
+}
+
+// Duas instalações escrevem o mesmo nome de matéria de formas que não são o
+// mesmo texto. Comparar byte a byte recusava a planilha inteira com a mensagem
+// mais confusa possível — "Língua Portuguesa não é uma matéria deste concurso"
+// para uma matéria que está na tela.
+func TestCasarPlanilha_NomeDaMateriaComparadoSemAcentoNemPontuacao(t *testing.T) {
+	t.Parallel()
+
+	cur := cursoDeTeste()
+	d1 := dia(2026, time.September, 1)
+
+	nomes := []struct {
+		caso string
+		nome string
+	}{
+		// Acento decomposto: "i" seguido do acento agudo combinante, que é como
+		// alguns sistemas gravam o arquivo.
+		// "Li" + acento agudo combinante: como alguns sistemas gravam o arquivo.
+		{"acento decomposto", "Li\u0301ngua Portuguesa"},
+		{"sem acento", "Lingua Portuguesa"},
+		{"caixa diferente", "LÍNGUA PORTUGUESA"},
+		{"espaço a mais", "Língua  Portuguesa "},
+	}
+
+	for _, tt := range nomes {
+		t.Run(tt.caso, func(t *testing.T) {
+			t.Parallel()
+
+			csv := "data,disciplina,tema,minutos,concluido\n" +
+				"01/09/2026," + tt.nome + ",Crase,45,sim\n"
+
+			linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+			if err != nil {
+				t.Fatalf("LerPlanilha: %v", err)
+			}
+
+			atividades := []plano.Atividade{atividade(cur, 0, d1, 0, "Crase")}
+
+			res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+
+			if len(res.Casadas) != 1 {
+				t.Fatalf("casadas = %d (recusadas: %+v), quer 1", len(res.Casadas), res.Recusadas)
+			}
+
+			if res.Casadas[0].Registro.AtividadeID != atividades[0].ID {
+				t.Error("a linha não foi para a atividade daquela matéria")
+			}
+		})
 	}
 }

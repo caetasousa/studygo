@@ -4,6 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
+
+	"studygo/internal/domain/plano"
 )
 
 // A planilha, ida e volta.
@@ -176,5 +179,204 @@ func TestPlanilha_ImportarRecusaArquivoIlegivel(t *testing.T) {
 
 	if !strings.Contains(validacao.Msg, "colunas") {
 		t.Errorf("mensagem = %q, devia dizer o que falta na planilha", validacao.Msg)
+	}
+}
+
+// O caso que motivou a importação: a planilha vem de OUTRA instalação, e os
+// dias dela não têm no cronograma daqui a mesma matéria — ou não têm nada,
+// porque a varredura de atraso esvaziou o passado não registrado.
+//
+// A planilha é a fonte do que aconteceu: dentro da janela do plano, a atividade
+// é reconstruída para o registro ter onde se apoiar.
+func TestPlanilha_ImportarReconstroiODiaQueFaltava(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	p := ce.obter(t)
+
+	estudo := diasDeEstudo(p)
+	perdido := estudo[2]
+
+	// O dia fica vazio, como depois de um AbsorverAtraso.
+	sobrando := []plano.Atividade{}
+
+	for _, a := range ce.cronograma.atividades {
+		if !plano.DayOf(a.Data).Equal(dataDe(t, perdido.Data)) {
+			sobrando = append(sobrando, a)
+		}
+	}
+
+	if err := ce.cronograma.SubstituirAtividades(ctx, ce.planos.p.ID, sobrando); err != nil {
+		t.Fatalf("esvaziando o dia: %v", err)
+	}
+
+	// E o tempo passa: aquele dia agora é passado.
+	ce.deps.Relogio = relogioFixo{t: diaT(2026, time.September, 30)}
+
+	data := dataDe(t, perdido.Data).Format("02/01/2006")
+	csv := "data,codigo,disciplina,tema,minutos,questoes,acertos,concluido\n" +
+		data + ",LINPO,Língua Portuguesa,Crase,45,10,8,sim\n" +
+		data + ",BANDA,Banco de Dados,SQL,60,20,15,sim\n"
+
+	svc := NewPlanilhaService(ce.deps)
+
+	prev, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{CSV: csv})
+	if err != nil {
+		t.Fatalf("prévia: %v", err)
+	}
+
+	if len(prev.Aplicadas) != 2 || len(prev.Recusadas) != 0 {
+		t.Fatalf("prévia: aplicadas=%d recusadas=%+v", len(prev.Aplicadas), prev.Recusadas)
+	}
+
+	if prev.Criadas != 2 {
+		t.Errorf("criadas = %d, quer 2", prev.Criadas)
+	}
+
+	res, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
+		CSV: csv, Confirmar: true,
+	})
+	if err != nil {
+		t.Fatalf("importar: %v", err)
+	}
+
+	if res.Gravadas != 2 {
+		t.Fatalf("gravadas = %d, quer 2", res.Gravadas)
+	}
+
+	// As atividades voltaram ao dia, com o estudo lançado nelas.
+	doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, perdido.Data))
+	if len(doDia) != 2 {
+		t.Fatalf("o dia ficou com %d atividades, quer 2", len(doDia))
+	}
+
+	for _, a := range doDia {
+		if !ce.cronograma.registros[a.ID].Concluido {
+			t.Errorf("a atividade %s de %s ficou sem registro", a.Disciplina, data)
+		}
+	}
+}
+
+// Antes do início do plano não há cronograma para receber nada, e a mensagem
+// diz o que fazer em vez de só recusar.
+func TestPlanilha_ImportarRecusaAntesDoInicioDoPlano(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ce.obter(t)
+
+	csv := "data,codigo,disciplina,tema,minutos,concluido\n" +
+		"20/08/2026,LINPO,Língua Portuguesa,Crase,45,sim\n"
+
+	res, err := NewPlanilhaService(ce.deps).ImportarCSV(
+		context.Background(), ce.usuario, ce.slug, ImportarPlanilhaCommand{CSV: csv},
+	)
+	if err != nil {
+		t.Fatalf("prévia: %v", err)
+	}
+
+	if len(res.Recusadas) != 1 {
+		t.Fatalf("recusadas = %d, quer 1", len(res.Recusadas))
+	}
+
+	if !strings.Contains(res.Recusadas[0].Motivo, "início do plano") {
+		t.Errorf("motivo = %q, devia mandar ajustar o início do plano", res.Recusadas[0].Motivo)
+	}
+}
+
+// dataDe converte a data ISO que a tela usa para o time.Time do domínio.
+func dataDe(t *testing.T, iso string) time.Time {
+	t.Helper()
+
+	d, err := time.Parse("2006-01-02", iso)
+	if err != nil {
+		t.Fatalf("data inválida %q: %v", iso, err)
+	}
+
+	return plano.DayOf(d.UTC())
+}
+
+// Mover o início do plano para TRÁS é o primeiro passo de quem recadastra um
+// histórico que começa antes de onde o plano nasceu. O trecho que entra nunca
+// existiu no cronograma, então ele nasce materializado: sem isso o estudante
+// muda a data, vê o plano crescer e não encontra nada nos dias novos.
+func TestSalvar_InicioParaTrasMaterializaOsDiasNovos(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	p := ce.obter(t)
+
+	inicio := dataDe(t, p.Config.Inicio)
+
+	depois, err := NewPlanoService(ce.deps).Salvar(ctx, ce.usuario, ce.slug, ConfigCommand{
+		Inicio: "2026-08-10",
+	})
+	if err != nil {
+		t.Fatalf("Salvar: %v", err)
+	}
+
+	if depois.Config.Inicio != "2026-08-10" {
+		t.Fatalf("início = %s, quer 2026-08-10", depois.Config.Inicio)
+	}
+
+	novos, comAtividade := 0, 0
+
+	for _, d := range depois.Dias {
+		if !dataDe(t, d.Data).Before(inicio) {
+			continue
+		}
+
+		novos++
+
+		if len(d.Itens) > 0 {
+			comAtividade++
+		}
+	}
+
+	if novos == 0 {
+		t.Fatal("o plano não cresceu para trás")
+	}
+
+	if comAtividade == 0 {
+		t.Errorf("os %d dias novos do passado ficaram sem atividade nenhuma", novos)
+	}
+}
+
+// A exceção é só para o início andando para trás. Qualquer outra mudança de
+// data continua respeitando o passado — inclusive o dia perdido, que fica vazio
+// porque é essa a verdade dele.
+func TestSalvar_OutraMudancaDeDataNaoRessuscitaODiaPerdido(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	p := ce.obter(t)
+
+	perdido := dataDe(t, diasDeEstudo(p)[2].Data)
+
+	sobrando := []plano.Atividade{}
+
+	for _, a := range ce.cronograma.atividades {
+		if !plano.DayOf(a.Data).Equal(perdido) {
+			sobrando = append(sobrando, a)
+		}
+	}
+
+	if err := ce.cronograma.SubstituirAtividades(ctx, ce.planos.p.ID, sobrando); err != nil {
+		t.Fatalf("esvaziando o dia: %v", err)
+	}
+
+	ce.deps.Relogio = relogioFixo{t: diaT(2026, time.September, 30)}
+
+	if _, err := NewPlanoService(ce.deps).Salvar(ctx, ce.usuario, ce.slug, ConfigCommand{
+		Prova: "2026-12-20",
+	}); err != nil {
+		t.Fatalf("Salvar: %v", err)
+	}
+
+	if doDia := plano.AtividadesDoDia(ce.cronograma.atividades, perdido); len(doDia) != 0 {
+		t.Errorf("o dia perdido voltou a ter %d atividades", len(doDia))
 	}
 }

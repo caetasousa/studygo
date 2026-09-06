@@ -156,7 +156,7 @@ type ImportarPlanilhaCommand struct {
 	Confirmar bool
 }
 
-// LinhaImportada é uma linha que encontrou sua atividade.
+// LinhaImportada é uma linha que encontrou onde entrar.
 type LinhaImportada struct {
 	Linha      int
 	Data       string
@@ -166,6 +166,8 @@ type LinhaImportada struct {
 	Questoes   *int
 	Acertos    *int
 	Concluido  bool
+	// Criada: a atividade não existia naquele dia e foi reconstruída.
+	Criada bool
 }
 
 // LinhaRecusada é uma linha que não entrou, e por quê.
@@ -177,9 +179,14 @@ type LinhaRecusada struct {
 }
 
 // ResultadoImportacao é o que a tela mostra depois de ler a planilha.
+//
+// Criadas são as linhas que caíram num dia onde aquela matéria não estava
+// agendada e por isso reconstroem a atividade — o caso de quem traz o histórico
+// de outra instalação.
 type ResultadoImportacao struct {
 	Aplicadas []LinhaImportada
 	Recusadas []LinhaRecusada
+	Criadas   int
 	Gravadas  int
 }
 
@@ -205,7 +212,14 @@ func (s *PlanilhaService) ImportarCSV(
 		return ResultadoImportacao{}, erroDePlanilha(err)
 	}
 
-	res := plano.CasarPlanilha(c.Atividades, linhas, c.Concurso)
+	// A janela em que a planilha pode reconstruir o que faltou: do início do
+	// plano até hoje, e só nos dias que o plano de fato estuda.
+	dias := plano.Gerar(c.Plano.Config, &c.Concurso).Dias
+
+	res := plano.CasarPlanilha(c.Atividades, dias, linhas, c.Concurso, plano.JanelaDaPlanilha{
+		Inicio: plano.DayOf(c.Plano.Config.Inicio),
+		Hoje:   plano.DayOf(s.relogio.Now()),
+	})
 
 	nomes := make(map[string]string, len(c.Concurso.Disciplinas))
 	for _, d := range c.Concurso.Disciplinas {
@@ -215,6 +229,7 @@ func (s *PlanilhaService) ImportarCSV(
 	out := ResultadoImportacao{
 		Aplicadas: make([]LinhaImportada, 0, len(res.Casadas)),
 		Recusadas: make([]LinhaRecusada, 0, len(res.Recusadas)),
+		Criadas:   len(res.Novas),
 	}
 
 	registros := make([]plano.RegistroAtividade, 0, len(res.Casadas))
@@ -251,6 +266,18 @@ func (s *PlanilhaService) ImportarCSV(
 		)
 	}
 
+	// As atividades reconstruídas entram ANTES dos registros: um registro é
+	// sempre de uma atividade, e a chave estrangeira recusaria a ordem inversa.
+	// Vai o cronograma inteiro, porque quem grava substitui — mandar só as novas
+	// apagaria todo o resto.
+	if len(res.Novas) > 0 {
+		completo := append(append([]plano.Atividade{}, c.Atividades...), res.Novas...)
+
+		if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, completo); err != nil {
+			return ResultadoImportacao{}, err
+		}
+	}
+
 	if err := s.cronograma.SalvarRegistros(ctx, c.Plano.ID, registros); err != nil {
 		return ResultadoImportacao{}, err
 	}
@@ -266,7 +293,7 @@ func linhaImportada(ca plano.LinhaCasada, nomes map[string]string) LinhaImportad
 		nome = n
 	}
 
-	out := LinhaImportada{
+	return LinhaImportada{
 		Linha:      ca.Linha.Numero,
 		Data:       ca.Linha.Data.Format(formatoISO),
 		Disciplina: nome,
@@ -275,9 +302,8 @@ func linhaImportada(ca plano.LinhaCasada, nomes map[string]string) LinhaImportad
 		Questoes:   ca.Registro.Questoes,
 		Acertos:    ca.Registro.Acertos,
 		Concluido:  ca.Registro.Concluido,
+		Criada:     ca.Criada,
 	}
-
-	return out
 }
 
 // erroDePlanilha traduz a recusa do domínio numa mensagem de validação: uma
