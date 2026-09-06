@@ -281,6 +281,84 @@ describe('migração das chaves de armazenamento', () => {
 	});
 });
 
+describe('sugerirTopicos e a lista de normativos', () => {
+	// O caso real: uma lista de normativos que veio do edital como UM tópico só.
+	// Cada item é um assunto de estudo inteiro, e mantê-los juntos vira um bloco
+	// que o cronograma não tem como distribuir.
+	const NORMATIVOS =
+		'Normativos e instrumentos institucionais do Tribunal de Contas do Estado de Goiás ' +
+		'relacionados à governança, ao planejamento, à segurança da informação e à tecnologia ' +
+		'da informação: Resolução Normativa nº 13/2016, que institui o Comitê Estratégico de ' +
+		'Tecnologia da Informação (CETI), considerando seu texto compilado; Resolução ' +
+		'Administrativa nº 14/2024, que dispõe sobre a Política de Governança Organizacional; ' +
+		'Resolução Administrativa nº 17/2024, que dispõe sobre a Política de Segurança da ' +
+		'Informação; Resolução Administrativa nº 14/2025, no que se refere à estrutura e às ' +
+		'competências da Diretoria de Tecnologia da Informação e de suas unidades vinculadas; ' +
+		'Plano Diretor de Tecnologia da Informação (PDTI) 2025–2026, aprovado pela Ordem de ' +
+		'Serviço nº 001/2025-CETI';
+
+	it('divide a lista de normativos em um assunto por item', () => {
+		const topicos = sugerirTopicos(NORMATIVOS);
+
+		expect(topicos).toHaveLength(5);
+		expect(topicos[1]).toBe(
+			'Resolução Administrativa nº 14/2024, que dispõe sobre a Política de Governança Organizacional'
+		);
+		expect(topicos[4]).toBe(
+			'Plano Diretor de Tecnologia da Informação (PDTI) 2025–2026, aprovado pela Ordem de Serviço nº 001/2025-CETI'
+		);
+	});
+
+	it('mantém o texto do edital nos pedaços', () => {
+		for (const t of sugerirTopicos(NORMATIVOS)) {
+			expect(NORMATIVOS).toContain(t);
+		}
+	});
+
+	it('não divide uma enumeração de atributos', () => {
+		// Os pedaços seguem em minúscula: é um assunto só listando o que ele
+		// abrange, não quatro dias de estudo.
+		const principios =
+			'Princípios da segurança da informação: confidencialidade; integridade; ' +
+			'disponibilidade; autenticidade e não repúdio';
+
+		expect(sugerirTopicos(principios)).toEqual([principios]);
+	});
+
+	// O ponto e vírgula genérico do edital enumera as partes de UM assunto.
+	// Dividir em todos eles multiplicaria os tópicos até o cronograma ficar
+	// impossível de percorrer — só o nome de um normativo autoriza a divisão.
+	it('não divide um assunto que apenas lista suas partes', () => {
+		const constituicao =
+			'Constituição da República Federativa do Brasil de 1988: Administração ' +
+			'Pública; fiscalização contábil, financeira, orçamentária, operacional e ' +
+			'patrimonial; controle interno e controle externo';
+
+		expect(sugerirTopicos(constituicao)).toEqual([constituicao]);
+	});
+
+	it('não divide itens em maiúscula que não são normativos', () => {
+		const engenharia =
+			'Engenharia de software: Requisitos e casos de uso; Arquitetura em camadas; ' +
+			'Testes automatizados e integração contínua';
+
+		expect(sugerirTopicos(engenharia)).toEqual([engenharia]);
+	});
+
+	it('divide uma lista de leis e decretos', () => {
+		const leis =
+			'Legislação aplicada: Lei nº 14.133/2021, que dispõe sobre licitações e ' +
+			'contratos administrativos; Decreto nº 10.024/2019, que regulamenta o pregão ' +
+			'eletrônico; Lei Complementar nº 101/2000, de responsabilidade fiscal';
+
+		expect(sugerirTopicos(leis)).toHaveLength(3);
+	});
+
+	it('oferece a divisão para a ementa de normativos', () => {
+		expect(pareceEmentaCorrida(NORMATIVOS)).toBe(true);
+	});
+});
+
 describe('tempo de estudo', () => {
 	it('converte minutos em horas como o banco os guarda', () => {
 		expect(minutosEmHoras(30)).toBe(0.5);

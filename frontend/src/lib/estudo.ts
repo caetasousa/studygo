@@ -80,15 +80,90 @@ export function semNumeroInicial(texto: string): string {
 	return limpo.trim() || texto.trim();
 }
 
+/** Abaixo disto um pedaço não é um assunto: é abreviação, número de lei, sobra. */
+const MIN_TOPICO = 24;
+
+/** Uma frase nova começa com maiúscula. */
+const COMECA_FRASE = /^[A-ZÀ-Þ]/;
+
+/**
+ * Um item que abre com o nome de um instrumento normativo.
+ *
+ * É o que autoriza dividir num ponto e vírgula. Deliberadamente estreito: uma
+ * lista de normativos são vários assuntos de estudo, mas o ponto e vírgula
+ * genérico do edital quase sempre enumera as partes de UM assunto
+ * ("fiscalização contábil, financeira; controle interno e controle externo").
+ * Dividir em todos eles multiplicaria os tópicos e deixaria o cronograma
+ * impossível de percorrer.
+ */
+const COMECA_NORMATIVO =
+	/^(lei|leis|decreto|resolu[çc][ãa]o|resolu[çc][õo]es|portaria|instru[çc][ãa]o normativa|medida provis[óo]ria|emenda constitucional|s[úu]mula|ordem de servi[çc]o|plano diretor|ato normativo|regimento|estatuto|constitui[çc][ãa]o)\b/i;
+
+/**
+ * Junta os pedaços de volta em assuntos.
+ *
+ * Um pedaço só começa assunto NOVO quando `comecaItem` o reconhece como item e
+ * o que veio antes já dá um assunto sozinho. Os dois testes existem pelo mesmo
+ * motivo: pedaço curto ou que não abre item é continuação, não assunto novo.
+ *
+ * `juntar` é o que volta entre dois pedaços remendados, para que o texto
+ * continue sendo o do edital.
+ */
+function agrupar(pedacos: string[], juntar: string, comecaItem: RegExp): string[] {
+	const partes: string[] = [];
+	let atual = '';
+
+	for (const pedaco of pedacos) {
+		if (!atual || !comecaItem.test(pedaco) || atual.length < MIN_TOPICO) {
+			atual = atual ? `${atual}${juntar}${pedaco}` : pedaco;
+			continue;
+		}
+
+		partes.push(atual);
+		atual = pedaco;
+	}
+
+	if (atual) {
+		// Uma sobra pequena demais para se sustentar pertence ao assunto anterior.
+		if (partes.length > 0 && atual.length < MIN_TOPICO) {
+			partes[partes.length - 1] = `${partes[partes.length - 1]}${juntar}${atual}`;
+		} else {
+			partes.push(atual);
+		}
+	}
+
+	return partes;
+}
+
+function pedacosDe(texto: string, separador: RegExp): string[] {
+	return texto
+		.split(separador)
+		.map((p) => p.trim())
+		.filter(Boolean);
+}
+
 /**
  * Split a prose ementa into topics.
  *
  * Some editais write "Conhecimentos Gerais" as flowing prose — a single stored
  * topic of 800+ characters — while the específicas arrive already itemised.
- * Sentence-final periods are the only reliable boundary in that prose, but a
- * period is also part of abbreviations, law numbers and initials, so this
- * splits only on a period that is followed by whitespace and an uppercase
- * letter, and refuses fragments that are too short to be a real topic.
+ *
+ * Dois separadores, nesta ordem:
+ *
+ *  1. O PONTO E VÍRGULA, e SÓ quando ele separa instrumentos normativos
+ *     ("Resolução nº 13/2016, que institui o CETI; Resolução nº 14/2024, que
+ *     dispõe sobre …"): cada lei é um assunto de estudo inteiro, e mantê-las
+ *     juntas vira um bloco só que o cronograma não tem como distribuir. Vem
+ *     antes do ponto final porque uma lista dessas é cheia de pontos que não
+ *     separam nada — número de lei, data.
+ *
+ *     O ponto e vírgula genérico NÃO divide. No edital ele quase sempre enumera
+ *     as partes de um mesmo assunto ("Constituição de 1988: Administração
+ *     Pública; fiscalização contábil, financeira; controle interno e externo"),
+ *     e dividir ali multiplicaria os tópicos até o cronograma ficar impossível
+ *     de percorrer.
+ *  2. O PONTO FINAL seguido de maiúscula, dentro de cada trecho: o único limite
+ *     confiável na prosa corrida, já que o ponto também é de abreviação.
  *
  * This is a *suggestion*: callers must show the result and let the user accept,
  * edit or reject it. Never rewrite stored data with it automatically.
@@ -97,34 +172,11 @@ export function sugerirTopicos(texto: string): string[] {
 	const base = texto.trim();
 	if (!base) return [];
 
-	const partes: string[] = [];
-	let atual = '';
+	const porFrase = (t: string) => agrupar(pedacosDe(t, /(?<=\.)\s+/), ' ', COMECA_FRASE);
 
-	// Split on ". " only where the next piece starts like a new sentence. A piece
-	// too short to be a topic on its own (an abbreviation, "Lei nº 8.666/93.")
-	// stays glued to the topic it belongs to instead of becoming one.
-	const MIN_TOPICO = 24;
-	const tokens = base.split(/(?<=\.)\s+/);
-	for (const token of tokens) {
-		const pedaco = token.trim();
-		if (!pedaco) continue;
-
-		const comecaFrase = /^[A-ZÀ-Þ]/.test(pedaco);
-		if (!atual || !comecaFrase || atual.length < MIN_TOPICO) {
-			atual = atual ? `${atual} ${pedaco}` : pedaco;
-			continue;
-		}
-		partes.push(atual.trim());
-		atual = pedaco;
-	}
-	if (atual.trim()) {
-		// A trailing fragment too small to stand alone belongs to the topic before it.
-		if (partes.length > 0 && atual.trim().length < MIN_TOPICO) {
-			partes[partes.length - 1] = `${partes[partes.length - 1]} ${atual.trim()}`;
-		} else {
-			partes.push(atual.trim());
-		}
-	}
+	const porPontoEVirgula = agrupar(pedacosDe(base, /;\s*/), '; ', COMECA_NORMATIVO);
+	const partes =
+		porPontoEVirgula.length > 1 ? porPontoEVirgula.flatMap(porFrase) : porFrase(base);
 
 	const limpos = partes.map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
 	// If the split produced nothing useful, keep the original as one topic.

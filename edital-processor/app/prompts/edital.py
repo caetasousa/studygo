@@ -226,8 +226,22 @@ CONTEUDO_INSTRUCTION = (
     "Cuidado para NÃO cortar no ponto de abreviações, números de lei ou datas "
     '("Lei nº 8.666/93", "Resolução nº 22, de 04/09/2008") — esses pontos não '
     "separam assuntos.\n"
-    "Mantenha junto o que o edital apresenta como um assunto só, mesmo que tenha "
-    "subdivisões internas com ponto e vírgula ou dois-pontos.\n"
+    "PONTO E VÍRGULA divide num caso só: quando ele separa INSTRUMENTOS "
+    "NORMATIVOS — lei, decreto, resolução, portaria, instrução normativa, "
+    "plano diretor —, cada um com sua descrição. Aí cada normativo é um "
+    "tópico, porque cada um é um assunto de estudo inteiro.\n"
+    'Exemplo que DIVIDE: "Resolução Normativa nº 13/2016, que institui o CETI; '
+    'Resolução Administrativa nº 14/2024, que dispõe sobre a Política de '
+    'Governança Organizacional" vira dois tópicos.\n'
+    "Fora desse caso o ponto e vírgula NÃO divide: no edital ele quase sempre "
+    "enumera as partes de um mesmo assunto, e dividir ali multiplicaria os "
+    "tópicos até o cronograma ficar impossível de percorrer.\n"
+    'Exemplos que NÃO dividem: "Constituição da República Federativa do Brasil '
+    'de 1988: Administração Pública; fiscalização contábil, financeira; '
+    'controle interno e controle externo" e "Princípios da segurança da '
+    'informação: confidencialidade; integridade; disponibilidade".\n'
+    "O mesmo vale para dois-pontos — mantenha junto o que o edital apresenta "
+    "como um assunto só.\n"
     "NÃO resuma nem modernize leis, versões ou tecnologias.\n"
     "NÃO misture o conteúdo de cargos diferentes.\n"
     "Retorne itens: [{ disciplina (exatamente como na lista), topicos: [string], "
