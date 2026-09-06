@@ -226,42 +226,6 @@ export function planoCorresponde(
 }
 
 /* ---------------------------------------------------------------------------
- * Display siglas
- *
- * A discipline's `codigo` is a technical identifier (D01, D02…) that keys
- * records, activities and reorderings — it must never change. But it says
- * nothing to a reader, and the schedule shows it on every activity chip.
- *
- * `sigla` derives a short mnemonic from the NAME, for display only:
- * "Raciocínio Lógico" → RL, "Banco de Dados" → BD, "Informática" → INF.
- * Nothing is keyed by it.
- * ------------------------------------------------------------------------- */
-
-/** Connectives and generic openers that carry no identity of their own. */
-const IGNORADAS = new Set([
-	'de','da','do','das','dos','e','em','a','o','as','os','para','com','no','na',
-	'nos','nas','nocoes','nocao','aplicada','aplicado','aplicadas','aplicados',
-	'geral','gerais','basica','basicas','basico','basicos','introducao','ao','aos'
-]);
-
-/** Folds the accented letters Portuguese uses down to ASCII. */
-function semAcento(s: string): string {
-	return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-
-function palavrasSignificativas(nome: string): string[] {
-	const cruas = semAcento(nome)
-		.toLowerCase()
-		.split(/[^a-z0-9]+/)
-		.filter(Boolean);
-
-	const boas = cruas.filter((p) => !IGNORADAS.has(p));
-
-	// A name made entirely of ignored words still has to yield something.
-	return boas.length > 0 ? boas : cruas;
-}
-
-/* ---------------------------------------------------------------------------
  * One activity's record
  *
  * The editing rules that the activity form and the store must agree on. Kept
