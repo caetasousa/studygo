@@ -461,3 +461,46 @@ func TestCasarPlanilha_NomeDaMateriaComparadoSemAcentoNemPontuacao(t *testing.T)
 		})
 	}
 }
+
+// O caso real: a planilha traz a TAG que o estudante escolheu na instalação de
+// origem ("PT"), e aqui o concurso foi recadastrado — os códigos são outros
+// ("LINPO"). O nome é o que atravessa entre as duas.
+//
+// Sem a segunda tentativa, a importação recusava a planilha inteira dizendo que
+// "Língua Portuguesa não é uma matéria deste concurso" para uma matéria que
+// está na tela.
+func TestCasarPlanilha_TagDeOutraInstalacaoCaiNoNome(t *testing.T) {
+	t.Parallel()
+
+	cur := cursoDeTeste() // códigos LINPO e BANDA
+	d1 := dia(2026, time.September, 1)
+	atividades := []plano.Atividade{atividade(cur, 0, d1, 0, "Crase")}
+
+	csv := cabecalho +
+		"1,01/09/2026,1,Conteúdo,est,PT,Língua Portuguesa,Crase,20,30,10,8,sim,\n" +
+		"1,01/09/2026,1,Conteúdo,est,BD,Banco de Dados,SQL,20,45,20,15,sim,\n"
+
+	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("LerPlanilha: %v", err)
+	}
+
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+
+	if len(res.Casadas) != 2 || len(res.Recusadas) != 0 {
+		t.Fatalf("casadas=%d recusadas=%+v", len(res.Casadas), res.Recusadas)
+	}
+
+	// A primeira achou a atividade que já existia; a segunda reconstruiu a dela.
+	if res.Casadas[0].Registro.AtividadeID != atividades[0].ID {
+		t.Error("a linha de Língua Portuguesa não foi para a atividade do dia")
+	}
+
+	if !res.Casadas[1].Criada || len(res.Novas) != 1 {
+		t.Fatalf("a linha de Banco de Dados devia reconstruir a atividade: %+v", res.Casadas[1])
+	}
+
+	if res.Novas[0].Disciplina != "BANDA" {
+		t.Errorf("a atividade nova ficou com o código %q, quer BANDA", res.Novas[0].Disciplina)
+	}
+}

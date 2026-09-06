@@ -322,10 +322,7 @@ func registroDaLinha(id uuid.UUID, l LinhaPlanilha) RegistroAtividade {
 // planilha traz o TIPO no lugar dela, que é o que o export escreve. Também
 // pode ter sido estudado, então também casa.
 func daMateria(doDia []Atividade, l LinhaPlanilha, cur concurso.Concurso) []Atividade {
-	codigo := strings.TrimSpace(l.Codigo)
-	if codigo == "" {
-		codigo = codigoPorNome(cur, l.Disciplina)
-	}
+	codigo := codigoDaLinha(cur, l)
 
 	out := make([]Atividade, 0, len(doDia))
 
@@ -368,16 +365,34 @@ func escolher(candidatas []Atividade, l LinhaPlanilha, usadas map[uuid.UUID]bool
 	return Atividade{}, false
 }
 
-// codigoPorNome acha a matéria pelo nome como ele veio na planilha — ou pelo
-// próprio código, quando foi ele que a coluna trouxe.
-func codigoPorNome(cur concurso.Concurso, nome string) string {
-	k := chave(nome)
+// codigoDaLinha resolve a matéria da linha para um código DESTE concurso.
+//
+// O código da planilha vem primeiro: é a identidade que o nome não é, e ele
+// sobrevive a renomear a matéria.
+//
+// Mas ele é a identidade daquela OUTRA instalação. Um concurso recadastrado
+// gera códigos novos, e a tag escolhida lá ("PT") não existe aqui ("LINPO") —
+// era o que fazia a importação recusar a planilha inteira dizendo que "Língua
+// Portuguesa não é uma matéria deste concurso" para uma matéria que está na
+// tela. Por isso o nome é a segunda tentativa: entre duas instalações do mesmo
+// edital, é ele que atravessa.
+func codigoDaLinha(cur concurso.Concurso, l LinhaPlanilha) string {
+	if c := codigoPorChave(cur, l.Codigo); c != "" {
+		return c
+	}
+
+	return codigoPorChave(cur, l.Disciplina)
+}
+
+// codigoPorChave acha a matéria cujo código OU nome bate com o texto dado.
+func codigoPorChave(cur concurso.Concurso, texto string) string {
+	k := chave(texto)
 	if k == "" {
 		return ""
 	}
 
 	for _, d := range cur.Disciplinas {
-		if chave(d.Nome) == k || chave(d.Codigo) == k {
+		if chave(d.Codigo) == k || chave(d.Nome) == k {
 			return d.Codigo
 		}
 	}
@@ -385,19 +400,16 @@ func codigoPorNome(cur concurso.Concurso, nome string) string {
 	return ""
 }
 
-// disciplinaDaLinha resolve a matéria da linha pelo código ou pelo nome.
+// disciplinaDaLinha é a matéria em si, para a atividade reconstruída apontar
+// para o id certo.
 func disciplinaDaLinha(l LinhaPlanilha, cur concurso.Concurso) *concurso.Disciplina {
-	codigo := strings.TrimSpace(l.Codigo)
-	if codigo == "" {
-		codigo = codigoPorNome(cur, l.Disciplina)
-	}
-
+	codigo := codigoDaLinha(cur, l)
 	if codigo == "" {
 		return nil
 	}
 
 	for i := range cur.Disciplinas {
-		if chave(cur.Disciplinas[i].Codigo) == chave(codigo) {
+		if cur.Disciplinas[i].Codigo == codigo {
 			return &cur.Disciplinas[i]
 		}
 	}
