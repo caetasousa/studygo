@@ -134,6 +134,10 @@ func (s *PlanilhaService) CSV(
 		return nil, err
 	}
 
+	if err := escreverMateriasCSV(w, c.Concurso, c.Plano.Config.Normalizar()); err != nil {
+		return nil, err
+	}
+
 	w.Flush()
 
 	if err := w.Error(); err != nil {
@@ -187,7 +191,10 @@ type ResultadoImportacao struct {
 	// Anotacoes são as entradas de caderno que a planilha traz e que ainda não
 	// existem aqui.
 	Anotacoes int
-	Gravadas  int
+	// Materias são as matérias cuja personalização a planilha atualiza: a tag, o
+	// link do caderno de erros e os ajustes de estudo.
+	Materias int
+	Gravadas int
 }
 
 // ImportarCSV traz os registros de uma planilha do plano.
@@ -235,11 +242,16 @@ func (s *PlanilhaService) ImportarCSV(
 
 	novasAnotacoes := plano.AnotacoesDaPlanilha(planilha.Caderno, anotacoes, c.Concurso)
 
+	// A personalização da matéria: a tag, o link do caderno de erros e os ajustes
+	// de estudo. É o trabalho que se perdia junto com o concurso.
+	ajustes := plano.AjustesDaPlanilha(planilha.Materias, c.Concurso, c.Plano.Config.Normalizar())
+
 	out := ResultadoImportacao{
 		Aplicadas: make([]LinhaImportada, 0, len(res.Casadas)),
 		Recusadas: make([]LinhaRecusada, 0, len(res.Recusadas)),
 		Criadas:   len(res.Novas),
 		Anotacoes: len(novasAnotacoes),
+		Materias:  len(ajustes),
 	}
 
 	registros := make([]plano.RegistroAtividade, 0, len(res.Casadas))
@@ -270,7 +282,7 @@ func (s *PlanilhaService) ImportarCSV(
 		return out, nil
 	}
 
-	if len(registros) == 0 && len(novasAnotacoes) == 0 {
+	if len(registros) == 0 && len(novasAnotacoes) == 0 && len(ajustes) == 0 {
 		// Sem nada para gravar há dois casos diferentes, e tratá-los igual seria
 		// mentir num deles: a planilha não casou com nada (erro de quem manda), ou
 		// o que ela traz já está aqui — reimportar o mesmo arquivo é inofensivo, e
@@ -306,9 +318,113 @@ func (s *PlanilhaService) ImportarCSV(
 		}
 	}
 
+	if err := s.aplicarAjustes(ctx, &c, ajustes); err != nil {
+		return ResultadoImportacao{}, err
+	}
+
 	out.Gravadas = len(registros)
 
 	return out, nil
+}
+
+// aplicarAjustes grava a personalização das matérias.
+//
+// A tag e o link moram na DISCIPLINA (são do concurso); questões, modo e
+// reforço moram no PLANO. São dois agregados e duas gravações — o que o domínio
+// já separava.
+func (s *PlanilhaService) aplicarAjustes(
+	ctx context.Context,
+	c *contexto,
+	ajustes []plano.AjusteDeMateria,
+) error {
+	if len(ajustes) == 0 {
+		return nil
+	}
+
+	cur := c.Concurso
+	cfg := c.Plano.Config.Normalizar()
+	mexeuNoConcurso, mexeuNoPlano := false, false
+
+	for _, a := range ajustes {
+		d := cur.DisciplinaPorID(a.DisciplinaID)
+		if d == nil {
+			continue
+		}
+
+		// Os ajustes do plano são indexados pelo código: eles são lidos com o
+		// código ANTIGO e regravados com o novo.
+		codigo := d.Codigo
+
+		if a.Codigo != "" {
+			d.Codigo = a.Codigo
+			mexeuNoConcurso = true
+		}
+
+		if a.CadernoURL != "" {
+			d.CadernoURL = a.CadernoURL
+			mexeuNoConcurso = true
+		}
+
+		if a.Questoes != nil {
+			cfg.Questoes[d.Codigo] = *a.Questoes
+			mexeuNoPlano = true
+		} else if d.Codigo != codigo {
+			cfg.Questoes[d.Codigo] = cfg.Questoes[codigo]
+		}
+
+		if a.Modo != nil {
+			cfg.Modos[d.Codigo] = *a.Modo
+			mexeuNoPlano = true
+		} else if d.Codigo != codigo {
+			cfg.Modos[d.Codigo] = cfg.ModoDe(codigo)
+		}
+
+		if a.Reforco != nil {
+			cfg.Reforcos[d.Codigo] = *a.Reforco
+			mexeuNoPlano = true
+		} else if d.Codigo != codigo {
+			cfg.Reforcos[d.Codigo] = cfg.ReforcoDe(codigo)
+		}
+
+		if d.Codigo != codigo {
+			delete(cfg.Questoes, codigo)
+			delete(cfg.Modos, codigo)
+			delete(cfg.Reforcos, codigo)
+
+			mexeuNoPlano = true
+		}
+	}
+
+	if mexeuNoConcurso {
+		cur.Normalizar()
+
+		if err := cur.Validar(); err != nil {
+			// A planilha não pode invalidar o cadastro: o histórico já entrou, e a
+			// personalização é o acessório. Quem a recusa é o domínio, e o estudante
+			// ajusta na tela de editar concurso.
+			return nil //nolint:nilerr // recusa da personalização não invalida a importação
+		}
+
+		atualizado, err := s.concursos.Atualizar(ctx, cur)
+		if err != nil {
+			return err
+		}
+
+		c.Concurso = atualizado
+	}
+
+	if mexeuNoPlano {
+		c.Plano.Config = cfg
+
+		p, err := s.planos.Salvar(ctx, c.Plano)
+		if err != nil {
+			return err
+		}
+
+		c.Plano = p
+	}
+
+	return nil
 }
 
 func linhaImportada(ca plano.LinhaCasada, nomes map[string]string) LinhaImportada {
@@ -338,6 +454,45 @@ func erroDePlanilha(err error) error {
 	}
 
 	return err
+}
+
+// escreverMateriasCSV grava a terceira tabela: o que o estudante personalizou
+// em cada matéria.
+//
+// A tag que ele escolheu, o link do caderno de erros dele (o do TEC, o do
+// Qconcursos, um documento) e os ajustes de estudo. Nada disso cabe nas linhas
+// do cronograma, e sem isso a planilha leva o histórico mas deixa para trás as
+// escolhas — que é o trabalho que ninguém quer refazer numa instalação nova.
+func escreverMateriasCSV(w *csv.Writer, cur concurso.Concurso, cfg plano.Config) error {
+	if len(cur.Disciplinas) == 0 {
+		return nil
+	}
+
+	if err := w.Write(nil); err != nil {
+		return err
+	}
+
+	if err := w.Write([]string{
+		"materia_codigo", "materia_nome", "materia_caderno",
+		"materia_questoes", "materia_modo", "materia_reforco",
+	}); err != nil {
+		return err
+	}
+
+	for _, d := range cur.Disciplinas {
+		if err := w.Write([]string{
+			d.Codigo,
+			d.Nome,
+			d.CadernoURL,
+			strconv.Itoa(cfg.Questoes[d.Codigo]),
+			string(cfg.ModoDe(d.Codigo)),
+			strconv.FormatFloat(cfg.ReforcoDe(d.Codigo), 'f', -1, 64),
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func escreverCadernoCSV(

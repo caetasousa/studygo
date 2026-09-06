@@ -122,6 +122,8 @@ export interface ImportacaoCSV {
 	criadas: number;
 	/** Quantas anotações de caderno a planilha traz e que ainda não existem aqui. */
 	anotacoes: number;
+	/** Quantas matérias recuperam a personalização: tag, link do caderno e ajustes. */
+	materias: number;
 	/** 0 na prévia; quantas linhas foram gravadas na importação confirmada. */
 	gravadas: number;
 }

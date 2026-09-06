@@ -451,3 +451,82 @@ func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
 		t.Errorf("a segunda importação duplicou o caderno: %d anotações", len(ce.caderno.anotacoes))
 	}
 }
+
+// A personalização da matéria — a tag escolhida, o link do caderno de erros do
+// estudante (o do TEC) e os ajustes de estudo — também viaja na planilha.
+//
+// Ela morava só na instalação de origem: quem exportava, excluía o concurso e
+// recadastrava perdia esse trabalho, porque o CSV levava o histórico e deixava
+// as escolhas para trás.
+func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	ce.obter(t)
+
+	link := "https://www.tecconcursos.com.br/questoes/caderno/123"
+	original := ce.concursos.c.Disciplinas[0]
+
+	// Na instalação de origem: tag própria, caderno do TEC e só questões.
+	ce.concursos.c.Disciplinas[0].Codigo = "PT"
+	ce.concursos.c.Disciplinas[0].CadernoURL = link
+
+	cfg := ce.planos.p.Config
+	cfg.Modos = map[string]plano.Modo{"PT": plano.ModoQuestoes}
+	cfg.Reforcos = map[string]float64{"PT": 2}
+	cfg.Questoes = map[string]int{"PT": 42}
+	ce.planos.p.Config = cfg
+
+	svc := NewPlanilhaService(ce.deps)
+
+	csv, err := svc.CSV(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("CSV: %v", err)
+	}
+
+	// A instalação nova: o concurso foi recadastrado, então a matéria voltou ao
+	// código automático, sem link e sem ajustes.
+	ce.concursos.c.Disciplinas[0].Codigo = original.Codigo
+	ce.concursos.c.Disciplinas[0].CadernoURL = ""
+	ce.planos.p.Config.Modos = map[string]plano.Modo{}
+	ce.planos.p.Config.Reforcos = map[string]float64{}
+	ce.planos.p.Config.Questoes = map[string]int{original.Codigo: 15}
+
+	res, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
+		CSV: string(csv), Confirmar: true,
+	})
+	if err != nil {
+		t.Fatalf("importar: %v", err)
+	}
+
+	if res.Materias == 0 {
+		t.Fatal("a personalização da matéria não foi reconhecida na planilha")
+	}
+
+	volta := ce.concursos.c.Disciplinas[0]
+
+	if volta.CadernoURL != link {
+		t.Errorf("caderno na volta = %q, quer %q", volta.CadernoURL, link)
+	}
+
+	if volta.Codigo != "PT" {
+		t.Errorf("tag na volta = %q, quer PT", volta.Codigo)
+	}
+
+	if volta.ID != original.ID {
+		t.Error("a matéria trocou de identidade")
+	}
+
+	if got := ce.planos.p.Config.ModoDe("PT"); got != plano.ModoQuestoes {
+		t.Errorf("modo na volta = %q, quer %q", got, plano.ModoQuestoes)
+	}
+
+	if got := ce.planos.p.Config.ReforcoDe("PT"); got != 2 {
+		t.Errorf("reforço na volta = %v, quer 2", got)
+	}
+
+	if got := ce.planos.p.Config.Questoes["PT"]; got != 42 {
+		t.Errorf("questões na volta = %d, quer 42", got)
+	}
+}

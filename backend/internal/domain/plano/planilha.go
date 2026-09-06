@@ -54,6 +54,22 @@ type LinhaPlanilha struct {
 type Planilha struct {
 	Registros []LinhaPlanilha
 	Caderno   []LinhaCaderno
+	Materias  []LinhaMateria
+}
+
+// LinhaMateria é a personalização de uma matéria: a tag que o estudante
+// escolheu, o link do caderno de erros dele e os ajustes de estudo.
+//
+// É o trabalho que ninguém quer refazer numa instalação nova — e que se perdia
+// junto com o concurso, porque a planilha não o levava.
+type LinhaMateria struct {
+	Numero     int
+	Codigo     string
+	Nome       string
+	CadernoURL string
+	Questoes   *int
+	Modo       string
+	Reforco    *float64
 }
 
 // LinhaCaderno é uma anotação do caderno de erros, como a planilha a traz.
@@ -122,6 +138,16 @@ var colunas = map[string][]string{
 	"concluido":  {"concluido", "concluído", "feito"},
 }
 
+// colunasMateria são as da terceira tabela do export.
+var colunasMateria = map[string][]string{
+	"codigo":   {"materiacodigo"},
+	"nome":     {"materianome"},
+	"caderno":  {"materiacaderno"},
+	"questoes": {"materiaquestoes"},
+	"modo":     {"materiamodo"},
+	"reforco":  {"materiareforco"},
+}
+
 // colunasCaderno são as da segunda tabela do export. O prefixo existe para que
 // as duas tabelas convivam no mesmo arquivo sem ambiguidade de cabeçalho.
 var colunasCaderno = map[string][]string{
@@ -159,34 +185,72 @@ func LerPlanilha(r io.Reader) (Planilha, error) {
 		return Planilha{}, fmt.Errorf("%w: não consegui ler o CSV: %s", ErrPlanilhaIlegivel, err)
 	}
 
-	out := Planilha{Registros: []LinhaPlanilha{}, Caderno: []LinhaCaderno{}}
+	out := Planilha{Registros: []LinhaPlanilha{}, Caderno: []LinhaCaderno{}, Materias: []LinhaMateria{}}
 
-	if inicio, idx := acharCabecalho(linhas, colunas, "disciplina", "codigo"); idx != nil {
-		for i := inicio + 1; i < len(linhas); i++ {
-			// A linha em branco encerra a tabela: o que vem depois é o caderno.
-			if vazia(linhas[i]) {
-				break
+	// Onde cada tabela começa.
+	//
+	// As três são achadas ANTES de qualquer uma ser lida, porque é o cabeçalho da
+	// seguinte que marca o fim da anterior. A linha em branco que o export
+	// escreve entre elas não serve: o leitor de CSV descarta linha vazia, e sem
+	// esta varredura a tabela do caderno seguia lendo as linhas de matéria como
+	// se fossem anotações.
+	rr, idxRegistros := acharCabecalho(linhas, colunas, func(idx map[string]int) bool {
+		return tem(idx, "data") && (tem(idx, "disciplina") || tem(idx, "codigo"))
+	})
+
+	rc, idxCaderno := acharCabecalho(linhas, colunasCaderno, func(idx map[string]int) bool {
+		return tem(idx, "data", "texto")
+	})
+
+	rm, idxMaterias := acharCabecalho(linhas, colunasMateria, func(idx map[string]int) bool {
+		return tem(idx, "codigo") || tem(idx, "nome")
+	})
+
+	inicios := []int{}
+
+	for pos, idx := range map[int]map[string]int{rr: idxRegistros, rc: idxCaderno, rm: idxMaterias} {
+		if idx != nil {
+			inicios = append(inicios, pos)
+		}
+	}
+
+	fim := func(inicio int) int {
+		ate := len(linhas)
+
+		for _, p := range inicios {
+			if p > inicio && p < ate {
+				ate = p
 			}
+		}
 
-			if l, ok := linhaDaPlanilha(linhas[i], idx, i+1); ok {
+		return ate
+	}
+
+	if idxRegistros != nil {
+		for i := rr + 1; i < fim(rr); i++ {
+			if l, ok := linhaDaPlanilha(linhas[i], idxRegistros, i+1); ok {
 				out.Registros = append(out.Registros, l)
 			}
 		}
 	}
 
-	if inicio, idx := acharCabecalho(linhas, colunasCaderno, "texto"); idx != nil {
-		for i := inicio + 1; i < len(linhas); i++ {
-			if vazia(linhas[i]) {
-				break
-			}
-
-			if l, ok := linhaDoCaderno(linhas[i], idx, i+1); ok {
+	if idxCaderno != nil {
+		for i := rc + 1; i < fim(rc); i++ {
+			if l, ok := linhaDoCaderno(linhas[i], idxCaderno, i+1); ok {
 				out.Caderno = append(out.Caderno, l)
 			}
 		}
 	}
 
-	if len(out.Registros) == 0 && len(out.Caderno) == 0 {
+	if idxMaterias != nil {
+		for i := rm + 1; i < fim(rm); i++ {
+			if l, ok := linhaDaMateria(linhas[i], idxMaterias, i+1); ok {
+				out.Materias = append(out.Materias, l)
+			}
+		}
+	}
+
+	if len(out.Registros) == 0 && len(out.Caderno) == 0 && len(out.Materias) == 0 {
 		return Planilha{}, fmt.Errorf(
 			"%w: não achei nem estudo lançado nem anotações de caderno nesta planilha "+
 				"— exporte o CSV do plano e importe esse arquivo",
@@ -195,6 +259,26 @@ func LerPlanilha(r io.Reader) (Planilha, error) {
 	}
 
 	return out, nil
+}
+
+// linhaDaMateria lê a personalização de uma matéria. Sem código nem nome não há
+// como saber de quem ela fala.
+func linhaDaMateria(rec []string, idx map[string]int, numero int) (LinhaMateria, bool) {
+	l := LinhaMateria{
+		Numero:     numero,
+		Codigo:     strings.TrimSpace(campo(rec, idx, "codigo")),
+		Nome:       strings.TrimSpace(campo(rec, idx, "nome")),
+		CadernoURL: strings.TrimSpace(campo(rec, idx, "caderno")),
+		Questoes:   inteiroOuNil(campo(rec, idx, "questoes")),
+		Modo:       strings.TrimSpace(campo(rec, idx, "modo")),
+		Reforco:    floatOuNil(campo(rec, idx, "reforco")),
+	}
+
+	if l.Codigo == "" && l.Nome == "" {
+		return LinhaMateria{}, false
+	}
+
+	return l, true
 }
 
 // linhaDoCaderno lê uma anotação. Sem texto não há anotação: a linha é sobra.
@@ -490,29 +574,31 @@ func materiaDaLinha(l LinhaPlanilha) string {
 // necessariamente a primeira: o arquivo tem duas tabelas, e uma planilha
 // editada à mão costuma ganhar um título em cima.
 //
-// `essenciais` são as colunas sem as quais aquela tabela não é ela mesma —
-// basta uma delas, porque a tabela de cronograma identifica a matéria pelo
-// código ou pelo nome, tanto faz qual venha.
+// `serve` decide se aquele conjunto de colunas é a tabela procurada — cada uma
+// tem a sua exigência, e a do cronograma aceita o código OU o nome da matéria.
 func acharCabecalho(
 	linhas [][]string,
 	nomes map[string][]string,
-	essenciais ...string,
+	serve func(map[string]int) bool,
 ) (int, map[string]int) {
 	for i, rec := range linhas {
-		idx := mapearColunas(rec, nomes)
-
-		if _, temData := idx["data"]; !temData {
-			continue
-		}
-
-		for _, e := range essenciais {
-			if _, tem := idx[e]; tem {
-				return i, idx
-			}
+		if idx := mapearColunas(rec, nomes); serve(idx) {
+			return i, idx
 		}
 	}
 
 	return 0, nil
+}
+
+// tem diz se o cabeçalho trouxe aquela coluna.
+func tem(idx map[string]int, campos ...string) bool {
+	for _, c := range campos {
+		if _, ok := idx[c]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 func mapearColunas(cabecalho []string, nomes map[string][]string) map[string]int {
@@ -699,16 +785,6 @@ func boolOuNil(s string) *bool {
 	return nil
 }
 
-func vazia(rec []string) bool {
-	for _, c := range rec {
-		if strings.TrimSpace(c) != "" {
-			return false
-		}
-	}
-
-	return true
-}
-
 // separadorDe descobre se a planilha usa vírgula ou ponto e vírgula. O Excel em
 // português salva com ponto e vírgula, e é dele que vem a maioria dos arquivos.
 func separadorDe(texto string) rune {
@@ -780,4 +856,81 @@ func assinaturaDaAnotacao(a Anotacao) string {
 	}
 
 	return strings.Join([]string{data, disciplina, chave(a.Tema), chave(a.Texto)}, "\x00")
+}
+
+// AjusteDeMateria é a personalização de uma matéria pronta para ser aplicada.
+type AjusteDeMateria struct {
+	DisciplinaID uuid.UUID
+	// Codigo é a tag da planilha, já normalizada, quando ela ainda não é a tag
+	// desta matéria e não está ocupada por outra.
+	Codigo     string
+	CadernoURL string
+	Questoes   *int
+	Modo       *Modo
+	Reforco    *float64
+}
+
+// AjustesDaPlanilha casa a personalização da planilha com as matérias daqui.
+//
+// Só devolve o que MUDA: uma tag que já é a mesma, ou um caderno que já está
+// gravado, não viram escrita. E a tag só entra se estiver livre — duas matérias
+// com a mesma tag mostrariam o mesmo chip, e o cadastro recusaria o concurso
+// inteiro por causa de uma linha de planilha.
+func AjustesDaPlanilha(
+	linhas []LinhaMateria,
+	cur concurso.Concurso,
+	cfg Config,
+) []AjusteDeMateria {
+	// As tags em uso aqui, para não criar colisão.
+	usadas := make(map[string]bool, len(cur.Disciplinas))
+	for _, d := range cur.Disciplinas {
+		usadas[chave(d.Codigo)] = true
+	}
+
+	out := []AjusteDeMateria{}
+
+	for _, l := range linhas {
+		d := disciplinaDaLinha(LinhaPlanilha{Codigo: l.Codigo, Disciplina: l.Nome}, cur)
+		if d == nil {
+			continue
+		}
+
+		ajuste := AjusteDeMateria{DisciplinaID: d.ID}
+		mudou := false
+
+		if tag := concurso.NormalizarCodigo(l.Codigo); tag != "" && tag != d.Codigo && !usadas[chave(tag)] {
+			usadas[chave(tag)] = true
+			ajuste.Codigo = tag
+			mudou = true
+		}
+
+		if l.CadernoURL != "" && l.CadernoURL != d.CadernoURL {
+			ajuste.CadernoURL = l.CadernoURL
+			mudou = true
+		}
+
+		if l.Questoes != nil && *l.Questoes != cfg.Questoes[d.Codigo] {
+			ajuste.Questoes = l.Questoes
+			mudou = true
+		}
+
+		if m := Modo(strings.ToLower(l.Modo)); m != "" && m != cfg.ModoDe(d.Codigo) {
+			if m == ModoCompleto || m == ModoQuestoes || m == ModoTeoria {
+				ajuste.Modo = &m
+				mudou = true
+			}
+		}
+
+		if l.Reforco != nil && *l.Reforco >= ReforcoMin && *l.Reforco <= ReforcoMax &&
+			*l.Reforco != cfg.ReforcoDe(d.Codigo) {
+			ajuste.Reforco = l.Reforco
+			mudou = true
+		}
+
+		if mudou {
+			out = append(out, ajuste)
+		}
+	}
+
+	return out
 }

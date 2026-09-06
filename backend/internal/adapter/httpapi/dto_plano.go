@@ -156,7 +156,10 @@ type importacaoDTO struct {
 	Criadas int `json:"criadas"`
 	// Anotacoes: quantas entradas de caderno de erros entram junto.
 	Anotacoes int `json:"anotacoes"`
-	Gravadas  int `json:"gravadas"`
+	// Materias: quantas matérias recuperam a personalização (tag, link do
+	// caderno e ajustes de estudo).
+	Materias int `json:"materias"`
+	Gravadas int `json:"gravadas"`
 }
 
 type linhaImportadaDTO struct {
@@ -184,6 +187,7 @@ func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
 		Recusadas: make([]linhaRecusadaDTO, 0, len(r.Recusadas)),
 		Criadas:   r.Criadas,
 		Anotacoes: r.Anotacoes,
+		Materias:  r.Materias,
 		Gravadas:  r.Gravadas,
 	}
 

@@ -102,7 +102,9 @@
 <h2 class="sec">Importar de uma planilha</h2>
 <p class="page-sub" style="margin-top:0">
 	Envie o CSV exportado de outro plano: voltam o <b>estudo lançado</b> — tempo,
-	questões, acertos e conclusão — e as <b>anotações do caderno de erros</b>.
+	questões, acertos e conclusão —, as <b>anotações do caderno de erros</b> e a
+	<b>personalização de cada matéria</b>: a tag, o link do seu caderno (TEC,
+	Qconcursos, um documento) e os ajustes de estudo.
 </p>
 <p class="page-sub" style="margin-top:0">
 	O cronograma à frente não muda. Um dia que já passou e não tem a matéria da planilha
@@ -131,6 +133,12 @@
 					<i>{resultado.anotacoes === 1 ? 'anotação no caderno' : 'anotações no caderno'}</i>
 				</span>
 			{/if}
+			{#if resultado.materias > 0}
+				<span class="num">
+					<b>{resultado.materias}</b>
+					<i>{resultado.materias === 1 ? 'matéria restaurada' : 'matérias restauradas'}</i>
+				</span>
+			{/if}
 			{#if resultado.recusadas.length > 0}
 				<span class="num fora">
 					<b>{resultado.recusadas.length}</b>
@@ -156,6 +164,12 @@
 			<span class="num">
 				<b>{previa.anotacoes}</b>
 				<i>{previa.anotacoes === 1 ? 'anotação no caderno' : 'anotações no caderno'}</i>
+			</span>
+		{/if}
+		{#if previa.materias > 0}
+			<span class="num">
+				<b>{previa.materias}</b>
+				<i>{previa.materias === 1 ? 'matéria restaurada' : 'matérias restauradas'}</i>
 			</span>
 		{/if}
 		{#if previa.recusadas.length > 0}
