@@ -177,8 +177,8 @@ func TestPlanilha_ImportarRecusaArquivoIlegivel(t *testing.T) {
 		t.Fatalf("erro = %v, esperava uma recusa de validação", err)
 	}
 
-	if !strings.Contains(validacao.Msg, "colunas") {
-		t.Errorf("mensagem = %q, devia dizer o que falta na planilha", validacao.Msg)
+	if !strings.Contains(validacao.Msg, "exporte o CSV do plano") {
+		t.Errorf("mensagem = %q, devia dizer o que fazer em seguida", validacao.Msg)
 	}
 }
 
@@ -378,5 +378,76 @@ func TestSalvar_OutraMudancaDeDataNaoRessuscitaODiaPerdido(t *testing.T) {
 
 	if doDia := plano.AtividadesDoDia(ce.cronograma.atividades, perdido); len(doDia) != 0 {
 		t.Errorf("o dia perdido voltou a ter %d atividades", len(doDia))
+	}
+}
+
+// O caderno de erros é a outra metade do arquivo. Sem ele o histórico volta
+// como número, e o raciocínio — o motivo de cada erro — fica para trás.
+func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	p := ce.obter(t)
+
+	// Uma anotação como a de quem estudou: matéria, tema e o que escapou.
+	data := dataDe(t, diasDeEstudo(p)[0].Data)
+	disciplina := ce.concursos.c.Disciplinas[0]
+
+	if _, err := ce.caderno.CriarAnotacao(ctx, ce.planos.p.ID, plano.Anotacao{
+		Data:         &data,
+		DisciplinaID: &disciplina.ID,
+		Tema:         "Crase",
+		Texto:        "errei a crase antes de pronome",
+		Origem:       plano.OrigemManual,
+	}); err != nil {
+		t.Fatalf("CriarAnotacao: %v", err)
+	}
+
+	svc := NewPlanilhaService(ce.deps)
+
+	csv, err := svc.CSV(ctx, ce.usuario, ce.slug)
+	if err != nil {
+		t.Fatalf("CSV: %v", err)
+	}
+
+	// A instalação nova: mesmo concurso, caderno em branco.
+	ce.caderno.anotacoes = nil
+
+	res, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
+		CSV: string(csv), Confirmar: true,
+	})
+	if err != nil {
+		t.Fatalf("importar: %v", err)
+	}
+
+	if res.Anotacoes != 1 {
+		t.Fatalf("anotações importadas = %d, quer 1", res.Anotacoes)
+	}
+
+	if len(ce.caderno.anotacoes) != 1 {
+		t.Fatalf("o caderno ficou com %d anotações", len(ce.caderno.anotacoes))
+	}
+
+	volta := ce.caderno.anotacoes[0]
+
+	if volta.Texto != "errei a crase antes de pronome" || volta.Tema != "Crase" {
+		t.Errorf("anotação na volta = %+v", volta)
+	}
+
+	if volta.DisciplinaID == nil || *volta.DisciplinaID != disciplina.ID {
+		t.Error("a anotação perdeu a matéria")
+	}
+
+	// Importar o mesmo arquivo de novo não pode duplicar o caderno.
+	repetida, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
+		CSV: string(csv), Confirmar: true,
+	})
+	if err != nil {
+		t.Fatalf("segunda importação: %v", err)
+	}
+
+	if repetida.Anotacoes != 0 || len(ce.caderno.anotacoes) != 1 {
+		t.Errorf("a segunda importação duplicou o caderno: %d anotações", len(ce.caderno.anotacoes))
 	}
 }

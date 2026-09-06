@@ -9,7 +9,6 @@ import (
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
-	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )
@@ -25,12 +24,10 @@ import (
 // deve ser ensinada.
 type PlanilhaService struct {
 	carregador
-
-	repo port.CadernoRepository
 }
 
 func NewPlanilhaService(deps Dependencias) *PlanilhaService {
-	return &PlanilhaService{carregador: deps.carregador(), repo: deps.Caderno}
+	return &PlanilhaService{deps.carregador()}
 }
 
 func (s *PlanilhaService) CSV(
@@ -128,7 +125,7 @@ func (s *PlanilhaService) CSV(
 		}
 	}
 
-	anotacoes, err := s.repo.Anotacoes(ctx, c.Plano.ID)
+	anotacoes, err := s.caderno.Anotacoes(ctx, c.Plano.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +184,9 @@ type ResultadoImportacao struct {
 	Aplicadas []LinhaImportada
 	Recusadas []LinhaRecusada
 	Criadas   int
+	// Anotacoes são as entradas de caderno que a planilha traz e que ainda não
+	// existem aqui.
+	Anotacoes int
 	Gravadas  int
 }
 
@@ -207,7 +207,7 @@ func (s *PlanilhaService) ImportarCSV(
 		return ResultadoImportacao{}, err
 	}
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(cmd.CSV))
+	planilha, err := plano.LerPlanilha(strings.NewReader(cmd.CSV))
 	if err != nil {
 		return ResultadoImportacao{}, erroDePlanilha(err)
 	}
@@ -216,7 +216,7 @@ func (s *PlanilhaService) ImportarCSV(
 	// plano até hoje, e só nos dias que o plano de fato estuda.
 	dias := plano.Gerar(c.Plano.Config, &c.Concurso).Dias
 
-	res := plano.CasarPlanilha(c.Atividades, dias, linhas, c.Concurso, plano.JanelaDaPlanilha{
+	res := plano.CasarPlanilha(c.Atividades, dias, planilha.Registros, c.Concurso, plano.JanelaDaPlanilha{
 		Inicio: plano.DayOf(c.Plano.Config.Inicio),
 		Hoje:   plano.DayOf(s.relogio.Now()),
 	})
@@ -226,10 +226,20 @@ func (s *PlanilhaService) ImportarCSV(
 		nomes[d.Codigo] = d.Nome
 	}
 
+	// O caderno de erros é a outra metade do arquivo: sem as anotações, o
+	// histórico volta como número e o raciocínio fica para trás.
+	anotacoes, err := s.caderno.Anotacoes(ctx, c.Plano.ID)
+	if err != nil {
+		return ResultadoImportacao{}, err
+	}
+
+	novasAnotacoes := plano.AnotacoesDaPlanilha(planilha.Caderno, anotacoes, c.Concurso)
+
 	out := ResultadoImportacao{
 		Aplicadas: make([]LinhaImportada, 0, len(res.Casadas)),
 		Recusadas: make([]LinhaRecusada, 0, len(res.Recusadas)),
 		Criadas:   len(res.Novas),
+		Anotacoes: len(novasAnotacoes),
 	}
 
 	registros := make([]plano.RegistroAtividade, 0, len(res.Casadas))
@@ -260,10 +270,18 @@ func (s *PlanilhaService) ImportarCSV(
 		return out, nil
 	}
 
-	if len(registros) == 0 {
-		return out, erroDeValidacao(
-			"nenhuma linha da planilha casou com o cronograma deste plano",
-		)
+	if len(registros) == 0 && len(novasAnotacoes) == 0 {
+		// Sem nada para gravar há dois casos diferentes, e tratá-los igual seria
+		// mentir num deles: a planilha não casou com nada (erro de quem manda), ou
+		// o que ela traz já está aqui — reimportar o mesmo arquivo é inofensivo, e
+		// dizer "0 linhas" é a resposta certa.
+		if len(res.Recusadas) > 0 {
+			return out, erroDeValidacao(
+				"nenhuma linha da planilha casou com o cronograma deste plano",
+			)
+		}
+
+		return out, nil
 	}
 
 	// As atividades reconstruídas entram ANTES dos registros: um registro é
@@ -280,6 +298,12 @@ func (s *PlanilhaService) ImportarCSV(
 
 	if err := s.cronograma.SalvarRegistros(ctx, c.Plano.ID, registros); err != nil {
 		return ResultadoImportacao{}, err
+	}
+
+	for _, a := range novasAnotacoes {
+		if _, err := s.caderno.CriarAnotacao(ctx, c.Plano.ID, a); err != nil {
+			return ResultadoImportacao{}, err
+		}
 	}
 
 	out.Gravadas = len(registros)

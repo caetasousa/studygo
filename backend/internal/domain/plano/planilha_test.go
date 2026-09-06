@@ -71,16 +71,16 @@ func TestLerPlanilha_LeAsColunasDoExport(t *testing.T) {
 	csv := "\ufeff" + cabecalho +
 		"1,01/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,45,10,8,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	if len(linhas) != 1 {
-		t.Fatalf("li %d linhas, quer 1", len(linhas))
+	if len(planilha.Registros) != 1 {
+		t.Fatalf("li %d planilha.Registros, quer 1", len(planilha.Registros))
 	}
 
-	l := linhas[0]
+	l := planilha.Registros[0]
 
 	if !l.Data.Equal(dia(2026, time.September, 1)) {
 		t.Errorf("data = %v", l.Data)
@@ -116,13 +116,13 @@ func TestLerPlanilha_AceitaHorasComoVeioAntes(t *testing.T) {
 	csv := "data;disciplina;horas;questoes;acertos\n" +
 		"01/09/2026;Língua Portuguesa;1,5;10;8\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	if linhas[0].Minutos == nil || *linhas[0].Minutos != 90 {
-		t.Errorf("minutos = %v, quer 90", linhas[0].Minutos)
+	if planilha.Registros[0].Minutos == nil || *planilha.Registros[0].Minutos != 90 {
+		t.Errorf("minutos = %v, quer 90", planilha.Registros[0].Minutos)
 	}
 }
 
@@ -137,13 +137,13 @@ func TestLerPlanilha_ParaNoCaderno(t *testing.T) {
 		"caderno_data,caderno_disciplina,caderno_tema,caderno_texto,caderno_origem,caderno_resolvido\n" +
 		"02/09/2026,Língua Portuguesa,Crase,errei feio,manual,não\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	if len(linhas) != 1 {
-		t.Fatalf("li %d linhas, quer 1 — o caderno entrou junto", len(linhas))
+	if len(planilha.Registros) != 1 {
+		t.Fatalf("li %d planilha.Registros, quer 1 — o caderno entrou junto", len(planilha.Registros))
 	}
 }
 
@@ -160,13 +160,13 @@ func TestLerPlanilha_IgnoraLinhaSemLancamento(t *testing.T) {
 		"1,01/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Crase,20,,,,não,\n" +
 		"2,02/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,SQL,20,30,,,não,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	if len(linhas) != 1 || linhas[0].Codigo != "BANDA" {
-		t.Fatalf("li %+v, quer só a linha do BANDA", linhas)
+	if len(planilha.Registros) != 1 || planilha.Registros[0].Codigo != "BANDA" {
+		t.Fatalf("li %+v, quer só a linha do BANDA", planilha.Registros)
 	}
 }
 
@@ -185,12 +185,12 @@ func TestCasarPlanilha_CasaODiaFixoPeloTipo(t *testing.T) {
 	csv := cabecalho +
 		"1,01/09/2026,1,Reta final,sim,,simulado,Simulado completo,120,240,120,90,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha([]plano.Atividade{simulado}, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha([]plano.Atividade{simulado}, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 1 {
 		t.Fatalf("casadas = %d (recusadas: %+v), quer 1", len(res.Casadas), res.Recusadas)
@@ -222,12 +222,12 @@ func TestCasarPlanilha_CasaPorDiaEMateria(t *testing.T) {
 	csv := cabecalho +
 		"1,01/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,SQL,20,60,20,15,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 1 || len(res.Recusadas) != 0 {
 		t.Fatalf("casadas=%d recusadas=%d", len(res.Casadas), len(res.Recusadas))
@@ -247,7 +247,7 @@ func TestCasarPlanilha_CasaPorDiaEMateria(t *testing.T) {
 	}
 }
 
-// Um dia que agenda a mesma matéria duas vezes tem duas linhas, e o tema diz
+// Um dia que agenda a mesma matéria duas vezes tem duas planilha.Registros, e o tema diz
 // qual é qual.
 func TestCasarPlanilha_TemaDesempataOcorrencias(t *testing.T) {
 	t.Parallel()
@@ -263,12 +263,12 @@ func TestCasarPlanilha_TemaDesempataOcorrencias(t *testing.T) {
 		"1,01/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,SQL,20,30,10,9,sim,\n" +
 		"1,01/09/2026,1,Conteúdo,est,BANDA,Banco de Dados,Modelagem,20,40,5,5,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 2 {
 		t.Fatalf("casadas = %d, quer 2", len(res.Casadas))
@@ -300,12 +300,12 @@ func TestCasarPlanilha_ReconstroiODiaQueFaltava(t *testing.T) {
 		// dia que o plano não tem atividade nenhuma
 		"2,03/09/2026,1,Conteúdo,est,LINPO,Língua Portuguesa,Regência,20,45,,,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 2 || len(res.Recusadas) != 0 {
 		t.Fatalf("casadas=%d recusadas=%+v", len(res.Casadas), res.Recusadas)
@@ -351,12 +351,12 @@ func TestCasarPlanilha_RecusaForaDaJanela(t *testing.T) {
 		// matéria que não existe neste concurso
 		"3,03/09/2026,1,Conteúdo,est,,Astronomia,Estrelas,20,30,,,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 0 || len(res.Novas) != 0 {
 		t.Fatalf("nada devia entrar: casadas=%d novas=%d", len(res.Casadas), len(res.Novas))
@@ -390,12 +390,12 @@ func TestCasarPlanilha_SemColunaDeConclusao(t *testing.T) {
 
 	csv := "data,disciplina,minutos\n01/09/2026,Língua Portuguesa,50\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 1 || !res.Casadas[0].Registro.Concluido {
 		t.Fatalf("resultado = %+v, quer uma linha concluída", res)
@@ -442,14 +442,14 @@ func TestCasarPlanilha_NomeDaMateriaComparadoSemAcentoNemPontuacao(t *testing.T)
 			csv := "data,disciplina,tema,minutos,concluido\n" +
 				"01/09/2026," + tt.nome + ",Crase,45,sim\n"
 
-			linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+			planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 			if err != nil {
 				t.Fatalf("LerPlanilha: %v", err)
 			}
 
 			atividades := []plano.Atividade{atividade(cur, 0, d1, 0, "Crase")}
 
-			res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+			res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 			if len(res.Casadas) != 1 {
 				t.Fatalf("casadas = %d (recusadas: %+v), quer 1", len(res.Casadas), res.Recusadas)
@@ -480,12 +480,12 @@ func TestCasarPlanilha_TagDeOutraInstalacaoCaiNoNome(t *testing.T) {
 		"1,01/09/2026,1,Conteúdo,est,PT,Língua Portuguesa,Crase,20,30,10,8,sim,\n" +
 		"1,01/09/2026,1,Conteúdo,est,BD,Banco de Dados,SQL,20,45,20,15,sim,\n"
 
-	linhas, err := plano.LerPlanilha(strings.NewReader(csv))
+	planilha, err := plano.LerPlanilha(strings.NewReader(csv))
 	if err != nil {
 		t.Fatalf("LerPlanilha: %v", err)
 	}
 
-	res := plano.CasarPlanilha(atividades, diasDoPlano(), linhas, cur, janela())
+	res := plano.CasarPlanilha(atividades, diasDoPlano(), planilha.Registros, cur, janela())
 
 	if len(res.Casadas) != 2 || len(res.Recusadas) != 0 {
 		t.Fatalf("casadas=%d recusadas=%+v", len(res.Casadas), res.Recusadas)

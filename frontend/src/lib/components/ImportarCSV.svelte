@@ -59,6 +59,17 @@
 	}
 
 	async function confirmar() {
+		if (!previa) return;
+
+		// Importar grava por cima do que já estiver lançado naquelas matérias:
+		// é escrita em dado do estudante, e escrita em dado se pergunta antes.
+		const aviso =
+			`Importar ${previa.aplicadas.length} ` +
+			`${previa.aplicadas.length === 1 ? 'linha' : 'linhas'}? ` +
+			'O que já estiver lançado nessas matérias será substituído.';
+
+		if (!confirm(aviso)) return;
+
 		ocupado = true;
 		erro = null;
 
@@ -88,47 +99,71 @@
 	}
 </script>
 
-<h2 class="sec">Importar registros de uma planilha</h2>
+<h2 class="sec">Importar de uma planilha</h2>
 <p class="page-sub" style="margin-top:0">
-	Exporte o CSV do outro plano e envie aqui: volta só o que foi <b>estudado</b> — tempo,
-	questões, acertos e conclusão. Cada linha procura a matéria daquele dia; quando o dia
-	já passou e a matéria não está lá, a atividade é <b>reconstruída</b> a partir da
-	planilha, porque é ela que sabe o que aconteceu. O cronograma futuro não é tocado, e
-	o que não achar onde entrar é listado com o motivo, não gravado.
+	Envie o CSV exportado de outro plano: voltam o <b>estudo lançado</b> — tempo,
+	questões, acertos e conclusão — e as <b>anotações do caderno de erros</b>.
+</p>
+<p class="page-sub" style="margin-top:0">
+	O cronograma à frente não muda. Um dia que já passou e não tem a matéria da planilha
+	é reconstruído a partir dela, que é quem sabe o que aconteceu; o que não achar onde
+	entrar aparece com o motivo e não é gravado.
 </p>
 
 {#if erro}<div class="form-error" style="margin-bottom:12px">{erro}</div>{/if}
 
 {#if resultado}
-	<div class="callout">
-		<span class="em"><NavIcon name="info" /></span>
-		<div>
-			<b>{resultado.gravadas}</b>
-			{resultado.gravadas === 1 ? 'linha importada' : 'linhas importadas'}{#if resultado.criadas > 0}, {resultado.criadas}
-				com a atividade reconstruída no dia{/if}.
-			{#if resultado.recusadas.length > 0}
-				{resultado.recusadas.length} ficaram de fora.
+	<div class="fim">
+		<div class="numeros">
+			<span class="num">
+				<b>{resultado.gravadas}</b>
+				<i>{resultado.gravadas === 1 ? 'linha importada' : 'linhas importadas'}</i>
+			</span>
+			{#if resultado.criadas > 0}
+				<span class="num">
+					<b>{resultado.criadas}</b>
+					<i>{resultado.criadas === 1 ? 'dia reconstruído' : 'dias reconstruídos'}</i>
+				</span>
 			{/if}
-			<button class="btn" style="margin-top:8px" onclick={limpar}>Importar outra</button>
+			{#if resultado.anotacoes > 0}
+				<span class="num">
+					<b>{resultado.anotacoes}</b>
+					<i>{resultado.anotacoes === 1 ? 'anotação no caderno' : 'anotações no caderno'}</i>
+				</span>
+			{/if}
+			{#if resultado.recusadas.length > 0}
+				<span class="num fora">
+					<b>{resultado.recusadas.length}</b>
+					<i>de fora</i>
+				</span>
+			{/if}
 		</div>
+		<button class="btn" onclick={limpar}>Importar outra</button>
 	</div>
 {:else if previa}
-	<div class="prev-topo">
-		<b>
-			{previa.aplicadas.length}
-			{previa.aplicadas.length === 1 ? 'linha entra' : 'linhas entram'}
-		</b>
-		<span>
-			{#if previa.criadas > 0}
-				{previa.criadas}
-				{previa.criadas === 1 ? 'reconstrói o dia' : 'reconstroem o dia'}{#if previa.recusadas.length > 0}
-					·
-				{/if}
-			{/if}
-			{#if previa.recusadas.length > 0}
-				{previa.recusadas.length} sem lugar
-			{/if}
+	<div class="numeros">
+		<span class="num">
+			<b>{previa.aplicadas.length}</b>
+			<i>{previa.aplicadas.length === 1 ? 'linha entra' : 'linhas entram'}</i>
 		</span>
+		{#if previa.criadas > 0}
+			<span class="num">
+				<b>{previa.criadas}</b>
+				<i>{previa.criadas === 1 ? 'dia reconstruído' : 'dias reconstruídos'}</i>
+			</span>
+		{/if}
+		{#if previa.anotacoes > 0}
+			<span class="num">
+				<b>{previa.anotacoes}</b>
+				<i>{previa.anotacoes === 1 ? 'anotação no caderno' : 'anotações no caderno'}</i>
+			</span>
+		{/if}
+		{#if previa.recusadas.length > 0}
+			<span class="num fora">
+				<b>{previa.recusadas.length}</b>
+				<i>sem lugar</i>
+			</span>
+		{/if}
 	</div>
 
 	{#if previa.aplicadas.length > 0}
@@ -195,18 +230,48 @@
 {/if}
 
 <style>
-	.prev-topo {
+	/* O resultado é uma linha de números, não um parágrafo: o que importa é
+	   quanto entrou, quanto foi reconstruído e quanto ficou de fora. */
+	.numeros {
 		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 12px;
 		flex-wrap: wrap;
-		margin-bottom: 10px;
+		gap: 10px 22px;
+		margin-bottom: 12px;
 	}
-	.prev-topo span {
+	.num {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.num b {
 		font-family: var(--font-mono);
-		font-size: 12px;
-		color: var(--text-muted);
+		font-size: 19px;
+		font-weight: 600;
+		line-height: 1.1;
+		color: var(--text);
+	}
+	.num i {
+		font-style: normal;
+		font-size: 11px;
+		letter-spacing: 0.04em;
+		color: var(--text-faint);
+	}
+	.num.fora b {
+		color: var(--warn);
+	}
+	.fim {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 16px;
+		flex-wrap: wrap;
+		background: var(--bg-soft);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 14px;
+	}
+	.fim .numeros {
+		margin-bottom: 0;
 	}
 	.materia {
 		color: var(--text-muted);

@@ -120,6 +120,8 @@ export interface ImportacaoCSV {
 	recusadas: LinhaRecusada[];
 	/** Quantas linhas reconstroem a atividade que faltava no dia. */
 	criadas: number;
+	/** Quantas anotações de caderno a planilha traz e que ainda não existem aqui. */
+	anotacoes: number;
 	/** 0 na prévia; quantas linhas foram gravadas na importação confirmada. */
 	gravadas: number;
 }

@@ -153,8 +153,10 @@ type importacaoDTO struct {
 	Aplicadas []linhaImportadaDTO `json:"aplicadas"`
 	Recusadas []linhaRecusadaDTO  `json:"recusadas"`
 	// Criadas: quantas linhas reconstroem a atividade que faltava naquele dia.
-	Criadas  int `json:"criadas"`
-	Gravadas int `json:"gravadas"`
+	Criadas int `json:"criadas"`
+	// Anotacoes: quantas entradas de caderno de erros entram junto.
+	Anotacoes int `json:"anotacoes"`
+	Gravadas  int `json:"gravadas"`
 }
 
 type linhaImportadaDTO struct {
@@ -181,6 +183,7 @@ func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
 		Aplicadas: make([]linhaImportadaDTO, 0, len(r.Aplicadas)),
 		Recusadas: make([]linhaRecusadaDTO, 0, len(r.Recusadas)),
 		Criadas:   r.Criadas,
+		Anotacoes: r.Anotacoes,
 		Gravadas:  r.Gravadas,
 	}
 

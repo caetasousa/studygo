@@ -113,6 +113,17 @@
 	async function reorganizar() {
 		if (reorganizando || !reorganizarData) return;
 
+		// Reorganizar devolve a sequência ao motor: a ordem montada à mão daquela
+		// data em diante é descartada. Desfazer trabalho se pergunta antes.
+		if (
+			!confirm(
+				`Refazer o cronograma a partir de ${reorganizarData.split('-').reverse().join('/')}? ` +
+					'A ordem que você arrumou à mão daí para frente será substituída pela do motor.'
+			)
+		) {
+			return;
+		}
+
 		reorganizando = true;
 		await planoStore.reorganizarDesde(reorganizarData);
 		reorganizando = false;

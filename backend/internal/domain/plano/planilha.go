@@ -47,6 +47,26 @@ type LinhaPlanilha struct {
 	Concluido  *bool
 }
 
+// Planilha é o arquivo lido: as duas tabelas que o export escreve.
+//
+// A segunda é o caderno de erros. Ele estava sendo ignorado na volta, e é
+// metade do valor do arquivo — o histórico sem as anotações é só número.
+type Planilha struct {
+	Registros []LinhaPlanilha
+	Caderno   []LinhaCaderno
+}
+
+// LinhaCaderno é uma anotação do caderno de erros, como a planilha a traz.
+type LinhaCaderno struct {
+	Numero     int
+	Data       *time.Time
+	Disciplina string
+	Tema       string
+	Texto      string
+	Origem     string
+	Resolvido  bool
+}
+
 // LinhaCasada é uma linha que encontrou onde entrar.
 //
 // Criada diz que a atividade não existia e foi reconstruída a partir da própria
@@ -102,16 +122,27 @@ var colunas = map[string][]string{
 	"concluido":  {"concluido", "concluído", "feito"},
 }
 
+// colunasCaderno são as da segunda tabela do export. O prefixo existe para que
+// as duas tabelas convivam no mesmo arquivo sem ambiguidade de cabeçalho.
+var colunasCaderno = map[string][]string{
+	"data":       {"cadernodata"},
+	"disciplina": {"cadernodisciplina"},
+	"tema":       {"cadernotema"},
+	"texto":      {"cadernotexto"},
+	"origem":     {"cadernoorigem"},
+	"resolvido":  {"cadernoresolvido"},
+}
+
 // LerPlanilha lê o CSV do plano e devolve as linhas que trazem registro.
 //
 // Ignora o que não é registro: a segunda tabela do export (o caderno de erros)
 // e as linhas de cronograma sem nada lançado. Uma planilha que não traz nenhum
 // registro é um erro — o usuário mandou o arquivo errado, e dizer isso é melhor
 // que importar zero linhas em silêncio.
-func LerPlanilha(r io.Reader) ([]LinhaPlanilha, error) {
+func LerPlanilha(r io.Reader) (Planilha, error) {
 	buf, err := io.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("%w: não consegui ler o arquivo: %s", ErrPlanilhaIlegivel, err)
+		return Planilha{}, fmt.Errorf("%w: não consegui ler o arquivo: %s", ErrPlanilhaIlegivel, err)
 	}
 
 	texto := strings.TrimPrefix(string(buf), "\ufeff")
@@ -123,47 +154,73 @@ func LerPlanilha(r io.Reader) ([]LinhaPlanilha, error) {
 	leitor.LazyQuotes = true
 	leitor.Comma = separadorDe(texto)
 
-	registros, err := leitor.ReadAll()
+	linhas, err := leitor.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("%w: não consegui ler o CSV: %s", ErrPlanilhaIlegivel, err)
+		return Planilha{}, fmt.Errorf("%w: não consegui ler o CSV: %s", ErrPlanilhaIlegivel, err)
 	}
 
-	inicio, idx := acharCabecalho(registros)
-	if idx == nil {
-		return nil, fmt.Errorf(
-			"%w: não achei as colunas de data e disciplina — exporte o CSV do plano "+
-				"e importe esse arquivo, ou monte uma planilha com esse cabeçalho",
-			ErrPlanilhaIlegivel,
-		)
-	}
+	out := Planilha{Registros: []LinhaPlanilha{}, Caderno: []LinhaCaderno{}}
 
-	out := []LinhaPlanilha{}
+	if inicio, idx := acharCabecalho(linhas, colunas, "disciplina", "codigo"); idx != nil {
+		for i := inicio + 1; i < len(linhas); i++ {
+			// A linha em branco encerra a tabela: o que vem depois é o caderno.
+			if vazia(linhas[i]) {
+				break
+			}
 
-	for i := inicio + 1; i < len(registros); i++ {
-		rec := registros[i]
-
-		// A linha em branco encerra a tabela de cronograma: o que vem depois é o
-		// caderno de erros, que a importação não toca.
-		if vazia(rec) {
-			break
+			if l, ok := linhaDaPlanilha(linhas[i], idx, i+1); ok {
+				out.Registros = append(out.Registros, l)
+			}
 		}
-
-		l, ok := linhaDaPlanilha(rec, idx, i+1)
-		if !ok {
-			continue
-		}
-
-		out = append(out, l)
 	}
 
-	if len(out) == 0 {
-		return nil, fmt.Errorf(
-			"%w: não achei nenhuma linha com tempo, questões ou conclusão nesta planilha",
+	if inicio, idx := acharCabecalho(linhas, colunasCaderno, "texto"); idx != nil {
+		for i := inicio + 1; i < len(linhas); i++ {
+			if vazia(linhas[i]) {
+				break
+			}
+
+			if l, ok := linhaDoCaderno(linhas[i], idx, i+1); ok {
+				out.Caderno = append(out.Caderno, l)
+			}
+		}
+	}
+
+	if len(out.Registros) == 0 && len(out.Caderno) == 0 {
+		return Planilha{}, fmt.Errorf(
+			"%w: não achei nem estudo lançado nem anotações de caderno nesta planilha "+
+				"— exporte o CSV do plano e importe esse arquivo",
 			ErrPlanilhaIlegivel,
 		)
 	}
 
 	return out, nil
+}
+
+// linhaDoCaderno lê uma anotação. Sem texto não há anotação: a linha é sobra.
+func linhaDoCaderno(rec []string, idx map[string]int, numero int) (LinhaCaderno, bool) {
+	texto := strings.TrimSpace(campo(rec, idx, "texto"))
+	if texto == "" {
+		return LinhaCaderno{}, false
+	}
+
+	l := LinhaCaderno{
+		Numero:     numero,
+		Disciplina: strings.TrimSpace(campo(rec, idx, "disciplina")),
+		Tema:       strings.TrimSpace(campo(rec, idx, "tema")),
+		Texto:      texto,
+		Origem:     strings.TrimSpace(campo(rec, idx, "origem")),
+	}
+
+	if data, ok := dataDaPlanilha(campo(rec, idx, "data")); ok {
+		l.Data = &data
+	}
+
+	if r := boolOuNil(campo(rec, idx, "resolvido")); r != nil {
+		l.Resolvido = *r
+	}
+
+	return l, true
 }
 
 // CasarPlanilha diz onde cada linha entraria, sem gravar nada.
@@ -429,34 +486,42 @@ func materiaDaLinha(l LinhaPlanilha) string {
 	return "a matéria da linha"
 }
 
-// acharCabecalho procura a linha de cabeçalho da tabela de cronograma. Não é
-// necessariamente a primeira: uma planilha editada à mão costuma ganhar um
-// título em cima.
-func acharCabecalho(registros [][]string) (int, map[string]int) {
-	for i, rec := range registros {
-		idx := mapearColunas(rec)
+// acharCabecalho procura a linha de cabeçalho de uma das tabelas. Não é
+// necessariamente a primeira: o arquivo tem duas tabelas, e uma planilha
+// editada à mão costuma ganhar um título em cima.
+//
+// `essenciais` são as colunas sem as quais aquela tabela não é ela mesma —
+// basta uma delas, porque a tabela de cronograma identifica a matéria pelo
+// código ou pelo nome, tanto faz qual venha.
+func acharCabecalho(
+	linhas [][]string,
+	nomes map[string][]string,
+	essenciais ...string,
+) (int, map[string]int) {
+	for i, rec := range linhas {
+		idx := mapearColunas(rec, nomes)
+
 		if _, temData := idx["data"]; !temData {
 			continue
 		}
 
-		_, temCodigo := idx["codigo"]
-		_, temDisciplina := idx["disciplina"]
-
-		if temCodigo || temDisciplina {
-			return i, idx
+		for _, e := range essenciais {
+			if _, tem := idx[e]; tem {
+				return i, idx
+			}
 		}
 	}
 
 	return 0, nil
 }
 
-func mapearColunas(cabecalho []string) map[string]int {
+func mapearColunas(cabecalho []string, nomes map[string][]string) map[string]int {
 	idx := map[string]int{}
 
 	for i, col := range cabecalho {
 		chave := chave(col)
 
-		for campo, apelidos := range colunas {
+		for campo, apelidos := range nomes {
 			if _, achado := idx[campo]; achado {
 				continue
 			}
@@ -657,4 +722,62 @@ func separadorDe(texto string) rune {
 	}
 
 	return ','
+}
+
+// AnotacoesDaPlanilha traduz as linhas do caderno em anotações deste plano.
+//
+// Duas regras, as duas para que reimportar o mesmo arquivo não vire um caderno
+// em duplicata: a anotação só entra se a matéria existir aqui, e só se não
+// houver já uma igual — mesma data, mesma matéria, mesmo tema e mesmo texto.
+func AnotacoesDaPlanilha(
+	linhas []LinhaCaderno,
+	existentes []Anotacao,
+	cur concurso.Concurso,
+) []Anotacao {
+	jaTem := make(map[string]bool, len(existentes))
+	for _, a := range existentes {
+		jaTem[assinaturaDaAnotacao(a)] = true
+	}
+
+	out := []Anotacao{}
+
+	for _, l := range linhas {
+		a := Anotacao{
+			Data:      l.Data,
+			Tema:      l.Tema,
+			Texto:     l.Texto,
+			Origem:    OrigemValida(Origem(strings.ToLower(strings.TrimSpace(l.Origem)))),
+			Resolvido: l.Resolvido,
+		}
+
+		if d := disciplinaDaLinha(LinhaPlanilha{Disciplina: l.Disciplina}, cur); d != nil {
+			id := d.ID
+			a.DisciplinaID = &id
+		}
+
+		chaveDela := assinaturaDaAnotacao(a)
+		if jaTem[chaveDela] {
+			continue
+		}
+
+		jaTem[chaveDela] = true
+		out = append(out, a)
+	}
+
+	return out
+}
+
+// assinaturaDaAnotacao é o que faz duas anotações serem a mesma anotação.
+func assinaturaDaAnotacao(a Anotacao) string {
+	data := ""
+	if a.Data != nil {
+		data = day(*a.Data).Format("2006-01-02")
+	}
+
+	disciplina := ""
+	if a.DisciplinaID != nil {
+		disciplina = a.DisciplinaID.String()
+	}
+
+	return strings.Join([]string{data, disciplina, chave(a.Tema), chave(a.Texto)}, "\x00")
 }
