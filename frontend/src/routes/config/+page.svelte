@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import Ajuste from '$lib/components/Ajuste.svelte';
+	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import ImportarCSV from '$lib/components/ImportarCSV.svelte';
 	import { planoStore, applyTheme, ehTema, type Tema } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
@@ -115,14 +116,15 @@
 
 		// Reorganizar devolve a sequência ao motor: a ordem montada à mão daquela
 		// data em diante é descartada. Desfazer trabalho se pergunta antes.
-		if (
-			!confirm(
-				`Refazer o cronograma a partir de ${reorganizarData.split('-').reverse().join('/')}? ` +
-					'A ordem que você arrumou à mão daí para frente será substituída pela do motor.'
-			)
-		) {
-			return;
-		}
+		const ok = await confirmar({
+			titulo: 'Refazer o cronograma?',
+			texto:
+				`A partir de ${reorganizarData.split('-').reverse().join('/')}, a ordem que você ` +
+				'arrumou à mão será substituída pela do motor. O que tem registro fica onde está.',
+			rotulo: 'Reorganizar'
+		});
+
+		if (!ok) return;
 
 		reorganizando = true;
 		await planoStore.reorganizarDesde(reorganizarData);
@@ -167,20 +169,31 @@
 	}
 
 	async function limpar() {
-		if (
-			!confirm(
-				'Isso apaga todas as horas, questões, anotações de dias e marcações de prazo. Continuar?'
-			)
-		)
-			return;
+		const ok = await confirmar({
+			titulo: 'Limpar todos os registros?',
+			texto:
+				'Isso apaga o tempo, as questões, os acertos, as anotações dos dias e as ' +
+				'marcações de prazo deste plano. O cronograma continua, mas sem histórico.',
+			rotulo: 'Limpar registros',
+			tom: 'perigo'
+		});
+
+		if (!ok) return;
+
 		await planoStore.limparRegistros();
 	}
 
 	async function restaurar() {
-		if (
-			!confirm('Isso desfaz as trocas manuais de matérias e volta à ordem calculada pelo peso. Continuar?')
-		)
-			return;
+		const ok = await confirmar({
+			titulo: 'Restaurar a ordem automática?',
+			texto:
+				'As trocas de matéria que você fez à mão são desfeitas, e o cronograma volta ' +
+				'à ordem que o motor calcula pelo peso. Dias já concluídos não se mexem.',
+			rotulo: 'Restaurar ordem'
+		});
+
+		if (!ok) return;
+
 		await planoStore.restaurarOrdem();
 	}
 </script>

@@ -2,6 +2,7 @@
 	import NavIcon from './NavIcon.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fmtDuracao } from '$lib/format';
+	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import type { ImportacaoCSV } from '$lib/types';
 
 	/**
@@ -58,17 +59,20 @@
 		}
 	}
 
-	async function confirmar() {
+	async function importar() {
 		if (!previa) return;
 
 		// Importar grava por cima do que já estiver lançado naquelas matérias:
 		// é escrita em dado do estudante, e escrita em dado se pergunta antes.
-		const aviso =
-			`Importar ${previa.aplicadas.length} ` +
-			`${previa.aplicadas.length === 1 ? 'linha' : 'linhas'}? ` +
-			'O que já estiver lançado nessas matérias será substituído.';
+		const ok = await confirmar({
+			titulo: `Importar ${previa.aplicadas.length} ${previa.aplicadas.length === 1 ? 'linha' : 'linhas'}?`,
+			texto:
+				'O que já estiver lançado nessas matérias será substituído pelo que a planilha ' +
+				'traz, e o dia vencido que ficar sem estudo será redistribuído.',
+			rotulo: 'Importar'
+		});
 
-		if (!confirm(aviso)) return;
+		if (!ok) return;
 
 		ocupado = true;
 		erro = null;
@@ -235,19 +239,19 @@
 		<button
 			class="btn primario"
 			disabled={ocupado || previa.aplicadas.length === 0}
-			onclick={confirmar}
+			onclick={importar}
 		>
 			{ocupado ? 'Importando…' : `Importar ${previa.aplicadas.length} linhas`}
 		</button>
 		<button class="btn" onclick={limpar}>Cancelar</button>
 	</div>
 {:else}
-	<div class="form-grid" style="align-items:center">
+	<div class="escolher">
 		<label class="btn" style="cursor:pointer">
 			{nomeArquivo || '⬆ Escolher CSV do plano'}
 			<input type="file" accept=".csv,text/csv" onchange={escolher} hidden />
 		</label>
-		{#if ocupado}<span class="page-sub">lendo…</span>{/if}
+		{#if ocupado}<span class="page-sub" style="margin:0">lendo…</span>{/if}
 	</div>
 {/if}
 
@@ -258,7 +262,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 10px 22px;
-		margin-bottom: 12px;
+		margin: 16px 0 12px;
 	}
 	.num {
 		display: flex;
@@ -281,7 +285,16 @@
 	.num.fora b {
 		color: var(--warn);
 	}
+	/* Toda ação da importação respira longe do texto que a explica. */
+	.escolher {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin-top: 16px;
+	}
 	.fim {
+		margin-top: 16px;
 		display: flex;
 		align-items: flex-end;
 		justify-content: space-between;

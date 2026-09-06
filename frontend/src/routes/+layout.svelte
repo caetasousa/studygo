@@ -7,6 +7,7 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore, applyTheme, ehTema } from '$lib/stores/plano.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import Confirmacao from '$lib/components/Confirmacao.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { browser } from '$app/environment';
 
@@ -119,6 +120,7 @@
 		</main>
 	</div>
 	<div class="saved-toast" class:on={planoStore.salvo}>Salvo</div>
+	<Confirmacao />
 {:else}
 	<!-- Signed out on a private route: the redirect effect above is already on its
 	     way to /login. Without this branch the document renders empty, which reads

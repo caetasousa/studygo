@@ -5,6 +5,7 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { fc, diffDays, hojeISO } from '$lib/format';
+	import { confirmar } from '$lib/stores/confirmacao.svelte';
 
 	let erro = $state<string | null>(null);
 
@@ -18,9 +19,17 @@
 	}
 
 	async function excluir(slug: string, nome: string) {
-		if (!confirm(`Excluir "${nome}"? O plano e todo o progresso desse concurso serão apagados.`)) {
-			return;
-		}
+		const ok = await confirmar({
+			titulo: `Excluir ${nome}?`,
+			texto:
+				'O plano, o cronograma, tudo que você registrou e o caderno de erros deste ' +
+				'concurso são apagados. Não dá para desfazer — exporte o CSV antes se quiser guardar.',
+			rotulo: 'Excluir concurso',
+			tom: 'perigo'
+		});
+
+		if (!ok) return;
+
 		try {
 			await concursoStore.remover(slug);
 			planoStore.limpar();
