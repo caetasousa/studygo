@@ -136,12 +136,26 @@ type BlocoDoDia struct {
 	Detalhe string
 }
 
-// RevisaoDoDia é a cauda de revisão: o que registrar e a observação já salva.
+// RevisaoDoDia é a cauda de revisão: o que revisar, o que registrar e a
+// observação já salva.
+//
+// Temas são os assuntos que a fila traz de volta neste dia. Sem eles a tela de
+// revisão só sabia pedir dois números, e o estudante tinha de adivinhar o que
+// o bloco mandava revisar — o motor sempre soube.
 type RevisaoDoDia struct {
 	Disciplina string
+	Temas      []TemaDaRevisao
 	Questoes   *int
 	Acertos    *int
 	Observacao string
+}
+
+// TemaDaRevisao é um assunto que volta hoje. Aproveitamento é o que o caderno
+// de erros registra nele, e é nil quando o tema nunca deu problema — a
+// diferença entre "você foi a 60% aqui" e "nada consta".
+type TemaDaRevisao struct {
+	Tema           string
+	Aproveitamento *int
 }
 
 // MarcoDoPlano é uma data do edital com seu check.

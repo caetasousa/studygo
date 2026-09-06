@@ -108,7 +108,10 @@ func (c carregador) montar(ctx context.Context, cx contexto) (PlanoMontado, erro
 			})
 
 			if b.Disciplina != "" {
-				dd.Revisao = montarRevisao(b.Disciplina, dt, cx.Dias, anotacoes)
+				dd.Revisao = montarRevisao(
+					b.Disciplina, dt, cx.Dias, anotacoes,
+					ctxBlocos.Revisao[d.N], ctxBlocos.Cadernos,
+				)
 			}
 		}
 
@@ -281,8 +284,20 @@ func montarRevisao(
 	dt time.Time,
 	dias map[time.Time]plano.RegistroDia,
 	anotacoes []plano.Anotacao,
+	fila []plano.ItemRevisao,
+	cadernos map[string][]plano.ItemCaderno,
 ) *RevisaoDoDia {
 	out := &RevisaoDoDia{Disciplina: disciplina}
+
+	for _, it := range fila {
+		tema := TemaDaRevisao{Tema: it.Tema}
+
+		if pct, errou := plano.AproveitamentoDoTema(cadernos, it); errou {
+			tema.Aproveitamento = &pct
+		}
+
+		out.Temas = append(out.Temas, tema)
+	}
 
 	if r, ok := dias[dt]; ok {
 		out.Questoes = r.RevisaoQuestoes

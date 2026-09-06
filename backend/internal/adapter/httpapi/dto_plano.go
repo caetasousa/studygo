@@ -133,10 +133,18 @@ type blocoDTO struct {
 }
 
 type revisaoDTO struct {
-	Disciplina string `json:"disciplina"`
-	Questoes   *int   `json:"questoes"`
-	Acertos    *int   `json:"acertos"`
-	Observacao string `json:"observacao"`
+	Disciplina string           `json:"disciplina"`
+	Temas      []temaRevisaoDTO `json:"temas"`
+	Questoes   *int             `json:"questoes"`
+	Acertos    *int             `json:"acertos"`
+	Observacao string           `json:"observacao"`
+}
+
+// temaRevisaoDTO é um assunto que a fila traz de volta hoje. `aproveitamento` é
+// null quando o tema não está no caderno de erros.
+type temaRevisaoDTO struct {
+	Tema           string `json:"tema"`
+	Aproveitamento *int   `json:"aproveitamento"`
 }
 
 type marcoDTO struct {
@@ -255,8 +263,16 @@ func planoParaDTO(p service.PlanoMontado) planoDTO {
 		}
 
 		if d.Revisao != nil {
+			temas := make([]temaRevisaoDTO, 0, len(d.Revisao.Temas))
+			for _, t := range d.Revisao.Temas {
+				temas = append(temas, temaRevisaoDTO{
+					Tema: t.Tema, Aproveitamento: t.Aproveitamento,
+				})
+			}
+
 			dd.Revisao = &revisaoDTO{
 				Disciplina: d.Revisao.Disciplina,
+				Temas:      temas,
 				Questoes:   d.Revisao.Questoes,
 				Acertos:    d.Revisao.Acertos,
 				Observacao: d.Revisao.Observacao,

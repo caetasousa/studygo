@@ -257,10 +257,19 @@ export interface Bloco {
 	detalhe: string;
 }
 
+/** Um assunto que a fila traz de volta hoje. */
+export interface TemaRevisao {
+	tema: string;
+	/** Aproveitamento no caderno de erros; null quando o tema nunca deu problema. */
+	aproveitamento: number | null;
+}
+
 /** A cauda de revisão do dia — presente a partir do segundo dia de estudo, que
  *  é quando a fila já tem o que nomear. */
 export interface Revisao {
 	disciplina: string;
+	/** O que revisar hoje, na ordem em que a fila os traz de volta. */
+	temas: TemaRevisao[];
 	questoes: number | null;
 	acertos: number | null;
 	observacao: string;

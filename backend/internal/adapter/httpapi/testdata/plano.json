@@ -131,7 +131,13 @@
         "acertos": "number",
         "disciplina": "string",
         "observacao": "string",
-        "questoes": "number"
+        "questoes": "number",
+        "temas": [
+          {
+            "aproveitamento": "number",
+            "tema": "string"
+          }
+        ]
       },
       "rotulo": "string",
       "semana": "number",

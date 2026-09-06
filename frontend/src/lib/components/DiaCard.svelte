@@ -391,6 +391,8 @@
 			data={dia.data}
 			nome={materiaRevisada}
 			revisao={dia.revisao}
+			cadernoUrl={cadernoExterno}
+			limiarFraco={planoStore.plano?.config.limiarFraco ?? 70}
 			salvando={salvandoRevisao}
 			erro={erroRevisaoForm}
 			onSalvar={(v) => void salvarRevisao(v)}

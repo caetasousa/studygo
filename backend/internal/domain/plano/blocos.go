@@ -255,7 +255,7 @@ func revisaoDetalhe(itens []ItemRevisao, cadernos map[string][]ItemCaderno) stri
 
 		b.WriteString(it.Tema)
 
-		if pct, errou := aproveitamentoNoCaderno(cadernos, it); errou {
+		if pct, errou := AproveitamentoDoTema(cadernos, it); errou {
 			b.WriteString(" (você foi a ")
 			b.WriteString(strconv.Itoa(pct))
 			b.WriteString("% aqui)")
@@ -265,9 +265,13 @@ func revisaoDetalhe(itens []ItemRevisao, cadernos map[string][]ItemCaderno) stri
 	return b.String()
 }
 
-// aproveitamentoNoCaderno reports the topic's hit rate when it is in the error
-// notebook, so the block can say which ones actually went wrong.
-func aproveitamentoNoCaderno(
+// AproveitamentoDoTema devolve o aproveitamento do tema quando ele está no
+// caderno de erros, e false quando nunca deu problema.
+//
+// É o que deixa a revisão dizer em quais assuntos o tempo rende mais. Exportada
+// porque a tela de registro mostra o mesmo número que o bloco anuncia — e o
+// número tem de ser o mesmo.
+func AproveitamentoDoTema(
 	cadernos map[string][]ItemCaderno,
 	it ItemRevisao,
 ) (int, bool) {

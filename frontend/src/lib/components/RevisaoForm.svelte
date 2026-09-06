@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { fl } from '$lib/format';
+	import { semNumeroInicial } from '$lib/estudo';
 	import type { Revisao } from '$lib/types';
 
 	/**
-	 * Logs one day's review tail: the battery (questões/acertos) and an
-	 * observação, which goes into the notebook under the discipline the review
-	 * covered that day — the same place the rest of the app writes to.
+	 * A revisão do dia: o que voltar a estudar, e o que ficou dela.
+	 *
+	 * A tela começa pelos ASSUNTOS. O bloco de revisão não é uma bateria de
+	 * questões — é uma segunda passada pelo que já foi estudado, e a fila do
+	 * motor sabe exatamente quais temas voltam hoje e em quais deles você já
+	 * errou. Pedir dois números sem dizer o que revisar deixava essa informação
+	 * no servidor e o trabalho de lembrar com o estudante.
+	 *
+	 * Questões e acertos continuam, mas embaixo e opcionais: eles servem a quem
+	 * fecha a revisão resolvendo questões, e alimentam as estatísticas.
 	 *
 	 * Edits are local until Salvar, exactly like AtividadeForm: cancelling
 	 * discards them without touching the store.
@@ -15,6 +23,8 @@
 		data,
 		nome,
 		revisao,
+		cadernoUrl = '',
+		limiarFraco = 70,
 		salvando = false,
 		erro = null,
 		onSalvar,
@@ -26,6 +36,10 @@
 		nome: string;
 		/** what is already saved for this review, if anything. */
 		revisao: Revisao;
+		/** the discipline's external error notebook, when the user set one. */
+		cadernoUrl?: string;
+		/** abaixo disto o aproveitamento é sinalizado como ponto fraco. */
+		limiarFraco?: number;
 		salvando?: boolean;
 		erro?: string | null;
 		onSalvar: (v: { questoes: number | null; acertos: number | null; observacao: string }) => void;
@@ -63,7 +77,9 @@
 	}
 
 	let painel = $state<HTMLDivElement | null>(null);
-	let primeiro = $state<HTMLInputElement | null>(null);
+	// O foco abre na observação: é o campo que sempre tem o que receber, e as
+	// questões são o acessório.
+	let primeiro = $state<HTMLTextAreaElement | null>(null);
 
 	$effect(() => {
 		primeiro?.focus();
@@ -120,6 +136,57 @@
 		<h2 id={tituloID} class="sec" style="margin-top:0">Registrar revisão — {nome}</h2>
 		<p id={descID} class="page-sub" style="margin-top:0">{fl(data)}</p>
 
+		{#if revisao.temas.length > 0}
+			<h3 class="rev-t">Volte a estes assuntos, sem consultar antes</h3>
+			<ul class="temas">
+				{#each revisao.temas as t (t.tema)}
+					<li>
+						<span class="tema-txt">{semNumeroInicial(t.tema)}</span>
+						{#if t.aproveitamento !== null}
+							<span
+								class="tema-pct"
+								class:critico={t.aproveitamento < 50}
+								class:fraco={t.aproveitamento >= 50 && t.aproveitamento < limiarFraco}
+								title="Seu aproveitamento neste assunto"
+							>
+								{t.aproveitamento}%
+							</span>
+						{:else}
+							<span class="tema-pct vazio" title="Este assunto ainda não deu problema">—</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			{#if cadernoUrl}
+				<p class="rev-link-ext">
+					<a href={cadernoUrl} target="_blank" rel="noopener noreferrer">
+						Abrir o caderno de erros de {nome} ↗
+					</a>
+				</p>
+			{/if}
+		{:else}
+			<p class="page-sub sem-temas">
+				A fila de revisão anda pelo que você já estudou de fato. Registre os
+				primeiros dias e ela passa a dizer quais assuntos voltam aqui.
+			</p>
+		{/if}
+
+		<label class="campo nota">
+			<span>O que ainda precisa de atenção</span>
+			<textarea
+				rows="3"
+				placeholder="O que escapou, o que revisar de novo, o que ficou claro…"
+				bind:this={primeiro}
+				bind:value={form.observacao}
+			></textarea>
+		</label>
+		<p class="page-sub obs-nota">
+			Vira uma anotação no caderno de erros desta disciplina — apagar o texto remove a anotação.
+		</p>
+
+		<!-- Opcionais: fecham a revisão para quem a termina resolvendo questões, e
+		     são o que alimenta o aproveitamento mostrado acima na próxima volta. -->
+		<h3 class="rev-t">Resolveu questões nesta revisão?</h3>
 		<div class="campos">
 			<label class="campo">
 				<span>Questões</span>
@@ -128,7 +195,6 @@
 					min="0"
 					step="1"
 					inputmode="numeric"
-					bind:this={primeiro}
 					value={form.questoes ?? ''}
 					oninput={(e) => (form.questoes = inteiro(e.currentTarget.value))}
 				/>
@@ -155,18 +221,6 @@
 		{#if invalido}
 			<p class="aviso" role="alert">Acertos não pode ser maior que o número de questões.</p>
 		{/if}
-
-		<label class="campo nota">
-			<span>Observação</span>
-			<textarea
-				rows="3"
-				placeholder="O que ainda precisa de atenção nesta matéria…"
-				bind:value={form.observacao}
-			></textarea>
-		</label>
-		<p class="page-sub obs-nota">
-			Vira uma anotação no caderno de erros desta disciplina — apagar o texto remove a anotação.
-		</p>
 
 		{#if erro}
 			<p class="aviso erro" role="alert">{erro}</p>
@@ -205,12 +259,66 @@
 	.rev-dlg {
 		width: min(460px, 100%);
 	}
+	.rev-t {
+		font-size: 10.5px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		font-weight: 600;
+		margin: 16px 0 6px;
+	}
+	.temas {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+	}
+	.temas li {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		padding: 8px 10px;
+		border-bottom: 1px solid var(--border);
+	}
+	.temas li:last-child {
+		border-bottom: none;
+	}
+	.tema-txt {
+		flex: 1 1 auto;
+		font-size: 13px;
+		line-height: 1.4;
+	}
+	.tema-pct {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 12.5px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-muted);
+	}
+	.tema-pct.fraco {
+		color: var(--warn);
+	}
+	.tema-pct.critico {
+		color: var(--danger);
+	}
+	.tema-pct.vazio {
+		color: var(--text-faint);
+	}
+	.rev-link-ext {
+		margin: 6px 0 0;
+		font-size: 12px;
+	}
+	.sem-temas {
+		margin: 14px 0 0;
+	}
 	.campos {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
 		gap: 10px;
 		align-items: end;
-		margin-top: 14px;
+		margin-top: 4px;
 	}
 	.campo {
 		display: flex;

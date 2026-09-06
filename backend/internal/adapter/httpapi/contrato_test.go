@@ -63,8 +63,15 @@ func TestContratoHTTP_Plano(t *testing.T) {
 				Movida: true, Horas: &horas, Questoes: &questoes,
 				Acertos: &acertos, Erros: &erros, Nota: "n", Concluido: true,
 			}},
-			Blocos:  []service.BlocoDoDia{{Minutos: 60, Titulo: "1º bloco", Detalhe: "d"}},
-			Revisao: &service.RevisaoDoDia{Disciplina: "LINPO", Questoes: &questoes, Acertos: &acertos, Observacao: "o"},
+			Blocos: []service.BlocoDoDia{{Minutos: 60, Titulo: "1º bloco", Detalhe: "d"}},
+			Revisao: &service.RevisaoDoDia{
+				Disciplina: "LINPO",
+				Temas: []service.TemaDaRevisao{
+					{Tema: "Crase", Aproveitamento: &hoje},
+					{Tema: "Regência"},
+				},
+				Questoes: &questoes, Acertos: &acertos, Observacao: "o",
+			},
 		}},
 		Marcos: []service.MarcoDoPlano{{
 			ID: uuid.New(), Rotulo: 1, DataInicio: data, DataFim: &data,
