@@ -260,6 +260,19 @@
 					<!-- Days with subjects carry no global control: the state is derived
 					     from the activities, and this only reports it. -->
 					<span class="selo-feito">Dia concluído</span>
+				{:else if podeAdiar}
+					<!-- O dia que não aconteceu. Adiar empurra o que estava marcado nele
+					     para o próximo dia livre e desloca o resto do plano — na ordem em
+					     que está. É a alternativa a reorganizar, que devolve a decisão ao
+					     motor e refaz a sequência. -->
+					<span class="acoes">
+						<IconButton
+							icon="descer"
+							label="Adiar este dia — leva o que está aqui para o próximo dia livre"
+							disabled={adiando}
+							onclick={adiar}
+						/>
+					</span>
 				{/if}
 			</div>
 
