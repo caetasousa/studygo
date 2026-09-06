@@ -530,3 +530,56 @@ func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
 		t.Errorf("questões na volta = %d, quer 42", got)
 	}
 }
+
+// Depois de importar, o passado que ficou sem estudo é atraso: o dia perdido
+// esvazia e o conteúdo dele se redistribui pelos dias que restam — a mesma
+// redistribuição da varredura diária, feita na hora em vez de na virada do dia.
+func TestPlanilha_ImportarRedistribuiODiaQueNaoFoiEstudado(t *testing.T) {
+	t.Parallel()
+
+	ce := novoCenario(t)
+	ctx := context.Background()
+	p := ce.obter(t)
+
+	estudo := diasDeEstudo(p)
+	estudado, perdido := estudo[0], estudo[1]
+
+	// O tempo passa: os dois primeiros dias já são passado.
+	ce.deps.Relogio = relogioFixo{t: diaT(2026, time.September, 10)}
+
+	// A planilha traz só o primeiro dia. O segundo ninguém estudou.
+	data := dataDe(t, estudado.Data).Format("02/01/2006")
+	csv := "data,codigo,disciplina,tema,minutos,questoes,acertos,concluido\n"
+
+	for _, it := range estudado.Itens {
+		csv += data + "," + it.Disciplina + ",," + it.Tema + ",60,10,8,sim\n"
+	}
+
+	res, err := NewPlanilhaService(ce.deps).ImportarCSV(
+		ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{CSV: csv, Confirmar: true},
+	)
+	if err != nil {
+		t.Fatalf("importar: %v", err)
+	}
+
+	if res.DiasVagos == 0 {
+		t.Fatal("o dia não estudado devia ter sido redistribuído")
+	}
+
+	// O dia perdido ficou vago; o que era dele foi para a frente.
+	if doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, perdido.Data)); len(doDia) != 0 {
+		t.Errorf("o dia perdido continuou com %d atividades", len(doDia))
+	}
+
+	// E o que foi estudado continua onde estava, com o registro dele.
+	doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, estudado.Data))
+	if len(doDia) != len(estudado.Itens) {
+		t.Fatalf("o dia estudado ficou com %d atividades, quer %d", len(doDia), len(estudado.Itens))
+	}
+
+	for _, a := range doDia {
+		if !ce.cronograma.registros[a.ID].Concluido {
+			t.Error("um registro importado se perdeu na redistribuição")
+		}
+	}
+}

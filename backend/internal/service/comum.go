@@ -238,6 +238,52 @@ func compactarDesde(
 	})
 }
 
+// absorverAtraso redistribui o currículo pelos dias que sobraram quando o
+// estudante perdeu dias de estudo.
+//
+// O dia vencido que ninguém estudou fica VAZIO — é a verdade dele — e o
+// conteúdo se redistribui a partir de hoje. A escolha é RECALCULAR e não
+// empurrar: com menos dias o plano dá menos voltas, e o que não couber fica de
+// fora (o AlertaCobertura conta isso). Empurrar dia a dia faria o último dia
+// acumular carga dupla, um dia impossível de cumprir.
+//
+// Devolve o cronograma novo e quantos dias estavam atrasados. Zero dias
+// significa que não havia nada a absorver, e nada deve ser gravado.
+func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
+	atrasados := plano.DiasAtrasados(c.Atividades, hoje, c.Registros.Concluida)
+	if len(atrasados) == 0 {
+		return nil, 0
+	}
+
+	// Depois da prova não há o que redistribuir: o plano acabou, e recalcular só
+	// produziria um cronograma vazio por cima do histórico.
+	if !hoje.Before(plano.DayOf(c.Plano.Config.Prova)) {
+		return nil, 0
+	}
+
+	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Concluida)
+
+	// A marca de "movida" vale contra o motor, não contra o calendário: quando o
+	// plano encolhe, manter posições escolhidas à mão travaria justamente as
+	// vagas que precisam ceder.
+	for i := range atuais {
+		if !plano.DayOf(atuais[i].Data).Before(hoje) {
+			atuais[i].Movida = false
+		}
+	}
+
+	// Gerar a partir de HOJE é o que faz o currículo caber em menos dias. Com o
+	// Inicio original o motor devolveria exatamente os mesmos dias de antes, e o
+	// conteúdo do dia perdido simplesmente sumiria.
+	cfg := c.Plano.Config
+	cfg.Inicio = hoje
+
+	res := plano.Gerar(cfg, &c.Concurso)
+	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
+
+	return plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida), len(atrasados)
+}
+
 // idsPorCodigo indexa as disciplinas pelo código, que é como o motor as nomeia.
 func idsPorCodigo(cur concurso.Concurso) map[string]uuid.UUID {
 	out := make(map[string]uuid.UUID, len(cur.Disciplinas))

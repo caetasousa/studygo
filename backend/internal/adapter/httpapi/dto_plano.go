@@ -159,7 +159,9 @@ type importacaoDTO struct {
 	// Materias: quantas matérias recuperam a personalização (tag, link do
 	// caderno e ajustes de estudo).
 	Materias int `json:"materias"`
-	Gravadas int `json:"gravadas"`
+	// DiasVagos: dias vencidos que ficaram sem estudo e foram redistribuídos.
+	DiasVagos int `json:"diasVagos"`
+	Gravadas  int `json:"gravadas"`
 }
 
 type linhaImportadaDTO struct {
@@ -188,6 +190,7 @@ func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
 		Criadas:   r.Criadas,
 		Anotacoes: r.Anotacoes,
 		Materias:  r.Materias,
+		DiasVagos: r.DiasVagos,
 		Gravadas:  r.Gravadas,
 	}
 

@@ -194,7 +194,10 @@ type ResultadoImportacao struct {
 	// Materias são as matérias cuja personalização a planilha atualiza: a tag, o
 	// link do caderno de erros e os ajustes de estudo.
 	Materias int
-	Gravadas int
+	// DiasVagos são os dias vencidos que ficaram sem estudo depois da
+	// importação: eles esvaziam, e o conteúdo deles se redistribui à frente.
+	DiasVagos int
+	Gravadas  int
 }
 
 // ImportarCSV traz os registros de uma planilha do plano.
@@ -324,7 +327,52 @@ func (s *PlanilhaService) ImportarCSV(
 
 	out.Gravadas = len(registros)
 
+	// Importado o histórico, o passado que sobrou sem estudo é atraso: o dia
+	// perdido fica vazio e o conteúdo dele se redistribui pelos dias que restam.
+	// É a mesma redistribuição que a varredura diária faria — fazê-la aqui evita
+	// que o estudante veja um cronograma errado até a virada do dia seguinte.
+	absorvidos, err := s.absorverDepoisDaImportacao(ctx, &c)
+	if err != nil {
+		return ResultadoImportacao{}, err
+	}
+
+	out.DiasVagos = absorvidos
+
 	return out, nil
+}
+
+// absorverDepoisDaImportacao redistribui o que ficou para trás.
+//
+// O cronograma é relido antes: as atividades reconstruídas e os registros que
+// acabaram de entrar mudam quais dias contam como perdidos, e decidir isso com
+// o estado antigo redistribuiria o que já foi estudado.
+func (s *PlanilhaService) absorverDepoisDaImportacao(
+	ctx context.Context,
+	c *contexto,
+) (int, error) {
+	atividades, err := s.cronograma.Atividades(ctx, c.Plano.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	registros, err := s.cronograma.Registros(ctx, c.Plano.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	c.Atividades = atividades
+	c.Registros = registros
+
+	novas, atrasados := absorverAtraso(*c, plano.DayOf(s.relogio.Now()))
+	if atrasados == 0 {
+		return 0, nil
+	}
+
+	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, novas); err != nil {
+		return 0, err
+	}
+
+	return atrasados, nil
 }
 
 // aplicarAjustes grava a personalização das matérias.

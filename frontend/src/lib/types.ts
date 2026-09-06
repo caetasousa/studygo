@@ -124,6 +124,8 @@ export interface ImportacaoCSV {
 	anotacoes: number;
 	/** Quantas matérias recuperam a personalização: tag, link do caderno e ajustes. */
 	materias: number;
+	/** Dias vencidos que ficaram sem estudo e foram redistribuídos à frente. */
+	diasVagos: number;
 	/** 0 na prévia; quantas linhas foram gravadas na importação confirmada. */
 	gravadas: number;
 }

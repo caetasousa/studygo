@@ -265,47 +265,17 @@ func (s *CronogramaService) AbsorverAtraso(
 		return PlanoMontado{}, 0, err
 	}
 
-	hoje := plano.DayOf(s.relogio.Now())
-
-	atrasados := plano.DiasAtrasados(c.Atividades, hoje, c.Registros.Concluida)
-	if len(atrasados) == 0 {
+	novas, atrasados := absorverAtraso(c, plano.DayOf(s.relogio.Now()))
+	if atrasados == 0 {
 		return PlanoMontado{}, 0, nil
 	}
 
-	// Depois da prova não há o que redistribuir: o plano acabou, e recalcular
-	// só produziria um cronograma vazio por cima do histórico.
-	if !hoje.Before(plano.DayOf(c.Plano.Config.Prova)) {
-		return PlanoMontado{}, 0, nil
-	}
-
-	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Concluida)
-
-	// A marca de "movida" vale contra o motor, não contra o calendário: quando
-	// o plano encolhe, manter posições escolhidas à mão travaria justamente as
-	// vagas que precisam ceder.
-	for i := range atuais {
-		if !plano.DayOf(atuais[i].Data).Before(hoje) {
-			atuais[i].Movida = false
-		}
-	}
-
-	// Gerar a partir de HOJE é o que faz o currículo caber em menos dias. Com o
-	// Inicio original o motor devolveria exatamente os mesmos dias de antes, e
-	// o conteúdo do dia perdido simplesmente sumiria.
-	cfg := c.Plano.Config
-	cfg.Inicio = hoje
-
-	res := plano.Gerar(cfg, &c.Concurso)
-	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
-
-	montado, err := s.gravarEMontar(
-		ctx, c, plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida),
-	)
+	montado, err := s.gravarEMontar(ctx, c, novas)
 	if err != nil {
 		return PlanoMontado{}, 0, err
 	}
 
-	return montado, len(atrasados), nil
+	return montado, atrasados, nil
 }
 
 // ReorganizarDesde redistribui o conteúdo a partir de uma data escolhida.

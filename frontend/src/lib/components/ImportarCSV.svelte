@@ -107,9 +107,11 @@
 	Qconcursos, um documento) e os ajustes de estudo.
 </p>
 <p class="page-sub" style="margin-top:0">
-	O cronograma à frente não muda. Um dia que já passou e não tem a matéria da planilha
-	é reconstruído a partir dela, que é quem sabe o que aconteceu; o que não achar onde
-	entrar aparece com o motivo e não é gravado.
+	Um dia que já passou e não tem a matéria da planilha é reconstruído a partir dela,
+	que é quem sabe o que aconteceu; o que não achar onde entrar aparece com o motivo e
+	não é gravado. No fim, o dia vencido que continuar sem estudo fica <b>vago</b> e o
+	conteúdo dele se redistribui pelos dias que restam até a prova — a mesma
+	redistribuição que a varredura diária faria.
 </p>
 
 {#if erro}<div class="form-error" style="margin-bottom:12px">{erro}</div>{/if}
@@ -137,6 +139,12 @@
 				<span class="num">
 					<b>{resultado.materias}</b>
 					<i>{resultado.materias === 1 ? 'matéria restaurada' : 'matérias restauradas'}</i>
+				</span>
+			{/if}
+			{#if resultado.diasVagos > 0}
+				<span class="num">
+					<b>{resultado.diasVagos}</b>
+					<i>{resultado.diasVagos === 1 ? 'dia vago redistribuído' : 'dias vagos redistribuídos'}</i>
 				</span>
 			{/if}
 			{#if resultado.recusadas.length > 0}
