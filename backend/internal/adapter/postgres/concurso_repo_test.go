@@ -342,3 +342,47 @@ func TestConcursoRepo_TrocarATagNaoDesligaOPlano(t *testing.T) {
 		t.Error("a tag antiga continuou no plano")
 	}
 }
+
+// Excluir o concurso apaga o progresso junto — é o que a tela avisa antes de
+// perguntar. A FK RESTRICT de registros_atividade existe contra o
+// replanejamento que apagaria história sem querer, não contra a exclusão
+// pedida; sem limpar os registros primeiro, todo concurso já estudado ficava
+// impossível de excluir, com "erro interno" na tela.
+func TestConcursoRepo_RemoverConcursoJaEstudado(t *testing.T) {
+	t.Parallel()
+
+	r := novoRepos(t)
+	u := r.criarUsuario(t, "excluir@b.c")
+	c := r.criarConcurso(t, u, "tce-go")
+	p := r.criarPlano(t, u, c)
+
+	lidas := r.criarAtividades(t, p, c, []plano.Atividade{
+		umDia(c.Disciplinas[0], dia(2026, time.September, 1), 0, "Crase"),
+	})
+
+	horas := 1.0
+	if err := r.cronograma.SalvarRegistro(t.Context(), p.ID, plano.RegistroAtividade{
+		AtividadeID: lidas[0].ID, Horas: &horas, Concluido: true,
+	}); err != nil {
+		t.Fatalf("SalvarRegistro: %v", err)
+	}
+
+	if err := r.concursos.Remover(t.Context(), c.ID); err != nil {
+		t.Fatalf("Remover: %v", err)
+	}
+
+	if _, err := r.concursos.PorID(t.Context(), c.ID); err == nil {
+		t.Error("o concurso continuou lá depois da exclusão")
+	}
+
+	var sobraram int
+	if err := r.pool.QueryRow(
+		t.Context(), `SELECT count(*) FROM registros_atividade`,
+	).Scan(&sobraram); err != nil {
+		t.Fatalf("contando registros: %v", err)
+	}
+
+	if sobraram != 0 {
+		t.Errorf("sobraram %d registros órfãos", sobraram)
+	}
+}

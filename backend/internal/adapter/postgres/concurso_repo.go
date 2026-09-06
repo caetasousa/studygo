@@ -202,9 +202,39 @@ func (r *ConcursoRepo) Atualizar(
 	return c, nil
 }
 
+// Remover apaga o concurso e tudo que pende dele.
+//
+// Os registros de estudo saem PRIMEIRO, na mesma transação. A FK
+// registros_atividade -> atividades é RESTRICT para que um replanejamento nunca
+// apague história pelas costas; aqui a intenção é outra e é explícita — o
+// usuário mandou excluir o concurso inteiro, e a tela já avisou que o plano e o
+// progresso vão junto. Sem esta limpeza o RESTRICT recusa o DELETE e a exclusão
+// falha com "erro interno" para todo concurso que já tenha sido estudado.
 func (r *ConcursoRepo) Remover(ctx context.Context, id uuid.UUID) error {
-	if _, err := r.pool.Exec(ctx, `DELETE FROM concursos WHERE id = $1`, id); err != nil {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM registros_atividade ra
+		  USING atividades a, planos p
+		  WHERE ra.atividade_id = a.id
+		    AND a.plano_id = p.id
+		    AND p.concurso_id = $1`,
+		id,
+	); err != nil {
+		return fmt.Errorf("removendo registros do concurso: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM concursos WHERE id = $1`, id); err != nil {
 		return fmt.Errorf("removendo concurso: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
