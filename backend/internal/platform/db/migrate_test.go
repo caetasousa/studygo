@@ -4,9 +4,11 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -174,4 +176,42 @@ func tabelas(t *testing.T, pool *pgxpool.Pool) []string {
 	}
 
 	return out
+}
+
+// Um banco de OUTRA linhagem do projeto tem schema_migrations com a versão 1
+// registrada — a baseline daquela época — e nenhuma das tabelas desta. O runner
+// não teria o que aplicar, e o backend subiria contra o schema errado: /health
+// só dá ping, responde 200, e o deploy é declarado bom com tudo quebrado.
+func TestMigrate_RecusaBancoDeOutraLinhagem(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.NovoVazio(t)
+	ctx := t.Context()
+
+	// O banco antigo: a versão 1 consta como aplicada, mas o schema é outro.
+	if _, err := pool.Exec(ctx, `
+		CREATE TABLE schema_migrations (
+			version    integer     PRIMARY KEY,
+			name       text        NOT NULL,
+			applied_at timestamptz NOT NULL DEFAULT now()
+		);
+		INSERT INTO schema_migrations (version, name) VALUES (1, 'initial_schema');
+		CREATE TABLE registros_bloco (id uuid PRIMARY KEY)`,
+	); err != nil {
+		t.Fatalf("montando o banco antigo: %v", err)
+	}
+
+	err := db.Migrate(ctx, pool, migrations.FS)
+	if err == nil {
+		t.Fatal("migrar sobre o banco de outra linhagem devia falhar")
+	}
+
+	if !errors.Is(err, db.ErrBancoDeOutraLinhagem) {
+		t.Fatalf("erro = %v, quer ErrBancoDeOutraLinhagem", err)
+	}
+
+	// A mensagem tem de dizer o que fazer, não só que deu errado.
+	if !strings.Contains(err.Error(), "banco vazio") {
+		t.Errorf("mensagem = %q, devia apontar a saída", err)
+	}
 }

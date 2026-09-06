@@ -27,6 +27,10 @@ const migrateLockID = 8_274_411_903
 // order, inside a transaction each, and records them in schema_migrations. It is
 // safe to call concurrently from multiple processes: a Postgres advisory lock
 // serializes the runs, and already-applied versions are skipped.
+// ErrBancoDeOutraLinhagem marca o banco que registra as migrations desta
+// aplicação sem ter o schema dela.
+var ErrBancoDeOutraLinhagem = errors.New("banco de outra linhagem")
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
@@ -68,7 +72,45 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
 		}
 	}
 
-	return nil
+	return conferirLinhagem(ctx, pool)
+}
+
+// tabelaCanaria é a tabela que só existe neste schema. Se uma migration futura
+// a renomear, é aqui que o nome muda.
+const tabelaCanaria = "atividades"
+
+// conferirLinhagem recusa um banco que não é desta aplicação.
+//
+// A numeração das migrations recomeça a cada linhagem do projeto, então um
+// banco antigo pode ter a versão 1 registrada em schema_migrations sem nunca
+// ter visto esta baseline. O runner então não aplica nada — corretamente, do
+// ponto de vista dele — e o backend sobe contra um schema que não é o seu.
+//
+// O estrago é silencioso: /health só dá ping no banco, responde 200, e o deploy
+// é declarado bem-sucedido enquanto toda consulta real falha. Falhar aqui é o
+// que transforma isso num deploy vermelho, que o Ansible reverte sozinho.
+func conferirLinhagem(ctx context.Context, pool *pgxpool.Pool) error {
+	var existe bool
+
+	if err := pool.QueryRow(
+		ctx,
+		`SELECT to_regclass('public.' || $1) IS NOT NULL`,
+		tabelaCanaria,
+	).Scan(&existe); err != nil {
+		return fmt.Errorf("conferindo o schema: %w", err)
+	}
+
+	if existe {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"%w: as migrations constam como aplicadas, mas a tabela %q não existe. "+
+			"O banco veio de outra linhagem do projeto, cujo schema_migrations "+
+			"também registra a versão 1 — este app não sabe ler aquele schema. "+
+			"Use um banco vazio ou restaure um dump desta versão",
+		ErrBancoDeOutraLinhagem, tabelaCanaria,
+	)
 }
 
 func applyOne(ctx context.Context, pool *pgxpool.Pool, m migration) error {

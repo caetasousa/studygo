@@ -118,6 +118,48 @@ worker pode subir junto sem corrida) e é seguro repetir.
 
 ---
 
+## 🗄️ Estrear esta versão num servidor que já rodou outra
+
+O banco de produção veio da linhagem anterior do projeto (`annyGo`), cujo
+modelo é outro: o cronograma materializado, o registro por atividade e o
+caderno não existiam naquele schema.
+
+A numeração das migrations recomeçou aqui, então aquele banco tem a **versão 1
+registrada** em `schema_migrations` sem nunca ter visto esta baseline. O runner
+concluiria que não há nada a aplicar e o backend subiria contra o schema
+errado — e como `/health` só dá ping no banco, o deploy passaria verde com
+todas as telas quebradas.
+
+Por isso o runner recusa: quando as migrations constam como aplicadas e a
+tabela `atividades` não existe, ele falha com `banco de outra linhagem`, o
+health não responde e o `deploy.yml` restaura a versão anterior sozinho.
+
+Para estrear, o volume antigo sai e o Postgres cria o banco do zero — mesmos
+nomes, dados novos. **Uma vez, na VPS, e nunca pela pipeline:**
+
+```bash
+ssh annyGo@SEU_IP
+cd /opt/annygo
+
+# 1. leve um dump antes, mesmo que os dados não sirvam mais aqui:
+#    é o que permite consultar o que existia se faltar alguma coisa depois.
+docker compose exec -T postgres pg_dumpall -U annygo > ~/annygo-$(date +%F).sql
+
+# 2. derruba a aplicação e apaga SÓ o volume do banco
+docker compose down
+docker volume rm annygo_postgres_data
+```
+
+O volume `annygo_edital_work` é cache do processador de editais e pode ficar.
+Na próxima tag, `deploy_production` sobe a aplicação, o Postgres cria o banco
+vazio e a baseline aplica.
+
+Os dados voltam pelo CSV: exporte no app antigo antes de derrubá-lo e importe
+em **Ajustes → Importar de uma planilha** depois que a conta estiver criada. O
+que o CSV não leva é a conta em si (cadastre de novo).
+
+---
+
 ## 🔑 Segredos e variáveis
 
 | | Onde | Arquivo | Contém |
