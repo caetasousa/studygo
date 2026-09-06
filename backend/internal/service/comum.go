@@ -206,6 +206,38 @@ func configPadrao(cur concurso.Concurso, agora time.Time) plano.Config {
 	return cfg.Normalizar()
 }
 
+// compactarDesde fecha os vãos a partir de `desde` e preenche com reforço o que
+// sobrar no fim da fase de aprendizado.
+//
+// As duas metades só fazem sentido juntas: a compactação empurra o plano para
+// cima e empilha os dias livres no FIM da fase; sem o reforço, um dia em branco
+// logo antes da reta final é o mesmo buraco que acabou de ser fechado, só que
+// deslocado.
+//
+// A ORDEM é preservada: o que está agendado a partir de `desde` vira uma fila
+// na sequência em que está hoje, e os dias são reempacotados a partir dela. É o
+// que separa compactar de reorganizar — este devolve a decisão ao motor, aquele
+// só encosta as matérias umas nas outras.
+func compactarDesde(
+	c contexto,
+	atividades []plano.Atividade,
+	desde time.Time,
+) []plano.Atividade {
+	res := plano.Gerar(c.Plano.Config, &c.Concurso)
+	concluido := c.DiaConcluido()
+
+	compactadas := plano.CompactarAtividades(atividades, res.Dias, desde, concluido)
+
+	return plano.PreencherVazios(compactadas, res.Dias, plano.Reforco{
+		Fila: plano.FilaDeReforco(
+			res.Dias,
+			plano.Caderno(resultadosDoPlano(res.Dias, c)),
+		),
+		Desde:     desde,
+		Concluido: concluido,
+	})
+}
+
 // idsPorCodigo indexa as disciplinas pelo código, que é como o motor as nomeia.
 func idsPorCodigo(cur concurso.Concurso) map[string]uuid.UUID {
 	out := make(map[string]uuid.UUID, len(cur.Disciplinas))

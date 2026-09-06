@@ -56,6 +56,9 @@ func (s *CronogramaService) Mover(
 		return PlanoMontado{}, erroDeValidacao("uma matéria já concluída não pode ser movida")
 	}
 
+	atual, _ := plano.PorID(c.Atividades, cmd.ID)
+	origem := plano.DayOf(atual.Data)
+
 	// A troca move DUAS atividades; a checagem acima protege só o lado de quem
 	// pediu. Sem isto, trocar um bloco a estudar por um já concluído deslocaria o
 	// concluído sem tocar no registro dele, e a conclusão passaria a apontar para
@@ -86,7 +89,31 @@ func (s *CronogramaService) Mover(
 		return PlanoMontado{}, erroDeReplanejamento(err)
 	}
 
+	if vaoAberto(cmd, origem, destino) {
+		movidas = compactarDesde(c, movidas, naoAntesDe(origem, plano.DayOf(s.relogio.Now())))
+	}
+
 	return s.gravarEMontar(ctx, c, movidas)
+}
+
+// vaoAberto diz se o movimento deixou o dia de origem com uma vaga a menos.
+//
+// Só subir a matéria para um dia ANTERIOR abre vão: a troca leva duas matérias
+// e mantém a conta de cada dia, e mandar uma para a frente é uma escolha
+// deliberada de data — encostar o cronograma ali a traria de volta, desfazendo
+// o que o estudante acabou de pedir.
+func vaoAberto(cmd MoverCommand, origem, destino time.Time) bool {
+	return !cmd.Trocar && destino.Before(origem)
+}
+
+// naoAntesDe evita fechar um vão puxando o futuro para dentro do passado:
+// aquele dia já aconteceu, e o que ele não recebeu não é mais agendável.
+func naoAntesDe(dt, piso time.Time) time.Time {
+	if dt.Before(piso) {
+		return piso
+	}
+
+	return dt
 }
 
 // AdiarDia empurra o conteúdo de um dia perdido para a frente, deslocando o
@@ -167,30 +194,9 @@ func (s *CronogramaService) Compactar(
 		return PlanoMontado{}, err
 	}
 
-	return s.gravarEMontar(ctx, c, s.compactar(c, plano.DayOf(s.relogio.Now())))
-}
-
-// compactar fecha os buracos a partir de `desde` e preenche com reforço o que
-// sobrar no fim da fase de aprendizado.
-//
-// As duas metades só fazem sentido juntas: a compactação empurra o plano para
-// cima e empilha os dias livres no FIM da fase; sem o reforço, um dia em branco
-// logo antes da reta final é o mesmo buraco que acabou de ser fechado, só que
-// deslocado.
-func (s *CronogramaService) compactar(c contexto, desde time.Time) []plano.Atividade {
-	res := plano.Gerar(c.Plano.Config, &c.Concurso)
-	concluido := c.DiaConcluido()
-
-	atividades := plano.CompactarAtividades(c.Atividades, res.Dias, desde, concluido)
-
-	return plano.PreencherVazios(atividades, res.Dias, plano.Reforco{
-		Fila: plano.FilaDeReforco(
-			res.Dias,
-			plano.Caderno(resultadosDoPlano(res.Dias, c)),
-		),
-		Desde:     desde,
-		Concluido: concluido,
-	})
+	return s.gravarEMontar(
+		ctx, c, compactarDesde(c, c.Atividades, plano.DayOf(s.relogio.Now())),
+	)
 }
 
 // RestaurarOrdem descarta as movimentações manuais e devolve o cronograma ao

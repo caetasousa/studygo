@@ -79,7 +79,10 @@ func (s *RegistroService) Registrar(
 	hoje := plano.DayOf(s.relogio.Now())
 
 	if reg.Concluido && plano.DayOf(atividade.Data).After(hoje) {
-		if err := s.anteciparEReorganizar(ctx, &c, cmd.AtividadeID, hoje); err != nil {
+		err := s.anteciparEReorganizar(
+			ctx, &c, cmd.AtividadeID, plano.DayOf(atividade.Data), hoje,
+		)
+		if err != nil {
 			return PlanoMontado{}, err
 		}
 	}
@@ -93,7 +96,7 @@ func (s *RegistroService) anteciparEReorganizar(
 	ctx context.Context,
 	c *contexto,
 	id uuid.UUID,
-	hoje time.Time,
+	origem, hoje time.Time,
 ) error {
 	res := plano.Gerar(c.Plano.Config, &c.Concurso)
 
@@ -105,6 +108,11 @@ func (s *RegistroService) anteciparEReorganizar(
 		// salvo. A atividade fica onde está em vez de o lançamento falhar.
 		return nil //nolint:nilerr // a recusa do remanejamento não invalida o registro
 	}
+
+	// O dia de onde a matéria saiu fica com uma vaga a menos. Encostar o que
+	// vem depois — na ordem em que está — é o que faz adiantar-se comprar tempo
+	// em vez de abrir um vão que vira dia vazio na segunda vez.
+	movidas = compactarDesde(*c, movidas, origem)
 
 	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, movidas); err != nil {
 		return err

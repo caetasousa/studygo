@@ -510,19 +510,21 @@
 
 				<h2 class="sec">Reordenação manual</h2>
 				<p class="page-sub" style="margin-top:0">
-					No Cronograma, cada matéria é movida sozinha: use as setas para mudá-la de
-					posição no dia, o menu <b>…</b> para enviá-la a outra data, ou arraste-a. O
-					dia inteiro não é movido — só as matérias dentro dele. Dias concluídos e
-					dias fixos não podem ser alterados.
+					No Cronograma, cada matéria é movida sozinha: as setas <b>↑ ↓</b> trocam a
+					matéria de lugar dentro do dia e, na borda dele, a levam para o dia
+					vizinho. O dia inteiro não é movido — só as matérias dentro dele. Uma
+					matéria já concluída não se move, e dia fixo não recebe conteúdo.
 				</p>
 				<p class="page-sub" style="margin-top:0">
-					Adiantou assuntos e sobraram dias vazios no meio? Compactar puxa o
-					cronograma para trás, e o tempo livre passa a se acumular no fim — onde
+					Adiantar uma matéria já fecha sozinho o vão que ela deixa: o que vinha
+					depois sobe uma vaga, na mesma ordem. <b>Compactar</b> faz isso no
+					cronograma inteiro, de hoje em diante — é para arrumar vãos antigos, e
+					também mantém a sua ordem. O tempo livre passa a se acumular no fim, onde
 					cabe mais conteúdo antes da prova.
 				</p>
 				<div class="form-grid">
 					<button class="btn" onclick={compactar} disabled={compactando}>
-						{compactando ? 'Compactando…' : '⇡ Compactar dias vazios'}
+						{compactando ? 'Compactando…' : '⇡ Compactar o cronograma'}
 					</button>
 					<button class="btn" disabled={!plano.temMovimentacaoManual} onclick={restaurar}>
 						↺ Restaurar ordem automática
@@ -535,9 +537,11 @@
 				</div>
 
 				<p class="page-sub" style="margin:14px 0 8px">
-					Registrou dias que já passaram e quer o cronograma refeito dali para a
-					frente? Escolha a data: o que tem registro fica onde está, e o resto é
-					redistribuído pelos dias que sobram até a prova.
+					Registrou dias que já passaram e quer o cronograma <b>refeito</b> dali para
+					a frente? Escolha a data: o que tem registro fica onde está, e o resto é
+					redistribuído pelos dias que sobram até a prova. Aqui quem decide a
+					sequência é o motor — se você arrumou a ordem à mão, ela é refeita.
+					Para só fechar vãos sem perder a sua ordem, use Compactar.
 				</p>
 				<div class="form-grid">
 					<input
