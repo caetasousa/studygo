@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"slices"
+	"time"
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )
@@ -90,7 +92,7 @@ func (s *PlanoService) Salvar(
 	// O replanejamento respeita o que já passou, o que está concluído e o que o
 	// estudante arrumou à mão.
 	if plano.RitmoMudou(anterior, cfg) || datasMudaram(anterior, cfg) {
-		if err := s.replanejarFuturo(ctx, &c); err != nil {
+		if err := s.replanejarFuturo(ctx, &c, desdeQuando(anterior, cfg, s.relogio)); err != nil {
 			return PlanoMontado{}, err
 		}
 	}
@@ -134,15 +136,39 @@ func datasMudaram(antes, depois plano.Config) bool {
 	return len(antes.Reforcos) != len(depois.Reforcos)
 }
 
-// replanejarFuturo regera os dias a partir de hoje e grava o resultado.
-func (s *PlanoService) replanejarFuturo(ctx context.Context, c *contexto) error {
+// desdeQuando diz de que dia em diante o replanejamento pode mexer.
+//
+// Normalmente é HOJE: o passado é história, e um dia perdido continua perdido.
+//
+// A exceção é o início do plano andando para TRÁS. O trecho que acabou de
+// entrar nunca existiu no cronograma — não há história ali para proteger —, e
+// sem materializá-lo o estudante muda a data, vê o plano crescer e não encontra
+// nada nos dias novos. É o caso de quem está recadastrando um histórico que
+// começa antes de onde o plano nasceu.
+func desdeQuando(antes, depois plano.Config, relogio port.Clock) time.Time {
+	hoje := plano.DayOf(relogio.Now())
+	inicio := plano.DayOf(depois.Inicio)
+
+	if inicio.Before(plano.DayOf(antes.Inicio)) && inicio.Before(hoje) {
+		return inicio
+	}
+
+	return hoje
+}
+
+// replanejarFuturo regera os dias a partir de `desde` e grava o resultado.
+func (s *PlanoService) replanejarFuturo(
+	ctx context.Context,
+	c *contexto,
+	desde time.Time,
+) error {
 	res := plano.Gerar(c.Plano.Config, &c.Concurso)
 	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
 
 	atividades := plano.Replanejar(
 		c.Atividades,
 		novas,
-		plano.DayOf(s.relogio.Now()),
+		desde,
 		c.Registros.Concluida,
 	)
 
