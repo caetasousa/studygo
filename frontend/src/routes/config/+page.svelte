@@ -10,7 +10,6 @@
 	const plano = $derived(planoStore.plano);
 	const cfg = $derived(plano?.config);
 	const disciplinas = $derived(plano?.concurso.disciplinas ?? []);
-	const balanceamento = $derived(plano?.balanceamento ?? []);
 
 	function salvar(patch: ConfigInput) {
 		void planoStore.salvarConfig(patch);
@@ -127,15 +126,6 @@
 
 
 
-
-	// Quantas vezes mais uma matéria aparece que uma básica (peso 1, reforço 1).
-	function frequenciaRelativa(codigo: string): number {
-		if (!cfg) return 1;
-		const l = balanceamento.find((x) => x.codigo === codigo);
-		const peso = l?.peso ?? 1;
-		const reforco = cfg.reforcos[codigo] ?? 1;
-		return peso * reforco;
-	}
 
 	let baixando = $state(false);
 	async function baixarCsv() {
@@ -488,14 +478,10 @@
 				</p>
 				<div class="modos">
 					{#each disciplinas as d (d.codigo)}
-						{@const rel = frequenciaRelativa(d.codigo)}
 						<div class="modo-linha">
 							<span class="modo-nome">
 								<span class="chip-dot" style="background:var(--c{d.cor}-tx)"></span>
 								<span class="modo-nome-txt">{d.nome}</span>
-								<em class="peso-tag">
-									peso {d.peso}{#if rel !== 1} · ~{nf1.format(rel)}× as básicas{/if}
-								</em>
 							</span>
 							<div class="day-sel">
 								{#each MODOS as m (m.v)}
@@ -605,16 +591,17 @@
 	   ele — "Engenharia de Software Assistida por Inteligência Artificial"
 	   virava "E...", e o estudante não sabia em que matéria estava clicando.
 	   
-	   Os grupos se alinham entre matérias sem esforço: os rótulos são os
-	   mesmos em toda linha, então `max-content` dá a mesma largura a todas. */
+	   O nome quebra a linha sozinho (`flex-basis: 100%`) em vez de esticar
+	   colunas de grid: assim um nome comprido não empurra o grupo de reforço
+	   para a direita só naquela matéria. Como os rótulos dos botões são os
+	   mesmos em toda linha, os dois grupos ficam alinhados entre as matérias. */
 	.modos {
 		display: flex;
 		flex-direction: column;
 	}
 	.modo-linha {
-		display: grid;
-		grid-template-columns: max-content max-content;
-		justify-content: start;
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 5px 10px;
 		padding: 8px 0;
@@ -624,7 +611,7 @@
 		border-bottom: none;
 	}
 	.modo-nome {
-		grid-column: 1 / -1;
+		flex: 0 0 100%;
 		display: flex;
 		align-items: baseline;
 		gap: 6px;
@@ -635,13 +622,6 @@
 		min-width: 0;
 		font-weight: 500;
 	}
-	.peso-tag {
-		flex: none;
-		font-style: normal;
-		font-family: var(--font-mono);
-		font-size: 10.5px;
-		color: var(--text-faint);
-	}
 	.reforco button[aria-pressed='true'] {
 		background: var(--warn-soft);
 		color: var(--warn);
@@ -650,11 +630,8 @@
 		white-space: nowrap;
 	}
 
-	/* Sem largura para os dois grupos lado a lado, o de reforço desce. */
+	/* Sem largura nem para um grupo inteiro, os botões dele também quebram. */
 	@media (max-width: 560px) {
-		.modo-linha {
-			grid-template-columns: 1fr;
-		}
 		.modo-linha .day-sel {
 			flex-wrap: wrap;
 		}
