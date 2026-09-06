@@ -171,7 +171,12 @@ func (s *ConcursoService) Atualizar(
 }
 
 // preservarIdentidade casa as disciplinas que chegaram com as já gravadas,
-// mantendo id e código. Uma matéria sem id é nova e recebe os dois.
+// mantendo o id. Uma matéria sem id é nova.
+//
+// A tag é do usuário: a que veio no formulário vale. Só quando ela chega vazia
+// a matéria conhecida fica com a que já tinha — assim um cliente que não
+// conhece o campo (uma aba antiga aberta) não regenera o mnemônico de todo o
+// concurso sem querer.
 func preservarIdentidade(novo *concurso.Concurso, atual concurso.Concurso) {
 	porID := make(map[uuid.UUID]concurso.Disciplina, len(atual.Disciplinas))
 	for _, d := range atual.Disciplinas {
@@ -180,13 +185,18 @@ func preservarIdentidade(novo *concurso.Concurso, atual concurso.Concurso) {
 
 	for i := range novo.Disciplinas {
 		d := &novo.Disciplinas[i]
+		d.Codigo = concurso.NormalizarCodigo(d.Codigo)
 
-		if anterior, ok := porID[d.ID]; ok {
-			d.Codigo = anterior.Codigo
-		} else {
-			// Não é uma disciplina conhecida deste concurso: trate como nova.
+		anterior, conhecida := porID[d.ID]
+		if !conhecida {
+			// Não é uma disciplina deste concurso: trate como nova.
 			d.ID = uuid.Nil
-			d.Codigo = ""
+
+			continue
+		}
+
+		if d.Codigo == "" {
+			d.Codigo = anterior.Codigo
 		}
 	}
 }
@@ -247,6 +257,7 @@ func concursoDoComando(cmd ConcursoCommand) (concurso.Concurso, []string) {
 
 	for _, dc := range cmd.Disciplinas {
 		d := concurso.Disciplina{
+			Codigo:         dc.Codigo,
 			Nome:           dc.Nome,
 			Bloco:          concurso.BlocoValido(dc.Bloco),
 			Peso:           dc.Peso,

@@ -61,6 +61,12 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, validacao.Msg
 	}
 
+	// A tag repetida nomeia a tag, então é um tipo e não um sentinela.
+	var tagRepetida concurso.ErrCodigoRepetido
+	if errors.As(err, &tagRepetida) {
+		return http.StatusUnprocessableEntity, tagRepetida.Error()
+	}
+
 	switch {
 	case errors.Is(err, usuario.ErrEmailEmUso):
 		return http.StatusConflict, usuario.ErrEmailEmUso.Error()

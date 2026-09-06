@@ -24,9 +24,12 @@ type ConcursoCommand struct {
 
 // DisciplinaCommand é uma matéria do formulário. ID vem preenchido quando a
 // matéria já existe: é o que permite editar o concurso sem desligar o
-// cronograma dela.
+// cronograma dela. Codigo é a tag que o usuário escolheu para o chip do
+// cronograma; vazia, a matéria mantém a que já tinha (ou ganha uma derivada do
+// nome, se for nova).
 type DisciplinaCommand struct {
 	ID         string
+	Codigo     string
 	Nome       string
 	Bloco      string
 	Questoes   int
@@ -271,6 +274,7 @@ func detalheDe(c concurso.Concurso) ConcursoDetalhe {
 
 		discs = append(discs, DisciplinaCommand{
 			ID:         d.ID.String(),
+			Codigo:     d.Codigo,
 			Nome:       d.Nome,
 			Bloco:      string(d.Bloco),
 			Questoes:   d.QuestoesPadrao,

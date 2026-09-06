@@ -144,7 +144,10 @@ Regras que o schema carrega:
   `plano_disciplinas.disciplina_id` são FKs de verdade. O `codigo` da disciplina
   é o mnemônico exibido ("DIRAD"), único no concurso — mas quem identifica é a
   chave primária. Editar o concurso preserva os ids, e por isso renomear uma
-  matéria não desliga o cronograma nem o histórico dela.
+  matéria não desliga o cronograma nem o histórico dela. É essa separação que
+  deixa o usuário escolher a própria tag ("RLM" no lugar de "MATRA") sem
+  consequência nenhuma: o formulário devolve `id` e `codigo`, e trocar o rótulo
+  não move FK alguma.
 - **O registro é história.** `registros_atividade.atividade_id` é NOT NULL, UNIQUE
   e **ON DELETE RESTRICT**: uma atividade já estudada não pode simplesmente sumir
   do cronograma.

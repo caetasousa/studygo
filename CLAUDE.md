@@ -81,7 +81,9 @@ A persistência acontece no backend após confirmação do usuário.
 - Um registro é história: a FK `registros_atividade → atividades` é RESTRICT.
 - A geração do plano é protegida pelo golden test em `backend/internal/domain/plano`.
 - A sigla de disciplina tem **uma única implementação**, em
-  `domain/concurso/sigla.go`. O frontend exibe o `codigo` que a API manda.
+  `domain/concurso/sigla.go` — tanto derivar do nome quanto normalizar a tag que
+  o usuário escolheu. O frontend exibe o `codigo` que a API manda e nunca o
+  calcula.
 
 ## 🐘 Banco de dados e migrations
 

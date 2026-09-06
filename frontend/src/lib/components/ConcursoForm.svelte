@@ -107,6 +107,9 @@
 		// submit: sem ela o servidor recria a matéria, e o cronograma e o
 		// histórico dela ficam apontando para o nada. Vazia numa matéria nova.
 		id: string;
+		// Tag do chip do cronograma. Vazia = o servidor decide (mantém a atual,
+		// ou deriva do nome numa matéria nova).
+		codigo: string;
 		nome: string;
 		bloco: 'esp' | 'ger';
 		questoes: number;
@@ -121,6 +124,7 @@
 	let discs = $state<DiscForm[]>(
 		(seed.disciplinas.length ? seed.disciplinas : [vazia()]).map((d) => ({
 			id: d.id ?? '',
+			codigo: d.codigo ?? '',
 			nome: d.nome,
 			bloco: d.bloco,
 			questoes: d.questoes,
@@ -197,6 +201,7 @@
 	function addDisc() {
 		discs.push({
 			id: '',
+			codigo: '',
 			nome: '',
 			bloco: 'esp',
 			questoes: 0,
@@ -240,6 +245,9 @@
 		e.preventDefault();
 		const disciplinas: DisciplinaInput[] = discs.map((d) => ({
 			id: d.id,
+			// Quem normaliza a tag (caixa alta, sem acento, tamanho) é o servidor:
+			// a regra do mnemônico tem uma implementação só, e não é esta.
+			codigo: d.codigo.trim(),
 			nome: d.nome.trim(),
 			bloco: d.bloco,
 			questoes: Math.max(0, d.questoes || 0),
@@ -384,6 +392,11 @@
 				Cada questão de <b>específicas</b> vale 2 pontos; de <b>gerais</b>, 1. É essa proporção que
 				divide o tempo. Os temas são opcionais — sem eles, o dia mostra o nome da disciplina.
 			</p>
+			<p class="page-sub" id="cf-tag-dica" style="margin-top:0">
+				A <b>tag</b> é o rótulo curto que aparece no cronograma — troque
+				<code>MATRA</code> por <code>RLM</code> se preferir. Em branco, ela é criada a partir do
+				nome. Duas matérias não podem usar a mesma.
+			</p>
 
 			{#each discs as d, i (i)}
 				<div class="card" style="margin-top:12px">
@@ -392,6 +405,18 @@
 							<div class="field" style="flex:1 1 220px">
 								<label for="cf-d{i}-nome">Disciplina *</label>
 								<input id="cf-d{i}-nome" type="text" bind:value={d.nome} required style="width:100%" />
+							</div>
+							<div class="field">
+								<label for="cf-d{i}-tag">Tag</label>
+								<input
+									class="tag-in"
+									id="cf-d{i}-tag"
+									type="text"
+									maxlength="6"
+									placeholder="auto"
+									aria-describedby="cf-tag-dica"
+									bind:value={d.codigo}
+								/>
 							</div>
 							<div class="field">
 								<label for="cf-d{i}-grupo">Grupo</label>
@@ -587,6 +612,14 @@
 {/if}
 
 <style>
+	/* A tag é curta e vira maiúscula ao ser gravada — o campo já a mostra assim,
+	   para que o que se digita seja o que aparece no chip do cronograma. */
+	.tag-in {
+		width: 88px;
+		font-family: var(--font-mono);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
 	.dica-dividir {
 		margin: 8px 0 0;
 		font-size: 12px;

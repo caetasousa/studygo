@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/plano"
 
 	"github.com/google/uuid"
 )
@@ -261,5 +262,83 @@ func TestConcursoRepo_RemoverLevaOCatalogo(t *testing.T) {
 		if restantes != 0 {
 			t.Errorf("sobraram %d linhas em %s depois de apagar o concurso", restantes, tabela)
 		}
+	}
+}
+
+// A tag da disciplina é rótulo, não chave: trocá-la ("BANDA" -> "BD") não pode
+// mexer no cronograma, no histórico nem nos ajustes por matéria — todos ligados
+// pelo id. É o que sustenta deixar o usuário escolher a própria tag.
+func TestConcursoRepo_TrocarATagNaoDesligaOPlano(t *testing.T) {
+	t.Parallel()
+
+	r := novoRepos(t)
+	u := r.criarUsuario(t, "tag@b.c")
+	c := r.criarConcurso(t, u, "tce-go")
+	p := r.criarPlano(t, u, c)
+
+	// Ajustes que o usuário fez para a matéria, gravados sob a tag antiga.
+	p.Config.Modos = map[string]plano.Modo{"BANDA": plano.ModoQuestoes}
+	p.Config.Reforcos = map[string]float64{"BANDA": 2}
+
+	if _, err := r.planos.Salvar(t.Context(), p); err != nil {
+		t.Fatalf("salvando ajustes: %v", err)
+	}
+
+	bd := c.Disciplinas[1]
+	lidas := r.criarAtividades(t, p, c, []plano.Atividade{
+		umDia(bd, dia(2026, time.September, 1), 0, "SQL"),
+	})
+
+	horas := 1.5
+	if err := r.cronograma.SalvarRegistro(t.Context(), p.ID, plano.RegistroAtividade{
+		AtividadeID: lidas[0].ID, Horas: &horas, Concluido: true,
+	}); err != nil {
+		t.Fatalf("SalvarRegistro: %v", err)
+	}
+
+	c.Disciplinas[1].Codigo = "BD"
+	if _, err := r.concursos.Atualizar(t.Context(), c); err != nil {
+		t.Fatalf("Atualizar: %v", err)
+	}
+
+	// A atividade continua sendo a mesma, apontando para a mesma matéria.
+	atividades, err := r.cronograma.Atividades(t.Context(), p.ID)
+	if err != nil {
+		t.Fatalf("Atividades: %v", err)
+	}
+
+	if len(atividades) != 1 || atividades[0].ID != lidas[0].ID {
+		t.Fatalf("o cronograma mudou depois da troca de tag: %+v", atividades)
+	}
+
+	if atividades[0].DisciplinaID == nil || *atividades[0].DisciplinaID != bd.ID {
+		t.Error("a atividade se desligou da matéria")
+	}
+
+	registros, err := r.cronograma.Registros(t.Context(), p.ID)
+	if err != nil {
+		t.Fatalf("Registros: %v", err)
+	}
+
+	if !registros.Concluida(lidas[0].ID) {
+		t.Error("o registro de estudo sumiu")
+	}
+
+	// E os ajustes voltam sob a tag NOVA: a coluna é o id, e o join traduz.
+	recarregado, err := r.planos.PorUsuario(t.Context(), u.ID, c.ID)
+	if err != nil {
+		t.Fatalf("PorUsuario: %v", err)
+	}
+
+	if got := recarregado.Config.Modos["BD"]; got != plano.ModoQuestoes {
+		t.Errorf("modo depois da troca = %q, quer %q", got, plano.ModoQuestoes)
+	}
+
+	if got := recarregado.Config.Reforcos["BD"]; got != 2 {
+		t.Errorf("reforço depois da troca = %v, quer 2", got)
+	}
+
+	if _, ainda := recarregado.Config.Modos["BANDA"]; ainda {
+		t.Error("a tag antiga continuou no plano")
 	}
 }

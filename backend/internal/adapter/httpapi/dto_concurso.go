@@ -25,8 +25,12 @@ type concursoRequest struct {
 // disciplinaRequest traz o `id` de volta ao servidor nas edições. É o que
 // permite renomear uma matéria sem que ela vire outra matéria — e sem que o
 // cronograma e o histórico dela se desliguem.
+//
+// `codigo` é a tag exibida no chip do cronograma. Vai e volta porque o usuário
+// pode escolhê-la; omitida, a matéria mantém a tag que já tem.
 type disciplinaRequest struct {
 	ID         string     `json:"id"`
+	Codigo     string     `json:"codigo"`
 	Nome       string     `json:"nome"`
 	Bloco      string     `json:"bloco"`
 	Questoes   int        `json:"questoes"`
@@ -225,6 +229,7 @@ func concursoParaComando(req concursoRequest) service.ConcursoCommand {
 
 		discs = append(discs, service.DisciplinaCommand{
 			ID:         d.ID,
+			Codigo:     d.Codigo,
 			Nome:       d.Nome,
 			Bloco:      d.Bloco,
 			Questoes:   d.Questoes,
@@ -272,6 +277,7 @@ func comandoParaConcurso(cmd service.ConcursoCommand) concursoRequest {
 
 		discs = append(discs, disciplinaRequest{
 			ID:         d.ID,
+			Codigo:     d.Codigo,
 			Nome:       d.Nome,
 			Bloco:      d.Bloco,
 			Questoes:   d.Questoes,

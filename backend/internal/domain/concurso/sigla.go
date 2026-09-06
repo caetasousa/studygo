@@ -158,3 +158,19 @@ func doisDigitos(n int) string {
 
 	return strconv.Itoa(n)
 }
+
+// TamanhoMaxCodigo limita o mnemônico ao que cabe no chip do cronograma sem
+// empurrar o tema para a linha de baixo. Os códigos derivados do nome têm no
+// máximo cinco letras; a folga extra é para quem escolhe a própria tag.
+const TamanhoMaxCodigo = 6
+
+// NormalizarCodigo prepara a tag que o usuário escolheu para uma disciplina:
+// ASCII maiúsculo, sem acento, sem espaço nem pontuação, no máximo
+// TamanhoMaxCodigo caracteres — o mesmo formato que Sigla produz, para que uma
+// tag escolhida e uma derivada sejam indistinguíveis no resto do sistema.
+//
+// Um texto sem letra nem dígito aproveitável devolve "", que quem chama lê como
+// "não escolheu": o código volta a ser derivado do nome.
+func NormalizarCodigo(s string) string {
+	return prefixo(semAcento(strings.ToLower(s)), TamanhoMaxCodigo)
+}

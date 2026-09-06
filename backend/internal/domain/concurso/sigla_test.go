@@ -121,3 +121,33 @@ func TestSigla_CasosDeEdital(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizarCodigo(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		nome     string
+		entrada  string
+		esperado string
+	}{
+		{"tag curta", "rlm", "RLM"},
+		{"já em caixa alta", "RLM", "RLM"},
+		{"com acento", "raciocínio", "RACIOC"},
+		{"com espaço e pontuação", "d. adm", "DADM"},
+		{"longa demais", "portugues", "PORTUG"},
+		{"com dígito", "lei8112", "LEI811"},
+		// Sem letra nem dígito não sobra tag: quem chama deriva do nome.
+		{"só símbolos", "--- ///", ""},
+		{"vazia", "  ", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.nome, func(t *testing.T) {
+			t.Parallel()
+
+			if got := concurso.NormalizarCodigo(tt.entrada); got != tt.esperado {
+				t.Errorf("NormalizarCodigo(%q) = %q, quer %q", tt.entrada, got, tt.esperado)
+			}
+		})
+	}
+}

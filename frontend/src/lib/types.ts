@@ -52,6 +52,11 @@ export interface DisciplinaInput {
 	 * criar.
 	 */
 	id?: string;
+	/**
+	 * Tag exibida no chip do cronograma ("RLM"). Escolhida pelo usuário; vazia,
+	 * o servidor mantém a que a matéria já tem ou deriva uma do nome.
+	 */
+	codigo?: string;
 	nome: string;
 	bloco: 'esp' | 'ger';
 	questoes: number;

@@ -23,6 +23,17 @@ var (
 	ErrSemPontos         = errors.New("some ao menos uma questão entre as disciplinas")
 )
 
+// ErrCodigoRepetido é a tag que o usuário deu a duas matérias. Ela nomeia a
+// tag porque o formulário tem uma linha por disciplina, e "está repetida" sem
+// dizer qual manda o estudante procurar.
+type ErrCodigoRepetido struct {
+	Codigo string
+}
+
+func (e ErrCodigoRepetido) Error() string {
+	return "a tag " + e.Codigo + " está em mais de uma matéria — cada uma precisa da sua"
+}
+
 // RetaPadraoDiasPadrao é quanto dura a reta final quando o cadastro não diz.
 // Abaixo de RetaPadraoDiasMinimo a reta não comporta nem uma semana de revisão
 // dirigida, então o valor é corrigido para o padrão.
@@ -123,6 +134,10 @@ type Concurso struct {
 // cronograma ("DIRAD"), único dentro do concurso — mas quem edita o concurso
 // não pode trocar a identidade da matéria, ou o histórico de estudo dela ficaria
 // apontando para o nada.
+//
+// O Codigo pode ser escolhido pelo usuário ("RLM" no lugar de "MATRA"): ele é
+// rótulo, não chave, e trocá-lo não desliga nada — atividades, registros e
+// ajustes por matéria apontam para o ID. Vazio, é derivado do nome.
 type Disciplina struct {
 	ID             uuid.UUID
 	Codigo         string
@@ -192,6 +207,7 @@ func (c *Concurso) Normalizar() {
 	for i := range c.Disciplinas {
 		d := &c.Disciplinas[i]
 		d.Nome = strings.TrimSpace(d.Nome)
+		d.Codigo = NormalizarCodigo(d.Codigo)
 		d.Bloco = BlocoValido(string(d.Bloco))
 		d.Peso = PesoDe(d.Bloco, d.Peso)
 		d.CadernoURL = strings.TrimSpace(d.CadernoURL)
@@ -259,7 +275,8 @@ func (c *Concurso) Normalizar() {
 }
 
 // atribuirCodigos garante que toda disciplina tenha um mnemônico único dentro
-// do concurso, PRESERVANDO o que as disciplinas já cadastradas têm.
+// do concurso, PRESERVANDO o que as disciplinas já cadastradas têm — inclusive
+// a tag que o usuário escolheu, que chega aqui já normalizada.
 //
 // Regerar todos os códigos a cada edição é o que desligava atividades e
 // registros da matéria: eles referenciam a disciplina, e um código novo em
@@ -300,6 +317,10 @@ func (c *Concurso) Validar() error {
 	}
 
 	pontos := 0
+	// Duas matérias com a mesma tag mostrariam o mesmo chip no cronograma, e o
+	// banco recusaria o UNIQUE (concurso_id, codigo) com uma mensagem que não
+	// diz nada a quem preencheu o formulário.
+	tags := make(map[string]bool, len(c.Disciplinas))
 
 	for _, d := range c.Disciplinas {
 		if d.Nome == "" {
@@ -309,6 +330,12 @@ func (c *Concurso) Validar() error {
 		if d.Bloco != BlocoEspecifico && d.Bloco != BlocoGeral {
 			return ErrBlocoInvalido
 		}
+
+		if tags[d.Codigo] {
+			return ErrCodigoRepetido{Codigo: d.Codigo}
+		}
+
+		tags[d.Codigo] = true
 
 		pontos += d.QuestoesPadrao * Peso[d.Bloco]
 	}
