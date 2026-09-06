@@ -45,6 +45,13 @@ export interface Fonte {
 }
 
 export interface DisciplinaInput {
+	/**
+	 * Identidade da matéria, devolvida ao servidor nas edições. É o que mantém
+	 * cronograma e histórico ligados quando ela é renomeada — uma matéria que
+	 * volta sem id é tratada como nova. Ausente nas que o formulário acabou de
+	 * criar.
+	 */
+	id?: string;
 	nome: string;
 	bloco: 'esp' | 'ger';
 	questoes: number;

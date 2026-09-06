@@ -103,6 +103,10 @@
 
 	// Disciplinas — temas/fontes edited as text, split on submit.
 	interface DiscForm {
+		// Identidade da matéria já cadastrada, guardada intacta e devolvida no
+		// submit: sem ela o servidor recria a matéria, e o cronograma e o
+		// histórico dela ficam apontando para o nada. Vazia numa matéria nova.
+		id: string;
 		nome: string;
 		bloco: 'esp' | 'ger';
 		questoes: number;
@@ -116,6 +120,7 @@
 
 	let discs = $state<DiscForm[]>(
 		(seed.disciplinas.length ? seed.disciplinas : [vazia()]).map((d) => ({
+			id: d.id ?? '',
 			nome: d.nome,
 			bloco: d.bloco,
 			questoes: d.questoes,
@@ -191,6 +196,7 @@
 
 	function addDisc() {
 		discs.push({
+			id: '',
 			nome: '',
 			bloco: 'esp',
 			questoes: 0,
@@ -233,6 +239,7 @@
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		const disciplinas: DisciplinaInput[] = discs.map((d) => ({
+			id: d.id,
 			nome: d.nome.trim(),
 			bloco: d.bloco,
 			questoes: Math.max(0, d.questoes || 0),
