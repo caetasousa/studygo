@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chave, migrar } from '$lib/storageKey';
+import { fmtDuracao } from '$lib/format';
 import {
 	agruparPorBloco,
+	horasEmMinutos,
+	minutosEmHoras,
 	VAZIO,
 	numeroHierarquico,
 	valoresIniciais,
@@ -275,5 +278,31 @@ describe('migração das chaves de armazenamento', () => {
 	it('monta a chave com o prefixo atual', () => {
 		expect(chave('.plano.tce.v1')).toBe('studygo.plano.tce.v1');
 		expect(chave(':rail')).toBe('studygo:rail');
+	});
+});
+
+describe('tempo de estudo', () => {
+	it('converte minutos em horas como o banco os guarda', () => {
+		expect(minutosEmHoras(30)).toBe(0.5);
+		expect(minutosEmHoras(90)).toBe(1.5);
+		// 25/60 é dízima; a coluna numeric(5,2) guardaria 0,42.
+		expect(minutosEmHoras(25)).toBe(0.42);
+		expect(minutosEmHoras(null)).toBeNull();
+	});
+
+	it('devolve o mesmo número que foi digitado', () => {
+		// O que se digita tem de voltar igual depois de gravado, ou o campo
+		// discorda de si mesmo a cada recarga da tela.
+		for (let min = 0; min <= 600; min++) {
+			expect(horasEmMinutos(minutosEmHoras(min))).toBe(min);
+		}
+	});
+
+	it('escreve a duração como se fala', () => {
+		expect(fmtDuracao(0)).toBe('0 min');
+		expect(fmtDuracao(45)).toBe('45 min');
+		expect(fmtDuracao(60)).toBe('1h');
+		expect(fmtDuracao(90)).toBe('1h30');
+		expect(fmtDuracao(125)).toBe('2h05');
 	});
 });

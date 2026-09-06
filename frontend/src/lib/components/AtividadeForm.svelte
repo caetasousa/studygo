@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { fl } from '$lib/format';
-	import { valoresIniciais, valoresInvalidos } from '$lib/estudo';
+	import { horasEmMinutos, minutosEmHoras, valoresIniciais, valoresInvalidos } from '$lib/estudo';
 	import type { Atividade } from '$lib/types';
 
 	/**
@@ -170,17 +170,20 @@
 		</p>
 
 		<div class="campos">
+			<!-- Em MINUTOS: o cronograma anuncia o bloco em minutos, e "45" é o que
+			     se tem na cabeça ao terminar de estudar. O registro continua sendo
+			     gravado em horas — a conversão acontece aqui. -->
 			<label class="campo">
-				<span>Horas estudadas</span>
+				<span>Minutos estudados</span>
 				<input
 					type="number"
 					min="0"
-					max="24"
-					step="0.25"
-					inputmode="decimal"
+					max="1440"
+					step="5"
+					inputmode="numeric"
 					bind:this={primeiro}
-					value={form.horas ?? ''}
-					oninput={(e) => (form.horas = num(e.currentTarget.value))}
+					value={horasEmMinutos(form.horas) ?? ''}
+					oninput={(e) => (form.horas = minutosEmHoras(inteiro(e.currentTarget.value)))}
 				/>
 			</label>
 

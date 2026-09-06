@@ -2,7 +2,9 @@
 	import { untrack } from 'svelte';
 	import type { Dia } from '$lib/types';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import { debounce, parseNum, parseInteger } from '$lib/debounce';
+	import { debounce, parseInteger } from '$lib/debounce';
+	import { horasEmMinutos, minutosEmHoras } from '$lib/estudo';
+	import { fmtDuracao } from '$lib/format';
 	import IconButton from './IconButton.svelte';
 
 	let {
@@ -97,7 +99,15 @@
 		return total;
 	}
 
-	const horasTotal = $derived(soma('horas'));
+	// O total do dia soma os MINUTOS de cada linha, não as horas: somar as horas
+	// arredondadas e converter no fim erraria o total por um minuto.
+	const minutosTotal = $derived(
+		linhas.reduce<number | null>((total, l) => {
+			const m = horasEmMinutos(campo(l.id).horas);
+
+			return m === null ? total : (total ?? 0) + m;
+		}, null)
+	);
 	const questoesTotal = $derived(soma('questoes'));
 	const acertosTotal = $derived(soma('acertos'));
 	const errosTotal = $derived(
@@ -142,8 +152,10 @@
 		});
 	}, 450);
 
+	// O campo de tempo é digitado em MINUTOS; o registro continua em horas, que é
+	// como a API o transporta.
 	function setCampo(id: string, chave: keyof Campos, bruto: string) {
-		const v = chave === 'horas' ? parseNum(bruto) : parseInteger(bruto);
+		const v = chave === 'horas' ? minutosEmHoras(parseInteger(bruto)) : parseInteger(bruto);
 		valores[id] = { ...campo(id), [chave]: v };
 		// Lançar horas numa matéria implica que você a estudou.
 		if (chave === 'horas' && v && !feitos[id]) feitos[id] = true;
@@ -195,7 +207,7 @@
 
 	const resumo = $derived(
 		[
-			horasTotal !== null ? `${horasTotal}h` : null,
+			minutosTotal !== null ? fmtDuracao(minutosTotal) : null,
 			questoesTotal !== null ? `${questoesTotal}q` : null,
 			acertosTotal !== null ? `${acertosTotal}✓` : null,
 			errosTotal ? `${errosTotal}✗` : null
@@ -227,14 +239,14 @@
 					{l.nome}
 				</span>
 				<label class="bl-in">
-					<span>horas</span>
+					<span>minutos</span>
 					<input
 						type="number"
 						min="0"
-						max="24"
-						step="0.25"
-						placeholder="0,00"
-						value={c.horas ?? ''}
+						max="1440"
+						step="5"
+						placeholder="0"
+						value={horasEmMinutos(c.horas) ?? ''}
 						oninput={(e) => setCampo(l.id, 'horas', e.currentTarget.value)}
 					/>
 				</label>
@@ -281,7 +293,7 @@
 			<div class="bl total">
 				<span aria-hidden="true"></span>
 				<span class="bl-nome">Total do dia</span>
-				<span class="bl-v">{horasTotal ?? '—'}<i>h</i></span>
+				<span class="bl-v">{minutosTotal === null ? '—' : fmtDuracao(minutosTotal)}</span>
 				{#if algumaComQuestoes}
 					<span class="bl-v">{questoesTotal ?? '—'}<i>q</i></span>
 					<span class="bl-v">{acertosTotal ?? '—'}<i>✓</i></span>
@@ -378,7 +390,7 @@
 	}
 	.bl {
 		display: grid;
-		/* check | discipline | horas | questões | acertos | erros */
+		/* check | discipline | minutos | questões | acertos | erros */
 		grid-template-columns: 22px minmax(0, 1fr) 84px 84px 84px 74px;
 		align-items: end;
 		gap: 8px;

@@ -27,8 +27,8 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   pontos, gerais vale 1; essa proporção define quantos dias cada disciplina
   recebe. Fases de **ciclo de conteúdo** (1ª passada no edital + revisão semanal)
   e **reta final** (revisão dirigida, discursiva, simulados).
-- **Registro por matéria** — horas, questões, acertos, conclusão e anotação de
-  **cada matéria**, não do dia inteiro: um dia pode estar meio feito, e a mesma
+- **Registro por matéria** — minutos estudados, questões, acertos, conclusão e
+  anotação de **cada matéria**, não do dia inteiro: um dia pode estar meio feito, e a mesma
   disciplina agendada duas vezes no mesmo dia tem registros independentes. O dia
   conclui sozinho quando todas as suas matérias concluem.
 - **Reorganizar o cronograma** — mova uma matéria para outro dia; se o destino já

@@ -64,8 +64,20 @@ export function rotulo(tipo: string): string {
 	}
 }
 
-export function fmtMinutos(min: number): string {
-	return `${min} min`;
+/**
+ * Duração de estudo escrita como se fala: "45 min", "1h30", "2h".
+ *
+ * O cronograma anuncia cada bloco em minutos, e é em minutos que o estudo é
+ * lançado; abaixo de uma hora o total continua em minutos em vez de virar uma
+ * fração de hora que ninguém lê de relance.
+ */
+export function fmtDuracao(min: number): string {
+	if (min < 60) return `${min} min`;
+
+	const h = Math.floor(min / 60);
+	const resto = min % 60;
+
+	return resto === 0 ? `${h}h` : `${h}h${String(resto).padStart(2, '0')}`;
 }
 
 /**

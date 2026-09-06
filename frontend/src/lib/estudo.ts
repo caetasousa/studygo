@@ -232,6 +232,29 @@ export function planoCorresponde(
  * pure so they can be tested without a DOM.
  * ------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------
+ * Horas gravadas, minutos digitados
+ *
+ * O registro é gravado em HORAS: é assim que a API o transporta e que as
+ * estatísticas somam a semana. Mas ninguém estuda "0,5 h" — o cronograma já
+ * anuncia cada bloco em minutos, e digitar 30 é o gesto natural. Quem lança
+ * converte na borda.
+ *
+ * O arredondamento em duas casas é o mesmo que a coluna `numeric(5,2)` do banco
+ * aplica, e é o que faz o número voltar como foi digitado: 25 min viram 0,42 h,
+ * que voltam a ser 25 min.
+ * ------------------------------------------------------------------------- */
+
+/** Horas gravadas -> minutos inteiros, para o campo de lançamento. */
+export function horasEmMinutos(horas: number | null): number | null {
+	return horas === null ? null : Math.round(horas * 60);
+}
+
+/** Minutos digitados -> horas, como a API e o banco as guardam. */
+export function minutosEmHoras(minutos: number | null): number | null {
+	return minutos === null ? null : Math.round((minutos / 60) * 100) / 100;
+}
+
 export interface ValoresAtividade {
 	horas: number | null;
 	questoes: number | null;
