@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHead from '$lib/components/PageHead.svelte';
 	import Ajuste from '$lib/components/Ajuste.svelte';
+	import ImportarCSV from '$lib/components/ImportarCSV.svelte';
 	import { planoStore, applyTheme, ehTema, type Tema } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -128,19 +129,27 @@
 
 
 	let baixando = $state(false);
+	let erroCsv = $state<string | null>(null);
+	// A exportação passa pelo cliente da API, e não por um fetch próprio: o
+	// access token expira em minutos, e sem a renovação o download vinha a ser o
+	// corpo do 401 — um arquivo com {"erro":"não autenticado"} dentro.
 	async function baixarCsv() {
+		if (baixando) return;
+
 		baixando = true;
+		erroCsv = null;
+
 		try {
-			const res = await fetch(planoStore.csvUrl(), {
-				headers: { Authorization: `Bearer ${auth.accessToken}` }
-			});
-			const blob = await res.blob();
+			const csv = await planoStore.exportarCsv();
+			const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
 			a.download = `plano-${concursoStore.ativoSlug ?? 'concurso'}.csv`;
 			a.click();
 			URL.revokeObjectURL(url);
+		} catch (e) {
+			erroCsv = e instanceof Error ? e.message : 'não consegui exportar agora';
 		} finally {
 			baixando = false;
 		}
@@ -569,14 +578,19 @@
 				</div>
 
 				<h2 class="sec">Dados</h2>
+				{#if erroCsv}<div class="form-error" style="margin-bottom:12px">{erroCsv}</div>{/if}
 				<div class="form-grid">
-					<button class="btn" onclick={baixarCsv} disabled={baixando}>⬇ Exportar CSV</button>
+					<button class="btn" onclick={baixarCsv} disabled={baixando}>
+						{baixando ? 'Exportando…' : '⬇ Exportar CSV'}
+					</button>
 					<button class="btn danger" onclick={limpar}>Limpar registros</button>
 				</div>
 				<p class="page-sub" style="margin-top:14px">
 					Seus dados ficam salvos no servidor, ligados à sua conta ({auth.usuario?.email}). O CSV é
-					uma cópia de segurança que você pode abrir no Excel.
+					uma cópia de segurança que você pode abrir no Excel — e é por ele que o histórico volta.
 				</p>
+
+				<ImportarCSV />
 			</div>
 		</div>
 	</div>

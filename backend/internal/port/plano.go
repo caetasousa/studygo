@@ -68,6 +68,13 @@ type CronogramaRepository interface {
 	// SalvarRegistro grava o lançamento de uma atividade.
 	SalvarRegistro(ctx context.Context, planoID uuid.UUID, r plano.RegistroAtividade) error
 
+	// SalvarRegistros grava vários lançamentos numa transação só.
+	//
+	// Existe para a importação de planilha, que chega com o histórico inteiro de
+	// uma vez: um INSERT por linha seriam centenas de idas ao banco, cada uma na
+	// sua transação, e uma falha no meio deixaria metade do histórico gravado.
+	SalvarRegistros(ctx context.Context, planoID uuid.UUID, rs []plano.RegistroAtividade) error
+
 	// ApagarRegistros limpa todo o histórico do plano.
 	ApagarRegistros(ctx context.Context, planoID uuid.UUID) error
 

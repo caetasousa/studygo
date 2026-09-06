@@ -259,6 +259,22 @@ func (f *fakeCronograma) SalvarRegistro(
 	return plano.ErrAtividadeNaoEncontrada
 }
 
+// SalvarRegistros aplica o lote linha a linha. O fake NÃO promete a
+// atomicidade do banco: quem testa "ou tudo ou nada" faz isso no PostgreSQL.
+func (f *fakeCronograma) SalvarRegistros(
+	ctx context.Context,
+	planoID uuid.UUID,
+	rs []plano.RegistroAtividade,
+) error {
+	for _, r := range rs {
+		if err := f.SalvarRegistro(ctx, planoID, r); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (f *fakeCronograma) ApagarRegistros(context.Context, uuid.UUID) error {
 	f.registros = plano.Registros{}
 	f.dias = map[time.Time]plano.RegistroDia{}

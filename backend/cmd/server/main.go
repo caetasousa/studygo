@@ -95,7 +95,7 @@ func run(logger *slog.Logger) error {
 			service.NewEstatisticaService(deps),
 			service.NewCadernoService(deps),
 			service.NewDossieService(deps),
-			service.NewExportacaoService(deps),
+			service.NewPlanilhaService(deps),
 			service.NewImportacaoTECService(deps),
 			logger,
 		),

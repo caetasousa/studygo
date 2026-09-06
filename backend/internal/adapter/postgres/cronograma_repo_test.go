@@ -439,3 +439,63 @@ func TestCronogramaRepo_AtividadesIsolamPorPlano(t *testing.T) {
 		t.Errorf("o plano A enxergou %d atividades: %+v", len(doA), doA)
 	}
 }
+
+// O lote da importação de planilha: uma transação, um upsert por linha. O que
+// importa aqui é o que o fake não modela — a atividade de outro plano não pode
+// receber registro, e o lote inteiro passa junto.
+func TestCronogramaRepo_SalvarRegistrosEmLote(t *testing.T) {
+	t.Parallel()
+
+	r := novoRepos(t)
+	u := r.criarUsuario(t, "lote@b.c")
+	c := r.criarConcurso(t, u, "tce-go")
+	p := r.criarPlano(t, u, c)
+
+	lidas := r.criarAtividades(t, p, c, []plano.Atividade{
+		umDia(c.Disciplinas[0], dia(2026, time.September, 1), 0, "Crase"),
+		umDia(c.Disciplinas[1], dia(2026, time.September, 2), 0, "SQL"),
+	})
+
+	horas := 0.75
+	questoes, acertos := 20, 16
+	deOutroPlano := uuid.New()
+
+	if err := r.cronograma.SalvarRegistros(t.Context(), p.ID, []plano.RegistroAtividade{
+		{AtividadeID: lidas[0].ID, Horas: &horas, Questoes: &questoes, Acertos: &acertos, Concluido: true},
+		{AtividadeID: lidas[1].ID, Horas: &horas, Concluido: true},
+		{AtividadeID: deOutroPlano, Horas: &horas, Concluido: true},
+	}); err != nil {
+		t.Fatalf("SalvarRegistros: %v", err)
+	}
+
+	registros, err := r.cronograma.Registros(t.Context(), p.ID)
+	if err != nil {
+		t.Fatalf("Registros: %v", err)
+	}
+
+	if len(registros) != 2 {
+		t.Fatalf("gravou %d registros, quer 2 — o id de fora entrou", len(registros))
+	}
+
+	primeiro := registros[lidas[0].ID]
+	if primeiro.Horas == nil || *primeiro.Horas != horas || !primeiro.Concluido {
+		t.Errorf("registro gravado = %+v", primeiro)
+	}
+
+	// De novo, por cima: o lote é upsert, não insert.
+	novasHoras := 1.25
+	if err := r.cronograma.SalvarRegistros(t.Context(), p.ID, []plano.RegistroAtividade{
+		{AtividadeID: lidas[0].ID, Horas: &novasHoras, Concluido: true},
+	}); err != nil {
+		t.Fatalf("SalvarRegistros (upsert): %v", err)
+	}
+
+	registros, err = r.cronograma.Registros(t.Context(), p.ID)
+	if err != nil {
+		t.Fatalf("Registros: %v", err)
+	}
+
+	if h := registros[lidas[0].ID].Horas; h == nil || *h != novasHoras {
+		t.Errorf("horas depois do upsert = %v, quer %v", h, novasHoras)
+	}
+}

@@ -187,23 +187,26 @@ func (r *CronogramaRepo) Registros(
 	return out, nil
 }
 
+// gravarRegistro é o upsert de um lançamento. A atividade precisa ser deste
+// plano: sem essa checagem, um id de outro plano gravaria um registro que a
+// leitura nunca devolveria.
+const gravarRegistro = `
+	INSERT INTO registros_atividade
+	  (atividade_id, horas, questoes, acertos, nota, concluido)
+	SELECT a.id, $3, $4, $5, $6, $7 FROM atividades a
+	 WHERE a.id = $2 AND a.plano_id = $1
+	ON CONFLICT (atividade_id) DO UPDATE SET
+	  horas = EXCLUDED.horas, questoes = EXCLUDED.questoes,
+	  acertos = EXCLUDED.acertos, nota = EXCLUDED.nota,
+	  concluido = EXCLUDED.concluido, atualizado_em = now()`
+
 func (r *CronogramaRepo) SalvarRegistro(
 	ctx context.Context,
 	planoID uuid.UUID,
 	reg plano.RegistroAtividade,
 ) error {
-	// A atividade precisa ser deste plano: sem essa checagem, um id de outro
-	// plano gravaria um registro que a leitura nunca devolveria.
 	ct, err := r.pool.Exec(
-		ctx,
-		`INSERT INTO registros_atividade
-		   (atividade_id, horas, questoes, acertos, nota, concluido)
-		 SELECT a.id, $3, $4, $5, $6, $7 FROM atividades a
-		  WHERE a.id = $2 AND a.plano_id = $1
-		 ON CONFLICT (atividade_id) DO UPDATE SET
-		   horas = EXCLUDED.horas, questoes = EXCLUDED.questoes,
-		   acertos = EXCLUDED.acertos, nota = EXCLUDED.nota,
-		   concluido = EXCLUDED.concluido, atualizado_em = now()`,
+		ctx, gravarRegistro,
 		planoID, reg.AtividadeID, reg.Horas, reg.Questoes, reg.Acertos,
 		reg.Nota, reg.Concluido,
 	)
@@ -213,6 +216,42 @@ func (r *CronogramaRepo) SalvarRegistro(
 
 	if ct.RowsAffected() == 0 {
 		return plano.ErrAtividadeNaoEncontrada
+	}
+
+	return nil
+}
+
+// SalvarRegistros grava o lote numa transação só: ou a planilha inteira entra,
+// ou nada entra. Uma atividade que não é deste plano simplesmente não casa no
+// SELECT e não grava nada — a checagem é a mesma de SalvarRegistro.
+func (r *CronogramaRepo) SalvarRegistros(
+	ctx context.Context,
+	planoID uuid.UUID,
+	rs []plano.RegistroAtividade,
+) error {
+	if len(rs) == 0 {
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	lote := &pgx.Batch{}
+
+	for _, reg := range rs {
+		lote.Queue(gravarRegistro, planoID, reg.AtividadeID, reg.Horas, reg.Questoes,
+			reg.Acertos, reg.Nota, reg.Concluido)
+	}
+
+	if err := tx.SendBatch(ctx, lote).Close(); err != nil {
+		return fmt.Errorf("gravando registros: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil

@@ -80,6 +80,7 @@ func NewRouter(
 
 	protegida("GET "+base+"/dossie", h.Plano.Dossie)
 	protegida("GET "+base+"/export.csv", h.Plano.ExportarCSV)
+	protegida("POST "+base+"/importar.csv", h.Plano.ImportarCSV)
 
 	protegida("POST "+base+"/tec/preview", h.Plano.PreviewTEC)
 	protegida("POST "+base+"/tec", h.Plano.ImportarTEC)

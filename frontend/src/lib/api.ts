@@ -12,6 +12,7 @@ import type {
 	Dossie,
 	Estatisticas,
 	EstruturaResposta,
+	ImportacaoCSV,
 	PlanoResposta,
 	PreviewTEC,
 	RegistroInput,
@@ -41,7 +42,19 @@ function mensagemHTTP(status: number): string {
 	}
 }
 
-async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+/**
+ * Uma requisição autenticada, com a renovação do token embutida.
+ *
+ * O access token é curto de propósito, então TODA chamada precisa passar por
+ * aqui: quem monta o próprio `fetch` com o token na mão funciona por alguns
+ * minutos e depois recebe 401 para sempre. Foi o que aconteceu com o download
+ * do CSV, que baixava `{"erro":"não autenticado"}` como se fosse a planilha.
+ */
+async function fetchAutenticado(
+	path: string,
+	init: RequestInit = {},
+	retry = true
+): Promise<Response> {
 	const headers = new Headers(init.headers);
 	if (auth.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`);
 	if (init.body && !headers.has('content-type') && typeof init.body === 'string') {
@@ -51,8 +64,36 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
 	const res = await fetch(path, { ...init, headers });
 
 	if (res.status === 401 && retry && (await auth.refresh())) {
-		return request<T>(path, init, false);
+		return fetchAutenticado(path, init, false);
 	}
+
+	return res;
+}
+
+/** Uma resposta que não é JSON — hoje, o CSV do plano. */
+async function requestTexto(path: string): Promise<string> {
+	const res = await fetchAutenticado(path);
+
+	if (!res.ok) {
+		if (res.status === 401) auth.clear();
+
+		// O corpo de erro é JSON mesmo quando a rota devolve texto.
+		const texto = await res.text();
+		let erro: string | undefined;
+		try {
+			erro = (JSON.parse(texto) as { erro?: string })?.erro;
+		} catch {
+			erro = undefined;
+		}
+
+		throw new ApiError(res.status, erro ?? mensagemHTTP(res.status));
+	}
+
+	return res.text();
+}
+
+async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+	const res = await fetchAutenticado(path, init, retry);
 
 	if (res.status === 204) return undefined as T;
 
@@ -239,7 +280,17 @@ export const api = {
 	dossie: (slug: string, disciplina: string) =>
 		request<Dossie>(`${planoBase(slug)}/dossie?disciplina=${encodeURIComponent(disciplina)}`),
 
-	exportCsvUrl: (slug: string) => `${planoBase(slug)}/export.csv`,
+	exportarCsv: (slug: string) => requestTexto(`${planoBase(slug)}/export.csv`),
+
+	/**
+	 * Lê uma planilha do plano. `confirmar: false` é a prévia — o servidor
+	 * responde o que entraria sem gravar nada.
+	 */
+	importarCsv: (slug: string, csv: string, confirmar: boolean) =>
+		request<ImportacaoCSV>(`${planoBase(slug)}/importar.csv`, {
+			method: 'POST',
+			body: JSON.stringify({ csv, confirmar })
+		}),
 
 	/** O tema é preferência do USUÁRIO, não do plano. */
 	definirTema: (temaUi: string) =>

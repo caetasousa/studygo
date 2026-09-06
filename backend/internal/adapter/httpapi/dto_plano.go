@@ -147,6 +147,56 @@ type temaRevisaoDTO struct {
 	Aproveitamento *int   `json:"aproveitamento"`
 }
 
+// --- importação de planilha ---
+
+type importacaoDTO struct {
+	Aplicadas []linhaImportadaDTO `json:"aplicadas"`
+	Recusadas []linhaRecusadaDTO  `json:"recusadas"`
+	Gravadas  int                 `json:"gravadas"`
+}
+
+type linhaImportadaDTO struct {
+	Linha      int    `json:"linha"`
+	Data       string `json:"data"`
+	Disciplina string `json:"disciplina"`
+	Tema       string `json:"tema"`
+	Minutos    *int   `json:"minutos"`
+	Questoes   *int   `json:"questoes"`
+	Acertos    *int   `json:"acertos"`
+	Concluido  bool   `json:"concluido"`
+}
+
+type linhaRecusadaDTO struct {
+	Linha      int    `json:"linha"`
+	Data       string `json:"data"`
+	Disciplina string `json:"disciplina"`
+	Motivo     string `json:"motivo"`
+}
+
+func importacaoParaDTO(r service.ResultadoImportacao) importacaoDTO {
+	out := importacaoDTO{
+		Aplicadas: make([]linhaImportadaDTO, 0, len(r.Aplicadas)),
+		Recusadas: make([]linhaRecusadaDTO, 0, len(r.Recusadas)),
+		Gravadas:  r.Gravadas,
+	}
+
+	for _, l := range r.Aplicadas {
+		out.Aplicadas = append(out.Aplicadas, linhaImportadaDTO{
+			Linha: l.Linha, Data: l.Data, Disciplina: l.Disciplina, Tema: l.Tema,
+			Minutos: l.Minutos, Questoes: l.Questoes, Acertos: l.Acertos,
+			Concluido: l.Concluido,
+		})
+	}
+
+	for _, l := range r.Recusadas {
+		out.Recusadas = append(out.Recusadas, linhaRecusadaDTO{
+			Linha: l.Linha, Data: l.Data, Disciplina: l.Disciplina, Motivo: l.Motivo,
+		})
+	}
+
+	return out
+}
+
 type marcoDTO struct {
 	ID         uuid.UUID `json:"id"`
 	Rotulo     int       `json:"rotulo"`

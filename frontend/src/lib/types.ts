@@ -92,6 +92,34 @@ export interface ConcursoInput {
 	conteudo: ConteudoInputItem[];
 }
 
+/** Uma linha da planilha que encontrou sua atividade no cronograma. */
+export interface LinhaImportada {
+	linha: number;
+	data: string;
+	disciplina: string;
+	tema: string;
+	minutos: number | null;
+	questoes: number | null;
+	acertos: number | null;
+	concluido: boolean;
+}
+
+/** Uma linha que não entrou, com o motivo em português. */
+export interface LinhaRecusada {
+	linha: number;
+	data: string;
+	disciplina: string;
+	motivo: string;
+}
+
+/** O que a importação faria (prévia) ou fez (confirmada). */
+export interface ImportacaoCSV {
+	aplicadas: LinhaImportada[];
+	recusadas: LinhaRecusada[];
+	/** 0 na prévia; quantas linhas foram gravadas na importação confirmada. */
+	gravadas: number;
+}
+
 export interface ConcursoDetalhe {
 	slug: string;
 	dados: ConcursoInput;

@@ -8,6 +8,7 @@ import type {
 	Caderno,
 	ConfigInput,
 	Estatisticas,
+	ImportacaoCSV,
 	PlanoResposta,
 	PreviewTEC,
 	RegistroDiaInput
@@ -245,7 +246,19 @@ class PlanoStore {
 		api.atualizarAnotacao(this.slug, id, input);
 	removerAnotacao = (id: string): Promise<Caderno> => api.removerAnotacao(this.slug, id);
 	dossie = (disciplina: string) => api.dossie(this.slug, disciplina);
-	csvUrl = () => api.exportCsvUrl(this.slug);
+	exportarCsv = (): Promise<string> => api.exportarCsv(this.slug);
+
+	/**
+	 * Lê uma planilha do plano. A prévia não grava; a importação confirmada
+	 * recarrega o plano, porque o que voltou muda o que a tela mostra.
+	 */
+	importarCsv = async (csv: string, confirmar: boolean): Promise<ImportacaoCSV> => {
+		const res = await api.importarCsv(this.slug, csv, confirmar);
+
+		if (confirmar) await this.carregar(true);
+
+		return res;
+	};
 	previewTec = (csv: string): Promise<PreviewTEC> => api.previewTec(this.slug, csv);
 	importarTec = async (csv: string, data: string): Promise<PreviewTEC> => {
 		const res = await api.importarTec(this.slug, csv, data);

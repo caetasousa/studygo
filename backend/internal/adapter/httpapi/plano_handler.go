@@ -26,7 +26,7 @@ type PlanoHandler struct {
 	estatistica *service.EstatisticaService
 	caderno     *service.CadernoService
 	dossie      *service.DossieService
-	exportacao  *service.ExportacaoService
+	planilha    *service.PlanilhaService
 	tec         *service.ImportacaoTECService
 	logger      *slog.Logger
 }
@@ -38,7 +38,7 @@ func NewPlanoHandler(
 	estatistica *service.EstatisticaService,
 	caderno *service.CadernoService,
 	dossie *service.DossieService,
-	exportacao *service.ExportacaoService,
+	planilha *service.PlanilhaService,
 	tec *service.ImportacaoTECService,
 	logger *slog.Logger,
 ) *PlanoHandler {
@@ -49,7 +49,7 @@ func NewPlanoHandler(
 		estatistica: estatistica,
 		caderno:     caderno,
 		dossie:      dossie,
-		exportacao:  exportacao,
+		planilha:    planilha,
 		tec:         tec,
 		logger:      logger,
 	}
@@ -667,6 +667,49 @@ func (h *PlanoHandler) ImportarTEC(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, previewTECParaDTO(prev))
 }
 
+type importarPlanilhaRequest struct {
+	CSV       string `json:"csv"`
+	Confirmar bool   `json:"confirmar"`
+}
+
+// ImportarCSV traz os registros de uma planilha do plano.
+//
+// `confirmar: false` é a prévia: o mesmo caminho, sem gravar. É por isso que
+// existe uma rota só — a tela mostra o que entraria e chama de novo com
+// `confirmar: true`, e as duas respostas não têm como discordar.
+func (h *PlanoHandler) ImportarCSV(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.contexto(r)
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+
+		return
+	}
+
+	var req importarPlanilhaRequest
+	if err := decode(r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	if len(req.CSV) > maxPlanilhaTEC {
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+
+		return
+	}
+
+	res, err := h.planilha.ImportarCSV(r.Context(), id, slug, service.ImportarPlanilhaCommand{
+		CSV: req.CSV, Confirmar: req.Confirmar,
+	})
+	if err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, importacaoParaDTO(res))
+}
+
 type dossieDTO struct {
 	Disciplina string           `json:"disciplina"`
 	Markdown   string           `json:"markdown"`
@@ -723,7 +766,7 @@ func (h *PlanoHandler) ExportarCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dados, err := h.exportacao.CSV(r.Context(), id, slug)
+	dados, err := h.planilha.CSV(r.Context(), id, slug)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 
