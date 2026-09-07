@@ -1,6 +1,7 @@
-// Package middleware holds cross-cutting HTTP concerns: request IDs, panic
-// recovery, structured request logging and CORS. Auth lives in the httpapi
-// adapter because it needs the token issuer.
+// Package middleware reúne o que atravessa todas as requisições: id de
+// correlação, recuperação de pânico, log estruturado, CORS e o teto de
+// requisições. A autenticação NÃO mora aqui — ela precisa do emissor de token,
+// e por isso fica no adapter httpapi, junto de quem conhece esse contrato.
 package middleware
 
 import (
@@ -16,7 +17,9 @@ type ctxKey int
 
 const requestIDKey ctxKey = iota
 
-// Chain applies middlewares so the first argument is the outermost wrapper.
+// Chain compõe os middlewares de modo que o PRIMEIRO argumento seja o mais
+// externo — a ordem em que se lê a chamada é a ordem em que a requisição
+// atravessa.
 func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(mws) - 1; i >= 0; i-- {
 		h = mws[i](h)
@@ -25,7 +28,10 @@ func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler 
 	return h
 }
 
-// RequestID attaches a UUID to the context and echoes it back in the response.
+// RequestID prende um identificador ao contexto e o devolve no cabeçalho.
+//
+// Reaproveita o X-Request-Id que veio, se veio: é o que liga a linha de log do
+// backend à do edital-processor quando um problema atravessa os dois.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-Id")
@@ -40,15 +46,15 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
-// RequestIDFrom returns the request ID stored by RequestID, or "".
+// RequestIDFrom devolve o id que RequestID guardou, ou "" se não houver.
 func RequestIDFrom(ctx context.Context) string {
 	id, _ := ctx.Value(requestIDKey).(string)
 
 	return id
 }
 
-// Recover turns a panic in a downstream handler into a 500 and one error log,
-// keeping the server alive.
+// Recover transforma um pânico em 500 e uma linha de log, mantendo o servidor
+// de pé. Um handler que quebra derruba a requisição dele, não o processo.
 func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +78,10 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// Logger emits one structured line per request with method, path, status and
-// duration — low-cardinality message, IDs as attributes.
+// Logger emite uma linha estruturada por requisição: método, rota, status e
+// duração. A MENSAGEM é fixa e os identificadores são atributos — o contrário
+// (id dentro da mensagem) produz uma mensagem distinta por requisição e torna
+// impossível agrupar por tipo de evento.
 func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +103,12 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// CORS answers preflight and adds the headers a browser SPA on origin needs.
+// CORS responde ao preflight e libera a origem configurada.
+//
+// Uma origem só, nunca "*": com o token no cabeçalho Authorization, um curinga
+// aqui deixaria qualquer site chamar a API com a credencial de quem estivesse
+// logado. Em produção o navegador nem passa por aqui — a SPA e a API são
+// servidas da mesma origem —, mas o desenvolvimento local usa duas portas.
 func CORS(origin string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,8 +137,9 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
-// Unwrap lets http.ResponseController reach the underlying writer (e.g. to
-// extend the write deadline for slow handlers).
+// Unwrap deixa o http.ResponseController alcançar o writer de baixo — é o que
+// permite ao handler de importação esticar o prazo de escrita enquanto espera a
+// IA. Sem isto, embrulhar o writer para contar o status quebraria esse ajuste.
 func (s *statusRecorder) Unwrap() http.ResponseWriter {
 	return s.ResponseWriter
 }

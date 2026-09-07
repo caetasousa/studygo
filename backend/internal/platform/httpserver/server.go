@@ -36,9 +36,9 @@ func New(addr string, opts ...Option) *Server {
 		httpServer: &http.Server{
 			Addr:        addr,
 			ReadTimeout: 15 * time.Second,
-			// Long enough for a normal request; the edital-import handler, which
-			// waits on an external LLM call, extends its own deadline via
-			// http.ResponseController.
+			// Suficiente para uma requisição normal. O handler de importação de
+			// edital, que espera uma chamada externa de IA, estica o próprio prazo
+			// pelo http.ResponseController.
 			WriteTimeout: 30 * time.Second,
 		},
 		shutdownTimeout: 10 * time.Second,
@@ -51,8 +51,8 @@ func New(addr string, opts ...Option) *Server {
 	return s
 }
 
-// Run starts the server and blocks until ctx is canceled, then shuts down
-// gracefully. It returns nil on a clean shutdown.
+// Run sobe o servidor e bloqueia até o contexto ser cancelado, então desliga
+// com calma. Devolve nil quando o desligamento foi limpo.
 func (s *Server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 

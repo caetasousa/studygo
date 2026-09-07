@@ -124,7 +124,7 @@ func (h *PlanoHandler) Salvar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req configRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -174,7 +174,7 @@ func (h *PlanoHandler) Registrar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req registroRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -216,7 +216,7 @@ func (h *PlanoHandler) RegistrarDia(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req registroDiaRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -264,7 +264,7 @@ func (h *PlanoHandler) MarcarMarco(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req marcarMarcoRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -287,7 +287,7 @@ func (h *PlanoHandler) AtualizarCadernoDisciplina(w http.ResponseWriter, r *http
 	}
 
 	var req cadernoDisciplinaRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -315,7 +315,7 @@ func (h *PlanoHandler) Mover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req moverRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -350,7 +350,7 @@ func (h *PlanoHandler) Antecipar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req anteciparRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -491,7 +491,7 @@ func (h *PlanoHandler) CriarAnotacao(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req anotacaoRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -517,7 +517,7 @@ func (h *PlanoHandler) AtualizarAnotacao(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req anotacaoRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
@@ -610,8 +610,10 @@ func (h *PlanoHandler) PreviewTEC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(maxPlanilhaTEC); err != nil {
-		writeError(w, r, h.logger, errRequisicaoInvalida)
+	r.Body = http.MaxBytesReader(w, r.Body, maxCorpoPlanilha)
+
+	if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil {
+		writeError(w, r, h.logger, traduzirCorpo(err))
 
 		return
 	}
@@ -649,8 +651,16 @@ func (h *PlanoHandler) ImportarTEC(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req importarTECRequest
-	if err := decode(r, &req); err != nil {
+	if err := decodeLimitado(w, r, &req, maxCorpoPlanilha); err != nil {
 		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	// O mesmo teto do CSV que chega por upload: a rota é outra, a planilha é a
+	// mesma. Sem isto, importar por JSON contornava o limite do multipart.
+	if len(req.CSV) > maxPlanilhaTEC {
+		writeError(w, r, h.logger, errCorpoGrandeDemais)
 
 		return
 	}
@@ -686,14 +696,14 @@ func (h *PlanoHandler) ImportarCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req importarPlanilhaRequest
-	if err := decode(r, &req); err != nil {
+	if err := decodeLimitado(w, r, &req, maxCorpoPlanilha); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
 	}
 
 	if len(req.CSV) > maxPlanilhaTEC {
-		writeError(w, r, h.logger, errRequisicaoInvalida)
+		writeError(w, r, h.logger, errCorpoGrandeDemais)
 
 		return
 	}

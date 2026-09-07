@@ -101,7 +101,13 @@ func run(logger *slog.Logger) error {
 		),
 	}
 
-	router := httpapi.NewRouter(handlers, tokens, authService, logger)
+	router := httpapi.NewRouter(handlers, tokens, authService, httpapi.LimitesPadrao(logger), logger)
+
+	// Teto global por IP, acima dos limites por rota. É generoso de propósito:
+	// a SPA conversa bastante (toda ação do plano devolve o plano inteiro), então
+	// o número aqui não é uma política de uso — é o que separa um usuário
+	// intenso de um laço automatizado.
+	global := middleware.NovoLimitador(240, 120, logger)
 
 	handler := middleware.Chain(
 		router,
@@ -109,15 +115,15 @@ func run(logger *slog.Logger) error {
 		middleware.Recover(logger),
 		middleware.Logger(logger),
 		middleware.CORS(cfg.CORSOrigin),
+		global.Middleware,
 	)
 
 	srv := httpserver.New(
 		cfg.ServerAddr,
 		httpserver.WithHandler(handler),
-		// The edital-import endpoints wait on Gemini (up to ~90s per call, two
-		// calls in a step). Everything else answers in milliseconds; a generous
-		// write timeout just keeps a slow-but-successful AI response from being
-		// cut off mid-body.
+		// As rotas de importação esperam o Gemini (até uns 90s por chamada, duas
+		// por passo). Todo o resto responde em milissegundos; este prazo largo só
+		// existe para não cortar no meio uma resposta lenta que ia dar certo.
 		httpserver.WithWriteTimeout(240*time.Second),
 	)
 

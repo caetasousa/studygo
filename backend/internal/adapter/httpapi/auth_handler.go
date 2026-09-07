@@ -50,7 +50,7 @@ type usuarioResponse struct {
 
 func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
@@ -66,7 +66,7 @@ func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Entrar(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
@@ -82,7 +82,7 @@ func (h *AuthHandler) Entrar(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Renovar(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
@@ -102,7 +102,7 @@ func (h *AuthHandler) Renovar(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Sair(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
@@ -164,7 +164,7 @@ func (h *AuthHandler) DefinirTema(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req temaRequest
-	if err := decode(r, &req); err != nil {
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return

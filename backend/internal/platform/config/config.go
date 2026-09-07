@@ -68,15 +68,30 @@ func Load() (Config, error) {
 	cfg.RefreshTTL = refreshTTL
 
 	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
+		return Config{}, fmt.Errorf("DATABASE_URL é obrigatória")
 	}
 
 	if cfg.JWTSecret == "" {
-		return Config{}, fmt.Errorf("JWT_SECRET is required")
+		return Config{}, fmt.Errorf("JWT_SECRET é obrigatório")
+	}
+
+	// HS256 assina com o segredo cru: um segredo curto é uma senha curta, e uma
+	// senha curta se quebra offline sem falar com o servidor. Trinta e dois
+	// caracteres é o tamanho da chave que o algoritmo usa — abaixo disso a
+	// margem é ilusória. Recusar na partida é melhor que descobrir depois: o
+	// processo não sobe, e ninguém emite token com um segredo fraco por engano.
+	if len(cfg.JWTSecret) < tamanhoMinimoSegredo {
+		return Config{}, fmt.Errorf(
+			"JWT_SECRET tem %d caracteres; o mínimo é %d (use: openssl rand -base64 48)",
+			len(cfg.JWTSecret), tamanhoMinimoSegredo,
+		)
 	}
 
 	return cfg, nil
 }
+
+// tamanhoMinimoSegredo é o piso do JWT_SECRET, em caracteres.
+const tamanhoMinimoSegredo = 32
 
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

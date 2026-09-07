@@ -1,3 +1,90 @@
+{#
+  Vhost da aplicação. Um arquivo por ambiente (ver vhost_file no inventário),
+  porque staging e produção dividem este mesmo nginx.
+
+  As zonas de limite têm nome derivado do vhost DE PROPÓSITO: limit_req_zone
+  vive no contexto http, que é compartilhado pelos dois ambientes, e dois
+  arquivos declarando `auth` fariam o nginx recusar a recarga inteira com
+  "limit_req_zone auth is already bound".
+#}
+{% set zona = vhost_file | regex_replace('\.conf$', '') | regex_replace('[^a-zA-Z0-9]', '_') %}
+{% macro comum() %}
+    # A versão do nginx não ajuda ninguém a usar o site, e ajuda quem procura
+    # uma versão com CVE conhecido.
+    server_tokens off;
+
+    # O default do nginx (1m) é bem menor do que a aplicação de fato aceita: o
+    # upload do edital tem limite próprio adiante na cadeia (os 20 MiB do
+    # backend, ver maxEditalPDF, mais a folga do multipart), então a borda
+    # precisa permitir pelo menos isso — senão recusa antes de o app ver.
+    client_max_body_size 24m;
+
+    # O default do nginx (60s) é bem menor do que a importação de edital
+    # legitimamente leva: OCR mais as chamadas do Gemini, numa VPS com menos
+    # CPU que a máquina de desenvolvimento, passa de um minuto sem drama. O
+    # nginx do container do frontend já espera 300s pelo mesmo motivo (ver
+    # frontend/nginx.conf) — igualar aqui é o que impede a BORDA de cortar a
+    # conexão primeiro e entregar um 504 ao navegador com a importação ainda
+    # rodando.
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+{% endmacro %}
+{% macro cabecalhos_tls() %}
+    # HSTS só sob TLS: anunciar a política num vhost que atende em texto claro
+    # não faz sentido, e o navegador ignora.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # A SPA é servida do próprio domínio e não carrega script de terceiro
+    # nenhum — o package.json do frontend não tem uma dependência de runtime
+    # sequer. 'unsafe-inline' em style-src é o preço do CSS que o SvelteKit
+    # embute; script-src não precisa dele.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+{% endmacro %}
+{% macro proxy_para_frontend() %}
+        proxy_pass http://127.0.0.1:{{ frontend_port }};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # SOBRESCREVE, não acrescenta. Com $proxy_add_x_forwarded_for, um
+        # cliente que mandasse o próprio X-Forwarded-For apareceria como
+        # primeiro da lista e trocaria de identidade a cada requisição —
+        # justamente a identidade que o limitador do backend usa para contar.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+{% endmacro %}
+{% macro rotas() %}
+    # Autenticação é onde a força bruta bate, e o único lugar em que uma rajada
+    # de navegação normal não acontece. `burst ... nodelay` deixa passar o pico
+    # legítimo (abrir o app com a sessão expirada dispara um refresh) e recusa
+    # o excedente em vez de enfileirá-lo.
+    location /api/auth/ {
+        limit_req zone=auth_{{ zona }} burst=10 nodelay;
+{{ proxy_para_frontend() }}
+    }
+
+    # O frontend serve a SPA e faz proxy de /api para o backend na rede do
+    # compose, então a borda só precisa de um upstream.
+    location / {
+        limit_req zone=geral_{{ zona }} burst=120 nodelay;
+{{ proxy_para_frontend() }}
+    }
+{% endmacro %}
+
+# Contagem pelo IP REAL da conexão. É esta a linha de frente do controle de
+# abuso: o limitador do Go conta pelo X-Forwarded-For, que só é confiável
+# porque este servidor o sobrescreve — e nem isso vale para quem ainda não
+# passou por aqui. 10 MB de zona guardam da ordem de 160 mil endereços.
+limit_req_zone $binary_remote_addr zone=geral_{{ zona }}:10m rate=240r/m;
+limit_req_zone $binary_remote_addr zone=auth_{{ zona }}:5m rate=20r/m;
+
+# 429 e não o 503 padrão: a semântica é "você excedeu", não "eu caí", e o
+# frontend já sabe ler 429.
+limit_req_status 429;
+
 server {
     listen 80;
     listen [::]:80;
@@ -20,46 +107,12 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/{{ app_domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ app_domain }}/privkey.pem;
-
-    # nginx's own default (1m) is well under what the app actually accepts —
-    # the edital PDF upload has its own limit further down the chain (the
-    # backend's own 20 MiB, see maxEditalPDF), so the edge has to allow at
-    # least that much or it rejects the request before the app ever sees it.
-    client_max_body_size 20m;
-
-    # nginx's own default read timeout (60s) is well under how long edital
-    # import can legitimately take: OCR plus the Gemini calls, on a VPS with
-    # less CPU than a dev machine, routinely runs past a minute. The frontend
-    # container's own nginx already waits up to 300s for exactly this reason
-    # (see frontend/nginx.conf) — matching it here is what stops the EDGE from
-    # cutting the connection first and handing the browser a 504 while the
-    # import is still legitimately running.
-    proxy_connect_timeout 10s;
-    proxy_send_timeout 300s;
-    proxy_read_timeout 300s;
-
-    # The frontend container serves the SPA and proxies /api to the backend on
-    # the compose network, so edge nginx only needs one upstream.
-    location / {
-        proxy_pass http://127.0.0.1:{{ frontend_port }};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+{{ comum() }}
+{{ cabecalhos_tls() }}
+{{ rotas() }}
 }
 {% else %}
-    client_max_body_size 20m;
-    proxy_connect_timeout 10s;
-    proxy_send_timeout 300s;
-    proxy_read_timeout 300s;
-
-    location / {
-        proxy_pass http://127.0.0.1:{{ frontend_port }};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+{{ comum() }}
+{{ rotas() }}
 }
 {% endif %}
