@@ -62,6 +62,16 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
 		return err
 	}
 
+	// ANTES de aplicar qualquer coisa: num banco de outra linhagem, a primeira
+	// migration que tocar numa tabela existente falha com um erro do Postgres
+	// ("relation ... does not exist"), e é esse erro cru que o operador vê — não
+	// o diagnóstico que esta verificação existe para dar. Enquanto só havia um
+	// DROP ... IF EXISTS pendente, nada falhava e conferir depois bastava; a
+	// primeira migration normal desfaz essa sorte.
+	if err := conferirLinhagem(ctx, pool, len(applied) > 0); err != nil {
+		return err
+	}
+
 	for _, m := range migrations {
 		if applied[m.version] {
 			continue
@@ -72,7 +82,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
 		}
 	}
 
-	return conferirLinhagem(ctx, pool)
+	// E DEPOIS de aplicar: num banco que estava vazio, a baseline precisa ter
+	// criado a tabela canária. Se não criou, o que subiu não é este schema.
+	return conferirLinhagem(ctx, pool, true)
 }
 
 // tabelaCanaria é a tabela que só existe neste schema. Se uma migration futura
@@ -89,7 +101,16 @@ const tabelaCanaria = "atividades"
 // O estrago é silencioso: /health só dá ping no banco, responde 200, e o deploy
 // é declarado bem-sucedido enquanto toda consulta real falha. Falhar aqui é o
 // que transforma isso num deploy vermelho, que o Ansible reverte sozinho.
-func conferirLinhagem(ctx context.Context, pool *pgxpool.Pool) error {
+//
+// `esperado` diz se a tabela canária já deveria existir. Chamada ANTES de
+// aplicar, ela vale quando há migration registrada: um banco vazio de verdade
+// não registrou nada e ainda não tem tabela nenhuma — recusá-lo seria impedir
+// toda instalação nova. Chamada DEPOIS, vale sempre.
+func conferirLinhagem(ctx context.Context, pool *pgxpool.Pool, esperado bool) error {
+	if !esperado {
+		return nil
+	}
+
 	var existe bool
 
 	if err := pool.QueryRow(
