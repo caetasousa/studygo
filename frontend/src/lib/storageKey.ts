@@ -64,3 +64,55 @@ export function lerMigrando(nome: string): string | null {
 
 	return migrar(localStorage, nome);
 }
+
+/** Um armazenamento que dá para percorrer — o que a limpeza por prefixo exige. */
+export interface ArmazenamentoIteravel extends Armazenamento {
+	readonly length: number;
+	key(i: number): string | null;
+}
+
+/**
+ * Apaga, do armazenamento dado, toda chave que comece por `inicio` — nos dois
+ * prefixos. Devolve as chaves removidas.
+ *
+ * Exportada pelo mesmo motivo que `migrar`: é a parte testável, e
+ * `esquecerPorPrefixo` é ela amarrada ao localStorage do navegador.
+ */
+export function esquecerEm(st: ArmazenamentoIteravel, inicio: string): string[] {
+	const alvos = [`${PREFIXO}${inicio}`, `${PREFIXO_ANTIGO}${inicio}`];
+	const remover: string[] = [];
+
+	for (let i = 0; i < st.length; i++) {
+		const atual = st.key(i);
+		if (atual !== null && alvos.some((a) => atual.startsWith(a))) {
+			remover.push(atual);
+		}
+	}
+
+	// Remove só depois de listar: apagar durante a iteração renumera os índices
+	// e faz a varredura pular chaves.
+	for (const k of remover) st.removeItem(k);
+
+	return remover;
+}
+
+/**
+ * Apaga toda chave que comece por `inicio`.
+ *
+ * Existe por causa do logout: o plano fica em cache sob
+ * `studygo.plano.<slug>.v1`, uma chave por concurso, e nada apagava nenhuma
+ * delas. Num navegador compartilhado, o histórico de estudo de quem saiu
+ * continuava no disco — e ia se acumulando, concurso após concurso.
+ *
+ * Varre o prefixo antigo junto: quem não reabre um concurso desde a renomeação
+ * do projeto ainda tem a chave `annygo.*` parada lá.
+ */
+export function esquecerPorPrefixo(inicio: string): void {
+	if (!browser) return;
+
+	try {
+		esquecerEm(localStorage, inicio);
+	} catch {
+		/* modo privado ou site data bloqueado — nada a esquecer */
+	}
+}

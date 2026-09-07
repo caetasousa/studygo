@@ -32,7 +32,9 @@
 
 		try {
 			await concursoStore.remover(slug);
-			planoStore.limpar();
+			// Só o cache DESTE concurso: excluir um não pode custar o plano em
+			// cache dos outros, que continuam valendo.
+			planoStore.esquecer(slug);
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Erro ao excluir';
 		}

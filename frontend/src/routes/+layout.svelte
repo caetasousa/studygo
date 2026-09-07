@@ -113,6 +113,16 @@
 	<div class="app" class:rail-only={railOnly}>
 		<Sidebar bind:open={menuOpen} bind:railOnly />
 		<main class="main">
+			{#if concursoStore.erro}
+				<!-- A lista de concursos não carregou. Sem isto a tela ficava vazia
+				     sem explicação e sem nada que tentasse de novo. -->
+				<div class="form-error carga-falhou">
+					<span>{concursoStore.erro}</span>
+					<button type="button" onclick={() => concursoStore.tentarNovamente()}>
+						Tentar de novo
+					</button>
+				</div>
+			{/if}
 			{#if planoStore.erro && !isConcursoAdmin}
 				<div class="form-error" style="margin-bottom:16px">{planoStore.erro}</div>
 			{/if}
@@ -127,3 +137,24 @@
 	     as a broken app rather than a moment of transition. -->
 	<p class="page-sub" style="padding:32px">Carregando…</p>
 {/if}
+
+<style>
+	.carga-falhou {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-bottom: 16px;
+	}
+
+	.carga-falhou button {
+		flex: none;
+		border: 1px solid currentColor;
+		border-radius: 6px;
+		padding: 4px 10px;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+</style>

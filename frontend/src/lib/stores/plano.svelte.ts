@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
-import { chave, lerMigrando } from '$lib/storageKey';
+import { chave, esquecerPorPrefixo, lerMigrando } from '$lib/storageKey';
 import type {
 	AnotacaoInput,
 	Atividade,
@@ -63,12 +63,23 @@ class PlanoStore {
 		return s;
 	}
 
-	private commit(p: PlanoResposta, toast = true) {
+	/**
+	 * Guarda a resposta, DESDE QUE ela ainda seja do concurso aberto.
+	 *
+	 * O slug vem por parâmetro, capturado antes do `await`, e não de
+	 * `concursoStore.ativoSlug` no momento da resposta. Eram dois bugs no mesmo
+	 * ponto: trocar de concurso com uma requisição em voo gravava o plano do
+	 * concurso A sob a CHAVE do concurso B, envenenando o cache; e uma resposta
+	 * atrasada sobrescrevia na tela o plano que já tinha chegado depois dela.
+	 */
+	private commit(slug: string, p: PlanoResposta, toast = true) {
+		if (concursoStore.ativoSlug !== slug) return;
+
 		this.plano = p;
 		this.erro = null;
-		if (browser && concursoStore.ativoSlug) {
+		if (browser) {
 			try {
-				localStorage.setItem(cacheKey(concursoStore.ativoSlug), JSON.stringify(p));
+				localStorage.setItem(cacheKey(slug), JSON.stringify(p));
 			} catch {
 				/* ignore quota / private mode */
 			}
@@ -83,8 +94,10 @@ class PlanoStore {
 	}
 
 	private async run(fn: (slug: string) => Promise<PlanoResposta>) {
+		const slug = this.slug;
+
 		try {
-			this.commit(await fn(this.slug));
+			this.commit(slug, await fn(slug));
 		} catch (e) {
 			this.erro = e instanceof Error ? e.message : 'Erro inesperado';
 		}
@@ -109,7 +122,7 @@ class PlanoStore {
 		if (!temCache) this.carregando = true;
 
 		try {
-			this.commit(await api.getPlano(slug), false);
+			this.commit(slug, await api.getPlano(slug), false);
 		} catch (e) {
 			if (!temCache) this.erro = e instanceof Error ? e.message : 'Erro ao carregar';
 		} finally {
@@ -132,10 +145,12 @@ class PlanoStore {
 		v: { questoes: number | null; acertos: number | null; observacao: string }
 	): Promise<string | null> => {
 		const dia = this.plano?.dias.find((d) => d.data === data);
+		const slug = this.slug;
 
 		try {
 			this.commit(
-				await api.registrarDia(this.slug, data, { ...v, nota: dia?.nota ?? '' })
+				slug,
+				await api.registrarDia(slug, data, { ...v, nota: dia?.nota ?? '' })
 			);
 
 			return null;
@@ -164,8 +179,10 @@ class PlanoStore {
 			nota: string;
 		}
 	): Promise<string | null> => {
+		const slug = this.slug;
+
 		try {
-			this.commit(await api.registrarAtividade(this.slug, { atividadeId, ...v }));
+			this.commit(slug, await api.registrarAtividade(slug, { atividadeId, ...v }));
 
 			return null;
 		} catch (e) {
@@ -188,8 +205,10 @@ class PlanoStore {
 		if (this.movendo) return false;
 		this.movendo = true;
 
+		const slug = this.slug;
+
 		try {
-			this.commit(await api.moverAtividade(this.slug, id, data, posicao, trocar), false);
+			this.commit(slug, await api.moverAtividade(slug, id, data, posicao, trocar), false);
 
 			return true;
 		} catch (e) {
@@ -210,8 +229,10 @@ class PlanoStore {
 	 * show it and stay open.
 	 */
 	atualizarCadernoDisciplina = async (codigo: string, url: string): Promise<string | null> => {
+		const slug = this.slug;
+
 		try {
-			this.commit(await api.atualizarCadernoDisciplina(this.slug, codigo, url), false);
+			this.commit(slug, await api.atualizarCadernoDisciplina(slug, codigo, url), false);
 
 			return null;
 		} catch (e) {
@@ -225,8 +246,10 @@ class PlanoStore {
 	 * coverage warning already reports.
 	 */
 	adiarDia = async (data: string): Promise<string | null> => {
+		const slug = this.slug;
+
 		try {
-			this.commit(await api.adiarDia(this.slug, data), false);
+			this.commit(slug, await api.adiarDia(slug, data), false);
 
 			return null;
 		} catch (e) {
@@ -234,9 +257,28 @@ class PlanoStore {
 		}
 	};
 
+	/**
+	 * Esquece o plano — da tela e do disco.
+	 *
+	 * É o que o logout chama. Zerar só a memória deixava o cronograma, os
+	 * registros e o caderno de erros de quem saiu guardados no localStorage do
+	 * navegador, disponíveis para o próximo que sentasse ali.
+	 */
 	limpar() {
 		this.plano = null;
 		this.carregadoSlug = null;
+		clearTimeout(this.toastTimer);
+		esquecerPorPrefixo('.plano.');
+	}
+
+	/** Esquece o cache de UM concurso — o que acabou de ser excluído. */
+	esquecer(slug: string) {
+		if (this.carregadoSlug === slug) {
+			this.plano = null;
+			this.carregadoSlug = null;
+		}
+
+		esquecerPorPrefixo(cacheSufixo(slug));
 	}
 
 	estatisticas = (): Promise<Estatisticas> => api.estatisticas(this.slug);

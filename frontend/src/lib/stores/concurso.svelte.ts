@@ -20,6 +20,7 @@ class ConcursoStore {
 	ativoSlug = $state<string | null>(readAtivo());
 	importacaoEdital = $state(false);
 	carregado = $state(false);
+	erro = $state<string | null>(null);
 
 	get ativo(): ConcursoResumo | null {
 		return this.lista.find((c) => c.slug === this.ativoSlug) ?? null;
@@ -40,15 +41,32 @@ class ConcursoStore {
 		this.persistAtivo();
 	}
 
+	/**
+	 * Carrega a lista de concursos do usuário.
+	 *
+	 * A falha é REGISTRADA, não engolida. Antes, um erro de rede saía por aqui
+	 * em silêncio com `carregado` ainda false — e como o efeito do layout só
+	 * dispara quando `carregado` muda, nada tentava de novo: a tela ficava vazia
+	 * até alguém recarregar a página, sem dizer por quê.
+	 *
+	 * `carregado` continua false de propósito num erro: ele significa "eu sei
+	 * quais são os concursos", e é dele que depende o desvio para o cadastro do
+	 * primeiro concurso. Marcá-lo aqui mandaria para "crie seu primeiro
+	 * concurso" quem só está sem internet.
+	 */
 	async carregar() {
 		let res;
 		try {
 			res = await api.listarConcursos();
-		} catch {
-			// 401 (stale session) etc. — auth store already cleared; the layout
-			// redirects to /login. Nothing to load.
+		} catch (e) {
+			// 401 (sessão vencida) já foi tratado pelo api: o auth store limpou e
+			// o layout leva para /login. Aqui sobra o que é falha de verdade.
+			this.erro = e instanceof Error ? e.message : 'Não foi possível carregar seus concursos';
+
 			return;
 		}
+
+		this.erro = null;
 		this.lista = res.concursos;
 		this.importacaoEdital = res.importacaoEdital;
 		this.carregado = true;
@@ -80,10 +98,17 @@ class ConcursoStore {
 		await this.carregar();
 	}
 
+	/** Tenta de novo depois de uma falha de carga. */
+	async tentarNovamente() {
+		this.erro = null;
+		await this.carregar();
+	}
+
 	limpar() {
 		this.lista = [];
 		this.ativoSlug = null;
 		this.carregado = false;
+		this.erro = null;
 		this.persistAtivo();
 	}
 }
