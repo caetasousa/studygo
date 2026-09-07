@@ -628,6 +628,81 @@ func DiasAtrasados(
 	return saida
 }
 
+// chaveDeConteudo identifica um tema coberto: a matéria e o tema.
+//
+// Não leva a passada porque só a PRIMEIRA entra nesta conta — ver coberta.
+type chaveDeConteudo struct {
+	disciplina string
+	tema       string
+}
+
+// coberta diz se a atividade é cobertura de conteúdo: a primeira vez que um
+// tema é estudado.
+//
+// O motor reparte as vagas de cada matéria em duas naturezas bem diferentes
+// (ver reparte, em motor.go): uma vaga de PASSADA 1 por tema, que é a cobertura
+// do edital, e depois quantas vagas de PASSADA 2 couberem, ciclando pelos temas
+// até encher o plano. A passada 2 é repetição POR DESENHO — é ela que dá
+// volume de questões e revisão até a prova.
+//
+// Só a passada 1 pode ser descontada. Descontar a 2 seria dizer que resolver
+// questões de SQL uma vez encerra SQL para sempre: numa medição, um tema com 19
+// sessões de prática programadas caía para 3 depois de o estudante fazer UMA.
+//
+// Atividade sem disciplina (simulado, discursiva, revisão semanal, véspera)
+// também fica de fora: são dias fixos do método, não conteúdo a cobrir.
+func coberta(a Atividade) bool {
+	return a.Disciplina != "" && a.Passada == 1
+}
+
+func chaveDe(a Atividade) chaveDeConteudo {
+	return chaveDeConteudo{disciplina: a.Disciplina, tema: a.Tema}
+}
+
+// SemConteudoJaConcluido tira das atividades recém-geradas o que o estudante já
+// concluiu.
+//
+// `Gerar` é um planejador PURO: dado o edital e a configuração, devolve o
+// currículo inteiro, sempre do começo. Ele não recebe o histórico, e receber
+// deixaria de ser puro — o golden test existe para manter isso assim.
+//
+// Quem replaneja é que precisa descontar o que já foi feito. Sem este passo,
+// redistribuir devolve à fila TODO o conteúdo já estudado, recomeçando na
+// passada 1: um plano com duas semanas de histórico volta com as duas semanas
+// inteiras pela frente, ocupando os dias que deveriam receber o que falta.
+//
+// Ao vivo o estrago passava despercebido, porque perder um dia repete um dia. É
+// importar um histórico de uma vez que o torna visível.
+func SemConteudoJaConcluido(
+	novas []Atividade,
+	atuais []Atividade,
+	concluida func(uuid.UUID) bool,
+) []Atividade {
+	feito := map[chaveDeConteudo]bool{}
+
+	for _, a := range atuais {
+		if coberta(a) && concluida(a.ID) {
+			feito[chaveDe(a)] = true
+		}
+	}
+
+	if len(feito) == 0 {
+		return novas
+	}
+
+	out := make([]Atividade, 0, len(novas))
+
+	for _, a := range novas {
+		if coberta(a) && feito[chaveDe(a)] {
+			continue
+		}
+
+		out = append(out, a)
+	}
+
+	return out
+}
+
 // SemAtrasadas devolve o cronograma sem as atividades vencidas que ninguém
 // estudou, deixando o dia perdido vazio.
 //

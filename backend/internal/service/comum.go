@@ -281,7 +281,23 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 	res := plano.Gerar(cfg, &c.Concurso)
 	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
 
-	return plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida), len(atrasados)
+	// O motor devolve o currículo INTEIRO, sempre do começo — é o que ele faz, e
+	// é o que o golden test protege. Descontar aqui o que já foi concluído é o
+	// que impede a redistribuição de reagendar tudo que o estudante já estudou.
+	novas = plano.SemConteudoJaConcluido(novas, c.Atividades, c.Registros.Concluida)
+
+	replanejadas := plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida)
+
+	// O desconto deixa buracos: os dias que perderam conteúdo ficariam curtos, e
+	// o que sobrou continuaria na data em que o motor o pôs. Compactar empurra a
+	// fila para cima — é o que faz o plano TERMINAR MAIS CEDO, que é a verdade
+	// de quem já estudou parte dele, em vez de ficar ralo até a prova.
+	return plano.CompactarAtividades(
+		replanejadas,
+		res.Dias,
+		hoje,
+		plano.DiaConcluidoFunc(replanejadas, c.Registros),
+	), len(atrasados)
 }
 
 // idsPorCodigo indexa as disciplinas pelo código, que é como o motor as nomeia.
