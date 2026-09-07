@@ -1,0 +1,63 @@
+# Configuração do golangci-lint.
+#
+# O `go vet` do `make check` pega o que quebra em execução; o que falta é a
+# camada acima: erro ignorado, contexto que não viaja, recurso que não fecha.
+# Esta configuração escolhe linters que apontam DEFEITO, não estilo — um linter
+# que reclama de gosto vira ruído que se aprende a ignorar, e aí ele deixa de
+# pegar o que importa.
+#
+# Rodar:  make lint   (o alvo diz como instalar, se faltar o binário)
+
+version: "2"
+
+run:
+  timeout: 3m
+  build-tags:
+    - integration
+
+linters:
+  enable:
+    # Erro ignorado é o defeito que mais aparece em Go, e é o que o vet não vê.
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Contexto que não é propagado desliga cancelamento e timeout sem avisar.
+    - contextcheck
+    # rows/Body/tx que não fecham vazam conexão do pool.
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    # Erro embrulhado sem %w quebra o errors.Is de que a classificação HTTP
+    # inteira depende (ver adapter/httpapi/respond.go).
+    - errorlint
+    # Chamada dentro de laço que ignora o erro anterior, e afins.
+    - nilerr
+    - noctx
+
+  settings:
+    errcheck:
+      # Escrita em ResponseWriter depois do WriteHeader não tem o que tratar: a
+      # linha de status já foi enviada. Os pontos onde isso acontece de
+      # propósito passam por writeJSON, que loga.
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+  exclusions:
+    rules:
+      # Nos testes, erro de setup vira t.Fatal na linha seguinte; exigir
+      # tratamento em cada helper só encheria os testes de ruído.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - noctx
+
+formatters:
+  enable:
+    - gofmt

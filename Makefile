@@ -29,7 +29,7 @@ ANSIBLE_DIR := ansible
 REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
-        check check-backend check-frontend check-processor check-db fmt \
+        check check-backend check-frontend check-processor check-db fmt lint \
         status commit push deploy provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
@@ -92,6 +92,18 @@ check-processor: ## ruff + mypy --strict + pytest
 # `-p 1`, já que os testes não disputam schema nenhum.
 check-db: ## Testes de integração com PostgreSQL efêmero (exige Docker)
 	cd backend && go test -tags=integration ./...
+
+# Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um
+# template externo fixado por tag. Acrescentar aqui uma ferramenta que o runner
+# pode não ter quebraria a esteira sem aviso. Quando o lint estiver estável,
+# promovê-lo é uma decisão consciente — e do lado do template.
+lint: ## Lint do backend (golangci-lint; veja backend/.golangci.yml)
+	@command -v golangci-lint >/dev/null 2>&1 || { \
+		echo "golangci-lint não está instalado."; \
+		echo "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		exit 1; \
+	}
+	cd backend && golangci-lint run
 
 fmt: ## Formata o código Go e o Python do processor
 	cd backend && gofmt -w .

@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -21,16 +20,14 @@ func NewHealthHandler(checker port.HealthChecker, logger *slog.Logger) *HealthHa
 }
 
 func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	if err := h.checker.Check(r.Context()); err != nil {
-		h.logger.ErrorContext(r.Context(), "health check failed", slog.Any("error", err))
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"status": "unavailable"})
+		h.logger.ErrorContext(r.Context(), "health check falhou", slog.Any("error", err))
+		writeJSON(w, h.logger, http.StatusServiceUnavailable, map[string]string{
+			"status": "unavailable",
+		})
 
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	writeJSON(w, h.logger, http.StatusOK, map[string]string{"status": "ok"})
 }

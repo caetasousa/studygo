@@ -25,10 +25,16 @@ RUN chmod +x /usr/local/bin/dev-run.sh
 EXPOSE 8080
 CMD ["/usr/local/bin/dev-run.sh"]
 
-FROM gcr.io/distroless/static-debian12
+# :nonroot, e não a tag padrão: a imagem padrão do distroless roda como uid 0.
+# O binário é estático, não escreve em disco e escuta numa porta alta — nada
+# aqui precisa de root, e um processo que não precisa não deve ter. O
+# edital-processor já fazia assim (uid 10001); esta era a exceção.
+FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=build /out/server /server
 COPY --from=build /out/worker /worker
+
+USER nonroot:nonroot
 
 EXPOSE 8080
 
