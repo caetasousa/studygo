@@ -5,5 +5,5 @@
 
 include:
   - project: 'caetasousa/ci-templates'
-    ref: 'v1.1.6'
+    ref: 'v1.1.8'
     file: '/templates/app-pipeline.yml'
