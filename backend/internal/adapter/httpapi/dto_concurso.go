@@ -29,15 +29,16 @@ type concursoRequest struct {
 // `codigo` é a tag exibida no chip do cronograma. Vai e volta porque o usuário
 // pode escolhê-la; omitida, a matéria mantém a tag que já tem.
 type disciplinaRequest struct {
-	ID         string     `json:"id"`
-	Codigo     string     `json:"codigo"`
-	Nome       string     `json:"nome"`
-	Bloco      string     `json:"bloco"`
-	Questoes   int        `json:"questoes"`
-	Peso       int        `json:"peso"`
-	CadernoURL string     `json:"cadernoUrl"`
-	Temas      []string   `json:"temas"`
-	Fontes     []fonteDTO `json:"fontes"`
+	ID          string     `json:"id"`
+	Codigo      string     `json:"codigo"`
+	Nome        string     `json:"nome"`
+	Bloco       string     `json:"bloco"`
+	Questoes    int        `json:"questoes"`
+	Peso        int        `json:"peso"`
+	CadernoURL  string     `json:"cadernoUrl"`
+	NotebookURL string     `json:"notebookUrl"`
+	Temas       []string   `json:"temas"`
+	Fontes      []fonteDTO `json:"fontes"`
 }
 
 type marcoRequest struct {
@@ -228,15 +229,16 @@ func concursoParaComando(req concursoRequest) service.ConcursoCommand {
 		}
 
 		discs = append(discs, service.DisciplinaCommand{
-			ID:         d.ID,
-			Codigo:     d.Codigo,
-			Nome:       d.Nome,
-			Bloco:      d.Bloco,
-			Questoes:   d.Questoes,
-			Peso:       d.Peso,
-			CadernoURL: d.CadernoURL,
-			Temas:      d.Temas,
-			Fontes:     fontes,
+			ID:          d.ID,
+			Codigo:      d.Codigo,
+			Nome:        d.Nome,
+			Bloco:       d.Bloco,
+			Questoes:    d.Questoes,
+			Peso:        d.Peso,
+			CadernoURL:  d.CadernoURL,
+			NotebookURL: d.NotebookURL,
+			Temas:       d.Temas,
+			Fontes:      fontes,
 		})
 	}
 
@@ -276,15 +278,16 @@ func comandoParaConcurso(cmd service.ConcursoCommand) concursoRequest {
 		}
 
 		discs = append(discs, disciplinaRequest{
-			ID:         d.ID,
-			Codigo:     d.Codigo,
-			Nome:       d.Nome,
-			Bloco:      d.Bloco,
-			Questoes:   d.Questoes,
-			Peso:       d.Peso,
-			CadernoURL: d.CadernoURL,
-			Temas:      d.Temas,
-			Fontes:     fontes,
+			ID:          d.ID,
+			Codigo:      d.Codigo,
+			Nome:        d.Nome,
+			Bloco:       d.Bloco,
+			Questoes:    d.Questoes,
+			Peso:        d.Peso,
+			CadernoURL:  d.CadernoURL,
+			NotebookURL: d.NotebookURL,
+			Temas:       d.Temas,
+			Fontes:      fontes,
 		})
 	}
 

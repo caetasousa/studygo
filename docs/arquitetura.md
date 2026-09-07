@@ -252,7 +252,7 @@ PUT       …/plano/atividades/{id}/registro     ← o registro é por ATIVIDADE
 PATCH     …/plano/dias/{data}                  ← nota do dia + cauda de revisão
 DELETE    …/plano/registros
 PUT       …/plano/marcos/{id}
-PATCH     …/plano/disciplinas/{codigo}/caderno
+PATCH     …/plano/disciplinas/{codigo}/links      ← caderno de erros + NotebookLM
 POST      …/plano/atividades/{mover,antecipar}
 POST      …/plano/dias/{data}/adiar
 POST      …/plano/{compactar,restaurar-ordem}

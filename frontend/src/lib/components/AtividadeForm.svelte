@@ -3,6 +3,7 @@
 	import { fl } from '$lib/format';
 	import { horasEmMinutos, minutosEmHoras, valoresIniciais, valoresInvalidos } from '$lib/estudo';
 	import type { Atividade } from '$lib/types';
+	import NavIcon, { type NavIconName } from './NavIcon.svelte';
 
 	/**
 	 * Logs ONE scheduled activity — not the day.
@@ -22,10 +23,12 @@
 		nome,
 		registro,
 		cadernoUrl = '',
+		notebookUrl = '',
+		soTeoria = false,
 		salvando = false,
 		erro = null,
 		onSalvar,
-		onSalvarCaderno,
+		onSalvarLinks,
 		onCancelar
 	}: {
 		item: Atividade;
@@ -35,8 +38,11 @@
 		nome: string;
 		/** what is already recorded for THIS activity, if anything */
 		registro: Atividade | null;
-		/** the discipline's current error-notebook link (discipline-wide, not per-activity) */
+		/** links da MATÉRIA (valem no cronograma todo), não desta atividade */
 		cadernoUrl?: string;
+		notebookUrl?: string;
+		/** a matéria está configurada como "só teoria" no plano */
+		soTeoria?: boolean;
 		salvando?: boolean;
 		erro?: string | null;
 		onSalvar: (v: {
@@ -46,8 +52,11 @@
 			concluido: boolean;
 			nota: string;
 		}) => void;
-		/** persists a changed caderno link for the whole discipline; returns an error message or null */
-		onSalvarCaderno?: (url: string) => Promise<string | null>;
+		/** grava os links da matéria; devolve mensagem de erro ou null */
+		onSalvarLinks?: (links: {
+			cadernoUrl: string;
+			notebookUrl: string;
+		}) => Promise<string | null>;
 		onCancelar: () => void;
 	} = $props();
 
@@ -59,11 +68,76 @@
 
 	let form = $state({ ...original });
 
-	// The caderno link is the discipline's, not this activity's — snapshotted the
-	// same way, saved separately (different endpoint) only when it actually changed.
-	const cadernoOriginal = untrack(() => cadernoUrl);
-	let cadernoForm = $state(cadernoOriginal);
-	let erroCaderno = $state<string | null>(null);
+	// Os links são da MATÉRIA, não desta atividade — capturados do mesmo jeito e
+	// gravados por outra rota, só quando de fato mudaram.
+	const linksOriginais = untrack(() => ({ caderno: cadernoUrl, notebook: notebookUrl }));
+	let links = $state({ ...linksOriginais });
+	let linkEmEdicao = $state<ChaveLink | null>(null);
+	let erroLinks = $state<string | null>(null);
+
+	type ChaveLink = 'caderno' | 'notebook';
+
+	const LINKS: { chave: ChaveLink; rotulo: string; icone: NavIconName; exemplo: string }[] = [
+		{
+			chave: 'caderno',
+			rotulo: 'Caderno de erros',
+			icone: 'caderno',
+			exemplo: 'https://www.tecconcursos.com.br/questoes/caderno/…'
+		},
+		{
+			chave: 'notebook',
+			rotulo: 'NotebookLM',
+			icone: 'conteudo',
+			exemplo: 'https://notebooklm.google.com/notebook/…'
+		}
+	];
+
+	/**
+	 * "Só estudei teoria": esconde Questões e Acertos.
+	 *
+	 * NÃO é um campo gravado, e não precisa ser — o modelo já diz isso, porque
+	 * questões em branco significa "não lancei". Guardar um booleano ao lado
+	 * criaria um segundo lugar para a mesma verdade, com a chance de os dois
+	 * discordarem.
+	 *
+	 * Por isso o estado inicial é DEDUZIDO: um registro que já existe e não tem
+	 * questões era teoria, e reabre recolhido. Atividade ainda não lançada abre
+	 * com as caixas à mostra, que é o caso comum.
+	 */
+	const jaRegistrado = untrack(
+		() => original.concluido || original.horas !== null || original.nota !== ''
+	);
+	let apenasTeoria = $state(jaRegistrado && original.questoes === null);
+
+	// A matéria em modo "só teoria" no plano nem oferece a opção: ali as caixas
+	// não fazem sentido nenhum, e um botão para reexibi-las só confundiria.
+	const mostrarQuestoes = $derived(!soTeoria && !apenasTeoria);
+
+	function alternarTeoria(marcado: boolean) {
+		apenasTeoria = marcado;
+
+		// Recolher e continuar mandando o que estava digitado gravaria um número
+		// que ninguém vê mais.
+		if (marcado) {
+			form.questoes = null;
+			form.acertos = null;
+		}
+	}
+
+	/** O host, que é o que identifica o link de relance. */
+	function host(url: string): string {
+		try {
+			return new URL(url).hostname.replace(/^www\./, '');
+		} catch {
+			return url;
+		}
+	}
+
+	/** Foca o campo assim que ele aparece — quem clicou em "adicionar" quer digitar. */
+	function focar(el: HTMLInputElement) {
+		el.focus();
+		el.select();
+	}
 
 	const erros = $derived(
 		form.questoes !== null && form.acertos !== null
@@ -86,19 +160,24 @@
 		return v === null ? null : Math.round(v);
 	}
 
-	let salvandoCaderno = $state(false);
+	let salvandoLinks = $state(false);
 
 	async function salvar() {
-		if (salvando || salvandoCaderno || invalido) return;
+		if (salvando || salvandoLinks || invalido) return;
 
-		// The discipline-wide caderno link first, so a failure there is shown
-		// before the activity record closes the dialog.
-		const url = cadernoForm.trim();
-		if (onSalvarCaderno && url !== cadernoOriginal.trim()) {
-			salvandoCaderno = true;
-			erroCaderno = await onSalvarCaderno(url);
-			salvandoCaderno = false;
-			if (erroCaderno) return;
+		// Os links da matéria primeiro, para que uma falha ali apareça antes de o
+		// registro da atividade fechar o diálogo.
+		const caderno = links.caderno.trim();
+		const notebook = links.notebook.trim();
+		const mudou =
+			caderno !== linksOriginais.caderno.trim() ||
+			notebook !== linksOriginais.notebook.trim();
+
+		if (onSalvarLinks && mudou) {
+			salvandoLinks = true;
+			erroLinks = await onSalvarLinks({ cadernoUrl: caderno, notebookUrl: notebook });
+			salvandoLinks = false;
+			if (erroLinks) return;
 		}
 
 		onSalvar({ ...form, nota: form.nota.trim() });
@@ -169,7 +248,7 @@
 				· {item.tema}{/if}
 		</p>
 
-		<div class="campos">
+		<div class="campos" class:so-horas={!mostrarQuestoes}>
 			<!-- Em MINUTOS: o cronograma anuncia o bloco em minutos, e "45" é o que
 			     se tem na cabeça ao terminar de estudar. O registro continua sendo
 			     gravado em horas — a conversão acontece aqui. -->
@@ -187,35 +266,51 @@
 				/>
 			</label>
 
-			<label class="campo">
-				<span>Questões</span>
-				<input
-					type="number"
-					min="0"
-					step="1"
-					inputmode="numeric"
-					value={form.questoes ?? ''}
-					oninput={(e) => (form.questoes = inteiro(e.currentTarget.value))}
-				/>
-			</label>
+			{#if mostrarQuestoes}
+				<label class="campo">
+					<span>Questões</span>
+					<input
+						type="number"
+						min="0"
+						step="1"
+						inputmode="numeric"
+						value={form.questoes ?? ''}
+						oninput={(e) => (form.questoes = inteiro(e.currentTarget.value))}
+					/>
+				</label>
 
-			<label class="campo">
-				<span>Acertos</span>
-				<input
-					type="number"
-					min="0"
-					step="1"
-					inputmode="numeric"
-					aria-invalid={invalido}
-					value={form.acertos ?? ''}
-					oninput={(e) => (form.acertos = inteiro(e.currentTarget.value))}
-				/>
-			</label>
+				<label class="campo">
+					<span>Acertos</span>
+					<input
+						type="number"
+						min="0"
+						step="1"
+						inputmode="numeric"
+						aria-invalid={invalido}
+						value={form.acertos ?? ''}
+						oninput={(e) => (form.acertos = inteiro(e.currentTarget.value))}
+					/>
+				</label>
 
-			<span class="campo-err" class:vazio={erros === null}>
-				{#if erros !== null}<b>{erros}</b> {erros === 1 ? 'erro' : 'erros'}{:else}—{/if}
-			</span>
+				<span class="campo-err" class:vazio={erros === null}>
+					{#if erros !== null}<b>{erros}</b> {erros === 1 ? 'erro' : 'erros'}{:else}—{/if}
+				</span>
+			{/if}
 		</div>
+
+		{#if soTeoria}
+			<p class="teoria-nota">Esta matéria está em <b>só teoria</b> no plano — sem questões.</p>
+		{:else}
+			<label class="teoria-lbl">
+				<input
+					type="checkbox"
+					class="checkbox"
+					checked={apenasTeoria}
+					onchange={(e) => alternarTeoria(e.currentTarget.checked)}
+				/>
+				Só estudei teoria hoje
+			</label>
+		{/if}
 
 		{#if invalido}
 			<p class="aviso" role="alert">Acertos não pode ser maior que o número de questões.</p>
@@ -235,23 +330,83 @@
 			/>
 		</label>
 
-		{#if onSalvarCaderno}
-			<label class="campo nota">
-				<span>Caderno de erros — link</span>
-				<input
-					type="url"
-					inputmode="url"
-					placeholder="https://www.tecconcursos.com.br/questoes/caderno/…"
-					bind:value={cadernoForm}
-				/>
-			</label>
-			<p class="dica-caderno">
-				Vale para {nome} em todo o cronograma. Aparece como atalho no bloco de revisão do dia.
-			</p>
+		{#if onSalvarLinks}
+			<!-- Uma seção só para os dois links, em vez de dois campos de URL de
+			     largura inteira com um parágrafo de ajuda cada: o link preenchido
+			     vira um atalho clicável (dá para abrir o caderno daqui, o que antes
+			     não dava), e o vazio ocupa uma linha discreta. -->
+			<div class="links">
+				<span class="links-titulo">Links de {nome}</span>
+
+				{#each LINKS as l (l.chave)}
+					<div class="link-linha">
+						<span class="link-icone"><NavIcon name={l.icone} size="sm" /></span>
+						<span class="link-rotulo">{l.rotulo}</span>
+
+						{#if linkEmEdicao === l.chave}
+							<input
+								class="link-campo"
+								type="url"
+								inputmode="url"
+								placeholder={l.exemplo}
+								bind:value={links[l.chave]}
+								use:focar
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === 'Escape') {
+										e.preventDefault();
+										e.stopPropagation();
+										linkEmEdicao = null;
+									}
+								}}
+							/>
+							<button type="button" class="link-acao" onclick={() => (linkEmEdicao = null)}>
+								pronto
+							</button>
+						{:else if links[l.chave]}
+							<a
+								class="link-valor"
+								href={links[l.chave]}
+								target="_blank"
+								rel="noreferrer"
+								title={links[l.chave]}
+							>
+								{host(links[l.chave])}
+							</a>
+							<button
+								type="button"
+								class="link-acao"
+								onclick={() => (linkEmEdicao = l.chave)}
+								aria-label="Editar link do {l.rotulo}"
+							>
+								editar
+							</button>
+							<button
+								type="button"
+								class="link-acao apagar"
+								onclick={() => (links[l.chave] = '')}
+								aria-label="Remover link do {l.rotulo}"
+							>
+								remover
+							</button>
+						{:else}
+							<button
+								type="button"
+								class="link-add"
+								onclick={() => (linkEmEdicao = l.chave)}
+								aria-label="Adicionar link do {l.rotulo}"
+							>
+								adicionar
+							</button>
+						{/if}
+					</div>
+				{/each}
+
+				<p class="links-dica">Valem para {nome} em todo o cronograma, não só neste dia.</p>
+			</div>
 		{/if}
 
-		{#if erroCaderno}
-			<p class="aviso erro" role="alert">{erroCaderno}</p>
+		{#if erroLinks}
+			<p class="aviso erro" role="alert">{erroLinks}</p>
 		{/if}
 
 		{#if erro}
@@ -259,16 +414,16 @@
 		{/if}
 
 		<div class="dlg-acoes">
-			<button type="button" class="btn" onclick={onCancelar} disabled={salvando || salvandoCaderno}>
+			<button type="button" class="btn" onclick={onCancelar} disabled={salvando || salvandoLinks}>
 				Cancelar
 			</button>
 			<button
 				type="button"
 				class="btn primario"
 				onclick={salvar}
-				disabled={salvando || salvandoCaderno || invalido}
+				disabled={salvando || salvandoLinks || invalido}
 			>
-				{salvando || salvandoCaderno ? 'Salvando…' : 'Salvar'}
+				{salvando || salvandoLinks ? 'Salvando…' : 'Salvar'}
 			</button>
 		</div>
 	</div>
@@ -335,8 +490,112 @@
 	.nota {
 		margin-top: 12px;
 	}
-	.dica-caderno {
-		margin: 4px 0 0;
+	/* Com as questões escondidas sobra um campo só: sem isto ele continuaria
+	   ocupando um terço da grade de três colunas, alinhado com o vazio. */
+	.campos.so-horas {
+		grid-template-columns: minmax(0, 160px);
+	}
+	.teoria-lbl {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		margin-top: 12px;
+		font-size: 13px;
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+	.teoria-nota {
+		margin: 12px 0 0;
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
+
+	/* Os links da matéria, num painel só. Antes eram campos de URL de largura
+	   inteira, cada um com um parágrafo de ajuda embaixo — dois deles fariam o
+	   diálogo virar um formulário de cadastro. Aqui o link preenchido é uma
+	   linha discreta e clicável, e o vazio quase não ocupa espaço. */
+	.links {
+		margin-top: 16px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 10px 12px;
+		background: var(--bg-soft);
+	}
+	.links-titulo {
+		display: block;
+		font-size: 10.5px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		font-weight: 600;
+		margin-bottom: 6px;
+	}
+	.link-linha {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 30px;
+	}
+	.link-linha + .link-linha {
+		border-top: 1px solid var(--border);
+	}
+	.link-icone {
+		display: inline-flex;
+		flex: none;
+		color: var(--text-faint);
+	}
+	.link-rotulo {
+		flex: none;
+		min-width: 106px;
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
+	/* O valor ganha o espaço que sobra e corta com reticências: uma URL de
+	   caderno é longa demais para caber, e quebrar a linha desalinharia tudo. */
+	.link-valor {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 12.5px;
+		color: var(--accent);
+		text-decoration: none;
+	}
+	.link-valor:hover {
+		text-decoration: underline;
+	}
+	.link-campo {
+		flex: 1 1 auto;
+		min-width: 0;
+		font-size: 12.5px;
+	}
+	.link-acao,
+	.link-add {
+		flex: none;
+		border: 0;
+		background: none;
+		padding: 3px 5px;
+		border-radius: 4px;
+		font: inherit;
+		font-size: 11.5px;
+		color: var(--text-faint);
+		cursor: pointer;
+	}
+	.link-add {
+		flex: 1 1 auto;
+		text-align: left;
+	}
+	.link-acao:hover,
+	.link-add:hover {
+		color: var(--text);
+		background: var(--bg-hover);
+	}
+	.link-acao.apagar:hover {
+		color: var(--danger);
+	}
+	.links-dica {
+		margin: 8px 0 0;
 		font-size: 11.5px;
 		color: var(--text-faint);
 	}

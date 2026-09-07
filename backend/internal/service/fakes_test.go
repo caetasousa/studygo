@@ -88,14 +88,16 @@ func (f *fakeConcursos) Atualizar(
 
 func (f *fakeConcursos) Remover(context.Context, uuid.UUID) error { return nil }
 
-func (f *fakeConcursos) DefinirCadernoURL(
+func (f *fakeConcursos) DefinirLinks(
 	_ context.Context,
 	_ uuid.UUID,
-	codigo, url string,
+	codigo string,
+	l concurso.Links,
 ) error {
 	for i := range f.c.Disciplinas {
 		if f.c.Disciplinas[i].Codigo == codigo {
-			f.c.Disciplinas[i].CadernoURL = url
+			f.c.Disciplinas[i].CadernoURL = l.Caderno
+			f.c.Disciplinas[i].NotebookURL = l.Notebook
 
 			return nil
 		}

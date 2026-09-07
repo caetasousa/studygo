@@ -212,13 +212,21 @@ func (s *PlanoService) MarcarMarco(
 	return s.montar(ctx, c)
 }
 
-// AtualizarCadernoDisciplina grava o link do caderno de erros de uma matéria,
-// para que o bloco de revisão do cronograma leve direto para lá sem exigir uma
-// edição completa do concurso.
-func (s *PlanoService) AtualizarCadernoDisciplina(
+// AtualizarLinksDisciplina grava os links de uma matéria — o caderno de erros e
+// o notebook do NotebookLM — sem exigir uma edição completa do concurso.
+//
+// O cronograma é a tela em que o estudante acompanha o estudo, então é dela que
+// esses links precisam ser editáveis: mandá-lo ao cadastro do concurso para
+// colar uma URL é tirá-lo de onde ele está trabalhando.
+//
+// Os dois viajam juntos porque a tela os edita juntos, numa seção só. O
+// registro da atividade continua sendo outra chamada: aquilo é do DIA, isto é
+// da matéria em todo o cronograma.
+func (s *PlanoService) AtualizarLinksDisciplina(
 	ctx context.Context,
 	usuarioID uuid.UUID,
-	slug, codigo, url string,
+	slug, codigo string,
+	links concurso.Links,
 ) (PlanoMontado, error) {
 	c, err := s.carregar(ctx, usuarioID, slug)
 	if err != nil {
@@ -229,7 +237,9 @@ func (s *PlanoService) AtualizarCadernoDisciplina(
 		return PlanoMontado{}, erroDeValidacao("matéria não encontrada")
 	}
 
-	if err := s.concursos.DefinirCadernoURL(ctx, c.Concurso.ID, codigo, url); err != nil {
+	if err := s.concursos.DefinirLinks(
+		ctx, c.Concurso.ID, codigo, links.Normalizar(),
+	); err != nil {
 		return PlanoMontado{}, err
 	}
 

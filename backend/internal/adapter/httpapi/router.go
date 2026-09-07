@@ -115,7 +115,7 @@ func NewRouter(
 	protegida("DELETE "+base+"/registros", h.Plano.LimparRegistros)
 
 	protegida("PUT "+base+"/marcos/{id}", h.Plano.MarcarMarco)
-	protegida("PATCH "+base+"/disciplinas/{codigo}/caderno", h.Plano.AtualizarCadernoDisciplina)
+	protegida("PATCH "+base+"/disciplinas/{codigo}/links", h.Plano.AtualizarLinksDisciplina)
 
 	protegida("POST "+base+"/atividades/mover", h.Plano.Mover)
 	protegida("POST "+base+"/atividades/antecipar", h.Plano.Antecipar)

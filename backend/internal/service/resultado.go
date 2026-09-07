@@ -45,14 +45,15 @@ type ConcursoDoPlano struct {
 // exibido nos chips do cronograma — não existe um segundo campo "sigla": o
 // código É a sigla, e ter os dois era o que deixava a tela discordar do banco.
 type DisciplinaDoPlano struct {
-	Codigo     string
-	Nome       string
-	Bloco      string
-	Peso       int
-	Cor        int
-	CadernoURL string
-	Temas      []string
-	Fontes     []FonteDoPlano
+	Codigo      string
+	Nome        string
+	Bloco       string
+	Peso        int
+	Cor         int
+	CadernoURL  string
+	NotebookURL string
+	Temas       []string
+	Fontes      []FonteDoPlano
 }
 
 // FonteDoPlano é uma origem de estudo. Tipo "questoes" é o banco de questões da

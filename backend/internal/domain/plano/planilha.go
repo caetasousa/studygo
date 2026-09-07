@@ -58,18 +58,20 @@ type Planilha struct {
 }
 
 // LinhaMateria é a personalização de uma matéria: a tag que o estudante
-// escolheu, o link do caderno de erros dele e os ajustes de estudo.
+// escolheu, os links dele (caderno de erros e NotebookLM) e os ajustes de
+// estudo.
 //
 // É o trabalho que ninguém quer refazer numa instalação nova — e que se perdia
 // junto com o concurso, porque a planilha não o levava.
 type LinhaMateria struct {
-	Numero     int
-	Codigo     string
-	Nome       string
-	CadernoURL string
-	Questoes   *int
-	Modo       string
-	Reforco    *float64
+	Numero      int
+	Codigo      string
+	Nome        string
+	CadernoURL  string
+	NotebookURL string
+	Questoes    *int
+	Modo        string
+	Reforco     *float64
 }
 
 // LinhaCaderno é uma anotação do caderno de erros, como a planilha a traz.
@@ -143,6 +145,7 @@ var colunasMateria = map[string][]string{
 	"codigo":   {"materiacodigo"},
 	"nome":     {"materianome"},
 	"caderno":  {"materiacaderno"},
+	"notebook": {"materianotebook"},
 	"questoes": {"materiaquestoes"},
 	"modo":     {"materiamodo"},
 	"reforco":  {"materiareforco"},
@@ -265,13 +268,14 @@ func LerPlanilha(r io.Reader) (Planilha, error) {
 // como saber de quem ela fala.
 func linhaDaMateria(rec []string, idx map[string]int, numero int) (LinhaMateria, bool) {
 	l := LinhaMateria{
-		Numero:     numero,
-		Codigo:     strings.TrimSpace(campo(rec, idx, "codigo")),
-		Nome:       strings.TrimSpace(campo(rec, idx, "nome")),
-		CadernoURL: strings.TrimSpace(campo(rec, idx, "caderno")),
-		Questoes:   inteiroOuNil(campo(rec, idx, "questoes")),
-		Modo:       strings.TrimSpace(campo(rec, idx, "modo")),
-		Reforco:    floatOuNil(campo(rec, idx, "reforco")),
+		Numero:      numero,
+		Codigo:      strings.TrimSpace(campo(rec, idx, "codigo")),
+		Nome:        strings.TrimSpace(campo(rec, idx, "nome")),
+		CadernoURL:  strings.TrimSpace(campo(rec, idx, "caderno")),
+		NotebookURL: strings.TrimSpace(campo(rec, idx, "notebook")),
+		Questoes:    inteiroOuNil(campo(rec, idx, "questoes")),
+		Modo:        strings.TrimSpace(campo(rec, idx, "modo")),
+		Reforco:     floatOuNil(campo(rec, idx, "reforco")),
 	}
 
 	if l.Codigo == "" && l.Nome == "" {
@@ -863,11 +867,12 @@ type AjusteDeMateria struct {
 	DisciplinaID uuid.UUID
 	// Codigo é a tag da planilha, já normalizada, quando ela ainda não é a tag
 	// desta matéria e não está ocupada por outra.
-	Codigo     string
-	CadernoURL string
-	Questoes   *int
-	Modo       *Modo
-	Reforco    *float64
+	Codigo      string
+	CadernoURL  string
+	NotebookURL string
+	Questoes    *int
+	Modo        *Modo
+	Reforco     *float64
 }
 
 // AjustesDaPlanilha casa a personalização da planilha com as matérias daqui.
@@ -906,6 +911,11 @@ func AjustesDaPlanilha(
 
 		if l.CadernoURL != "" && l.CadernoURL != d.CadernoURL {
 			ajuste.CadernoURL = l.CadernoURL
+			mudou = true
+		}
+
+		if l.NotebookURL != "" && l.NotebookURL != d.NotebookURL {
+			ajuste.NotebookURL = l.NotebookURL
 			mudou = true
 		}
 

@@ -87,9 +87,9 @@ A persistência acontece no backend após confirmação do usuário.
 
 ## 🐘 Banco de dados e migrations
 
-Migrations ficam em `backend/migrations/`, e hoje são uma baseline só
-(`000001_initial_schema`). O runner executa apenas os `.up.sql`; não há rollback
-automático pelos `.down.sql`.
+Migrations ficam em `backend/migrations/`, numeradas em sequência a partir da
+baseline `000001_initial_schema`. O runner executa apenas os `.up.sql`; não há
+rollback automático pelos `.down.sql`.
 
 - Migrations criam ESTRUTURA. Nada de backfill, função, trigger ou regra de
   negócio — há um teste que falha o build se isso aparecer

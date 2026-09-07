@@ -76,7 +76,16 @@
 	}
 
 	function vazia(): DisciplinaInput {
-		return { nome: '', bloco: 'esp', questoes: 0, peso: 0, cadernoUrl: '', temas: [], fontes: [] };
+		return {
+			nome: '',
+			bloco: 'esp',
+			questoes: 0,
+			peso: 0,
+			cadernoUrl: '',
+			notebookUrl: '',
+			temas: [],
+			fontes: []
+		};
 	}
 
 	// The form owns editable copies seeded from `inicial` at mount. Parents only
@@ -117,6 +126,7 @@
 		peso: number;
 		// Optional link to this subject's external error notebook.
 		cadernoUrl: string;
+		notebookUrl: string;
 		temasTexto: string;
 		fontesTexto: string;
 	}
@@ -130,6 +140,7 @@
 			questoes: d.questoes,
 			peso: d.peso ?? 0,
 			cadernoUrl: d.cadernoUrl ?? '',
+			notebookUrl: d.notebookUrl ?? '',
 			temasTexto: (d.temas ?? []).join('\n'),
 			fontesTexto: (d.fontes ?? []).map((f) => `${f.titulo} | ${f.url}`).join('\n')
 		}))
@@ -207,6 +218,7 @@
 			questoes: 0,
 			peso: PESO_PADRAO.esp,
 			cadernoUrl: '',
+			notebookUrl: '',
 			temasTexto: '',
 			fontesTexto: ''
 		});
@@ -253,6 +265,7 @@
 			questoes: Math.max(0, d.questoes || 0),
 			peso: Math.max(0, Math.round(d.peso || 0)),
 			cadernoUrl: d.cadernoUrl.trim(),
+			notebookUrl: d.notebookUrl.trim(),
 			temas: d.temasTexto
 				.split('\n')
 				.map((t) => t.trim())
@@ -463,7 +476,7 @@
 
 						<details style="margin-top:10px">
 							<summary style="cursor:pointer;font-size:13px;color:var(--text-muted)">
-								Temas, fontes e caderno (opcional)
+								Temas, fontes e links (opcional)
 							</summary>
 							<div class="form-grid" style="margin-top:10px">
 								<div class="field" style="flex:1 1 100%">
@@ -479,6 +492,21 @@
 									<p class="page-sub" style="margin:4px 0 0;font-size:12px">
 										Onde você guarda os erros desta matéria (TEC, Qconcursos, um documento).
 										Aparece como atalho no bloco de revisão do dia.
+									</p>
+								</div>
+								<div class="field" style="flex:1 1 100%">
+									<label for="cf-d{i}-notebook">NotebookLM — link</label>
+									<input
+										id="cf-d{i}-notebook"
+										type="url"
+										inputmode="url"
+										bind:value={d.notebookUrl}
+										placeholder="https://notebooklm.google.com/notebook/..."
+										style="width:100%"
+									/>
+									<p class="page-sub" style="margin:4px 0 0;font-size:12px">
+										O notebook que você criou com o dossiê desta matéria. Os dois links
+										também podem ser colados direto do cronograma, ao registrar o estudo.
 									</p>
 								</div>
 								<div class="field" style="flex:1 1 320px">

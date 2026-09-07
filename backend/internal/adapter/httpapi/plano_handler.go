@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/tec"
 	"studygo/internal/service"
 
@@ -274,11 +275,18 @@ func (h *PlanoHandler) MarcarMarco(w http.ResponseWriter, r *http.Request) {
 	h.responderPlano(w, r, p, err)
 }
 
-type cadernoDisciplinaRequest struct {
-	CadernoURL string `json:"cadernoUrl"`
+// linksDisciplinaRequest são os links da matéria, editáveis do cronograma.
+//
+// Os dois campos viajam SEMPRE, mesmo quando só um mudou: o corpo descreve o
+// estado final dos links da matéria, não um delta. Aceitar campo ausente como
+// "não mexer" faria uma aba antiga, que não conhece o notebook, apagá-lo ao
+// salvar o caderno.
+type linksDisciplinaRequest struct {
+	CadernoURL  string `json:"cadernoUrl"`
+	NotebookURL string `json:"notebookUrl"`
 }
 
-func (h *PlanoHandler) AtualizarCadernoDisciplina(w http.ResponseWriter, r *http.Request) {
+func (h *PlanoHandler) AtualizarLinksDisciplina(w http.ResponseWriter, r *http.Request) {
 	id, slug, ok := h.contexto(r)
 	if !ok {
 		writeError(w, r, h.logger, errNaoAutenticado)
@@ -286,15 +294,16 @@ func (h *PlanoHandler) AtualizarCadernoDisciplina(w http.ResponseWriter, r *http
 		return
 	}
 
-	var req cadernoDisciplinaRequest
+	var req linksDisciplinaRequest
 	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 
 		return
 	}
 
-	p, err := h.planos.AtualizarCadernoDisciplina(
-		r.Context(), id, slug, r.PathValue("codigo"), req.CadernoURL,
+	p, err := h.planos.AtualizarLinksDisciplina(
+		r.Context(), id, slug, r.PathValue("codigo"),
+		concurso.Links{Caderno: req.CadernoURL, Notebook: req.NotebookURL},
 	)
 	h.responderPlano(w, r, p, err)
 }

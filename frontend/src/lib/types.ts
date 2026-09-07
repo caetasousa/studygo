@@ -62,8 +62,10 @@ export interface DisciplinaInput {
 	questoes: number;
 	/** 0 = use the block default (1 for ger, 2 for esp); a positive value overrides it. */
 	peso: number;
-	/** Optional link to this subject's external error notebook (TEC, Qconcursos, a doc). */
+	/** Link opcional para o caderno de erros externo da matéria (TEC, Qconcursos, um doc). */
 	cadernoUrl: string;
+	/** Link opcional para o notebook do NotebookLM desta matéria. */
+	notebookUrl: string;
 	temas: string[];
 	fontes: FonteInput[];
 }
@@ -214,8 +216,10 @@ export interface Disciplina {
 	bloco: 'esp' | 'ger';
 	peso: number;
 	cor: number;
-	/** Optional link to this subject's external error notebook; the review block links to it. */
+	/** Link opcional para o caderno de erros externo; o bloco de revisão leva até ele. */
 	cadernoUrl: string;
+	/** Link opcional para o notebook do NotebookLM desta matéria. */
+	notebookUrl: string;
 	temas: string[];
 	fontes: Fonte[];
 }

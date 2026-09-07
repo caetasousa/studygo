@@ -169,14 +169,15 @@ func montarConcurso(c concurso.Concurso) ConcursoDoPlano {
 		}
 
 		discs = append(discs, DisciplinaDoPlano{
-			Codigo:     d.Codigo,
-			Nome:       d.Nome,
-			Bloco:      string(d.Bloco),
-			Peso:       d.Peso,
-			Cor:        i % concurso.TotalCoresDisciplinas,
-			CadernoURL: d.CadernoURL,
-			Temas:      temas,
-			Fontes:     fontes,
+			Codigo:      d.Codigo,
+			Nome:        d.Nome,
+			Bloco:       string(d.Bloco),
+			Peso:        d.Peso,
+			Cor:         i % concurso.TotalCoresDisciplinas,
+			CadernoURL:  d.CadernoURL,
+			NotebookURL: d.NotebookURL,
+			Temas:       temas,
+			Fontes:      fontes,
 		})
 	}
 

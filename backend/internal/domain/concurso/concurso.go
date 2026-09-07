@@ -155,8 +155,32 @@ type Disciplina struct {
 	// matéria (um caderno do TEC/Qconcursos, um documento). O bloco de revisão
 	// do cronograma leva direto para lá.
 	CadernoURL string
-	Temas      []string
-	Fontes     []Fonte
+	// NotebookURL é o notebook do NotebookLM desta matéria — aquele que o dossiê
+	// manda criar e que, sem este campo, era preciso reencontrar toda vez.
+	NotebookURL string
+	Temas       []string
+	Fontes      []Fonte
+}
+
+// Links são os endereços que o estudante guarda por matéria e edita direto do
+// cronograma, sem reenviar o concurso inteiro.
+//
+// Um struct e não dois parâmetros soltos de string: são dois campos do mesmo
+// tipo, e trocá-los de lugar numa chamada compila e só aparece na tela do
+// usuário, com o caderno abrindo o notebook.
+type Links struct {
+	Caderno  string
+	Notebook string
+}
+
+// Normalizar apara o que veio da borda. Link em branco é ausência de link — o
+// domínio não distingue "vazio" de "nulo", e ter os dois só criaria um terceiro
+// estado para o resto do código tratar.
+func (l Links) Normalizar() Links {
+	return Links{
+		Caderno:  strings.TrimSpace(l.Caderno),
+		Notebook: strings.TrimSpace(l.Notebook),
+	}
 }
 
 // Fonte é uma origem de estudo de uma disciplina — uma lei, uma
@@ -216,6 +240,7 @@ func (c *Concurso) Normalizar() {
 		d.Bloco = BlocoValido(string(d.Bloco))
 		d.Peso = PesoDe(d.Bloco, d.Peso)
 		d.CadernoURL = strings.TrimSpace(d.CadernoURL)
+		d.NotebookURL = strings.TrimSpace(d.NotebookURL)
 		d.Ordem = i
 
 		if d.QuestoesPadrao < 0 {

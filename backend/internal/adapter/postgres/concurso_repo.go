@@ -240,19 +240,24 @@ func (r *ConcursoRepo) Remover(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *ConcursoRepo) DefinirCadernoURL(
+// DefinirLinks grava os dois links da matéria de uma vez.
+//
+// Um UPDATE só, e não um por link: a tela os edita juntos, e gravá-los em duas
+// idas deixaria o caderno salvo e o notebook não se a segunda falhasse.
+func (r *ConcursoRepo) DefinirLinks(
 	ctx context.Context,
 	concursoID uuid.UUID,
-	codigo, url string,
+	codigo string,
+	l concurso.Links,
 ) error {
 	ct, err := r.pool.Exec(
 		ctx,
-		`UPDATE disciplinas SET caderno_url = $3
+		`UPDATE disciplinas SET caderno_url = $3, notebook_url = $4
 		  WHERE concurso_id = $1 AND codigo = $2`,
-		concursoID, codigo, url,
+		concursoID, codigo, l.Caderno, l.Notebook,
 	)
 	if err != nil {
-		return fmt.Errorf("atualizando caderno_url: %w", err)
+		return fmt.Errorf("atualizando links da disciplina: %w", err)
 	}
 
 	if ct.RowsAffected() == 0 {
@@ -290,11 +295,12 @@ func gravarDisciplinas(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) err
 			if err := tx.QueryRow(
 				ctx,
 				`INSERT INTO disciplinas
-				   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+				   (concurso_id, codigo, nome, bloco, peso, questoes_padrao, ordem,
+				    caderno_url, notebook_url)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 				 RETURNING id`,
 				c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso,
-				d.QuestoesPadrao, d.Ordem, d.CadernoURL,
+				d.QuestoesPadrao, d.Ordem, d.CadernoURL, d.NotebookURL,
 			).Scan(&d.ID); err != nil {
 				return fmt.Errorf("inserindo disciplina %s: %w", d.Nome, err)
 			}
@@ -302,10 +308,11 @@ func gravarDisciplinas(ctx context.Context, tx pgx.Tx, c *concurso.Concurso) err
 			ctx,
 			`UPDATE disciplinas SET
 			   codigo = $3, nome = $4, bloco = $5, peso = $6,
-			   questoes_padrao = $7, ordem = $8, caderno_url = $9
+			   questoes_padrao = $7, ordem = $8, caderno_url = $9,
+			   notebook_url = $10
 			 WHERE id = $1 AND concurso_id = $2`,
 			d.ID, c.ID, d.Codigo, d.Nome, string(d.Bloco), d.Peso,
-			d.QuestoesPadrao, d.Ordem, d.CadernoURL,
+			d.QuestoesPadrao, d.Ordem, d.CadernoURL, d.NotebookURL,
 		); err != nil {
 			return fmt.Errorf("atualizando disciplina %s: %w", d.Nome, err)
 		}
@@ -437,7 +444,8 @@ func (r *ConcursoRepo) disciplinas(
 ) ([]concurso.Disciplina, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url
+		`SELECT id, codigo, nome, bloco, peso, questoes_padrao, ordem, caderno_url,
+		        notebook_url
 		   FROM disciplinas WHERE concurso_id = $1 ORDER BY ordem`,
 		concursoID,
 	)
@@ -457,7 +465,7 @@ func (r *ConcursoRepo) disciplinas(
 
 		if err := rows.Scan(
 			&d.ID, &d.Codigo, &d.Nome, &bloco, &d.Peso,
-			&d.QuestoesPadrao, &d.Ordem, &d.CadernoURL,
+			&d.QuestoesPadrao, &d.Ordem, &d.CadernoURL, &d.NotebookURL,
 		); err != nil {
 			return nil, fmt.Errorf("lendo disciplina: %w", err)
 		}

@@ -377,10 +377,12 @@
 				nome={nomeDe(it.disciplina)}
 				registro={it}
 				cadernoUrl={planoStore.discIndex[it.disciplina]?.cadernoUrl ?? ''}
+				notebookUrl={planoStore.discIndex[it.disciplina]?.notebookUrl ?? ''}
+				soTeoria={planoStore.plano?.config.modos?.[it.disciplina] === 'teoria'}
 				{salvando}
 				erro={erroForm}
 				onSalvar={(v) => void salvarAtividade(it, v)}
-				onSalvarCaderno={(url) => planoStore.atualizarCadernoDisciplina(it.disciplina, url)}
+				onSalvarLinks={(links) => planoStore.atualizarLinksDisciplina(it.disciplina, links)}
 				onCancelar={fecharForm}
 			/>
 		{/if}

@@ -413,6 +413,13 @@ func (s *PlanilhaService) aplicarAjustes(
 			mexeuNoConcurso = true
 		}
 
+		// Coluna ausente numa planilha antiga chega vazia, e vazio é "não mexer"
+		// — importar um CSV exportado antes deste campo não apaga o link.
+		if a.NotebookURL != "" {
+			d.NotebookURL = a.NotebookURL
+			mexeuNoConcurso = true
+		}
+
 		if a.Questoes != nil {
 			cfg.Questoes[d.Codigo] = *a.Questoes
 			mexeuNoPlano = true
@@ -522,7 +529,7 @@ func escreverMateriasCSV(w *csv.Writer, cur concurso.Concurso, cfg plano.Config)
 
 	if err := w.Write([]string{
 		"materia_codigo", "materia_nome", "materia_caderno",
-		"materia_questoes", "materia_modo", "materia_reforco",
+		"materia_notebook", "materia_questoes", "materia_modo", "materia_reforco",
 	}); err != nil {
 		return err
 	}
@@ -532,6 +539,7 @@ func escreverMateriasCSV(w *csv.Writer, cur concurso.Concurso, cfg plano.Config)
 			d.Codigo,
 			d.Nome,
 			d.CadernoURL,
+			d.NotebookURL,
 			strconv.Itoa(cfg.Questoes[d.Codigo]),
 			string(cfg.ModoDe(d.Codigo)),
 			strconv.FormatFloat(cfg.ReforcoDe(d.Codigo), 'f', -1, 64),

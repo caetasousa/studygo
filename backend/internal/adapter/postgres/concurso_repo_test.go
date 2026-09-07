@@ -216,10 +216,10 @@ func TestConcursoRepo_DefinirCadernoURL(t *testing.T) {
 	u := r.criarUsuario(t, "a@b.c")
 	c := r.criarConcurso(t, u, "tce-go")
 
-	if err := r.concursos.DefinirCadernoURL(
-		t.Context(), c.ID, "LINPO", "https://tec/caderno",
+	if err := r.concursos.DefinirLinks(
+		t.Context(), c.ID, "LINPO", concurso.Links{Caderno: "https://tec/caderno"},
 	); err != nil {
-		t.Fatalf("DefinirCadernoURL: %v", err)
+		t.Fatalf("DefinirLinks: %v", err)
 	}
 
 	lido, err := r.concursos.PorSlug(t.Context(), "tce-go")
@@ -232,8 +232,8 @@ func TestConcursoRepo_DefinirCadernoURL(t *testing.T) {
 	}
 
 	// Um código que não existe naquele concurso não é silenciosamente ignorado.
-	if err := r.concursos.DefinirCadernoURL(
-		t.Context(), c.ID, "NAOEXISTE", "https://x",
+	if err := r.concursos.DefinirLinks(
+		t.Context(), c.ID, "NAOEXISTE", concurso.Links{Caderno: "https://x"},
 	); !errors.Is(err, concurso.ErrNaoEncontrado) {
 		t.Errorf("código inexistente = %v, quer ErrNaoEncontrado", err)
 	}

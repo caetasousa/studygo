@@ -47,14 +47,15 @@ type concursoDoPlanoDTO struct {
 // os dois, e o frontend calculava a sigla por conta própria com outra regra —
 // era isso que fazia o chip da tela discordar do que estava gravado.
 type disciplinaDTO struct {
-	Codigo     string     `json:"codigo"`
-	Nome       string     `json:"nome"`
-	Bloco      string     `json:"bloco"`
-	Peso       int        `json:"peso"`
-	Cor        int        `json:"cor"`
-	CadernoURL string     `json:"cadernoUrl"`
-	Temas      []string   `json:"temas"`
-	Fontes     []fonteDTO `json:"fontes"`
+	Codigo      string     `json:"codigo"`
+	Nome        string     `json:"nome"`
+	Bloco       string     `json:"bloco"`
+	Peso        int        `json:"peso"`
+	Cor         int        `json:"cor"`
+	CadernoURL  string     `json:"cadernoUrl"`
+	NotebookURL string     `json:"notebookUrl"`
+	Temas       []string   `json:"temas"`
+	Fontes      []fonteDTO `json:"fontes"`
 }
 
 type fonteDTO struct {
@@ -398,14 +399,15 @@ func concursoDoPlanoParaDTO(c service.ConcursoDoPlano) concursoDoPlanoDTO {
 		}
 
 		discs = append(discs, disciplinaDTO{
-			Codigo:     d.Codigo,
-			Nome:       d.Nome,
-			Bloco:      d.Bloco,
-			Peso:       d.Peso,
-			Cor:        d.Cor,
-			CadernoURL: d.CadernoURL,
-			Temas:      d.Temas,
-			Fontes:     fontes,
+			Codigo:      d.Codigo,
+			Nome:        d.Nome,
+			Bloco:       d.Bloco,
+			Peso:        d.Peso,
+			Cor:         d.Cor,
+			CadernoURL:  d.CadernoURL,
+			NotebookURL: d.NotebookURL,
+			Temas:       d.Temas,
+			Fontes:      fontes,
 		})
 	}
 

@@ -2,7 +2,11 @@
 
 package postgres_test
 
-import "testing"
+import (
+	"testing"
+
+	"studygo/internal/domain/concurso"
+)
 
 // O caminho que grava o link do caderno de erros da matéria — o que a tela de
 // registro chama quando o estudante cola a URL do TEC.
@@ -15,8 +19,10 @@ func TestReproDefinirCadernoURL(t *testing.T) {
 
 	url := "https://www.tecconcursos.com.br/questoes/caderno/123"
 
-	if err := r.concursos.DefinirCadernoURL(t.Context(), c.ID, c.Disciplinas[0].Codigo, url); err != nil {
-		t.Fatalf("DefinirCadernoURL: %v", err)
+	if err := r.concursos.DefinirLinks(
+		t.Context(), c.ID, c.Disciplinas[0].Codigo, concurso.Links{Caderno: url},
+	); err != nil {
+		t.Fatalf("DefinirLinks: %v", err)
 	}
 
 	lido, err := r.concursos.PorID(t.Context(), c.ID)

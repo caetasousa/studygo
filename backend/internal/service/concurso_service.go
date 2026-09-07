@@ -283,6 +283,7 @@ func concursoDoComando(cmd ConcursoCommand) (concurso.Concurso, []string) {
 			Peso:           dc.Peso,
 			QuestoesPadrao: dc.Questoes,
 			CadernoURL:     dc.CadernoURL,
+			NotebookURL:    dc.NotebookURL,
 			Temas:          dc.Temas,
 		}
 

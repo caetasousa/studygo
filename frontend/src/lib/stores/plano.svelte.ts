@@ -32,6 +32,7 @@ interface DiscInfo {
 	cor: number;
 	bloco: 'esp' | 'ger';
 	cadernoUrl: string;
+	notebookUrl: string;
 }
 
 class PlanoStore {
@@ -51,7 +52,8 @@ class PlanoStore {
 				nome: d.nome,
 				cor: d.cor,
 				bloco: d.bloco,
-				cadernoUrl: d.cadernoUrl ?? ''
+				cadernoUrl: d.cadernoUrl ?? '',
+				notebookUrl: d.notebookUrl ?? ''
 			};
 		}
 		return m;
@@ -224,19 +226,24 @@ class PlanoStore {
 	reorganizarDesde = (data: string) => this.run((s) => api.reorganizarDesde(s, data));
 
 	/**
-	 * Sets one discipline's error-notebook link, from the schedule. Discipline-
-	 * wide, not per-activity. Returns an error message on failure so the form can
-	 * show it and stay open.
+	 * Grava os links de uma matéria a partir do cronograma.
+	 *
+	 * São da MATÉRIA em todo o cronograma, não daquela atividade: o caderno de
+	 * erros e o notebook seguem a disciplina, não o dia. Devolve a mensagem de
+	 * erro quando falha, para o formulário mostrá-la e continuar aberto.
 	 */
-	atualizarCadernoDisciplina = async (codigo: string, url: string): Promise<string | null> => {
+	atualizarLinksDisciplina = async (
+		codigo: string,
+		links: { cadernoUrl: string; notebookUrl: string }
+	): Promise<string | null> => {
 		const slug = this.slug;
 
 		try {
-			this.commit(slug, await api.atualizarCadernoDisciplina(slug, codigo, url), false);
+			this.commit(slug, await api.atualizarLinksDisciplina(slug, codigo, links), false);
 
 			return null;
 		} catch (e) {
-			return e instanceof Error ? e.message : 'Não foi possível salvar o link';
+			return e instanceof Error ? e.message : 'Não foi possível salvar os links';
 		}
 	};
 

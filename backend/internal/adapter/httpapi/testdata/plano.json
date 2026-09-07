@@ -55,6 +55,7 @@
           }
         ],
         "nome": "string",
+        "notebookUrl": "string",
         "peso": "number",
         "temas": [
           "string"

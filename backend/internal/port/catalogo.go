@@ -28,7 +28,8 @@ type ConcursoRepository interface {
 
 	Remover(ctx context.Context, id uuid.UUID) error
 
-	// DefinirCadernoURL atualiza só o link do caderno de uma disciplina, para que
-	// o cronograma possa editá-lo sem reenviar o concurso inteiro.
-	DefinirCadernoURL(ctx context.Context, concursoID uuid.UUID, codigo, url string) error
+	// DefinirLinks atualiza só os links de uma disciplina (caderno de erros e
+	// NotebookLM), para que o cronograma possa editá-los sem reenviar o concurso
+	// inteiro. Os dois juntos porque a tela os edita juntos.
+	DefinirLinks(ctx context.Context, concursoID uuid.UUID, codigo string, l concurso.Links) error
 }

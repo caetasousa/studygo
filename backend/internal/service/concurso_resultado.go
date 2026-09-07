@@ -28,15 +28,16 @@ type ConcursoCommand struct {
 // cronograma; vazia, a matéria mantém a que já tinha (ou ganha uma derivada do
 // nome, se for nova).
 type DisciplinaCommand struct {
-	ID         string
-	Codigo     string
-	Nome       string
-	Bloco      string
-	Questoes   int
-	Peso       int
-	CadernoURL string
-	Temas      []string
-	Fontes     []FonteCommand
+	ID          string
+	Codigo      string
+	Nome        string
+	Bloco       string
+	Questoes    int
+	Peso        int
+	CadernoURL  string
+	NotebookURL string
+	Temas       []string
+	Fontes      []FonteCommand
 }
 
 type FonteCommand struct {
@@ -273,15 +274,16 @@ func detalheDe(c concurso.Concurso) ConcursoDetalhe {
 		}
 
 		discs = append(discs, DisciplinaCommand{
-			ID:         d.ID.String(),
-			Codigo:     d.Codigo,
-			Nome:       d.Nome,
-			Bloco:      string(d.Bloco),
-			Questoes:   d.QuestoesPadrao,
-			Peso:       d.Peso,
-			CadernoURL: d.CadernoURL,
-			Temas:      temas,
-			Fontes:     fontes,
+			ID:          d.ID.String(),
+			Codigo:      d.Codigo,
+			Nome:        d.Nome,
+			Bloco:       string(d.Bloco),
+			Questoes:    d.QuestoesPadrao,
+			Peso:        d.Peso,
+			CadernoURL:  d.CadernoURL,
+			NotebookURL: d.NotebookURL,
+			Temas:       temas,
+			Fontes:      fontes,
 		})
 	}
 

@@ -255,10 +255,21 @@ export const api = {
 	restaurarOrdem: (slug: string) =>
 		request<PlanoResposta>(`${planoBase(slug)}/restaurar-ordem`, { method: 'POST' }),
 
-	atualizarCadernoDisciplina: (slug: string, codigo: string, cadernoUrl: string) =>
+	/**
+	 * Grava os links de UMA matéria — caderno de erros e NotebookLM.
+	 *
+	 * Os dois vão sempre juntos, e o corpo descreve o estado FINAL: mandar um
+	 * campo vazio apaga aquele link. É o que permite ao formulário oferecer
+	 * "remover" sem uma rota própria para isso.
+	 */
+	atualizarLinksDisciplina: (
+		slug: string,
+		codigo: string,
+		links: { cadernoUrl: string; notebookUrl: string }
+	) =>
 		request<PlanoResposta>(
-			`${planoBase(slug)}/disciplinas/${encodeURIComponent(codigo)}/caderno`,
-			{ method: 'PATCH', body: JSON.stringify({ cadernoUrl }) }
+			`${planoBase(slug)}/disciplinas/${encodeURIComponent(codigo)}/links`,
+			{ method: 'PATCH', body: JSON.stringify(links) }
 		),
 
 	estatisticas: (slug: string) => request<Estatisticas>(`${planoBase(slug)}/estatisticas`),
