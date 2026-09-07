@@ -1,12 +1,16 @@
-// Package editalproc is the HTTP client for the internal edital-processor
-// service. It is the only place that knows the wire format of that service; the
-// rest of the backend talks to it through port.EditalProcessor.
+// Package editalproc é o cliente HTTP do edital-processor.
+//
+// É o ÚNICO lugar que conhece o formato de fio daquele serviço; o resto do
+// backend fala com ele por port.EditalProcessor e não sabe sequer que existe
+// HTTP no meio. Aqui também mora o disjuntor, porque a saúde do processador é
+// um fato de transporte, não de domínio.
 package editalproc
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -20,28 +24,51 @@ import (
 
 var _ port.EditalProcessor = (*Client)(nil)
 
-// Client calls the edital-processor over the compose network.
+// Client fala com o edital-processor pela rede do compose.
 type Client struct {
-	baseURL string
-	token   string
-	http    *http.Client
+	baseURL   string
+	token     string
+	http      *http.Client
+	disjuntor *Disjuntor
 }
 
-// New builds a client. An empty baseURL yields a client whose Disponivel()
-// reports false — the composition root uses the null processor instead.
+// falhasParaAbrir e esperaDoDisjuntor calibram o corte.
+//
+// Três falhas seguidas porque uma pode ser azar (um timeout isolado do
+// provedor) e duas ainda podem ser coincidência; três seguidas, num serviço que
+// normalmente responde, é padrão. Trinta segundos porque é o tempo típico de um
+// container reiniciar — curto o bastante para a importação voltar sozinha
+// enquanto o estudante ainda está na tela, longo o bastante para não martelar
+// um serviço que está subindo.
+const (
+	falhasParaAbrir   = 3
+	esperaDoDisjuntor = 30 * time.Second
+)
+
+// New constrói um cliente. Uma baseURL vazia produz um cliente cujo Disponivel()
+// responde false — a raiz de composição usa o processador nulo no lugar.
 func New(baseURL, token string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		token:   token,
-		// The processor OCRs and calls an LLM per step; a scanned edital can
-		// take ~40s. Generous, but bounded.
-		http: &http.Client{Timeout: 4 * time.Minute},
+		// O processador faz OCR e chama um LLM por passo; um edital digitalizado
+		// pode levar uns 40s. Generoso, mas com teto.
+		http:      &http.Client{Timeout: 4 * time.Minute},
+		disjuntor: NovoDisjuntor(falhasParaAbrir, esperaDoDisjuntor),
 	}
 }
 
-func (c *Client) Disponivel() bool { return c.baseURL != "" }
+// Disponivel responde pela SAÚDE, não pela configuração.
+//
+// Antes bastava a URL estar definida, e a tela seguia oferecendo o assistente
+// com o processador fora do ar: o estudante subia o PDF, esperava, e recebia um
+// 503 no fim. Com o disjuntor aberto a importação some da tela e o cadastro
+// manual — que sempre funcionou — passa a ser o caminho oferecido.
+func (c *Client) Disponivel() bool {
+	return c.baseURL != "" && c.disjuntor.Fechado()
+}
 
-// --- wire types ------------------------------------------------------------
+// --- tipos de fio ----------------------------------------------------------
 
 type wireAlerta struct {
 	Codigo    string `json:"code"`
@@ -128,9 +155,9 @@ type wireError struct {
 	RequestID string `json:"requestId"`
 }
 
-// --- calls ---------------------------------------------------------------
+// --- chamadas --------------------------------------------------------------
 
-// Analisar posts the edital and returns the document handle plus cargos.
+// Analisar envia o edital e devolve o identificador do documento e os cargos.
 func (c *Client) Analisar(ctx context.Context, ownerRef string, up port.EditalUpload) (port.EditalAnalise, error) {
 	body, contentType, err := multipartUpload(up)
 	if err != nil {
@@ -152,7 +179,7 @@ func (c *Client) Analisar(ctx context.Context, ownerRef string, up port.EditalUp
 	}, nil
 }
 
-// Estrutura extracts the exam structure for one cargo.
+// Estrutura extrai a composição da prova de um cargo.
 func (c *Client) Estrutura(ctx context.Context, ownerRef, documentoID, cargo string) (port.EditalEstrutura, error) {
 	payload, _ := json.Marshal(map[string]string{"documentId": documentoID, "cargo": cargo})
 
@@ -164,8 +191,11 @@ func (c *Client) Estrutura(ctx context.Context, ownerRef, documentoID, cargo str
 	return toEstrutura(out), nil
 }
 
-// Conteudo extracts the syllabus topics for the given disciplines. A fresh
-// upload is accepted (documentoID empty) so the edit screen keeps working.
+// Conteudo extrai o conteúdo programático das disciplinas pedidas.
+//
+// Aceita um upload novo (documentoID vazio) porque a tela de EDIÇÃO chama este
+// passo sozinha, sem ter passado pelo assistente — e portanto sem documento
+// guardado do outro lado.
 func (c *Client) Conteudo(ctx context.Context, ownerRef, documentoID, cargo string, disciplinas []string, up port.EditalUpload) (port.EditalConteudo, error) {
 	var body io.Reader
 	contentType := "application/json"
@@ -198,12 +228,26 @@ func (c *Client) Conteudo(ctx context.Context, ownerRef, documentoID, cargo stri
 	return port.EditalConteudo{Itens: itens, Alertas: toAlertas(out.Alerts)}, nil
 }
 
-// --- plumbing ------------------------------------------------------------
+// --- encanamento -----------------------------------------------------------
 
 func (c *Client) do(ctx context.Context, method, path, ownerRef, contentType string, body io.Reader, out any) error {
+	// Falhar rápido: com o disjuntor aberto, o corpo nem é enviado. É a
+	// diferença entre o usuário esperar um minuto para saber e saber agora.
+	if !c.disjuntor.Permitir() {
+		return fmt.Errorf(
+			"%w: o processador de editais falhou nas últimas tentativas",
+			port.ErrProvedorIndisponivel,
+		)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("building request: %w", err)
+		// Erro de montagem é bug nosso, não indisponibilidade dele: a sonda que
+		// este caminho tomou precisa ser devolvida, ou o disjuntor trava
+		// meio-aberto para sempre.
+		c.disjuntor.Sucesso()
+
+		return fmt.Errorf("montando requisição: %w", err)
 	}
 
 	req.Header.Set("Content-Type", contentType)
@@ -215,6 +259,8 @@ func (c *Client) do(ctx context.Context, method, path, ownerRef, contentType str
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		c.disjuntor.Falha()
+
 		return fmt.Errorf("%w: %w", port.ErrProvedorIndisponivel, err)
 	}
 	defer resp.Body.Close()
@@ -222,19 +268,40 @@ func (c *Client) do(ctx context.Context, method, path, ownerRef, contentType str
 	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 
 	if resp.StatusCode >= 400 {
-		return mapError(resp.StatusCode, payload)
+		return c.registrar(mapError(resp.StatusCode, payload))
 	}
 
 	if err := json.Unmarshal(payload, out); err != nil {
+		c.disjuntor.Falha()
+
 		return fmt.Errorf("%w: resposta inválida do processador: %w", port.ErrProvedorIndisponivel, err)
 	}
+
+	c.disjuntor.Sucesso()
 
 	return nil
 }
 
-// mapError turns a processor error body into one of the domain errors. A
-// transient code (or any 5xx) becomes ErrProvedorIndisponivel — the API surfaces
-// it as a 503 with a retry hint.
+// registrar conta no disjuntor apenas o que é indisponibilidade.
+//
+// A distinção é a razão de o disjuntor ser útil: um edital que o processador
+// leu e recusou é resposta SAUDÁVEL. Contá-la abriria o disjuntor por causa de
+// um PDF ruim de um usuário, tirando a importação do ar para todos os outros.
+func (c *Client) registrar(err error) error {
+	if errors.Is(err, port.ErrProvedorIndisponivel) {
+		c.disjuntor.Falha()
+	} else {
+		c.disjuntor.Sucesso()
+	}
+
+	return err
+}
+
+// mapError traduz o corpo de erro do processador num erro nosso.
+//
+// Código transitório (ou qualquer 5xx, ou 429) vira ErrProvedorIndisponivel — a
+// API o apresenta como 503 com convite a tentar de novo, e o disjuntor o conta.
+// O resto é recusa do EDITAL, não do serviço: sobe como erro comum e não conta.
 func mapError(status int, payload []byte) error {
 	var we wireError
 	_ = json.Unmarshal(payload, &we)
@@ -300,7 +367,7 @@ func multipartConteudo(up port.EditalUpload, cargo string, disciplinas []string)
 	return &buf, w.FormDataContentType(), nil
 }
 
-// --- mappers ------------------------------------------------------------
+// --- tradutores ------------------------------------------------------------
 
 func toCargos(in []wireCargo) []port.EditalCargo {
 	out := make([]port.EditalCargo, 0, len(in))
