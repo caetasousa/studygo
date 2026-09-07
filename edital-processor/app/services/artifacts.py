@@ -72,13 +72,19 @@ class ArtifactStore:
         self._path_for(document_id).unlink(missing_ok=True)
 
     def sweep_expired(self) -> int:
-        """Remove expired artifacts. Returns how many were deleted."""
+        """Remove expired artifacts. Returns how many were deleted.
+
+        Um artefato ilegível também sai: ou é lixo de uma escrita interrompida,
+        ou é de um formato que este código já não entende. Nos dois casos ele
+        não serve para carregar documento nenhum, e mantê-lo só ocupa disco.
+        """
         removed = 0
         now = time.time()
         for path in self._root.glob("*.json"):
             try:
-                created = json.loads(path.read_text(encoding="utf-8")).get("created_at", 0)
-                ttl = json.loads(path.read_text(encoding="utf-8")).get("ttl_seconds", self._ttl)
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                created = payload.get("created_at", 0)
+                ttl = payload.get("ttl_seconds", self._ttl)
             except (OSError, json.JSONDecodeError):
                 path.unlink(missing_ok=True)
                 removed += 1

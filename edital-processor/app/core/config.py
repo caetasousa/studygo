@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # --- temporary artifacts -----------------------------------------------
     work_dir: Path = Path("/var/lib/edital-processor/work")
     artifact_ttl_seconds: int = 3600
+    # De quanto em quanto tempo a faxina passa. Bem menor que o TTL de propósito:
+    # o que decide quando um artefato morre é o TTL, e o intervalo só define
+    # quanto ele fica ocupando disco depois de morto.
+    artifact_sweep_seconds: int = 900
 
     # --- ops -----------------------------------------------------------------
     debug_endpoint_enabled: bool = False

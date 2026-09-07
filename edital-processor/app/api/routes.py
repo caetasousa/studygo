@@ -8,6 +8,7 @@ browser never sees text, a provider URI, or anything but the opaque
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings, get_settings
@@ -36,6 +37,18 @@ def get_store(settings: Settings = Depends(get_settings)) -> ArtifactStore:
     global _store
     if _store is None:
         _store = ArtifactStore(settings)
+    return _store
+
+
+def store_em_uso() -> ArtifactStore | None:
+    """O store que já está em uso, ou None se nenhuma requisição o criou ainda.
+
+    A faxina periódica consulta por aqui em vez de construir o seu: um
+    ArtifactStore cria o work_dir no construtor, e o padrão é /var/lib — em
+    teste isso tentaria escrever fora do tmp_path, e em produção duplicaria a
+    decisão de qual diretório vale. Sem store não há artefato, e não haver o que
+    varrer é a resposta certa, não um caso de erro.
+    """
     return _store
 
 
@@ -109,7 +122,14 @@ async def _analyse_request(
         data = await file.read(settings.max_upload_bytes + 1)
         if len(data) > settings.max_upload_bytes:
             raise UploadTooLarge("upload exceeds the configured limit")
-        return analyse(
+        # run_in_threadpool porque `analyse` é SÍNCRONA e cara: ela abre o PDF,
+        # extrai texto e chama o Tesseract. Chamada direto de dentro de um
+        # `async def`, ela ocupa o event loop do uvicorn do começo ao fim — e
+        # com o loop parado nada mais é atendido, nem o /healthz de 3 segundos,
+        # que passava a falhar durante toda importação e marcava o container
+        # como unhealthy sem ter nada de errado com ele.
+        return await run_in_threadpool(
+            analyse,
             data=data,
             declared_mime=file.content_type,
             filename=file.filename or "edital.pdf",
@@ -131,7 +151,10 @@ async def _analyse_request(
     if not texto:
         raise InvalidPDF("no file and no text in the request")
 
-    return analyse_text(
+    # Mesmo motivo do caminho do PDF: sem OCR, mas ainda normalização e
+    # classificação sobre um texto que pode ser o edital inteiro colado.
+    return await run_in_threadpool(
+        analyse_text,
         text=texto,
         filename="edital-colado.txt",
         owner_ref=ref,
