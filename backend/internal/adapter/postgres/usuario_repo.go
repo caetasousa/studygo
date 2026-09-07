@@ -14,7 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var _ port.UsuarioRepository = (*UsuarioRepo)(nil)
+var (
+	_ port.UsuarioRepository = (*UsuarioRepo)(nil)
+	_ port.SessaoManutencao  = (*UsuarioRepo)(nil)
+)
 
 // UsuarioRepo persiste contas e refresh tokens.
 type UsuarioRepo struct {
@@ -155,4 +158,27 @@ func (r *UsuarioRepo) RevogarRefreshToken(ctx context.Context, tokenHash string)
 	}
 
 	return nil
+}
+
+// LimparRefreshTokens apaga o que não autentica mais ninguém.
+//
+// A tabela só crescia: cada login, cadastro e renovação insere uma linha, e a
+// rotação revoga a anterior sem nunca removê-la. Um usuário ativo deixa
+// centenas de linhas mortas por ano, e todas participam do índice que a
+// renovação consulta a cada quinze minutos.
+//
+// O vencido sai porque a própria consulta de validação já o ignora; o revogado
+// sai porque revogar é definitivo. Nenhum dos dois tem como voltar a valer, e
+// por isso apagar aqui não é política — é varrer o que a política já descartou.
+func (r *UsuarioRepo) LimparRefreshTokens(ctx context.Context, agora time.Time) (int64, error) {
+	ct, err := r.pool.Exec(
+		ctx,
+		`DELETE FROM refresh_tokens WHERE revogado OR expira_em <= $1`,
+		agora,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("limpando refresh tokens: %w", err)
+	}
+
+	return ct.RowsAffected(), nil
 }

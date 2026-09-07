@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"studygo/internal/domain/concurso"
@@ -112,6 +113,16 @@ func (s *ConcursoService) PorSlug(
 	return s.doDono(ctx, usuarioID, slug)
 }
 
+// tentativasDeSlug é quantas vezes um sufixo novo é sorteado antes de desistir.
+//
+// O slug é o nome normalizado mais dois bytes aleatórios, e o UNIQUE é do banco
+// inteiro: dois estudantes cadastrando "Polícia Federal" disputam o mesmo
+// espaço de 65 mil sufixos. A colisão é rara, mas não é impossível — e o
+// desfecho dela era um 500 com "erro interno" numa operação que só precisava
+// tentar de novo. Três tentativas tornam a falha improvável a ponto de o 409
+// que sobra ser honesto.
+const tentativasDeSlug = 3
+
 func (s *ConcursoService) Criar(
 	ctx context.Context,
 	usuarioID uuid.UUID,
@@ -119,7 +130,6 @@ func (s *ConcursoService) Criar(
 ) (ConcursoResumo, []string, error) {
 	c, avisos := concursoDoComando(cmd)
 	c.DonoID = usuarioID
-	c.Slug = concurso.Slug(c.Nome)
 
 	c.Normalizar()
 
@@ -127,12 +137,22 @@ func (s *ConcursoService) Criar(
 		return ConcursoResumo{}, nil, err
 	}
 
-	criado, err := s.repo.Criar(ctx, c)
-	if err != nil {
-		return ConcursoResumo{}, nil, err
+	// O sorteio fica DENTRO do laço: repetir com o mesmo slug colidiria de novo.
+	for tentativa := range tentativasDeSlug {
+		c.Slug = concurso.Slug(c.Nome)
+
+		criado, err := s.repo.Criar(ctx, c)
+		if err == nil {
+			return resumoDe(criado), avisos, nil
+		}
+
+		if !errors.Is(err, concurso.ErrSlugEmUso) || tentativa == tentativasDeSlug-1 {
+			return ConcursoResumo{}, nil, err
+		}
 	}
 
-	return resumoDe(criado), avisos, nil
+	// Inalcançável: o laço sempre devolve. Existe porque o compilador não sabe.
+	return ConcursoResumo{}, nil, concurso.ErrSlugEmUso
 }
 
 func (s *ConcursoService) Atualizar(

@@ -65,12 +65,14 @@ func run(logger *slog.Logger) error {
 		port.SystemClock{},
 	)
 
+	usuarios := postgres.NewUsuarioRepo(pool)
+
 	replanejamento := service.NewCronogramaService(service.Dependencias{
 		Planos:     planos,
 		Cronograma: cronogramas,
 		Concursos:  concursos,
 		Caderno:    postgres.NewCadernoRepo(pool),
-		Usuarios:   postgres.NewUsuarioRepo(pool),
+		Usuarios:   usuarios,
 		Relogio:    port.SystemClock{},
 	})
 
@@ -96,7 +98,7 @@ func run(logger *slog.Logger) error {
 
 	// Uma passada agora, antes de esperar a virada: se o processo ficou fora do
 	// ar durante uma meia-noite, o atraso daquele dia continua lá esperando.
-	tick(ctx, logger, svc, replanejamento)
+	tick(ctx, logger, svc, replanejamento, usuarios, time.Now)
 
 	for {
 		espera := proximaVirada(time.Now().In(port.Fuso))
@@ -118,7 +120,7 @@ func run(logger *slog.Logger) error {
 
 			return nil
 		case <-timer.C:
-			tick(ctx, logger, svc, replanejamento)
+			tick(ctx, logger, svc, replanejamento, usuarios, time.Now)
 		}
 	}
 }
@@ -144,11 +146,16 @@ func proximaVirada(agora time.Time) time.Duration {
 // O replanejamento vem ANTES do lembrete de propósito: o lembrete conta o que
 // estudar hoje, e hoje só está certo depois que os dias perdidos foram
 // absorvidos. Na ordem inversa o estudante receberia a agenda de ontem.
+//
+// A faxina das sessões vem por último: ela não muda o que o estudante vê, e
+// falhar nela não pode custar a agenda de ninguém.
 func tick(
 	ctx context.Context,
 	logger *slog.Logger,
 	svc *service.NotificacaoService,
 	replanejamento *service.CronogramaService,
+	sessoes port.SessaoManutencao,
+	agora func() time.Time,
 ) {
 	replanejados, err := replanejamento.AbsorverAtrasosDoDia(ctx)
 	if err != nil {
@@ -162,9 +169,31 @@ func tick(
 
 	enviados, err := svc.EnviarLembretesDoDia(ctx)
 	if err != nil {
-		logger.ErrorContext(ctx, "dispatching lembretes", slog.Any("error", err))
+		logger.ErrorContext(ctx, "despachando lembretes", slog.Any("error", err))
+	} else {
+		logger.InfoContext(ctx, "lembretes despachados", slog.Int("enviados", enviados))
+	}
+
+	limparSessoes(ctx, logger, sessoes, agora())
+}
+
+// limparSessoes varre os refresh tokens que não valem mais. Erro aqui é ruído
+// de operação, não incidente: a tabela cresce um dia a mais e a próxima virada
+// tenta de novo.
+func limparSessoes(
+	ctx context.Context,
+	logger *slog.Logger,
+	sessoes port.SessaoManutencao,
+	agora time.Time,
+) {
+	apagados, err := sessoes.LimparRefreshTokens(ctx, agora)
+	if err != nil {
+		logger.ErrorContext(ctx, "limpando refresh tokens", slog.Any("error", err))
+
 		return
 	}
 
-	logger.InfoContext(ctx, "lembretes despachados", slog.Int("enviados", enviados))
+	if apagados > 0 {
+		logger.InfoContext(ctx, "sessões expiradas removidas", slog.Int64("tokens", apagados))
+	}
 }

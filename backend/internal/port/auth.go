@@ -23,6 +23,16 @@ type UsuarioRepository interface {
 	RevogarRefreshToken(ctx context.Context, tokenHash string) error
 }
 
+// SessaoManutencao é a faxina periódica das sessões. É uma porta SEPARADA de
+// UsuarioRepository de propósito: quem autentica não precisa saber varrer, e
+// quem varre é só o worker. Juntá-las obrigaria todo caso de uso de conta a
+// carregar um método que não usa.
+type SessaoManutencao interface {
+	// LimparRefreshTokens apaga os tokens que já não servem para nada — os
+	// revogados e os vencidos — e devolve quantos saíram.
+	LimparRefreshTokens(ctx context.Context, agora time.Time) (int64, error)
+}
+
 // HasherDeSenha gera e confere hashes de senha (argon2id).
 type HasherDeSenha interface {
 	Hash(senha string) (string, error)

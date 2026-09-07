@@ -11,6 +11,10 @@ import (
 // concurso.
 var ErrNaoEncontrado = errors.New("plano não encontrado")
 
+// ErrAnotacaoNaoEncontrada cobre tanto a anotação que não existe quanto a que é
+// de outro plano: quem pergunta recebe a mesma resposta nos dois casos.
+var ErrAnotacaoNaoEncontrada = errors.New("anotação não encontrada")
+
 // Plano é o plano de estudo de um usuário para um concurso: a configuração
 // escolhida mais tudo que ele registrou.
 //

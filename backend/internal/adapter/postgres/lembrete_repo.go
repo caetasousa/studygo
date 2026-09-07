@@ -161,13 +161,20 @@ func (r *PlanoRepo) espalharDisciplinas(
 // A atividade conta como atrasada quando não há registro OU o registro existe
 // mas não marca conclusão: um dia aberto pela metade continua sendo um dia que
 // não aconteceu.
+//
+// `p.prova > $1` não é otimização: é a mesma regra que o caso de uso já aplica
+// (absorverAtraso desiste quando a prova chegou, porque não há futuro em que
+// redistribuir). Sem ela, todo concurso já realizado permanece "atrasado" para
+// sempre — a varredura carregava plano, cronograma e registros inteiros, toda
+// noite, para concluir que não havia nada a fazer, e esse custo só crescia.
 func (r *PlanoRepo) ComAtraso(ctx context.Context, hoje time.Time) ([]port.PlanoAtrasado, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT p.usuario_id, c.slug
 		   FROM planos p
 		   JOIN concursos c ON c.id = p.concurso_id
-		  WHERE EXISTS (
+		  WHERE p.prova > $1
+		    AND EXISTS (
 		        SELECT 1
 		          FROM atividades a
 		     LEFT JOIN registros_atividade ra ON ra.atividade_id = a.id

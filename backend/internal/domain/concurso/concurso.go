@@ -21,6 +21,11 @@ var (
 	ErrDisciplinaSemNome = errors.New("toda disciplina precisa de um nome")
 	ErrBlocoInvalido     = errors.New(`bloco da disciplina deve ser "esp" ou "ger"`)
 	ErrSemPontos         = errors.New("some ao menos uma questão entre as disciplinas")
+
+	// ErrSlugEmUso marca a colisão do identificador de URL. É sentinela porque
+	// quem cria o concurso sabe reagir a ela — sorteando outro sufixo — e quem
+	// persiste, não.
+	ErrSlugEmUso = errors.New("já existe um concurso com esse endereço")
 )
 
 // ErrCodigoRepetido é a tag que o usuário deu a duas matérias. Ela nomeia a

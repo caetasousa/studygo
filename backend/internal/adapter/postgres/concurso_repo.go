@@ -134,7 +134,7 @@ func (r *ConcursoRepo) Criar(
 	).Scan(&c.ID)
 	if err != nil {
 		if violaUnique(err) {
-			return concurso.Concurso{}, fmt.Errorf("slug %q já existe", c.Slug)
+			return concurso.Concurso{}, fmt.Errorf("%w: %q", concurso.ErrSlugEmUso, c.Slug)
 		}
 
 		return concurso.Concurso{}, fmt.Errorf("inserindo concurso: %w", err)

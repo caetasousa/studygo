@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"studygo/internal/domain/plano"
 	"studygo/internal/port"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -88,6 +90,13 @@ func (r *CadernoRepo) CriarAnotacao(
 	return a, nil
 }
 
+// AtualizarAnotacao grava a edição, restrita ao plano de quem pediu.
+//
+// Não casar o par (id, plano_id) significa que a anotação não existe OU não é
+// deste plano — e as duas coisas devolvem a mesma resposta de propósito, como
+// em concursoDoDono. Antes disso o pgx.ErrNoRows subia cru e virava 500: a tela
+// dizia "erro interno" sobre uma anotação que o usuário tinha acabado de apagar
+// em outra aba.
 func (r *CadernoRepo) AtualizarAnotacao(
 	ctx context.Context,
 	planoID uuid.UUID,
@@ -103,6 +112,11 @@ func (r *CadernoRepo) AtualizarAnotacao(
 		a.ID, planoID, a.Data, a.DisciplinaID, a.Tema, a.Texto, string(a.Origem),
 		a.URL, a.ProximaRevisao, a.Resolvido,
 	).Scan(&a.ID, &a.CriadoEm, &a.AtualizadoEm)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return plano.Anotacao{}, plano.ErrAnotacaoNaoEncontrada
+	}
+
 	if err != nil {
 		return plano.Anotacao{}, fmt.Errorf("atualizando anotação: %w", err)
 	}
