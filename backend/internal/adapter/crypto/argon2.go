@@ -1,5 +1,5 @@
-// Package crypto adapts password hashing (argon2id) and access tokens (JWT) to
-// the auth ports. It has no knowledge of HTTP or the database.
+// Package crypto adapta o hash de senha (argon2id) e o access token (JWT) às
+// portas de autenticação. Não conhece HTTP nem banco.
 package crypto
 
 import (
@@ -18,11 +18,16 @@ import (
 
 var _ port.HasherDeSenha = (*Argon2Hasher)(nil)
 
-// ErrIncompatibleHash is returned when an encoded hash cannot be parsed.
+// ErrIncompatibleHash marca um hash gravado que não dá para interpretar.
+//
+// É ERRO, e não "senha não confere", de propósito: as duas coisas levariam o
+// usuário à mesma tela, mas só uma delas é bug nosso — e confundi-las esconderia
+// para sempre um hash corrompido atrás de "credenciais inválidas".
 var ErrIncompatibleHash = errors.New("hash de senha em formato incompatível")
 
-// Argon2Hasher implements port.HasherDeSenha with argon2id and the standard
-// PHC string encoding.
+// Argon2Hasher implementa port.HasherDeSenha com argon2id, gravando no formato
+// PHC padrão — que carrega os parâmetros dentro do próprio hash, e é o que
+// permite aumentar o custo sem invalidar as senhas já cadastradas.
 type Argon2Hasher struct {
 	params config.Argon2Params
 }

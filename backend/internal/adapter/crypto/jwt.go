@@ -13,10 +13,12 @@ import (
 
 var _ port.TokenIssuer = (*JWTIssuer)(nil)
 
-// ErrInvalidToken is returned when an access token fails validation.
+// ErrInvalidToken cobre toda recusa de token — assinatura, prazo, formato,
+// subject. Uma só: dizer QUAL foi a falha ajudaria mais quem forja do que quem
+// depura.
 var ErrInvalidToken = errors.New("token inválido")
 
-// JWTIssuer mints HS256 access tokens with the user id as subject.
+// JWTIssuer emite access tokens HS256 com o id do usuário no subject.
 type JWTIssuer struct {
 	secret []byte
 	ttl    time.Duration
