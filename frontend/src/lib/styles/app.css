@@ -530,7 +530,10 @@ a:focus-visible {
 
 .hoje-grid {
 	display: grid;
-	grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+	/* O dia é o trabalho; a lateral é contexto. A proporção reflete isso — e
+	   assunto de edital é texto longo, que precisa de linha larga para não
+	   quebrar em cinco. */
+	grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
 	gap: 18px;
 	align-items: start;
 }
