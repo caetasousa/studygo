@@ -2,10 +2,11 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import PanoramaPlano from '$lib/components/PanoramaPlano.svelte';
 	import DiaCard from '$lib/components/DiaCard.svelte';
+	import EmentaModal from '$lib/components/EmentaModal.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import { atividadeFeita } from '$lib/estudo';
+	import { diaVizinho, passoDeMovimento } from '$lib/mover';
 	import { fc, nf1 } from '$lib/format';
-	import type { Dia, Atividade } from '$lib/types';
+	import type { Dia } from '$lib/types';
 
 	const plano = $derived(planoStore.plano);
 
@@ -42,87 +43,40 @@
 	 * per-activity: each row carries an up and a down button that step it
 	 * one slot at a time, crossing the day boundary when it reaches the top
 	 * or bottom.
+	 *
+	 * Para onde cada degrau leva é decidido em $lib/mover — a mesma regra que a
+	 * tela Hoje usa, para as duas não divergirem nos casos de borda.
 	 */
 	function diaMovivel(d: Dia): boolean {
 		return d.itens.length > 0;
 	}
 
-	/** Days that receive activities: study, weekly review, guided review. */
-	function ehDiaUtil(d: Dia): boolean {
-		return d.tipo === 'est' || d.tipo === 'rev' || d.tipo === 'revd';
-	}
-
-	/** Uma atividade concluída é história: trocar por cima dela reescreveria o
-	 *  que foi estudado. */
-	function feita(_d: Dia, it: Atividade): boolean {
-		return atividadeFeita(it);
-	}
-
-	/** The (day, index) an activity currently sits on, or null. */
-	function posicaoAtual(id: string): { dia: Dia; indice: number } | null {
-		for (const d of plano?.dias ?? []) {
-			const i = d.itens.findIndex((x) => x.id === id);
-			if (i >= 0) return { dia: d, indice: i };
-		}
-		return null;
-	}
-
-	/** The nearest useful day of `d` on the given side that still has room
-	 *  for an arrival — a fully-completed day is history, not a target. */
-	function diaVizinho(d: Dia, passo: -1 | 1): Dia | null {
-		const dias = plano?.dias ?? [];
-		const i = dias.findIndex((x) => x.data === d.data);
-		if (i < 0) return null;
-		for (let j = i + passo; j >= 0 && j < dias.length; j += passo) {
-			const cand = dias[j];
-			if (!ehDiaUtil(cand)) continue;
-			// A day with only concluded rows is closed as far as movement goes.
-			if (cand.itens.length > 0 && cand.itens.every((it) => feita(cand, it))) {
-				continue;
-			}
-			return cand;
-		}
-		return null;
-	}
-
-	/** The next slot up or down in the day that is NOT already concluded.
-	 *  Skipping over finished rows leaves them where they were logged and
-	 *  lands the moving row where a real swap makes sense. */
-	function proximoAlvoNoDia(d: Dia, indice: number, passo: -1 | 1): number {
-		for (let j = indice + passo; j >= 0 && j < d.itens.length; j += passo) {
-			if (!feita(d, d.itens[j])) return j;
-		}
-		return -1;
-	}
-
-	/**
-	 * Steps one activity by one slot. Inside the day it swaps with the next
-	 * NOT-CONCLUDED neighbour (backend TrocarAtividades) so finished rows are
-	 * skipped over instead of being rewritten. At the boundary of the day it
-	 * crosses to the nearest useful day — up goes to the BOTTOM of the day
-	 * before, down to the TOP of the day after — with trocar=false so the
-	 * source day loses one and the target day gains one.
-	 */
 	async function moverPorPasso(id: string, passo: -1 | 1) {
-		const p = posicaoAtual(id);
-		if (!p) return;
+		const destino = passoDeMovimento(plano?.dias ?? [], id, passo);
+		if (!destino) return;
 
-		const alvo = proximoAlvoNoDia(p.dia, p.indice, passo);
-		if (alvo >= 0) {
-			await planoStore.moverAtividade(id, p.dia.data, alvo, true);
-			return;
-		}
-
-		const vizinho = diaVizinho(p.dia, passo);
-		if (!vizinho) return; // no useful day on that side; button was hidden anyway
-
-		// Up → land at the END of the previous useful day; down → land at slot 0.
-		const alvoPos = passo === -1 ? vizinho.itens.length : 0;
-		await planoStore.moverAtividade(id, vizinho.data, alvoPos, false);
+		await planoStore.moverAtividade(id, destino.data, destino.posicao, destino.trocar);
 	}
 
 	const moverAcima = (id: string) => moverPorPasso(id, -1);
 	const moverAbaixo = (id: string) => moverPorPasso(id, 1);
+
+	// --- o conteúdo programático da matéria ---------------------------------
+
+	/** A matéria aberta no diálogo, e o assunto que ele marca dentro da ementa. */
+	let ementa = $state<{ codigo: string; tema: string } | null>(null);
+	let gatilho: HTMLElement | null = null;
+
+	function abrirMateria(codigo: string, tema: string) {
+		gatilho = document.activeElement as HTMLElement | null;
+		ementa = { codigo, tema };
+	}
+
+	function fecharEmenta() {
+		ementa = null;
+		gatilho?.focus();
+		gatilho = null;
+	}
 </script>
 
 <PageHead
@@ -179,16 +133,21 @@
 						<DiaCard
 							dia={d}
 							movivel={diaMovivel(d)}
-							temAntes={diaVizinho(d, -1) !== null}
-							temDepois={diaVizinho(d, 1) !== null}
+							temAntes={diaVizinho(plano.dias, d, -1) !== null}
+							temDepois={diaVizinho(plano.dias, d, 1) !== null}
 							onMoverAcima={moverAcima}
 							onMoverAbaixo={moverAbaixo}
+							onAbrirMateria={abrirMateria}
 						/>
 					{/each}
 				</div>
 			</section>
 		{/each}
 	</div>
+
+	{#if ementa}
+		<EmentaModal codigo={ementa.codigo} tema={ementa.tema} onclose={fecharEmenta} />
+	{/if}
 {/if}
 
 <style>

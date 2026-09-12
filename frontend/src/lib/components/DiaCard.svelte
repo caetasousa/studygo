@@ -6,6 +6,7 @@
 	import AtividadeItem from './AtividadeItem.svelte';
 	import { hojeISO, weekdayShort } from '$lib/format';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import { atividadeFeita } from '$lib/estudo';
 	import AtividadeForm from './AtividadeForm.svelte';
 	import RevisaoForm from './RevisaoForm.svelte';
@@ -32,7 +33,9 @@
 		temAntes = false,
 		temDepois = false,
 		onMoverAcima,
-		onMoverAbaixo
+		onMoverAbaixo,
+		onAbrirMateria,
+		tecDe
 	}: {
 		dia: Dia;
 		movivel: boolean;
@@ -40,10 +43,16 @@
 		temAntes?: boolean;
 		/** true when there is a useful day later in the plan, so the LAST row of this day can still step down. */
 		temDepois?: boolean;
-		/** Step one activity up by one slot (crossing days at the top). */
-		onMoverAcima: (id: string) => void;
+		/** Step one activity up by one slot (crossing days at the top).
+		 *  Ausente quando a tela não oferece remanejamento (ver `movivel`). */
+		onMoverAcima?: (id: string) => void;
 		/** Step one activity down by one slot (crossing days at the bottom). */
-		onMoverAbaixo: (id: string) => void;
+		onMoverAbaixo?: (id: string) => void;
+		/** Abre o conteúdo programático de uma matéria, marcando um assunto. */
+		onAbrirMateria?: (codigo: string, tema: string) => void;
+		/** Monta o link do caderno de questões de um assunto. Só a tela Hoje
+		 *  passa isto: no cronograma inteiro seriam centenas de links. */
+		tecDe?: (codigo: string, tema: string) => string;
 	} = $props();
 
 	const hoje = $derived(dia.data === hojeISO());
@@ -72,6 +81,18 @@
 
 	async function adiar() {
 		if (adiando) return;
+
+		// Adiar desloca TODO o plano um dia de estudo à frente — é a ação mais
+		// cara do cartão, e ficava a um clique de distância do botão de
+		// registrar. Pergunta antes.
+		const ok = await confirmar({
+			titulo: 'Adiar este dia?',
+			texto:
+				'O que está agendado aqui vai para o próximo dia livre, e todo o restante do plano desloca junto.',
+			rotulo: 'Adiar o dia'
+		});
+
+		if (!ok) return;
 
 		adiando = true;
 		// A refusal (dia já concluído, nada para onde empurrar…) used to be
@@ -298,6 +319,8 @@
 								podeDescer={temAlvoAbaixoNoDia || temDepois}
 								{onMoverAcima}
 								{onMoverAbaixo}
+								{onAbrirMateria}
+								tecUrl={tecDe?.(it.disciplina, it.tema) ?? ''}
 								minutos={minutosPorItem[i] ?? null}
 								concluida={atividadeFeita(it)}
 								onRegistrar={(el) => {
@@ -314,15 +337,34 @@
 						{#if blocoRevisao}
 							<div class="atv revisao-bloco">
 								<span class="min">{blocoRevisao.minutos} min</span>
-								<span class="chip rev-selo">REV</span>
-								<span class="txt">
-									<span class="tema">{materiaRevisada || 'Revisão'}</span>
-									{#if dia.revisao?.questoes != null}
-										<span class="rev-resultado" title="Acertos já registrados nesta revisão">
-											{dia.revisao.acertos ?? 0}/{dia.revisao.questoes}
-										</span>
-									{/if}
-								</span>
+								<!-- Mesmo alvo das atividades acima: a cauda de revisão também
+								     nomeia uma matéria, e clicar nela abre o cronograma dela. No
+								     primeiro dia a fila ainda não tem o que nomear, e aí não há
+								     matéria para abrir — o mesmo conteúdo vai num span. -->
+								{#snippet corpoRevisao()}
+									<span class="chip rev-selo">REV</span>
+									<span class="txt">
+										<span class="tema">{materiaRevisada || 'Revisão'}</span>
+										{#if dia.revisao?.questoes != null}
+											<span class="rev-resultado" title="Acertos já registrados nesta revisão">
+												{dia.revisao.acertos ?? 0}/{dia.revisao.questoes}
+											</span>
+										{/if}
+									</span>
+								{/snippet}
+
+								{#if disciplinaRevisada}
+									<button
+										type="button"
+										class="materia"
+										title="{materiaRevisada} — ver o conteúdo programático da matéria"
+										onclick={() => onAbrirMateria?.(disciplinaRevisada, '')}
+									>
+										{@render corpoRevisao()}
+									</button>
+								{:else}
+									<span class="materia">{@render corpoRevisao()}</span>
+								{/if}
 								<span class="acoes">
 									{#if dia.revisao}
 										<!-- From the plan's second study day onward: the queue has
@@ -509,13 +551,40 @@
 	   of the two rows living in different components. */
 	.revisao-bloco {
 		display: grid;
-		grid-template-columns: auto auto minmax(0, 1fr) auto;
+		grid-template-columns: auto minmax(0, 1fr) auto;
 		align-items: baseline;
 		gap: 6px 10px;
 		padding: 7px 8px;
 		border-radius: 8px;
 		border-top: 1px dashed var(--border);
 		margin-top: 2px;
+	}
+	/* O selo e o nome da matéria são um alvo só, como nas atividades. */
+	.revisao-bloco .materia {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		min-width: 0;
+		background: transparent;
+		border: 0;
+		padding: 0;
+		margin: 0;
+		text-align: left;
+		font: inherit;
+		color: inherit;
+	}
+	.revisao-bloco button.materia {
+		cursor: pointer;
+	}
+	.revisao-bloco button.materia:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+		border-radius: 6px;
+	}
+	.revisao-bloco button.materia:hover .tema {
+		text-decoration: underline;
+		text-decoration-color: var(--border-strong);
+		text-underline-offset: 3px;
 	}
 	.revisao-bloco .min {
 		font-family: var(--font-mono);
@@ -661,21 +730,19 @@
 		   width beneath — otherwise the review's title wrapped one word per line
 		   in a squeezed middle column. */
 		.revisao-bloco {
-			grid-template-columns: auto auto 1fr auto;
+			grid-template-columns: minmax(0, 1fr) auto;
 			grid-template-areas:
-				'min chip . acoes'
-				'txt txt txt txt';
+				'min acoes'
+				'materia materia';
 			align-items: center;
 			gap: 4px 8px;
 		}
 		.revisao-bloco .min {
 			grid-area: min;
 		}
-		.revisao-bloco .chip {
-			grid-area: chip;
-		}
-		.revisao-bloco .txt {
-			grid-area: txt;
+		.revisao-bloco .materia {
+			grid-area: materia;
+			align-items: flex-start;
 		}
 		.revisao-bloco .acoes {
 			grid-area: acoes;
