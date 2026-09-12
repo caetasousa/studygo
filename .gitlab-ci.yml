@@ -7,3 +7,17 @@ include:
   - project: 'caetasousa/ci-templates'
     ref: 'v1.1.8'
     file: '/templates/app-pipeline.yml'
+
+# Voltar uma versão é o botão do próprio GitLab: Operate > Environments >
+# production > "Rollback environment" na versão desejada. Ele reexecuta o
+# deploy_production daquela pipeline, com os digests dela, sem reconstruir
+# nada (docs/ci-cd.md).
+#
+# O rollback_production do template fica desligado aqui. Ele pede três digests
+# colados à mão e não passa --vault-password-file ao playbook — sem ela os
+# secrets.yml não são decifrados e o deploy falha. Um botão chamado rollback ao
+# lado do de produção, que não funciona na hora da pressa, é pior que nenhum.
+# Quando o template o corrigir ou remover, este bloco sai junto com o ref.
+rollback_production:
+  rules:
+    - when: never

@@ -183,8 +183,8 @@ make deploy-logs svc=backend    # o que o backend registrou?
 ```
 
 **Publiquei e quebrou?**
-Dá para voltar à versão anterior sem refazer nada. O procedimento está em
-[ci-cd.md](ci-cd.md), na seção "Rollback".
+Dá para voltar à versão anterior sem refazer nada, com um clique no GitLab. O
+procedimento está em [ci-cd.md](ci-cd.md), na seção "Rollback".
 
 **Quebrou na minha máquina?**
 ```bash

@@ -23,15 +23,18 @@ diferente) e mandar o bolo pronto (todo mundo recebe o mesmo).
 
 ```bash
 # 1. publica no ambiente de TESTE (staging)
-git push gitlab main
+make push
 
 # 2. prepara uma versão para PRODUÇÃO
-git tag v1.2.3
-git push gitlab v1.2.3
+make release          # mostra o nome da versão e o que vai nela
+make release go=1     # cria a versão e manda para o GitLab
 ```
 
 Depois do segundo, vá ao site do GitLab e clique no botão de publicar. Produção
 sempre exige esse clique — nada vai para o ar sozinho.
+
+Para **voltar atrás**, é outro clique: no GitLab, **Operate → Environments →
+production**, escolha a versão anterior e clique em **Rollback environment**.
 
 ---
 
@@ -63,9 +66,12 @@ git push (main)
    ├── deploy_staging  Ansible promove o digest → staging
    └── smoke_test ── staging responde
                             │
-git tag v1.2.3              │  (mesmo digest, sem rebuild)
+make release go=1           │  (tag v2026.09.12, mesmo digest, sem rebuild)
    └── deploy_production ◄──┘  BOTÃO MANUAL, só em tag protegida
        └── verify ───────────  produção responde
+
+Operate → Environments
+   └── Rollback environment ── reexecuta o deploy_production de uma tag antiga
 ```
 
 Cada estágio depende do anterior. Um teste vermelho não bloqueia só a si mesmo:
@@ -74,11 +80,29 @@ impede que o build sequer comece, e portanto que qualquer deploy aconteça.
 ## Publicar uma versão em produção
 
 ```bash
-git tag v1.2.3
-git push origin v1.2.3
+make release          # mostra a tag, a anterior e os commits que entram
+make release go=1     # cria a tag anotada e a envia ao GitLab
 ```
 
-A pipeline roda até `smoke_test` sozinha. Produção espera você clicar em
+A versão é a data: `v2026.09.12`, e `v2026.09.12.1` se houver uma segunda no
+mesmo dia. O que se quer saber de uma versão no ar é de quando ela é — a
+numeração antiga não dizia nada, e `v1.0.0` e `v1.0.1` apontam para o mesmo
+commit. A tag é sempre anotada, com os commits desde a anterior: é o changelog.
+
+`make release` recusa quando:
+
+| Recusa | Por quê |
+|---|---|
+| fora da `main` | produção sai da main |
+| árvore suja | o que você vê não é o que vai |
+| `HEAD` diferente de `gitlab/main` | staging não testou este commit |
+| o commit já tem tag | não há nada novo; reimplantar é **Re-deploy** (ver Rollback) |
+
+A tag vai para o remote `gitlab`, nunca para o `origin` — o `origin` é o espelho
+do GitHub, que não roda pipeline, e uma tag enviada para lá nunca libera
+produção.
+
+A pipeline da tag roda até `smoke_test` sozinha. Produção espera você clicar em
 **deploy_production** na interface da pipeline.
 
 Duas coisas impedem um deploy acidental de produção:
@@ -88,27 +112,123 @@ Duas coisas impedem um deploy acidental de produção:
    branch ou tag protegida. Um merge request não recebe a credencial, então
    não consegue implantar mesmo que alguém tente.
 
+## Qual versão está no ar
+
+```bash
+make health env=production
+# {"status":"ok","versao":"v2026.09.12","deploy":"2034411922","schema":3}
+# implantado pela pipeline https://gitlab.com/caetasousa/studygo/-/pipelines/2034411922
+```
+
+| Campo | O que é |
+|---|---|
+| `versao` | a tag; num deploy da `main` (staging), o commit |
+| `deploy` | a pipeline que implantou |
+| `schema` | a última migration aplicada no banco |
+
+Os três vêm do deploy, não do build: a mesma imagem sobe como publicações
+diferentes. Em desenvolvimento, `versao` é `dev` e `deploy` não aparece.
+
 ## Rollback
 
-Sem rebuild: promove-se um digest anterior.
+**É um botão, como o de produção.** No GitLab, **Operate → Environments →
+production**. A lista mostra cada publicação pela tag; na versão para a qual
+quer voltar, clique em **Rollback environment**.
 
-1. abra o job `publish` da pipeline da versão que você quer de volta
-2. copie os digests dos artifacts (retidos por 90 dias)
-3. rode a pipeline manualmente com:
+O GitLab reexecuta o `deploy_production` daquela pipeline antiga, com os
+digests que ela publicou. Nada é reconstruído: sobe a mesma imagem que já esteve
+no ar, pelo mesmo playbook de sempre — cópia do banco, health check e, se a
+versão antiga não responder, a volta automática para a que estava.
 
+O mesmo resultado sai pela pipeline: abra a pipeline da tag desejada e
+reexecute (↻) o job `deploy_production`. Para republicar a versão atual sem
+mudar nada, é o **Re-deploy to environment** da mesma página.
+
+Depois, `make health env=production` deve mostrar a tag antiga.
+
+Três coisas a saber:
+
+- **O botão só aparece em versões que já foram para produção com sucesso.**
+  Se "Prevent outdated deployment jobs" estiver ligado (Settings → CI/CD →
+  General pipelines), mantenha marcado "Allow job retries for rollback
+  deployments" — sem ele o GitLab bloqueia a reexecução de um deploy antigo.
+- **Os digests vêm dos artifacts do job `publish`.** Eles vencem em 90 dias,
+  mas o GitLab guarda os da última pipeline bem-sucedida de cada ref, e cada tag
+  é uma ref: toda versão publicada conserva os seus. Isso depende de "Keep
+  artifacts from most recent successful jobs" (Settings → CI/CD → Artifacts),
+  ligado por padrão.
+- **O `rollback_production` do template está desligado** neste projeto, no
+  `.gitlab-ci.yml`: ele pedia três digests colados à mão e falhava ao decifrar
+  os segredos.
+
+### E o banco?
+
+**Rollback de código não reverte schema.** O runner só aplica `.up.sql`: a
+versão que volta encontra o banco como a outra o deixou. O `schema` do
+`make health` diz onde ele está — se for maior que a última migration da versão
+que voltou, o banco está à frente do código.
+
+| A versão que sai trouxe… | O que fazer |
+|---|---|
+| nenhuma migration | Rollback environment, e acabou |
+| migration **aditiva** (tabela, coluna, índice novos) | Rollback environment; o código antigo ignora o que não conhece |
+| migration **destrutiva** (tem `-- contract:`) | o botão não basta: restaure a cópia do banco (abaixo) ou siga em frente com uma migration corretiva |
+
+O que mantém a terceira linha vazia é expand/contract: primeiro uma publicação
+que para de usar a coluna (mantendo-a), e só numa publicação **posterior** a
+migration que a remove — nunca as duas na mesma. Entre esses dois passos,
+qualquer rollback é seguro.
+
+O `make check` cobra isso. Uma migration com `DROP TABLE`, `DROP COLUMN`,
+`RENAME`, `ALTER COLUMN ... TYPE`, `SET NOT NULL` ou `TRUNCATE` falha o build sem
+um marcador que diga quem já parou de usar o que ela tira:
+
+```sql
+-- contract: a versão v2026.09.05 parou de ler planos.ciclo
 ```
-ROLLBACK_BACKEND_DIGEST=registry.gitlab.com/.../backend@sha256:...
-ROLLBACK_FRONTEND_DIGEST=...
-ROLLBACK_PROCESSOR_DIGEST=...
+
+O teste não tem como conferir a ordem das publicações — o marcador obriga você a
+escrevê-la. `ADD COLUMN ... NOT NULL DEFAULT` é aditivo e passa sem marcador.
+
+### Cópia do banco antes de cada deploy
+
+Todo deploy, staging e produção, rollback incluído, faz um `pg_dump` antes de
+subir as imagens novas: `<app_dir>/backups/pre-deploy-<data>-p<pipeline>.sql.gz`,
+mantidas as 5 últimas. Se a cópia falhar, o deploy é recusado antes de mexer em
+qualquer coisa.
+
+A cópia que desfaz uma versão é a que leva no nome o `deploy` que o
+`make health` mostrava **com ela no ar**: foi feita imediatamente antes daquela
+pipeline implantar.
+
+Restaurar — na VPS, e só quando a árvore acima mandar:
+
+```bash
+ssh annyGo@SEU_IP
+sudo -i
+cd /opt/annygo      # staging: /opt/studygo-staging, usuário e banco studygo_staging
+
+# 1. pare quem escreve no banco
+docker compose stop backend worker
+
+# 2. guarde o estado atual — ele tem o que foi escrito DEPOIS do deploy, e a
+#    restauração vai descartar isso
+docker compose exec -T postgres pg_dump -U annygo annygo \
+  | gzip > backups/antes-da-restauracao-$(date +%Y%m%d-%H%M%S).sql.gz
+
+# 3. recrie o banco a partir da cópia
+ls -1t backups/
+docker compose exec -T postgres psql -U annygo -d postgres -v ON_ERROR_STOP=1 \
+  -c 'DROP DATABASE annygo WITH (FORCE)' -c 'CREATE DATABASE annygo OWNER annygo'
+gunzip -c backups/pre-deploy-AAAAMMDD-HHMMSS-pNNNN.sql.gz \
+  | docker compose exec -T postgres psql -U annygo -d annygo -v ON_ERROR_STOP=1 >/dev/null
 ```
 
-4. dispare o job `rollback_production`
+4. No GitLab, **Rollback environment** para a versão anterior. É ele que sobe o
+   backend e o worker de novo, com o código que entende aquele schema.
 
-> **Rollback de aplicação não reverte schema.** Se a versão que sai criou
-> migrations, o banco continua migrado. Por isso migração destrutiva exige
-> expand/contract: primeiro adiciona a coluna nova mantendo a antiga, e só
-> remove a antiga quando nenhuma versão em uso a referencia. Entre esses dois
-> passos, qualquer rollback é seguro.
+O que foi escrito entre o deploy e a restauração fica só na cópia do passo 2 —
+recuperar isso, se for o caso, é consulta à mão naquele arquivo.
 
 ## Ambientes
 
@@ -170,8 +290,8 @@ defesa, não o procedimento: rodar o Ansible da sua máquina implanta um artefat
 que ninguém testou naquela combinação, e pula o `smoke_test` que é justamente
 quem autoriza produção.
 
-Precisa voltar atrás rápido? `rollback_production`, na pipeline, promove um
-digest anterior sem reconstruir nada.
+Precisa voltar atrás rápido? **Rollback environment**, em Operate →
+Environments, promove um digest anterior sem reconstruir nada.
 
 ## Arquitetura
 

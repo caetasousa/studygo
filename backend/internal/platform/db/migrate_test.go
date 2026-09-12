@@ -149,6 +149,47 @@ func TestMigrate_ConcorrenteNaoDuplica(t *testing.T) {
 	}
 }
 
+// A versão do schema que o /health mostra é a MAIOR migration aplicada — não a
+// contagem de linhas. É o número que se compara com o código depois de um
+// rollback, então confundir os dois esconderia um banco à frente do código.
+func TestSchema_VersaoEAMaiorMigrationAplicada(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.NovoVazio(t)
+	ctx := t.Context()
+
+	if err := db.Migrate(ctx, pool, migrations.FS); err != nil {
+		t.Fatalf("migrando banco vazio: %v", err)
+	}
+
+	schema := db.NovoSchema(pool)
+
+	versao, err := schema.VersaoSchema(ctx)
+	if err != nil {
+		t.Fatalf("lendo a versão: %v", err)
+	}
+
+	// As migrations são numeradas em sequência a partir de 1.
+	ultima := quantasMigrations(t)
+	if versao != ultima {
+		t.Fatalf("versão = %d, quer %d", versao, ultima)
+	}
+
+	// Sem a baseline registrada sobram menos linhas, mas a maior continua lá.
+	if _, err := pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version = 1`); err != nil {
+		t.Fatalf("removendo a baseline do registro: %v", err)
+	}
+
+	versao, err = schema.VersaoSchema(ctx)
+	if err != nil {
+		t.Fatalf("lendo a versão de novo: %v", err)
+	}
+
+	if versao != ultima {
+		t.Errorf("versão = %d depois de tirar a baseline, quer %d (a maior, não a contagem)", versao, ultima)
+	}
+}
+
 // tabelas lista o schema public, em ordem, para comparar com o esperado.
 func tabelas(t *testing.T, pool *pgxpool.Pool) []string {
 	t.Helper()

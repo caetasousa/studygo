@@ -24,6 +24,13 @@ type Config struct {
 	// processes edital PDFs. Empty URL disables AI import.
 	EditalProcessorURL   string
 	EditalProcessorToken string
+
+	// Versao e Deploy identificam o que está no ar: a tag (ou o commit, fora de
+	// tag) e a pipeline que implantou. Quem preenche é o deploy, não o build — a
+	// mesma imagem sobe como versões diferentes, e o que se quer saber olhando o
+	// servidor é qual publicação ele está servindo.
+	Versao string
+	Deploy string
 }
 
 // Argon2Params configures the argon2id password hasher. Defaults follow the
@@ -45,6 +52,8 @@ func Load() (Config, error) {
 		RunMigrations:        getEnvBool("RUN_MIGRATIONS", true),
 		EditalProcessorURL:   os.Getenv("EDITAL_PROCESSOR_URL"),
 		EditalProcessorToken: os.Getenv("EDITAL_PROCESSOR_TOKEN"),
+		Versao:               getEnv("APP_VERSAO", "dev"),
+		Deploy:               os.Getenv("APP_DEPLOY"),
 		Argon2: Argon2Params{
 			Memory:      uint32(getEnvInt("ARGON2_MEMORY_KIB", 19*1024)),
 			Iterations:  uint32(getEnvInt("ARGON2_ITERATIONS", 2)),

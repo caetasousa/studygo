@@ -83,8 +83,10 @@ func run(logger *slog.Logger) error {
 	}
 
 	handlers := httpapi.Handlers{
-		Health: httpapi.NewHealthHandler(service.NewHealthService(pool), logger),
-		Auth:   httpapi.NewAuthHandler(authService, logger),
+		Health: httpapi.NewHealthHandler(
+			service.NewHealthService(pool, db.NovoSchema(pool), cfg.Versao, cfg.Deploy), logger,
+		),
+		Auth: httpapi.NewAuthHandler(authService, logger),
 		Concurso: httpapi.NewConcursoHandler(
 			service.NewConcursoService(concursoRepo, editalProc), logger,
 		),
@@ -127,7 +129,11 @@ func run(logger *slog.Logger) error {
 		httpserver.WithWriteTimeout(240*time.Second),
 	)
 
-	logger.Info("server starting", slog.String("addr", cfg.ServerAddr))
+	logger.Info("server starting",
+		slog.String("addr", cfg.ServerAddr),
+		slog.String("versao", cfg.Versao),
+		slog.String("deploy", cfg.Deploy),
+	)
 
 	if err := srv.Run(ctx); err != nil && err != http.ErrServerClosed {
 		return err

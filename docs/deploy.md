@@ -85,7 +85,8 @@ ansible-playbook site.yml
 #    (o deploy.yml exige um digest já publicado e recusa rodar sem ele)
 ```
 
-Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok"}`.
+Ao final, `https://SEU-DOMINIO/health` responde `{"status":"ok", ...}`, com a
+versão, o deploy e o schema que estão no ar.
 
 ---
 
@@ -108,13 +109,15 @@ sem ela, `site.yml` roda tudo, inclusive o `apt upgrade` da role `common`.
 A **aplicação** não sobe por aqui em nenhuma hipótese: quem publica é a
 pipeline, staging primeiro e produção depois ([ci-cd.md](ci-cd.md)).
 
-Publicar a aplicação é da pipeline: push na `main` implanta em staging, e uma
-tag `v*` libera o botão manual de produção. Veja [ci-cd.md](ci-cd.md). O fluxo
-completo (desenvolver, verificar, commitar, publicar) está em
-[fluxo-de-trabalho.md](fluxo-de-trabalho.md).
+Publicar a aplicação é da pipeline: push na `main` implanta em staging, e
+`make release go=1` cria a tag `v*` que libera o botão manual de produção. Veja
+[ci-cd.md](ci-cd.md). O fluxo completo (desenvolver, verificar, commitar,
+publicar) está em [fluxo-de-trabalho.md](fluxo-de-trabalho.md).
 
 `deploy.yml` roda as migrations no boot do backend (advisory-lock, então o
-worker pode subir junto sem corrida) e é seguro repetir.
+worker pode subir junto sem corrida) e é seguro repetir. Antes de subir as
+imagens, ele copia o banco para `<app_dir>/backups` e guarda as 5 últimas
+cópias — a restauração está em [ci-cd.md](ci-cd.md#cópia-do-banco-antes-de-cada-deploy).
 
 ---
 

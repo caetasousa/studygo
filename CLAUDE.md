@@ -96,6 +96,11 @@ rollback automático pelos `.down.sql`.
   (`TestMigrations_NaoContemLogicaDeNegocio`).
 - Trate migrations que podem ter sido aplicadas como imutáveis; corrija com uma
   migration nova.
+- Rollback de código não reverte schema. Migration destrutiva (`DROP TABLE`,
+  `DROP COLUMN`, `RENAME`, `ALTER COLUMN ... TYPE`, `SET NOT NULL`, `TRUNCATE`)
+  só entra numa publicação posterior à que parou de usar o que ela remove, e
+  declara isso num `-- contract:` — sem o marcador, o build falha
+  (`TestMigrations_DestrutivaDeclaraOContract`).
 - O banco cuida de PK, FK, UNIQUE, NOT NULL, CHECK, índices e transações.
 - O domínio e a aplicação cuidam de políticas, cálculos, fluxos e validações.
 - DDL destrutivo ou transformação com risco de perda exige aprovação e uma
@@ -154,7 +159,8 @@ primeiro, produção depois. Nunca direto.**
 
 - `staging` recebe o push na `main`, automaticamente.
 - `produção` só é liberada por tag, com aprovação manual na pipeline, e só
-  depois de o `smoke_test` de staging passar.
+  depois de o `smoke_test` de staging passar. A tag é a data (`v2026.09.12`) e
+  quem a cria é o `make release`, nunca um `git tag` à mão.
 - Não existe caminho manual. Não crie um: nem alvo de Makefile, nem script,
   nem `ansible-playbook deploy.yml` na mão. Se aparecer um, remova.
 - O Ansible não constrói nada — ele promove digests que a pipeline já testou.
@@ -162,8 +168,10 @@ primeiro, produção depois. Nunca direto.**
   o que passou nos testes.
 
 Precisa de uma correção urgente em produção? Ela também passa por staging.
-Para voltar atrás sem esperar, use o `rollback_production` da pipeline, que
-promove um digest anterior sem reconstruir.
+Para voltar atrás sem esperar, use o **Rollback environment** do GitLab
+(Operate → Environments → production), que reexecuta o `deploy_production` de
+uma versão anterior com os digests dela, sem reconstruir. O `rollback_production`
+do template fica desligado no `.gitlab-ci.yml` — não o religue.
 
 ## 🔐 Segurança e produção
 

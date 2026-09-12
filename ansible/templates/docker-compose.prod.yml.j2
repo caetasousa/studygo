@@ -30,6 +30,9 @@ services:
       CORS_ORIGIN: "https://{{ app_domain }}"
       EDITAL_PROCESSOR_URL: "http://edital-processor:8000"
       EDITAL_PROCESSOR_TOKEN: "{{ edital_processor_token }}"
+      # O que o /health responde: qual publicação está no ar (ver deploy.yml).
+      APP_VERSAO: "{{ app_versao }}"
+      APP_DEPLOY: "{{ deploy_pipeline_id | default('') }}"
     depends_on:
       postgres:
         condition: service_healthy

@@ -186,6 +186,35 @@ func appliedVersions(ctx context.Context, pool *pgxpool.Pool) (map[int]bool, err
 	return applied, nil
 }
 
+// Schema lê o que o runner registrou em schema_migrations.
+//
+// Existe para o /health dizer em que migration o banco está. Um rollback troca
+// o código e deixa o banco onde estava — o runner só aplica .up.sql —, então
+// depois de voltar uma versão é este número que diz se o código que subiu
+// conhece o schema que ficou.
+type Schema struct {
+	pool *pgxpool.Pool
+}
+
+func NovoSchema(pool *pgxpool.Pool) Schema {
+	return Schema{pool: pool}
+}
+
+// VersaoSchema devolve a maior migration aplicada, ou 0 se nenhuma foi.
+func (s Schema) VersaoSchema(ctx context.Context) (int, error) {
+	applied, err := appliedVersions(ctx, s.pool)
+	if err != nil {
+		return 0, err
+	}
+
+	maior := 0
+	for v := range applied {
+		maior = max(maior, v)
+	}
+
+	return maior, nil
+}
+
 // loadMigrations reads every "NNNNNN_name.up.sql" entry from fsys.
 func loadMigrations(fsys fs.FS) ([]migration, error) {
 	entries, err := fs.Glob(fsys, "*.up.sql")

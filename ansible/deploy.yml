@@ -19,6 +19,13 @@
     # deixando a stack antiga rodando com os dados.
     remote_app_dir: "{{ app_dir | default('/opt/annygo') }}"
     previous_state_file: "{{ remote_app_dir }}/.deploy-anterior"
+    backup_dir: "{{ remote_app_dir }}/backups"
+
+    # O que o /health vai dizer que está no ar: a tag, ou o commit num deploy
+    # da main. Vem do ambiente do job — o Ansible roda dentro dele —, e não do
+    # build, porque a mesma imagem sobe como publicações diferentes. Um rollback
+    # reexecuta o job da versão antiga, e com ele volta a tag antiga.
+    app_versao: "{{ lookup('env', 'CI_COMMIT_TAG') or lookup('env', 'CI_COMMIT_SHORT_SHA') or 'desconhecida' }}"
 
   pre_tasks:
     # Digest, não tag. Uma tag pode ser reapontada; o digest identifica bytes.
@@ -56,6 +63,71 @@
         fail_msg: "Menos de 2 GB livres em / — o pull das imagens pode falhar."
 
   tasks:
+    # Cópia do banco ANTES de qualquer imagem nova subir: o backend aplica as
+    # migrations no boot, e rollback de código não desfaz schema. Se a versão
+    # nova trouxer uma migration destrutiva, é deste arquivo que se volta.
+    #
+    # Nos dois ambientes, não só em produção: assim o passo roda em staging a
+    # cada push e chega a produção já exercitado — o mesmo motivo de staging
+    # vir primeiro.
+    - name: Ver se há um banco de pé para copiar
+      ansible.builtin.command: docker compose ps --status running --services
+      args:
+        chdir: "{{ remote_app_dir }}"
+      register: servicos_de_pe
+      changed_when: false
+      # Primeiro deploy do ambiente: não há compose nem banco, e nada a copiar.
+      failed_when: false
+
+    - name: Copiar o banco antes do deploy
+      when: "'postgres' in servicos_de_pe.stdout_lines | default([])"
+      block:
+        - name: Garantir o diretório das cópias
+          ansible.builtin.file:
+            path: "{{ backup_dir }}"
+            state: directory
+            mode: '0700'
+
+        # Grava num .parcial e só renomeia no fim: um dump interrompido nunca
+        # fica com cara de cópia válida. pipefail porque, sem ele, o gzip
+        # terminaria bem e esconderia um pg_dump que falhou. A data no nome
+        # impede que reexecutar o job da mesma pipeline — é assim que o
+        # rollback funciona — sobrescreva a cópia anterior.
+        - name: Gerar o dump
+          ansible.builtin.shell:
+            cmd: |
+              set -euo pipefail
+              destino="{{ backup_dir }}/pre-deploy-$(date +%Y%m%d-%H%M%S)-p{{ deploy_pipeline_id | default('sem-pipeline') }}.sql.gz"
+              trap 'rm -f "$destino.parcial"' EXIT
+              docker compose exec -T postgres pg_dump -U '{{ postgres_user }}' '{{ postgres_db }}' \
+                | gzip > "$destino.parcial"
+              chmod 600 "$destino.parcial"
+              mv "$destino.parcial" "$destino"
+              echo "$destino"
+            chdir: "{{ remote_app_dir }}"
+            executable: /bin/bash
+          register: dump
+
+        - name: Manter só as 5 cópias mais recentes
+          ansible.builtin.shell:
+            cmd: ls -1t pre-deploy-*.sql.gz | tail -n +6 | xargs -r rm -f --
+            chdir: "{{ backup_dir }}"
+          changed_when: false
+
+        - name: Informar onde ficou a cópia
+          ansible.builtin.debug:
+            msg: "Cópia do banco antes do deploy: {{ dump.stdout }}"
+
+      rescue:
+        # Sem a cópia, uma migration destrutiva desta versão não teria de onde
+        # voltar. Recusar aqui não custa nada: ainda não se mexeu em nada.
+        - name: Recusar o deploy sem cópia do banco
+          ansible.builtin.fail:
+            msg: >-
+              Não consegui copiar o banco de {{ app_domain }} antes do deploy, e
+              nada foi alterado — a versão atual continua no ar. O motivo está na
+              tarefa "Gerar o dump", logo acima.
+
     # block/rescue: se QUALQUER passo abaixo falhar — incluindo o health check —
     # o rescue devolve a versão anterior. Sem isso um deploy que quebra no meio
     # deixa o ambiente no ar, quebrado, até alguém perceber.
@@ -125,7 +197,7 @@
         - name: Confirmar a versão implantada
           ansible.builtin.debug:
             msg: >-
-              OK - {{ backend_image }}
+              OK - {{ app_versao }} - {{ backend_image }}
               (pipeline {{ deploy_pipeline_id | default('n/d') }})
 
       rescue:

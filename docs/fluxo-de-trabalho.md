@@ -21,11 +21,11 @@ editar código
      │
      ├── git add <arquivos>
      ├── make commit m="..." . roda os checks de novo e commita
-     ├── git push ........... você, sempre
+     ├── make push .......... você, sempre → pipeline implanta em staging
      │
-     └── git push/tag ....... pipeline testa, publica e implanta
+     └── make release go=1 .. tag de produção → botão manual na pipeline
               │
-              └── make health  confirma no ar
+              └── make health  confirma qual versão está no ar
 ```
 
 ---
@@ -110,7 +110,7 @@ qual campo mudou — `frontend/src/lib/types.ts` muda junto.
 ```bash
 git add backend/internal/domain/plano/replanejar.go   # você escolhe o que entra
 make commit m="fix(backend): fechar lacuna deixada pelo assunto adiantado"
-git push
+make push
 ```
 
 `make commit`:
@@ -141,21 +141,26 @@ A mensagem segue [Conventional Commits](https://www.conventionalcommits.org/):
 Escopos usados aqui: `backend`, `frontend`, `ansible`, `docker`, `nginx`,
 `claude`. Omita o escopo só quando a mudança atravessa o repo inteiro.
 
-**O `git push` é sempre seu** — nenhum alvo do Makefile empurra para o remoto.
+**O push é sempre um ato seu** — `make commit` nunca empurra nada. `make push` é
+o invólucro que mostra o que vai subir e envia a `main` aos dois remotes (GitLab
+primeiro, depois o espelho); tags ficam de fora, e só `make release go=1` envia
+uma.
 
 ---
 
 ## 4️⃣ Publicar
 
 ```bash
-git push                      # main → pipeline implanta em staging sozinha
-git tag v1.2.3 && git push --tags   # libera o botão manual de produção
-make health                   # GET https://<app_domain>/health → {"status":"ok"}
+make push                     # main → pipeline implanta em staging sozinha
+make release                  # mostra a tag de produção e o que entra nela
+make release go=1             # cria a tag e envia → libera o botão de produção
+make health                   # que versão está no ar (versao, deploy, schema)
 ```
 
 Quem publica é a pipeline, não a sua máquina: ela roda os mesmos checks, constrói
 a imagem **uma vez**, testa a imagem de pé e promove esse mesmo digest para
-staging e produção. Detalhes e rollback em [ci-cd.md](ci-cd.md).
+staging e produção. Voltar atrás é o botão **Rollback environment** do GitLab.
+Detalhes, versão e rollback em [ci-cd.md](ci-cd.md).
 
 Quando a mudança for de **infraestrutura** (nginx, firewall, certificado), e não
 de código:
@@ -179,10 +184,12 @@ make deploy-logs svc=backend env=staging
 
 ### 📦 O que o deploy faz
 
-As imagens são buildadas **na sua máquina**, salvas em tarball, copiadas e
-carregadas na VPS — o código-fonte nunca vai para o servidor. As migrations
+A pipeline constrói as imagens **uma vez**, publica no Registry e o Ansible
+promove o mesmo digest na VPS — nada é montado na sua máquina, e o código-fonte
+nunca vai para o servidor. Antes de subir, o deploy copia o banco; as migrations
 rodam sozinhas no boot do backend (com advisory lock, então o worker pode subir
-junto). Repetir o deploy é seguro.
+junto). Repetir o deploy é seguro. O caminho completo está em
+[ci-cd.md](ci-cd.md).
 
 O passo a passo do **primeiro** deploy de um servidor novo (bootstrap, lockdown,
 provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
@@ -199,6 +206,6 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
 | `make fmt` | formatação |
 | `make status` `commit` | git |
-| `make push` · `git tag v*` | publicar (staging, depois produção) |
+| `make push` · `make release` | publicar (staging, depois produção) |
 | `make provision env=…` | mexer na infra |
 | `make deploy-status` `deploy-logs` `health` | olhar a produção |

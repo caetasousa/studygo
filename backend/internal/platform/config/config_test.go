@@ -49,6 +49,12 @@ func TestLoad_padroesRazoaveis(t *testing.T) {
 	if cfg.Argon2.Memory != 19*1024 || cfg.Argon2.Iterations != 2 {
 		t.Errorf("Argon2 = %+v, quer 19 MiB e 2 iterações", cfg.Argon2)
 	}
+
+	// Fora do deploy não há tag nem pipeline: o /health diz "dev" em vez de
+	// uma versão em branco que pareceria erro de implantação.
+	if cfg.Versao != "dev" || cfg.Deploy != "" {
+		t.Errorf("Versao = %q, Deploy = %q; quer \"dev\" e vazio", cfg.Versao, cfg.Deploy)
+	}
 }
 
 // A regra nova: HS256 assina com o segredo cru, então um segredo curto é uma
@@ -140,6 +146,8 @@ func TestLoad_ambienteSobrescreveOsPadroes(t *testing.T) {
 	t.Setenv("CORS_ORIGIN", "https://exemplo.tld")
 	t.Setenv("RUN_MIGRATIONS", "false")
 	t.Setenv("JWT_ACCESS_TTL", "5m")
+	t.Setenv("APP_VERSAO", "v2026.09.12")
+	t.Setenv("APP_DEPLOY", "1234567")
 
 	cfg, err := Load()
 	if err != nil {
@@ -148,6 +156,10 @@ func TestLoad_ambienteSobrescreveOsPadroes(t *testing.T) {
 
 	if cfg.ServerAddr != ":9090" || cfg.CORSOrigin != "https://exemplo.tld" {
 		t.Errorf("cfg = %+v", cfg)
+	}
+
+	if cfg.Versao != "v2026.09.12" || cfg.Deploy != "1234567" {
+		t.Errorf("Versao = %q, Deploy = %q", cfg.Versao, cfg.Deploy)
 	}
 
 	if cfg.RunMigrations {
