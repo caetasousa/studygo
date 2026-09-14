@@ -46,6 +46,11 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   que vencem no dia (hoje só loga; e-mail fica atrás da mesma interface).
 - **Multiusuário** — conta por e-mail/senha (argon2id + JWT), cada usuário com
   seus concursos e progresso isolados.
+- **Questões** — catálogo compartilhado de provas da FCC: curadores enviam o
+  PDF da prova e o gabarito, o Gemini transcreve as questões e aponta as
+  figuras, que são recortadas do PDF original; nada é publicado sem a
+  conferência de um curador. Resolve-se a prova inteira ou as questões de uma
+  matéria, de todas as provas juntas.
 
 ---
 
@@ -58,8 +63,8 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
 | 🐘 | **PostgreSQL 18** | banco — `concurso → disciplinas → temas → marcos` e `plano → atividades → registros`, sem ORM |
 | 📜 | **SQL à mão** | uma baseline de migration, runner próprio (embed + `schema_migrations` + advisory lock) |
 | 🔐 | **argon2id + JWT** | hash de senha (PHC) e auth com refresh rotativo |
-| 🤖 | **Gemini API** | importação opcional do concurso a partir do edital (`GEMINI_API_KEY`) |
-| 🔔 | **worker** | `cmd/worker` — lembretes diários de revisão espaçada |
+| 🤖 | **Gemini API** | importação opcional do concurso a partir do edital e das provas anteriores (`GEMINI_API_KEY`) |
+| 🔔 | **worker** | `cmd/worker` — lembretes diários de revisão espaçada e a fila de extração de provas |
 | 🐳 | **Docker Compose** | `postgres + backend + worker + frontend`, com **hot reload** no desenvolvimento |
 | 🌐 | **nginx + Let's Encrypt** | reverse proxy de borda + HTTPS na VPS |
 | 📕 | **Ansible** | provisiona a VPS e faz o deploy (imagens buildadas localmente e enviadas prontas) |
