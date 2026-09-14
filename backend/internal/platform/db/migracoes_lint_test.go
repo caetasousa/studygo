@@ -97,7 +97,7 @@ func TestMigrations_DestrutivaDeclaraOContract(t *testing.T) {
 }
 
 // O que conta como destrutivo, fixado caso a caso. O falso positivo mais fácil é
-// o NOT NULL: ADD COLUMN ... NOT NULL DEFAULT '' é aditivo — é o que a 000003
+// o NOT NULL: ADD COLUMN ... NOT NULL DEFAULT ” é aditivo — é o que a 000003
 // faz —, e só o SET NOT NULL numa coluna existente quebra quem insere sem ela.
 func TestDestrutivosSemContract(t *testing.T) {
 	t.Parallel()

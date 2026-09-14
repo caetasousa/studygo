@@ -63,7 +63,8 @@ func TestMigrate_CriaSchemaAPartirDeBancoVazio(t *testing.T) {
 	esperadas := []string{
 		"anotacoes", "atividades", "concursos", "conteudo_programatico",
 		"disciplinas", "fontes", "marco_checks", "marcos",
-		"plano_disciplinas", "planos", "refresh_tokens", "registros_atividade",
+		"plano_disciplinas", "planos", "provas", "provas_anotacoes", "provas_apoios", "provas_apoios_conteudo", "provas_arquivos",
+		"provas_etapas", "provas_importacao_arquivos", "provas_importacoes", "provas_questoes", "provas_questoes_conteudo", "provas_revisoes", "refresh_tokens", "registros_atividade",
 		"registros_dia", "schema_migrations", "temas", "usuarios",
 	}
 

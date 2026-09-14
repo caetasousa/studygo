@@ -1,0 +1,1069 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"studygo/internal/domain/prova"
+	"studygo/internal/port"
+)
+
+// A orquestração da curadoria de provas: quem pode o quê, o que acontece com
+// os arquivos quando a importação não nasce, e a fila andando etapa a etapa.
+// A fila de verdade — reserva, tentativa vencida, versão — é testada no
+// PostgreSQL, em adapter/postgres/prova_repo_test.go.
+
+const curador = "11111111-1111-1111-1111-111111111111"
+
+var pdfMinimo = []byte("%PDF-1.7 prova")
+
+// fakeProvas guarda importações em memória e registra o que a fila fez.
+type fakeProvas struct {
+	port.ProvaRepository
+
+	importacoes map[string]prova.Importacao
+	existente   *prova.Importacao // Criar devolve esta, como num reenvio
+	errCriar    error
+
+	etapas  []int
+	falhas  []time.Duration // espera, por falha registrada; zero é desistir
+	arquivo map[string]string
+	// irmas são as provas publicadas do mesmo concurso.
+	irmas []prova.Publicacao
+}
+
+func (f *fakeProvas) ProvasDoAno(context.Context, string, int, string) ([]prova.Publicacao, error) {
+	return f.irmas, nil
+}
+
+func (f *fakeProvas) Publicacao(_ context.Context, id string) (prova.Publicacao, error) {
+	for _, p := range f.irmas {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return prova.Publicacao{}, prova.ErrNaoEncontrada
+}
+
+func novoFakeProvas() *fakeProvas {
+	return &fakeProvas{importacoes: map[string]prova.Importacao{}, arquivo: map[string]string{}}
+}
+
+func (f *fakeProvas) Criar(_ context.Context, i prova.Importacao, _ int) (prova.Importacao, error) {
+	if f.errCriar != nil {
+		return prova.Importacao{}, f.errCriar
+	}
+	if f.existente != nil {
+		return *f.existente, nil
+	}
+	i.Versao = 1
+	f.importacoes[i.ID] = i
+
+	return i, nil
+}
+
+func (f *fakeProvas) Obter(_ context.Context, id string) (prova.Importacao, error) {
+	i, ok := f.importacoes[id]
+	if !ok {
+		return prova.Importacao{}, prova.ErrNaoEncontrada
+	}
+
+	return i, nil
+}
+
+func (f *fakeProvas) Salvar(_ context.Context, i prova.Importacao, _ int) error {
+	i.Versao++
+	f.importacoes[i.ID] = i
+
+	return nil
+}
+
+func (f *fakeProvas) Excluir(_ context.Context, i prova.Importacao) error {
+	atual, ok := f.importacoes[i.ID]
+	if !ok || atual.Versao != i.Versao || atual.Estado != i.Estado {
+		return prova.ErrConflito
+	}
+	delete(f.importacoes, i.ID)
+
+	return nil
+}
+
+func (f *fakeProvas) Reservar(context.Context) (prova.Importacao, error) {
+	for id, i := range f.importacoes {
+		if i.Estado == prova.EstadoNaFila {
+			i.Estado = prova.EstadoProcessando
+			i.Chamadas++
+			i.Tentativa = "t"
+			f.importacoes[id] = i
+
+			return i, nil
+		}
+	}
+
+	return prova.Importacao{}, prova.ErrNaoEncontrada
+}
+
+func (f *fakeProvas) Renovar(context.Context, string, string) (bool, error) { return true, nil }
+
+func (f *fakeProvas) ConcluirEtapa(_ context.Context, i prova.Importacao, etapa int, _ any, _ time.Duration) error {
+	f.etapas = append(f.etapas, etapa)
+	i.Versao++
+	f.importacoes[i.ID] = i
+
+	return nil
+}
+
+func (f *fakeProvas) Falhar(_ context.Context, i prova.Importacao, msg string, espera time.Duration) error {
+	f.falhas = append(f.falhas, espera)
+	i.Estado = prova.EstadoFalhou
+	i.Erro = msg
+	f.importacoes[i.ID] = i
+
+	return nil
+}
+
+func (f *fakeProvas) RegistrarArquivo(_ context.Context, _, id, ext string) error {
+	f.arquivo[id] = ext
+	return nil
+}
+
+func (f *fakeProvas) ArquivosDaImportacao(context.Context, string) ([]string, error) {
+	ids := []string{}
+	for id := range f.arquivo {
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+// fakeVolume é o volume de arquivos em memória.
+type fakeVolume struct{ nomes map[string]bool }
+
+func (v *fakeVolume) Guardar(id string, _ []byte) error { v.nomes[id+".pdf"] = true; return nil }
+func (v *fakeVolume) Remover(nome string) error         { delete(v.nomes, nome); return nil }
+func (v *fakeVolume) Existe(id, ext string) bool        { return v.nomes[id+"."+ext] }
+func (v *fakeVolume) Caminho(id, ext string) (string, error) {
+	return "/provas/" + id + "." + ext, nil
+}
+
+// fakeExtrator responde como o processador, com uma prova de duas regiões.
+type fakeExtrator struct {
+	regioes        []prova.Origem
+	porRegiao      map[string]prova.Rascunho
+	gabarito       prova.Gabarito
+	err            error
+	errClassificar error
+	// errRegiao é o erro de uma região só, pelo rótulo.
+	errRegiao map[string]error
+	extraidas []string
+}
+
+func (e *fakeExtrator) Preparar(context.Context, string) ([]prova.Origem, error) {
+	return e.regioes, e.err
+}
+
+func (e *fakeExtrator) Metadados(context.Context, string, prova.Origem) (prova.Metadados, error) {
+	return prova.Metadados{Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 2}, e.err
+}
+
+func (e *fakeExtrator) Extrair(_ context.Context, _ string, o prova.Origem) (prova.Rascunho, error) {
+	e.extraidas = append(e.extraidas, o.Regiao)
+	if err := e.errRegiao[o.Regiao]; err != nil {
+		return prova.Rascunho{}, err
+	}
+	return e.porRegiao[o.Regiao], e.err
+}
+
+func (e *fakeExtrator) Gabarito(context.Context, string) (prova.Gabarito, error) {
+	return e.gabarito, e.err
+}
+
+func (e *fakeExtrator) Classificar(_ context.Context, qs []prova.ResumoDeQuestao) (map[int]string, error) {
+	if e.errClassificar != nil {
+		return nil, e.errClassificar
+	}
+	out := map[int]string{}
+	for _, q := range qs {
+		out[q.Numero] = fmt.Sprint("Matéria ", q.Numero)
+	}
+
+	return out, nil
+}
+
+func (e *fakeExtrator) Recortar(context.Context, string, prova.Origem) (string, error) {
+	return "22222222-2222-2222-2222-222222222222", e.err
+}
+
+func questaoExtraida(numero int, completa bool) prova.Questao {
+	q := prova.Questao{Numero: numero, Completa: completa, Blocos: []prova.Bloco{{Tipo: "texto", Texto: fmt.Sprint("q", numero)}}}
+	for _, l := range []string{"A", "B", "C", "D", "E"} {
+		q.Alternativas = append(q.Alternativas, prova.Alternativa{Letra: l, Blocos: []prova.Bloco{{Tipo: "texto", Texto: l}}})
+	}
+
+	return q
+}
+
+func extratorDeDuasRegioes() *fakeExtrator {
+	return &fakeExtrator{
+		regioes: []prova.Origem{{Pagina: 1, Regiao: "0"}, {Pagina: 1, Regiao: "1"}},
+		porRegiao: map[string]prova.Rascunho{
+			// A sobreposição corta a questão 2 no fim da região 0 e a repete
+			// inteira na 1 — e a região 1 chega antes da 2 na ordem de número.
+			"0": {Questoes: []prova.Questao{questaoExtraida(1, true), questaoExtraida(2, false)}},
+			"1": {Questoes: []prova.Questao{questaoExtraida(2, true)}},
+		},
+		gabarito: prova.Gabarito{
+			Cargo: "E05", Caderno: "4", Tipo: "preliminar",
+			Respostas: map[string]string{"1": "B", "2": "D"},
+		},
+	}
+}
+
+func novoProvaServiceDeTeste(repo *fakeProvas, extrator *fakeExtrator) (*ProvaService, *fakeVolume) {
+	volume := &fakeVolume{nomes: map[string]bool{}}
+
+	return &ProvaService{
+		Repo: repo, Processor: extrator, Arquivos: volume,
+		Curadores:    map[string]bool{curador: true},
+		MaxPendentes: 2, MaxChamadas: 50, MaxProcessamento: time.Hour, MaxEtapa: time.Minute,
+		ExigirConferencia: true,
+	}, volume
+}
+
+var semLog = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func processarTudo(t *testing.T, s *ProvaService, repo *fakeProvas, id string) prova.Importacao {
+	t.Helper()
+
+	for range 20 {
+		if err := s.ProcessarUma(context.Background(), semLog); err != nil {
+			t.Fatalf("ProcessarUma: %v", err)
+		}
+		if i := repo.importacoes[id]; i.Estado != prova.EstadoNaFila {
+			return i
+		}
+	}
+	t.Fatal("a fila não terminou em 20 etapas")
+
+	return prova.Importacao{}
+}
+
+func TestProvas_SoCuradorEscreve(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	ctx := context.Background()
+	const estudante = "33333333-3333-3333-3333-333333333333"
+
+	escritas := map[string]func() error{
+		"Importar": func() error { _, err := s.Importar(ctx, estudante, pdfMinimo, nil); return err },
+		"Obter":    func() error { _, err := s.Obter(ctx, estudante, "x"); return err },
+		"Listar":   func() error { _, err := s.Listar(ctx, estudante); return err },
+		"Salvar":   func() error { _, err := s.Salvar(ctx, estudante, "x", 1, prova.Rascunho{}); return err },
+		"Publicar": func() error { _, err := s.Publicar(ctx, estudante, "x", 1); return err },
+		"Cancelar": func() error { _, err := s.Cancelar(ctx, estudante, "x", 1); return err },
+		"Reprocessar": func() error {
+			_, err := s.Reprocessar(ctx, estudante, "x", 1)
+			return err
+		},
+		"Recortar": func() error { _, err := s.Recortar(ctx, estudante, "x", 1, prova.Origem{}); return err },
+		"AtualizarGabarito": func() error {
+			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo)
+			return err
+		},
+		"Revisar": func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
+		"Excluir": func() error { return s.Excluir(ctx, estudante, "x", 1) },
+		"Retirar": func() error { return s.Retirar(ctx, estudante, "x") },
+	}
+	for nome, escrever := range escritas {
+		if err := escrever(); !errors.Is(err, prova.ErrAcesso) {
+			t.Errorf("%s de quem não é curador: err = %v, quer ErrAcesso", nome, err)
+		}
+	}
+}
+
+// Excluir apaga o rascunho; a publicada é o histórico da prova e a que está
+// processando precisa ser cancelada antes.
+func TestProvas_Excluir(t *testing.T) {
+	t.Parallel()
+
+	casos := []struct {
+		nome   string
+		estado string
+		apaga  bool
+	}{
+		{"na fila", prova.EstadoNaFila, true},
+		{"em revisão", prova.EstadoEmRevisao, true},
+		{"falhou", prova.EstadoFalhou, true},
+		{"cancelada", prova.EstadoCancelada, true},
+		{"processando", prova.EstadoProcessando, false},
+		{"publicada", prova.EstadoPublicada, false},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			t.Parallel()
+
+			repo := novoFakeProvas()
+			s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+			ctx := context.Background()
+			nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i := repo.importacoes[nova.ID]
+			i.Estado = c.estado
+			repo.importacoes[nova.ID] = i
+
+			if err := s.Excluir(ctx, curador, i.ID, i.Versao+1); !errors.Is(err, prova.ErrConflito) {
+				t.Fatalf("Excluir com versão velha: err = %v, quer ErrConflito", err)
+			}
+
+			err = s.Excluir(ctx, curador, i.ID, i.Versao)
+			_, sobrou := repo.importacoes[i.ID]
+			if c.apaga {
+				if err != nil || sobrou {
+					t.Fatalf("Excluir: err = %v, sobrou = %v", err, sobrou)
+				}
+				return
+			}
+			var v ErrValidacao
+			if !errors.As(err, &v) || !sobrou {
+				t.Fatalf("Excluir %s: err = %v, sobrou = %v; quer recusa", c.estado, err, sobrou)
+			}
+		})
+	}
+}
+
+// Cancelada, a importação solta os PDFs: importar os mesmos arquivos começa
+// do zero em vez de devolver a cancelada.
+func TestProvas_CancelarSoltaOsPDFs(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	ctx := context.Background()
+	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Cancelar(ctx, curador, nova.ID, nova.Versao); err != nil {
+		t.Fatal(err)
+	}
+
+	if h := repo.importacoes[nova.ID].Hash; h != "" {
+		t.Fatalf("hash da cancelada = %q, quer vazio", h)
+	}
+}
+
+// No ambiente local, qualquer conta é curadora: a lista de UUIDs perde a
+// validade toda vez que o banco é recriado.
+func TestProvas_TodosCuradoresLiberaQualquerConta(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	s.Curadores, s.TodosCuradores = map[string]bool{}, true
+	ctx := context.Background()
+	const estudante = "33333333-3333-3333-3333-333333333333"
+
+	nova, err := s.Importar(ctx, estudante, pdfMinimo, nil)
+	if err != nil {
+		t.Fatalf("Importar de uma conta qualquer: %v", err)
+	}
+
+	if _, err := s.Obter(ctx, estudante, nova.ID); err != nil {
+		t.Fatalf("Obter a própria importação: %v", err)
+	}
+}
+
+// Reenviar os mesmos PDFs devolve a importação existente; os arquivos que o
+// reenvio gravou não têm linha nenhuma que os aponte e precisam sair.
+func TestProvas_ReenvioNaoDeixaArquivoOrfao(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	repo.existente = &prova.Importacao{ID: "existente", Estado: prova.EstadoEmRevisao}
+	s, volume := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+
+	i, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	if err != nil {
+		t.Fatalf("Importar: %v", err)
+	}
+
+	if i.ID != "existente" {
+		t.Fatalf("id = %q, quer a importação existente", i.ID)
+	}
+	if len(volume.nomes) != 0 {
+		t.Fatalf("arquivos órfãos no volume: %v", volume.nomes)
+	}
+}
+
+func TestProvas_LimiteNaoDeixaArquivoOrfao(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	repo.errCriar = prova.ErrLimite
+	s, volume := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+
+	if _, err := s.Importar(context.Background(), curador, pdfMinimo, nil); !errors.Is(err, prova.ErrLimite) {
+		t.Fatalf("err = %v, quer ErrLimite", err)
+	}
+	if len(volume.nomes) != 0 {
+		t.Fatalf("arquivos órfãos no volume: %v", volume.nomes)
+	}
+}
+
+func TestProvas_ImportarRecusaQuemNaoEPDF(t *testing.T) {
+	t.Parallel()
+
+	s, _ := novoProvaServiceDeTeste(novoFakeProvas(), extratorDeDuasRegioes())
+
+	_, err := s.Importar(context.Background(), curador, []byte("<html>"), nil)
+
+	var v ErrValidacao
+	if !errors.As(err, &v) {
+		t.Fatalf("err = %v, quer ErrValidacao", err)
+	}
+}
+
+// A fila inteira: capa, gabarito, uma etapa por região e a consolidação. A
+// resposta de cada questão vem do gabarito, e a questão cortada pela
+// sobreposição termina inteira.
+func TestProvas_FilaDaCapaAteARevisao(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+
+	criada, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	if err != nil {
+		t.Fatalf("Importar: %v", err)
+	}
+
+	i := processarTudo(t, s, repo, criada.ID)
+
+	if i.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("estado = %s (%s), quer em_revisao", i.Estado, i.Erro)
+	}
+	quer := []int{prova.EtapaPreparar, prova.EtapaMetadados, prova.EtapaGabarito, 3, 4, 5}
+	if fmt.Sprint(repo.etapas) != fmt.Sprint(quer) {
+		t.Errorf("etapas = %v, quer %v", repo.etapas, quer)
+	}
+	if i.Etapa != prova.TotalEtapas(2) {
+		t.Errorf("etapa final = %d, quer %d", i.Etapa, prova.TotalEtapas(2))
+	}
+
+	r := i.Rascunho
+	if r.Orgao != "TJCE" || r.Total != 2 || r.Cargo != "E05" {
+		t.Errorf("metadados da capa não aplicados: %+v", r)
+	}
+	if len(r.Questoes) != 2 || !r.Questoes[1].Completa {
+		t.Fatalf("questões = %+v", r.Questoes)
+	}
+	if r.Questoes[0].Resposta != "B" || r.Questoes[1].Resposta != "D" {
+		t.Errorf("respostas = %q %q, quer as do gabarito", r.Questoes[0].Resposta, r.Questoes[1].Resposta)
+	}
+	if r.Questoes[1].Disciplina != "Matéria 2" {
+		t.Errorf("disciplina = %q, quer a matéria sugerida na consolidação", r.Questoes[1].Disciplina)
+	}
+}
+
+// A matéria é sugestão: a IA recusar a classificação não pode derrubar uma
+// importação que já extraiu todas as questões.
+func TestProvas_ClassificacaoRecusadaNaoFalhaAImportacao(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	extrator.errClassificar = fmt.Errorf("%w: recusou", port.ErrDocumentoRecusado)
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	criada, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	i := processarTudo(t, s, repo, criada.ID)
+
+	if i.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("estado = %s (%s)", i.Estado, i.Erro)
+	}
+	if !strings.Contains(strings.Join(i.Rascunho.Alertas, " "), "matérias") {
+		t.Fatalf("alertas = %v, quer o aviso da classificação", i.Rascunho.Alertas)
+	}
+}
+
+// Só a falha que passa sozinha volta à fila, e com espera que cresce a cada
+// falha seguida — até as tentativas acabarem.
+func TestProvas_FalhaTransitoriaRepeteComEspera(t *testing.T) {
+	t.Parallel()
+
+	sobrecarga := fmt.Errorf("%w: 503", port.ErrProcessamentoTransitorio)
+	casos := []struct {
+		nome             string
+		err              error
+		falhasAnteriores int
+		espera           time.Duration
+	}{
+		{"documento recusado", fmt.Errorf("%w: página inexistente", port.ErrDocumentoRecusado), 0, 0},
+		{"Gemini sobrecarregado", sobrecarga, 0, 15 * time.Second},
+		{"erro desconhecido", errors.New("conexão recusada"), 0, 15 * time.Second},
+		{"quarta falha seguida", sobrecarga, 3, 2 * time.Minute},
+		{"tentativas esgotadas", sobrecarga, 5, 0},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			t.Parallel()
+
+			repo := novoFakeProvas()
+			extrator := extratorDeDuasRegioes()
+			extrator.err = c.err
+			s, _ := novoProvaServiceDeTeste(repo, extrator)
+			nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i := repo.importacoes[nova.ID]
+			i.Falhas = c.falhasAnteriores
+			repo.importacoes[nova.ID] = i
+
+			if err := s.ProcessarUma(context.Background(), semLog); err != nil {
+				t.Fatal(err)
+			}
+
+			if len(repo.falhas) != 1 || repo.falhas[0] != c.espera {
+				t.Fatalf("falhas = %v, quer espera de %v", repo.falhas, c.espera)
+			}
+		})
+	}
+}
+
+func TestProvas_TetoDeChamadasParaSemChamarOProcessador(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	s.MaxChamadas = 0
+	if _, err := s.Importar(context.Background(), curador, pdfMinimo, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.ProcessarUma(context.Background(), semLog); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(repo.falhas) != 1 || repo.falhas[0] != 0 {
+		t.Fatalf("falhas = %v, quer uma falha definitiva", repo.falhas)
+	}
+	if len(extrator.extraidas) != 0 {
+		t.Fatal("chamou o processador depois do teto")
+	}
+}
+
+func TestProvas_SalvarPreservaRegistroDasChamadas(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	repo.importacoes["i"] = prova.Importacao{
+		ID: "i", Estado: prova.EstadoEmRevisao, Versao: 3,
+		Rascunho: prova.Rascunho{Extracoes: []prova.Extracao{{Modelo: "gemini", TokensSaida: 900}}},
+	}
+
+	editado := prova.Rascunho{Orgao: "TJCE", Extracoes: nil}
+	if _, err := s.Salvar(context.Background(), curador, "i", 3, editado); err != nil {
+		t.Fatalf("Salvar: %v", err)
+	}
+
+	if got := repo.importacoes["i"].Rascunho.Extracoes; len(got) != 1 || got[0].TokensSaida != 900 {
+		t.Fatalf("extrações = %+v, quer as gravadas", got)
+	}
+}
+
+func TestProvas_SalvarComVersaoVelhaConflita(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Estado: prova.EstadoEmRevisao, Versao: 3}
+
+	if _, err := s.Salvar(context.Background(), curador, "i", 2, prova.Rascunho{}); !errors.Is(err, prova.ErrConflito) {
+		t.Fatalf("err = %v, quer ErrConflito", err)
+	}
+}
+
+func TestProvas_PublicarComPendenciaRecusa(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Estado: prova.EstadoEmRevisao, Versao: 1}
+
+	_, err := s.Publicar(context.Background(), curador, "i", 1)
+
+	var v ErrValidacao
+	if !errors.As(err, &v) {
+		t.Fatalf("err = %v, quer ErrValidacao com as pendências", err)
+	}
+}
+
+// Com a conferência desligada, um rascunho íntegro publica sem nenhuma questão
+// marcada — e sem gabarito, que nunca foi obrigatório.
+func TestProvas_PublicarSemConferenciaQuandoDesligada(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, volume := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	s.ExigirConferencia = false
+	volume.nomes["doc.pdf"] = true
+	r := prova.Rascunho{Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 1,
+		Questoes: []prova.Questao{questaoExtraida(1, true)}}
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
+
+	id, err := s.Publicar(context.Background(), curador, "i", 1)
+	if err != nil || id == "" {
+		t.Fatalf("Publicar = %q, %v", id, err)
+	}
+
+	s.ExigirConferencia = true
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
+	var v ErrValidacao
+	if _, err := s.Publicar(context.Background(), curador, "i", 1); !errors.As(err, &v) {
+		t.Fatalf("com a conferência exigida, publicou sem ela: %v", err)
+	}
+}
+
+// fakePublicacao registra a publicação sem reproduzir o banco.
+type fakePublicacao struct{ *fakeProvas }
+
+func (f *fakePublicacao) Publicacao(context.Context, string) (prova.Publicacao, error) {
+	return prova.Publicacao{ID: "prova-1"}, nil
+}
+
+func (f *fakePublicacao) ImportacaoDaPublicacao(context.Context, string) (prova.Importacao, error) {
+	return f.importacoes["base"], nil
+}
+
+// Extrair de novo parte do mesmo PDF e do mesmo gabarito, do zero, e vira
+// revisão da mesma prova — não uma prova nova no catálogo.
+func TestProvas_ReextrairAbreRevisaoDaMesmaProva(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, _ := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	repo.importacoes["base"] = prova.Importacao{
+		ID: "base", Documento: "doc", GabaritoArquivo: "gab", Estado: prova.EstadoPublicada, Etapa: 17,
+		Rascunho: prova.Rascunho{Questoes: []prova.Questao{questaoExtraida(1, true)}},
+	}
+
+	i, err := s.Reextrair(context.Background(), curador, "prova-1")
+	if err != nil {
+		t.Fatalf("Reextrair: %v", err)
+	}
+
+	if i.Estado != prova.EstadoNaFila || i.Etapa != prova.EtapaPreparar || len(i.Rascunho.Questoes) != 0 {
+		t.Fatalf("importação = %+v, quer na fila, do começo e sem o rascunho antigo", i.Importacao)
+	}
+	if i.Documento != "doc" || i.GabaritoArquivo != "gab" || i.ProvaID != "prova-1" || i.Hash != "" {
+		t.Fatalf("importação = %+v, quer os arquivos da base e a mesma prova", i.Importacao)
+	}
+}
+
+func (f *fakePublicacao) Publicar(context.Context, prova.Importacao, string) (string, error) {
+	return "prova-1", nil
+}
+
+// O gabarito definitivo sai depois do preliminar. Trocá-lo não pode reextrair
+// as questões — cada região é uma chamada paga — nem manter a conferência.
+func TestProvas_NovoGabaritoNaoReextrai(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	q := questaoExtraida(1, true)
+	q.Resposta, q.Revisada = "B", true
+	repo.importacoes["i"] = prova.Importacao{
+		ID: "i", Estado: prova.EstadoEmRevisao, Versao: 1, Regioes: extrator.regioes,
+		Rascunho: prova.Rascunho{Questoes: []prova.Questao{q}},
+	}
+	extrator.gabarito = prova.Gabarito{Tipo: "definitivo", Respostas: map[string]string{"1": "C"}}
+
+	if _, err := s.AtualizarGabarito(context.Background(), curador, "i", 1, pdfMinimo); err != nil {
+		t.Fatalf("AtualizarGabarito: %v", err)
+	}
+	i := processarTudo(t, s, repo, "i")
+
+	if i.Estado != prova.EstadoEmRevisao || len(extrator.extraidas) != 0 {
+		t.Fatalf("estado = %s, regiões reextraídas = %v", i.Estado, extrator.extraidas)
+	}
+	if got := i.Rascunho.Questoes[0]; got.Resposta != "C" || got.Revisada {
+		t.Fatalf("questão = %+v, quer resposta C e conferência desfeita", got)
+	}
+}
+
+// O caso da prova do TJCE: a região 0 corta a questão 2 no fim, e a região 1,
+// que a via inteira, a pula. Depois da última região, a questão ganha uma
+// leitura só dela, e o texto de apoio que apareça no recorte não se repete.
+func TestProvas_QuestaoCortadaGanhaReleitura(t *testing.T) {
+	t.Parallel()
+
+	em := func(q prova.Questao, y0, y1 float64) prova.Questao {
+		q.Origens = []prova.Origem{{Pagina: 1, Regiao: "0", Retangulo: []float64{100, y0, 480, y1}}}
+		return q
+	}
+	cortada := em(questaoExtraida(2, false), 700, 845)
+	cortada.Alternativas = cortada.Alternativas[:1]
+	extrator := extratorDeDuasRegioes()
+	extrator.regioes = []prova.Origem{
+		{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 845}},
+		{Pagina: 1, Regiao: "1", Retangulo: []float64{0, 690, 595, 1535}},
+	}
+	extrator.porRegiao = map[string]prova.Rascunho{
+		"0":  {Questoes: []prova.Questao{em(questaoExtraida(1, true), 50, 600), cortada}},
+		"1":  {Questoes: []prova.Questao{em(questaoExtraida(3, true), 900, 1100)}},
+		"q2": {Questoes: []prova.Questao{questaoExtraida(2, true)}, Apoios: []prova.Apoio{{ID: "rq2-t1"}}},
+	}
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	final := processarTudo(t, s, repo, nova.ID)
+
+	if got := strings.Join(extrator.extraidas, ","); got != "0,1,q2" {
+		t.Fatalf("regiões lidas = %s, quer 0,1,q2", got)
+	}
+	i := slices.IndexFunc(final.Rascunho.Questoes, func(q prova.Questao) bool { return q.Numero == 2 })
+	if i < 0 || !final.Rascunho.Questoes[i].Completa || len(final.Rascunho.Questoes[i].Alternativas) != 5 {
+		t.Fatalf("questão 2 depois da releitura = %+v", final.Rascunho.Questoes)
+	}
+	if len(final.Rascunho.Apoios) != 0 {
+		t.Fatalf("a releitura trouxe texto de apoio: %+v", final.Rascunho.Apoios)
+	}
+	if final.Estado != prova.EstadoEmRevisao || final.Etapa != prova.TotalEtapas(3) {
+		t.Fatalf("estado = %s, etapa = %d; quer em revisão na etapa %d", final.Estado, final.Etapa, prova.TotalEtapas(3))
+	}
+}
+
+// A releitura é reforço: recusada pelo processador, a importação chega à
+// revisão com a questão como as regiões a leram e um alerta — antes, a prova
+// inteira falhava por um retângulo recusado.
+func TestProvas_ReleituraRecusadaNaoDerrubaAImportacao(t *testing.T) {
+	t.Parallel()
+
+	em := func(q prova.Questao, y0, y1 float64) prova.Questao {
+		q.Origens = []prova.Origem{{Pagina: 1, Regiao: "0", Retangulo: []float64{100, y0, 480, y1}}}
+		return q
+	}
+	cortada := em(questaoExtraida(2, false), 700, 845)
+	cortada.Alternativas = cortada.Alternativas[:1]
+	extrator := extratorDeDuasRegioes()
+	extrator.regioes = []prova.Origem{
+		{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 845}},
+		{Pagina: 1, Regiao: "1", Retangulo: []float64{0, 690, 595, 1535}},
+	}
+	extrator.porRegiao = map[string]prova.Rascunho{
+		"0": {Questoes: []prova.Questao{em(questaoExtraida(1, true), 50, 600), cortada}},
+		"1": {Questoes: []prova.Questao{em(questaoExtraida(3, true), 900, 1100)}},
+	}
+	extrator.errRegiao = map[string]error{
+		"q2": fmt.Errorf("%w: retângulo fora da página", port.ErrDocumentoRecusado),
+	}
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	final := processarTudo(t, s, repo, nova.ID)
+
+	if final.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("estado = %s (%s), quer em revisão", final.Estado, final.Erro)
+	}
+	if !slices.ContainsFunc(final.Rascunho.Alertas, func(a string) bool {
+		return strings.Contains(a, "releitura da questão 2 não foi feita") && strings.Contains(a, "fora da página")
+	}) {
+		t.Fatalf("alertas = %v, quer o da releitura recusada", final.Rascunho.Alertas)
+	}
+}
+
+// A releitura automática pode não resolver; o curador pede de novo, e a fila
+// relê só a questão que continua incompleta, sem mexer no resto.
+func TestProvas_RelerQuestaoQueContinuouIncompleta(t *testing.T) {
+	t.Parallel()
+
+	em := func(q prova.Questao, y0, y1 float64) prova.Questao {
+		q.Origens = []prova.Origem{{Pagina: 1, Regiao: "0", Retangulo: []float64{100, y0, 480, y1}}}
+		return q
+	}
+	cortada := em(questaoExtraida(2, false), 700, 845)
+	cortada.Alternativas = cortada.Alternativas[:1]
+	extrator := extratorDeDuasRegioes()
+	extrator.regioes = []prova.Origem{
+		{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 845}},
+		{Pagina: 1, Regiao: "1", Retangulo: []float64{0, 690, 595, 1535}},
+	}
+	extrator.porRegiao = map[string]prova.Rascunho{
+		"0": {Questoes: []prova.Questao{em(questaoExtraida(1, true), 50, 600), cortada}},
+		"1": {Questoes: []prova.Questao{em(questaoExtraida(3, true), 900, 1100)}},
+	}
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	ctx := context.Background()
+	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisao := processarTudo(t, s, repo, nova.ID)
+
+	extrator.porRegiao["q2"] = prova.Rascunho{Questoes: []prova.Questao{questaoExtraida(2, true)}}
+	relida, err := s.Reler(ctx, curador, nova.ID, revisao.Versao)
+	if err != nil {
+		t.Fatalf("Reler: %v", err)
+	}
+	if relida.Estado != prova.EstadoNaFila || relida.Etapa != prova.EtapaPrimeiraRegiao+2 || len(relida.Regioes) != 3 {
+		t.Fatalf("depois de Reler: estado %s, etapa %d, %d regiões", relida.Estado, relida.Etapa, len(relida.Regioes))
+	}
+
+	final := processarTudo(t, s, repo, nova.ID)
+
+	i := slices.IndexFunc(final.Rascunho.Questoes, func(q prova.Questao) bool { return q.Numero == 2 })
+	if i < 0 || len(final.Rascunho.Questoes[i].Alternativas) != 5 || final.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("questão 2 depois de reler = %+v, estado %s", final.Rascunho.Questoes, final.Estado)
+	}
+
+	// Sem questão incompleta, não há o que reler.
+	var v ErrValidacao
+	if _, err := s.Reler(ctx, curador, nova.ID, final.Versao); !errors.As(err, &v) {
+		t.Fatalf("Reler sem incompleta: err = %v, quer ErrValidacao", err)
+	}
+}
+
+// Rascunho gravado antes da regra, com questão apontando para um texto que
+// não existe: a tela e as pendências já o veem acertado.
+func TestProvas_LigacaoParaTextoInexistenteNaoViraPendencia(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	ctx := context.Background()
+	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := repo.importacoes[nova.ID]
+	i.Estado = prova.EstadoEmRevisao
+	q := questaoExtraida(4, true)
+	q.Apoios = []string{"r0-t1", "rq4-t1"}
+	i.Rascunho.Questoes = []prova.Questao{q}
+	i.Rascunho.Apoios = []prova.Apoio{{ID: "r0-t1", Questoes: []int{1, 2, 3, 4}, Blocos: []prova.Bloco{{Tipo: "texto", Texto: "A vida"}}}}
+	repo.importacoes[nova.ID] = i
+
+	got, err := s.Obter(ctx, curador, nova.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, p := range got.Pendencias {
+		if strings.Contains(p, "não existe mais") {
+			t.Fatalf("pendência de texto inexistente: %s", p)
+		}
+	}
+	if a := got.Rascunho.Questoes[0].Apoios; len(a) != 1 || a[0] != "r0-t1" {
+		t.Fatalf("textos da questão 4 = %v, quer só r0-t1", a)
+	}
+}
+
+// fakeAnotacoes guarda anotações por usuário, prova e número, e responde a
+// Questoes com as questões de uma prova publicada de mentira.
+type fakeAnotacoes struct {
+	*fakeProvas
+
+	publicadas map[string][]prova.Questao
+	anotacoes  map[string]prova.Anotacao
+}
+
+func (f *fakeAnotacoes) chave(usuario, provaID string, numero int) string {
+	return fmt.Sprint(usuario, "/", provaID, "/", numero)
+}
+
+func (f *fakeAnotacoes) Questoes(_ context.Context, provaID string, numero int, _ string) ([]prova.Questao, error) {
+	var out []prova.Questao
+	for _, q := range f.publicadas[provaID] {
+		if numero == 0 || q.Numero == numero {
+			out = append(out, q)
+		}
+	}
+
+	return out, nil
+}
+
+func (f *fakeAnotacoes) Anotacoes(_ context.Context, usuario, provaID string) ([]prova.Anotacao, error) {
+	var out []prova.Anotacao
+	for n := 1; n <= 200; n++ {
+		if a, ok := f.anotacoes[f.chave(usuario, provaID, n)]; ok {
+			out = append(out, a)
+		}
+	}
+
+	return out, nil
+}
+
+func (f *fakeAnotacoes) SalvarAnotacao(_ context.Context, usuario, provaID string, a prova.Anotacao) (prova.Anotacao, error) {
+	a.AtualizadaEm = time.Now()
+	f.anotacoes[f.chave(usuario, provaID, a.Numero)] = a
+
+	return a, nil
+}
+
+func (f *fakeAnotacoes) ExcluirAnotacao(_ context.Context, usuario, provaID string, numero int) error {
+	delete(f.anotacoes, f.chave(usuario, provaID, numero))
+	return nil
+}
+
+// A anotação é do estudante que a escreveu, em cada questão que existe na
+// prova; apagar o texto apaga a anotação.
+func TestProvas_AnotacaoDaQuestao(t *testing.T) {
+	t.Parallel()
+
+	const provaID, estudante, outro = "p1", "33333333-3333-3333-3333-333333333333", "44444444-4444-4444-4444-444444444444"
+	repo := &fakeAnotacoes{
+		fakeProvas: novoFakeProvas(),
+		publicadas: map[string][]prova.Questao{provaID: {questaoExtraida(1, true), questaoExtraida(2, true)}},
+		anotacoes:  map[string]prova.Anotacao{},
+	}
+	s := &ProvaService{Repo: repo}
+	ctx := context.Background()
+
+	a, err := s.Anotar(ctx, estudante, provaID, 2, "  ## Por que C\n\nO art. 5º diz…  ")
+	if err != nil || a.Texto != "## Por que C\n\nO art. 5º diz…" || a.AtualizadaEm.IsZero() {
+		t.Fatalf("Anotar = %+v, %v", a, err)
+	}
+	if lista, _ := s.Anotacoes(ctx, estudante, provaID); len(lista) != 1 || lista[0].Numero != 2 {
+		t.Fatalf("anotações do estudante = %+v", lista)
+	}
+	if lista, _ := s.Anotacoes(ctx, outro, provaID); len(lista) != 0 {
+		t.Fatalf("outro estudante vê a anotação: %+v", lista)
+	}
+
+	if _, err := s.Anotar(ctx, estudante, provaID, 9, "questão que não existe"); !errors.Is(err, prova.ErrNaoEncontrada) {
+		t.Fatalf("anotar questão inexistente: err = %v, quer ErrNaoEncontrada", err)
+	}
+	var v ErrValidacao
+	if _, err := s.Anotar(ctx, estudante, provaID, 1, strings.Repeat("a", prova.TamanhoMaximoDaAnotacao+1)); !errors.As(err, &v) {
+		t.Fatalf("anotação longa demais: err = %v, quer ErrValidacao", err)
+	}
+
+	if _, err := s.Anotar(ctx, estudante, provaID, 2, "   "); err != nil {
+		t.Fatal(err)
+	}
+	if lista, _ := s.Anotacoes(ctx, estudante, provaID); len(lista) != 0 {
+		t.Fatalf("texto vazio não apagou: %+v", lista)
+	}
+}
+
+// A questão de Conhecimentos Gerais que outro cargo do mesmo concurso já
+// publicou chega na revisão como a publicada, com a resposta do gabarito desta
+// prova; o recorte dela passa a ser desta importação também.
+func TestProvas_ImportacaoReaproveitaQuestaoDeOutroCargo(t *testing.T) {
+	t.Parallel()
+
+	comum := func(numero int, texto string) prova.Questao {
+		q := questaoExtraida(numero, true)
+		q.Blocos[0].Texto = texto
+		return q
+	}
+	lida := comum(1, "No  texto, Sêneca caracteriza o presente como")
+	lida.Blocos = append(lida.Blocos, prova.Bloco{Tipo: "imagem", Arquivo: "recorte-desta"})
+	extrator := extratorDeDuasRegioes()
+	extrator.porRegiao = map[string]prova.Rascunho{
+		"0": {Questoes: []prova.Questao{lida}},
+		"1": {Questoes: []prova.Questao{comum(2, "Uma questão só deste cargo, sobre redes de computadores")}},
+	}
+	publicada := comum(1, "No texto, Sêneca caracteriza o presente como")
+	publicada.Blocos = append(publicada.Blocos, prova.Bloco{Tipo: "imagem", Arquivo: "recorte-da-e04", Largura: 30})
+	publicada.Resposta = "C" // o gabarito da E04 não vale aqui
+	repo := novoFakeProvas()
+	repo.irmas = []prova.Publicacao{{ID: "e04", Conteudo: prova.Rascunho{
+		Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E04", Questoes: []prova.Questao{publicada},
+	}}}
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	nova, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	final := processarTudo(t, s, repo, nova.ID)
+
+	q1, q2 := final.Rascunho.Questoes[0], final.Rascunho.Questoes[1]
+	if q1.IgualA != "TJCE 2026 · E04, questão 1" || q1.Blocos[1].Arquivo != "recorte-da-e04" || q1.Resposta != "B" {
+		t.Fatalf("questão 1 = %+v; quer a da E04, com a resposta B do gabarito desta prova", q1)
+	}
+	if repo.arquivo["recorte-da-e04"] != "png" {
+		t.Fatal("o recorte reaproveitado não foi registrado nesta importação")
+	}
+	if q2.IgualA != "" {
+		t.Fatalf("questão só deste cargo foi reaproveitada: %+v", q2)
+	}
+}
+
+// A irmã foi publicada depois que esta foi importada: "procurar as já
+// cadastradas" troca por referência o que ela tem, e a questão fica conferida.
+func TestProvas_ProcurarCadastradasNaRevisao(t *testing.T) {
+	t.Parallel()
+
+	comum := func(numero int, texto string) prova.Questao {
+		q := questaoExtraida(numero, true)
+		q.Blocos[0].Texto = texto
+		return q
+	}
+	extrator := extratorDeDuasRegioes()
+	extrator.porRegiao = map[string]prova.Rascunho{
+		"0": {Questoes: []prova.Questao{comum(1, "No texto, Sâneca caracteriza o presente como")}},
+		"1": {Questoes: []prova.Questao{comum(2, "Uma questão só deste cargo, sobre redes de computadores")}},
+	}
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	ctx := context.Background()
+	nova, err := s.Importar(ctx, curador, pdfMinimo, pdfMinimo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisao := processarTudo(t, s, repo, nova.ID)
+	if revisao.Rascunho.Questoes[0].IgualA != "" {
+		t.Fatal("reaproveitou sem irmã publicada")
+	}
+
+	repo.irmas = []prova.Publicacao{{ID: "f06", Conteudo: prova.Rascunho{
+		Banca: "FCC", Orgao: "TJ-CE", Ano: 2026, Cargo: "F06",
+		Questoes: []prova.Questao{comum(1, "No texto, Sêneca caracteriza o presente como")},
+	}}}
+	depois, err := s.ProcurarCadastradas(ctx, curador, nova.ID, revisao.Versao)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := depois.Rascunho.Questoes[0]
+	if q1.IgualA != "TJCE 2026 · F06, questão 1" && q1.IgualA != "TJ-CE 2026 · F06, questão 1" {
+		t.Fatalf("questão 1 = %+v", q1)
+	}
+	if !q1.Revisada || !strings.Contains(q1.Blocos[0].Texto, "Sêneca") {
+		t.Fatalf("a referência não ficou conferida com o texto de lá: %+v", q1)
+	}
+}

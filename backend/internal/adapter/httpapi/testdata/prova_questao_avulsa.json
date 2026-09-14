@@ -1,0 +1,10 @@
+{
+  "ano": "number",
+  "cargo": "string",
+  "cargoNome": "string",
+  "disciplina": "string",
+  "numero": "number",
+  "orgao": "string",
+  "provaId": "string",
+  "resposta": "string"
+}

@@ -8,23 +8,27 @@ import (
 	"studygo/internal/port"
 )
 
-// Handlers reúne os handlers que o router liga.
+// Handlers reúne os handlers que o router liga. Prova é opcional: sem ele, as
+// rotas do catálogo de provas não existem.
 type Handlers struct {
 	Health   *HealthHandler
 	Auth     *AuthHandler
 	Concurso *ConcursoHandler
 	Plano    *PlanoHandler
+	Prova    *ProvaHandler
 }
 
 // Limites reúne os limitadores das rotas que merecem um teto próprio.
 //
-// Duas classes, por motivos diferentes: a de autenticação porque um endpoint
-// que compara senha é onde a força bruta bate, e a de edital porque cada
-// chamada custa OCR, CPU e uma ida paga ao provedor de IA. O resto da API é
-// barato e fica com o teto global aplicado por quem monta a cadeia.
+// Três classes, por motivos diferentes: a de autenticação porque um endpoint
+// que compara senha é onde a força bruta bate; a de edital porque cada chamada
+// custa OCR, CPU e uma ida paga ao provedor de IA; e a de curadoria porque o
+// recorte de provas renderiza o PDF a cada ajuste. O resto da API é barato e
+// fica com o teto global aplicado por quem monta a cadeia.
 type Limites struct {
-	Auth   *middleware.Limitador
-	Edital *middleware.Limitador
+	Auth      *middleware.Limitador
+	Edital    *middleware.Limitador
+	Curadoria *middleware.Limitador
 }
 
 // LimitesPadrao é a política que sobe em produção.
@@ -34,11 +38,16 @@ type Limites struct {
 //
 // Edital: 12 por HORA por usuário, rajada de 4. O assistente tem três passos,
 // então quatro tentativas seguidas é um wizard inteiro com uma repetição; doze
-// por hora é um dia de trabalho legítimo e um teto de custo previsível.
+// por hora é um dia de trabalho legítimo e um teto de custo previsível. A
+// importação de provas usa o mesmo: também é PDF grande indo ao Gemini.
+//
+// Curadoria: 120 por minuto por usuário, rajada de 30. Revisar uma prova é
+// passar por dezenas de regiões e ajustar recortes; o teto só pega script.
 func LimitesPadrao(logger *slog.Logger) Limites {
 	return Limites{
-		Auth:   middleware.NovoLimitador(20, 10, logger),
-		Edital: middleware.NovoLimitador(12*60, 4, logger, middleware.ComChave(chaveDoUsuario)),
+		Auth:      middleware.NovoLimitador(20, 10, logger),
+		Edital:    middleware.NovoLimitador(12*60, 4, logger, middleware.ComChave(chaveDoUsuario)),
+		Curadoria: middleware.NovoLimitador(120, 30, logger, middleware.ComChave(chaveDoUsuario)),
 	}
 }
 
@@ -102,6 +111,42 @@ func NewRouter(
 	protegida("GET /api/concursos/{slug}", h.Concurso.Get)
 	protegida("PUT /api/concursos/{slug}", h.Concurso.Atualizar)
 	protegida("DELETE /api/concursos/{slug}", h.Concurso.Remover)
+
+	// Nenhuma rota de provas pode ter o {id} no terceiro segmento seguido de
+	// outro segmento: "GET /api/provas/{id}/questoes" conflitaria com
+	// "/api/provas/arquivos/{id}", e o ServeMux entra em pânico ao registrar.
+	// Por isso o filtro de questões é query string de /api/provas/{id}.
+	if h.Prova != nil {
+		// Consulta: qualquer conta autenticada.
+		protegida("GET /api/provas", h.Prova.Catalogo)
+		protegida("GET /api/provas/questoes", h.Prova.QuestoesAvulsas)
+		protegida("GET /api/provas/{id}", h.Prova.Prova)
+		protegida("GET /api/provas/arquivos/{id}", h.Prova.Arquivo)
+		// Anotações do próprio estudante. O segmento fixo antes do id evita o
+		// conflito de padrões com /api/provas/arquivos/{id}.
+		protegida("GET /api/provas/anotacoes/{id}", h.Prova.Anotacoes)
+		protegida("PUT /api/provas/anotacoes/{id}/{numero}", h.Prova.Anotar)
+
+		// Curadoria: o service recusa quem não está na lista de curadores.
+		protegida("POST /api/provas/{id}/revisar", h.Prova.Revisar)
+		limitada("POST /api/provas/{id}/reextrair", limites.Edital, h.Prova.Reextrair)
+		protegida("DELETE /api/provas/{id}", h.Prova.Retirar)
+
+		const imp = "/api/provas/importacoes"
+		protegida("GET "+imp, h.Prova.ListarImportacoes)
+		limitada("POST "+imp, limites.Edital, h.Prova.Importar)
+		protegida("GET "+imp+"/{id}", h.Prova.Importacao)
+		protegida("PATCH "+imp+"/{id}", h.Prova.SalvarImportacao)
+		protegida("POST "+imp+"/{id}/publicar", h.Prova.Publicar)
+		protegida("POST "+imp+"/{id}/cancelar", h.Prova.Cancelar)
+		protegida("POST "+imp+"/{id}/reprocessar", h.Prova.Reprocessar)
+		protegida("POST "+imp+"/{id}/excluir", h.Prova.Excluir)
+		limitada("POST "+imp+"/{id}/reler", limites.Edital, h.Prova.Reler)
+		protegida("POST "+imp+"/{id}/cadastradas", h.Prova.ProcurarCadastradas)
+		limitada("POST "+imp+"/{id}/recortar", limites.Curadoria, h.Prova.Recortar)
+		limitada("POST "+imp+"/{id}/gabarito", limites.Edital, h.Prova.AtualizarGabarito)
+		limitada("POST "+imp+"/{id}/materias", limites.Edital, h.Prova.SugerirMaterias)
+	}
 
 	const base = "/api/concursos/{slug}/plano"
 

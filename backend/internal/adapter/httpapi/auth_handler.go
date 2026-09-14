@@ -13,6 +13,11 @@ import (
 type AuthHandler struct {
 	auth   *service.AuthService
 	logger *slog.Logger
+
+	// CuradorProvas diz se a conta pode importar e publicar provas. Opcional:
+	// sem ele, /api/me responde como se ninguém fosse curador. É só um aviso
+	// para a tela; quem decide o acesso é o ProvaService.
+	CuradorProvas func(usuario string) bool
 }
 
 func NewAuthHandler(auth *service.AuthService, logger *slog.Logger) *AuthHandler {
@@ -42,10 +47,11 @@ type authResponse struct {
 }
 
 type usuarioResponse struct {
-	ID     string `json:"id"`
-	Email  string `json:"email"`
-	Nome   string `json:"nome"`
-	TemaUI string `json:"temaUi"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	Nome          string `json:"nome"`
+	TemaUI        string `json:"temaUi"`
+	CuradorProvas bool   `json:"curadorProvas,omitempty"`
 }
 
 func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +134,7 @@ func (h *AuthHandler) Eu(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
+	writeJSON(w, h.logger, http.StatusOK, h.contaResponse(u))
 }
 
 func toAuthResponse(u usuario.Usuario, pair service.ParDeTokens) authResponse {
@@ -138,6 +144,16 @@ func toAuthResponse(u usuario.Usuario, pair service.ParDeTokens) authResponse {
 		AccessExpiresAt: pair.AccessExpiraEm,
 		RefreshToken:    pair.RefreshToken,
 	}
+}
+
+// contaResponse é a conta vista por ela mesma, com o que ela pode fazer.
+func (h *AuthHandler) contaResponse(u usuario.Usuario) usuarioResponse {
+	resp := toUsuarioResponse(u)
+	if h.CuradorProvas != nil {
+		resp.CuradorProvas = h.CuradorProvas(u.ID.String())
+	}
+
+	return resp
 }
 
 func toUsuarioResponse(u usuario.Usuario) usuarioResponse {
@@ -183,5 +199,5 @@ func (h *AuthHandler) DefinirTema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
+	writeJSON(w, h.logger, http.StatusOK, h.contaResponse(u))
 }

@@ -3,8 +3,10 @@
 package db_test
 
 import (
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"studygo/internal/platform/db"
 	"studygo/internal/platform/pgtest"
@@ -24,25 +26,23 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 	pool := pgtest.NovoVazio(t)
 	ctx := t.Context()
 
-	if err := db.Migrate(ctx, pool, migrations.FS); err != nil {
-		t.Fatalf("primeira migração: %v", err)
+	anteriores := fstest.MapFS{}
+	entradas, err := fs.Glob(migrations.FS, "*.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, nome := range entradas[:len(entradas)-1] {
+		b, e := migrations.FS.ReadFile(nome)
+		if e != nil {
+			t.Fatal(e)
+		}
+		anteriores[nome] = &fstest.MapFile{Data: b}
+	}
+	if err := db.Migrate(ctx, pool, anteriores); err != nil {
+		t.Fatal(err)
 	}
 
 	total := quantasMigrations(t)
-
-	// Volta o banco para o estado de quem só tinha a baseline: a linha some de
-	// schema_migrations e a coluna que a última migration criou é desfeita.
-	if _, err := pool.Exec(ctx,
-		`DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)`,
-	); err != nil {
-		t.Fatalf("rebobinando schema_migrations: %v", err)
-	}
-
-	if _, err := pool.Exec(ctx,
-		`ALTER TABLE disciplinas DROP COLUMN IF EXISTS notebook_url`,
-	); err != nil {
-		t.Fatalf("rebobinando a coluna: %v", err)
-	}
 
 	// O runner precisa aplicar só o que falta, sem tropeçar no que já existe.
 	if err := db.Migrate(ctx, pool, migrations.FS); err != nil {
@@ -62,7 +62,7 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 	if err := pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.columns
-			 WHERE table_name = 'disciplinas' AND column_name = 'notebook_url'
+			 WHERE table_name = 'provas_importacoes' AND column_name = 'estado'
 		)`).Scan(&existe); err != nil {
 		t.Fatalf("conferindo a coluna: %v", err)
 	}

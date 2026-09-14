@@ -8,6 +8,7 @@ import (
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
+	"studygo/internal/domain/prova"
 	"studygo/internal/domain/usuario"
 	"studygo/internal/port"
 	"studygo/internal/service"
@@ -116,6 +117,25 @@ func classificar(err error) (int, string) {
 		return http.StatusServiceUnavailable,
 			"a IA está sobrecarregada agora — tente de novo em alguns minutos " +
 				"ou cadastre o concurso manualmente"
+
+	case errors.Is(err, prova.ErrAcesso):
+		return http.StatusForbidden, err.Error()
+
+	case errors.Is(err, prova.ErrNaoEncontrada):
+		return http.StatusNotFound, err.Error()
+
+	// Outra aba, ou o worker, gravou antes: quem pediu precisa recarregar.
+	case errors.Is(err, prova.ErrConflito):
+		return http.StatusConflict, err.Error()
+
+	case errors.Is(err, prova.ErrLimite):
+		return http.StatusTooManyRequests, err.Error()
+
+	case errors.Is(err, port.ErrDocumentoRecusado):
+		return http.StatusUnprocessableEntity, err.Error()
+
+	case errors.Is(err, port.ErrProcessamentoTransitorio):
+		return http.StatusServiceUnavailable, port.ErrProcessamentoTransitorio.Error() + "; tente de novo em instantes"
 
 	default:
 		return http.StatusInternalServerError, "erro interno"

@@ -171,6 +171,28 @@ func TestLoad_ambienteSobrescreveOsPadroes(t *testing.T) {
 	}
 }
 
+// "*" libera a curadoria para qualquer conta, mas só no ambiente local: no ar,
+// qualquer conta aberta importaria PDF e publicaria no catálogo.
+func TestLoad_todosCuradoresSoNoLocal(t *testing.T) {
+	ambienteMinimo(t)
+	t.Setenv("PROVAS_CURADORES", "*")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if !cfg.Provas.TodosCuradores {
+		t.Error("PROVAS_CURADORES=* devia liberar a curadoria no ambiente local")
+	}
+
+	t.Setenv("APP_VERSAO", "v2026.09.12")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "PROVAS_CURADORES") {
+		t.Errorf("Load no deploy com PROVAS_CURADORES=*: err = %v, quer recusa", err)
+	}
+}
+
 // Sem EDITAL_PROCESSOR_URL a importação por IA fica desligada, e o cadastro
 // manual continua funcionando — é o que a raiz de composição verifica.
 func TestLoad_semProcessadorDeEdital(t *testing.T) {
