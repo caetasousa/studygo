@@ -50,7 +50,7 @@ function mensagemHTTP(status: number): string {
  * minutos e depois recebe 401 para sempre. Foi o que aconteceu com o download
  * do CSV, que baixava `{"erro":"não autenticado"}` como se fosse a planilha.
  */
-async function fetchAutenticado(
+export async function fetchAutenticado(
 	path: string,
 	init: RequestInit = {},
 	retry = true
@@ -92,7 +92,7 @@ async function requestTexto(path: string): Promise<string> {
 	return res.text();
 }
 
-async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
 	const res = await fetchAutenticado(path, init, retry);
 
 	if (res.status === 204) return undefined as T;

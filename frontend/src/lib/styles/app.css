@@ -894,6 +894,40 @@ table.tbl tfoot td {
 .btn.danger:hover {
 	background: var(--danger-soft);
 }
+/* Botão do Notion, o das telas de questões: frase comum, sem caixa alta. */
+.nbtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 14px;
+	font: inherit;
+	font-size: 14px;
+	font-weight: 500;
+	white-space: nowrap;
+	text-decoration: none;
+	color: var(--text);
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	cursor: pointer;
+}
+.nbtn:hover:not(:disabled) {
+	background: var(--bg-hover);
+}
+.nbtn.primario {
+	color: #fff;
+	background: #2383e2;
+	border-color: #2383e2;
+}
+.nbtn.primario:hover:not(:disabled) {
+	background: #0077d4;
+}
+.nbtn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
 .saved-toast {
 	position: fixed;
 	right: 18px;

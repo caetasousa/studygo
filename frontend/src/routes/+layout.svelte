@@ -42,7 +42,11 @@
 
 	const publicRoutes = ['/login', '/registro'];
 	const isPublic = $derived(publicRoutes.includes(page.url.pathname));
-	const isConcursoAdmin = $derived(page.url.pathname.startsWith('/concursos'));
+	// Telas que não dependem de um concurso ativo: o cadastro de concursos e as
+	// questões das provas, que são as mesmas para todo mundo.
+	const foraDoPlano = $derived(
+		['/concursos', '/provas', '/questoes'].some((p) => page.url.pathname.startsWith(p))
+	);
 
 	$effect(() => {
 		if (!auth.isAuthenticated && !isPublic) {
@@ -64,7 +68,7 @@
 			auth.isAuthenticated &&
 			concursoStore.carregado &&
 			concursoStore.lista.length === 0 &&
-			!isConcursoAdmin
+			!foraDoPlano
 		) {
 			goto('/concursos/novo');
 		}
@@ -123,7 +127,7 @@
 					</button>
 				</div>
 			{/if}
-			{#if planoStore.erro && !isConcursoAdmin}
+			{#if planoStore.erro && !foraDoPlano}
 				<div class="form-error" style="margin-bottom:16px">{planoStore.erro}</div>
 			{/if}
 			{@render children()}
