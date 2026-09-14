@@ -35,7 +35,14 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 WORKDIR /app
 COPY app ./app
 
+# O grupo 65532 é o do usuário nonroot do backend: é por ele que os dois
+# containers dividem o volume de provas (ver backend/Dockerfile).
 RUN useradd --system --uid 10001 --home /home/appuser appuser \
+    && groupadd --gid 65532 provas \
+    && usermod -aG provas appuser \
+    && mkdir -p /var/lib/provas \
+    && chown 10001:65532 /var/lib/provas \
+    && chmod 2770 /var/lib/provas \
     && mkdir -p /var/lib/edital-processor/work \
     && chown -R appuser:appuser /var/lib/edital-processor
 USER appuser

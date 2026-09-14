@@ -197,6 +197,13 @@ subir as imagens novas: `<app_dir>/backups/pre-deploy-<data>-p<pipeline>.sql.gz`
 mantidas as 5 últimas. Se a cópia falhar, o deploy é recusado antes de mexer em
 qualquer coisa.
 
+Junto do dump sai `…-p<pipeline>.provas.tar.gz`: os PDFs e recortes do
+catálogo de provas, que moram no volume `provas_data` e não no banco. Os dois
+são feitos por `scripts/backup-provas.py` sob o mesmo advisory lock da limpeza
+de provas, para o dump nunca referenciar um arquivo que a cópia do volume não
+tem. Se o `edital-processor` estiver fora do ar, o volume não é copiado e o
+deploy avisa na saída — o banco continua copiado, e o deploy segue.
+
 A cópia que desfaz uma versão é a que leva no nome o `deploy` que o
 `make health` mostrava **com ela no ar**: foi feita imediatamente antes daquela
 pipeline implantar.
@@ -222,6 +229,14 @@ docker compose exec -T postgres psql -U annygo -d postgres -v ON_ERROR_STOP=1 \
   -c 'DROP DATABASE annygo WITH (FORCE)' -c 'CREATE DATABASE annygo OWNER annygo'
 gunzip -c backups/pre-deploy-AAAAMMDD-HHMMSS-pNNNN.sql.gz \
   | docker compose exec -T postgres psql -U annygo -d annygo -v ON_ERROR_STOP=1 >/dev/null
+```
+
+Se a cópia tiver o `.provas.tar.gz` do mesmo nome, restaure o volume junto —
+banco sem os arquivos deixa provas publicadas com imagens quebradas:
+
+```bash
+python3 backup-provas.py --app-dir . \
+  --restaurar backups/pre-deploy-AAAAMMDD-HHMMSS-pNNNN.provas.tar.gz
 ```
 
 4. No GitLab, **Rollback environment** para a versão anterior. É ele que sobe o
@@ -344,10 +359,13 @@ runner que busca os jobs. Por isso nada precisa ser exposto na sua rede.
 | postgres | — | só rede do compose |
 
 **Volumes** (por ambiente, nomeados pelo diretório do projeto):
-`postgres_data`, `edital_work`.
+`postgres_data`, `edital_work` (cache de editais, expira em uma hora) e
+`provas_data` (PDFs e recortes das provas, durável — vai no backup de cada
+deploy junto com o banco).
 
 **DNS**: `cronograma.caetasousa.tech` e `staging.cronograma.caetasousa.tech`,
 ambos apontando para a VPS.
 
 **Dependências externas**: GitLab.com (repositório, Registry e pipeline),
-Let's Encrypt (TLS) e Google Gemini (opcional, importação de edital).
+Let's Encrypt (TLS) e Google Gemini (opcional, importação de edital e de
+provas).

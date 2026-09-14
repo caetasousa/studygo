@@ -88,31 +88,28 @@
             state: directory
             mode: '0700'
 
-        # Grava num .parcial e só renomeia no fim: um dump interrompido nunca
-        # fica com cara de cópia válida. pipefail porque, sem ele, o gzip
-        # terminaria bem e esconderia um pg_dump que falhou. A data no nome
-        # impede que reexecutar o job da mesma pipeline — é assim que o
-        # rollback funciona — sobrescreva a cópia anterior.
-        - name: Gerar o dump
-          ansible.builtin.shell:
-            cmd: |
-              set -euo pipefail
-              destino="{{ backup_dir }}/pre-deploy-$(date +%Y%m%d-%H%M%S)-p{{ deploy_pipeline_id | default('sem-pipeline') }}.sql.gz"
-              trap 'rm -f "$destino.parcial"' EXIT
-              docker compose exec -T postgres pg_dump -U '{{ postgres_user }}' '{{ postgres_db }}' \
-                | gzip > "$destino.parcial"
-              chmod 600 "$destino.parcial"
-              mv "$destino.parcial" "$destino"
-              echo "$destino"
-            chdir: "{{ remote_app_dir }}"
-            executable: /bin/bash
-          register: dump
+        - name: Copiar ferramenta de backup pareado
+          ansible.builtin.copy:
+            src: "../scripts/backup-provas.py"
+            dest: "{{ remote_app_dir }}/backup-provas.py"
+            mode: '0700'
 
-        - name: Manter só as 5 cópias mais recentes
-          ansible.builtin.shell:
-            cmd: ls -1t pre-deploy-*.sql.gz | tail -n +6 | xargs -r rm -f --
-            chdir: "{{ backup_dir }}"
-          changed_when: false
+        - name: Gerar o dump e copiar arquivos de provas sob o mesmo lock
+          ansible.builtin.command:
+            argv:
+              - python3
+              - "{{ remote_app_dir }}/backup-provas.py"
+              - --app-dir
+              - "{{ remote_app_dir }}"
+              - --backup-dir
+              - "{{ backup_dir }}"
+              - --user
+              - "{{ postgres_user }}"
+              - --database
+              - "{{ postgres_db }}"
+              - --pipeline
+              - "{{ deploy_pipeline_id | default('sem-pipeline') }}"
+          register: dump
 
         - name: Informar onde ficou a cópia
           ansible.builtin.debug:

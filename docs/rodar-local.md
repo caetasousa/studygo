@@ -67,6 +67,33 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `LEMBRETE_INTERVALO` | | `24h` | força intervalo fixo em vez de acordar na virada do dia. Existe para desenvolver sem esperar a meia-noite; em produção fica vazio |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
 | `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
+| `PROVAS_CURADORES` | | vazio | UUIDs, separados por vírgula, das contas que importam e publicam provas. `*` faz de qualquer conta curadora, só no ambiente local (com `APP_VERSAO` preenchida, o backend não sobe). Vazio desliga a curadoria e a fila de provas no worker; a consulta ao catálogo continua |
+| `PROVAS_EXIGIR_CONFERENCIA` | | `true` | com `false`, publicar uma prova não exige marcar cada questão e recorte como conferido — só a integridade do rascunho bloqueia. Para testar o fluxo; produção fica com `true` |
+
+O backend ainda lê, com defaults razoáveis, os limites do catálogo de provas —
+`PROVAS_MAX_UPLOAD_MIB` (25, por PDF), `PROVAS_MAX_PENDENTES` (2 importações
+abertas por curador), `PROVAS_MAX_CHAMADAS` (180 etapas por importação) e
+`PROVAS_MAX_MINUTOS` (20 de processamento por importação). O Compose local não
+os repassa; para mudar, acrescente-os ao `environment` do backend e do worker.
+Subir o upload acima de 25 MiB exige subir junto o `client_max_body_size` do
+`frontend/nginx.conf` e o `EP_MAX_UPLOAD_BYTES` do processador.
+
+### 📚 Virar curador de provas
+
+A importação de provas usa o Gemini, então precisa de `GEMINI_API_KEY`. Crie
+sua conta pela tela, pegue o id e ponha no `.env`:
+
+```bash
+docker compose exec postgres psql -U studygo studygo -c "select id, email from usuarios"
+# .env: PROVAS_CURADORES=<id>
+docker compose up -d backend worker   # recria os dois com a variável nova
+```
+
+Para não repetir isso a cada `make reset` (o id da conta muda com o banco),
+`PROVAS_CURADORES=*` faz de qualquer conta local curadora.
+
+A tela **Questões** passa a mostrar a aba Curadoria. Os PDFs e recortes
+ficam no volume `provas_data`; `make reset` apaga ele junto com o banco.
 
 ---
 

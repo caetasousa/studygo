@@ -28,11 +28,17 @@ services:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
       CORS_ORIGIN: "https://{{ app_domain }}"
+      PROVAS_CURADORES: "{{ provas_curadores | default('') }}"
+      # Desligar deixa publicar prova sem a conferência do curador; só para
+      # testar o fluxo em staging.
+      PROVAS_EXIGIR_CONFERENCIA: "{{ provas_exigir_conferencia | default(true) }}"
       EDITAL_PROCESSOR_URL: "http://edital-processor:8000"
       EDITAL_PROCESSOR_TOKEN: "{{ edital_processor_token }}"
       # O que o /health responde: qual publicação está no ar (ver deploy.yml).
       APP_VERSAO: "{{ app_versao }}"
       APP_DEPLOY: "{{ deploy_pipeline_id | default('') }}"
+    volumes:
+      - provas_data:/var/lib/provas
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,6 +55,7 @@ services:
       EP_GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
     volumes:
       - edital_work:/var/lib/edital-processor/work
+      - provas_data:/var/lib/provas
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
       interval: 15s
@@ -58,10 +65,15 @@ services:
   worker:
     image: "{{ backend_image }}"
     entrypoint: ["/worker"]
+    volumes:
+      - provas_data:/var/lib/provas
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
+      PROVAS_CURADORES: "{{ provas_curadores | default('') }}"
+      EDITAL_PROCESSOR_URL: "http://edital-processor:8000"
+      EDITAL_PROCESSOR_TOKEN: "{{ edital_processor_token }}"
       # Sem intervalo fixo: em produção o worker acorda na virada do dia, que
       # é quando o replanejamento precisa acontecer. Definir lembrete_intervalo
       # volta ao modo de intervalo — útil só para depurar.
@@ -91,5 +103,6 @@ services:
       retries: 5
 
 volumes:
+  provas_data:
   postgres_data:
   edital_work:
