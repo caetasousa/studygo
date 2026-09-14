@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite dev --host --port 5173",
-    "build": "vite build",
+    "dev": "svelte-kit sync && vite dev --host --port 5173",
+    "build": "svelte-kit sync && vite build",
     "preview": "vite preview --host --port 5173",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run"
