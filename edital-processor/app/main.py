@@ -13,6 +13,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.api.routes import install_error_handler, router, store_em_uso
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.provas.routes import router as provas_router
 
 _log = get_logger("main")
 
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
     app.include_router(router)
+    app.include_router(provas_router)
     install_error_handler(app)
     return app
 

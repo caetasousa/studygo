@@ -58,7 +58,7 @@ ignore_missing_imports = true
 # PyMuPDF ships type hints but they are incomplete: nearly every method comes
 # back as untyped, so strict mode's no-untyped-call fires on ordinary use.
 # Scope the relaxation to the two modules that touch it directly.
-module = ["app.services.extraction", "app.services.validation", "app.services.ocr"]
+module = ["app.services.extraction", "app.services.validation", "app.services.ocr", "app.provas.documentos", "app.provas.pipeline"]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]

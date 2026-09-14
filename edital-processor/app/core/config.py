@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     # never exposed publicly; this is defence in depth for the compose network.
     service_token: str = Field(default="", min_length=0)
 
+    # --- provas ----------------------------------------------------------------
+    # Volume durável compartilhado com o backend; ao contrário de work_dir, nada
+    # aqui expira sozinho.
+    provas_dir: Path = Path("/var/lib/provas")
+    provas_max_regions: int = 120
+    # Teto de pixels de cada renderização: a prova de exemplo é uma página só,
+    # com 8.772 pt de altura, e inteira a 300 DPI daria 91 milhões de pixels.
+    provas_region_pixels: int = 6_000_000
+    # Uma região com dez questões e texto de apoio passou de 38s no piloto,
+    # perto do teto dos editais. A fila roda sem ninguém esperando na tela.
+    provas_gemini_timeout_seconds: float = 150.0
+
     # --- upload / PDF limits --------------------------------------------------
     max_upload_bytes: int = 25 * 1024 * 1024
     max_pages: int = 80
