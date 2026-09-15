@@ -281,8 +281,14 @@ consolidar de novo. O que o trecho trouxe entra sem comparar com a leitura
 antiga — quem apontou onde está foi o curador —: o enunciado, se veio, e cada
 alternativa pela letra; o resto da questão, a matéria, a resposta e os textos
 ligados ficam (`Rascunho.AplicarTrecho`). Sem o número dentro do trecho, o
-modelo chuta outro, e vale a única questão lida. O trecho é a última região da
-lista, rotulada `t<número>`. Quando o Gemini se
+modelo chuta outro, e vale a única questão lida. O retângulo começa do alto da
+questão até pouco depois do começo da seguinte (`trechoInicial`) — a área que a
+extração deu é só o que ela leu, e na questão sem alternativas era o enunciado —,
+e as bordas se esticam com o dedo. Arredondado na tela, o retângulo passava da
+página por um centésimo e era recusado; agora ele volta para dentro da região,
+e o processador aceita meio ponto além da borda. Se a questão continua sem as
+cinco alternativas, um alerta diz para esticar até a (E). O trecho é a última
+região da lista, rotulada `t<número>`. Quando o Gemini se
 recusa a transcrever o texto de apoio (recitação de obra publicada), o
 processador pede só a estrutura e transcreve o texto por OCR do retângulo, com
 alerta para o curador. Recusada até a estrutura — as questões citam trechos do

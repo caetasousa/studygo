@@ -3,6 +3,7 @@ package prova
 import (
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -903,9 +904,14 @@ func TestNovoTrecho(t *testing.T) {
 		{Pagina: 2, Regiao: "q7", Retangulo: []float64{0, 300, 595, 700}},
 	}
 
-	got, ok := NovoTrecho(regioes, 7, Origem{Pagina: 2, Retangulo: []float64{40, 310.5, 560, 842.4}, Regiao: "1"})
-	if !ok || got.Regiao != "t7" || got.Pagina != 2 || got.Retangulo[3] != 842.4 {
+	got, ok := NovoTrecho(regioes, 7, Origem{Pagina: 2, Retangulo: []float64{40, 310.5, 560, 700}, Regiao: "1"})
+	if !ok || got.Regiao != "t7" || got.Pagina != 2 || !slices.Equal(got.Retangulo, []float64{40, 310.5, 560, 700}) {
 		t.Fatalf("trecho = %+v, %v; quer t7 na página 2 com o retângulo marcado", got, ok)
+	}
+	// O pé arredondado na tela passa da borda por um centésimo: fica na borda,
+	// que é o que o processador aceita.
+	if got, ok := NovoTrecho(regioes, 7, Origem{Pagina: 2, Retangulo: []float64{40, 310.5, 560, 842.4}}); !ok || got.Retangulo[3] != 842 {
+		t.Fatalf("trecho no pé da página = %+v, %v; quer a base em 842", got, ok)
 	}
 
 	recusados := map[string]struct {
@@ -1062,6 +1068,28 @@ func TestAplicarTrecho_SoOEnunciado(t *testing.T) {
 
 	if q := r.Questoes[0]; q.Blocos[0].Texto != "enunciado inteiro" || len(q.Alternativas) != 5 || !q.Completa {
 		t.Fatalf("questão = %+v, quer o enunciado novo com as alternativas de antes", q)
+	}
+	if len(r.Alertas) != 0 {
+		t.Fatalf("alertas = %v; com as cinco alternativas, nada a avisar", r.Alertas)
+	}
+}
+
+// O caso da 60 do TRT-15 em staging: o trecho ficou do tamanho do enunciado,
+// onde a questão tinha sido lida, e não chegou às alternativas. A leitura não
+// trouxe nenhuma, e sem aviso parecia que ela não tinha acontecido.
+func TestAplicarTrecho_QueNaoChegouAsAlternativasAvisa(t *testing.T) {
+	t.Parallel()
+
+	semAlternativas := questao(60, false, "O padrão de projeto mais adequado é o")
+	semAlternativas.Alternativas = nil
+	r := Rascunho{Questoes: []Questao{semAlternativas}}
+	soEnunciado := questao(60, false, "O padrão de projeto mais adequado é o")
+	soEnunciado.Alternativas = nil
+
+	r.AplicarTrecho(60, Rascunho{Questoes: []Questao{soEnunciado}})
+
+	if !contem(r.Alertas, "questão 60 continua com 0 de 5 alternativas") || r.Questoes[0].Completa {
+		t.Fatalf("alertas = %v, completa = %v; quer o aviso para marcar até a (E)", r.Alertas, r.Questoes[0].Completa)
 	}
 }
 

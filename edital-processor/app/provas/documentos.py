@@ -59,12 +59,18 @@ def render(root: Path, identificador: str, origem: Origem, settings: Settings) -
             raise InvalidPDF("página inexistente")
         page = doc[origem.pagina - 1]
         clip = pymupdf.Rect(origem.retangulo)
+        # O retângulo chega arredondado da tela: o pé da folha A4 (841,9199…)
+        # vira 841,92. Passar da página por menos de meio ponto é a borda dela,
+        # e o recorte fica nela; mais do que isso é retângulo errado.
+        pagina = page.rect
+        folga = pymupdf.Rect(pagina.x0 - 0.5, pagina.y0 - 0.5, pagina.x1 + 0.5, pagina.y1 + 0.5)
         if (
             not all(math.isfinite(v) for v in origem.retangulo)
             or clip.is_empty
-            or not page.rect.contains(clip)
+            or not folga.contains(clip)
         ):
             raise InvalidPDF("retângulo fora da página")
+        clip.intersect(pagina)
         scale = min(2.8, math.sqrt(settings.provas_region_pixels / (clip.width * clip.height)))
         if (
             math.ceil(clip.width * scale) * math.ceil(clip.height * scale)

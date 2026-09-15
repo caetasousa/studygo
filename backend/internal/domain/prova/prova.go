@@ -379,11 +379,16 @@ func NovoTrecho(regioes []Origem, numero int, o Origem) (Origem, bool) {
 			r[0] >= c[0]-folgaDoTrecho && r[1] >= c[1]-folgaDoTrecho &&
 			r[2] <= c[2]+folgaDoTrecho && r[3] <= c[3]+folgaDoTrecho
 	}
-	if !slices.ContainsFunc(regioes, cabe) {
+	k := slices.IndexFunc(regioes, cabe)
+	if k < 0 {
 		return Origem{}, false
 	}
+	// A folga fica na região: o centésimo que o arredondamento da tela passa da
+	// borda, levado ao processador, era "retângulo fora da página".
+	c := regioes[k].Retangulo
+	dentro := []float64{max(r[0], c[0]), max(r[1], c[1]), min(r[2], c[2]), min(r[3], c[3])}
 
-	return Origem{Pagina: o.Pagina, Retangulo: slices.Clone(r), Regiao: fmt.Sprintf("%s%d", prefixoTrecho, numero)}, true
+	return Origem{Pagina: o.Pagina, Retangulo: dentro, Regiao: fmt.Sprintf("%s%d", prefixoTrecho, numero)}, true
 }
 
 // RelerTrecho põe a leitura do trecho na fila. Ele entra no fim das regiões,
@@ -479,6 +484,15 @@ func (r *Rascunho) AplicarTrecho(numero int, lido Rascunho) {
 		// O pedaço vem marcado como cortado — e é: juntar os pedaços era o que
 		// a marca pedia, e quem os juntou foi o curador.
 		q.Completa = !semConteudo(q.Blocos) && len(q.Alternativas) == 5
+	}
+
+	// Ainda sem as cinco, o trecho não cobriu onde elas estão — e sem o aviso
+	// parecia que a leitura não tinha acontecido.
+	if n := len(q.Alternativas); n < 5 {
+		r.Alertas = append(r.Alertas, fmt.Sprintf(
+			"A questão %d continua com %d de 5 alternativas depois da leitura do trecho: "+
+				"marque de novo, esticando o retângulo até a alternativa (E).", numero, n,
+		))
 	}
 
 	r.OrdenarQuestoes()

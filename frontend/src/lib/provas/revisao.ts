@@ -130,18 +130,56 @@ export function regiaoDoTrecho(regioes: Origem[], q: Questao | undefined): numbe
 }
 
 /**
- * O retângulo com que o trecho começa: a faixa em que a questão foi lida, na
- * largura da região — a área que o modelo dá erra para os lados, e a questão
- * ocupa a coluna inteira. O curador estica até a alternativa que faltou.
+ * O retângulo com que o trecho começa: do alto da questão até onde começa a
+ * seguinte na mesma página — ou o pé da região —, na largura da região. A área
+ * que a extração deu é só o que ela leu: na 60 do TRT-15, que veio sem
+ * alternativas, era só o enunciado, e o trecho que começava nela relia o mesmo
+ * pedaço. A largura é a da região porque a do modelo erra para os lados.
  */
-export function trechoInicial(regiao: Origem, q: Questao | undefined): number[] {
+export function trechoInicial(regiao: Origem, q: Questao | undefined, questoes: Questao[] = []): number[] {
 	const [x0, y0, x1, y1] = regiao.retangulo;
 	const o = q?.origens.find((x) => x.pagina === regiao.pagina && x.retangulo.length === 4);
-	if (!o) return [x0, y0, x1, y1];
-	const topo = Math.max(y0, o.retangulo[1]);
-	const pe = Math.min(y1, o.retangulo[3]);
+	if (!q || !o) return [x0, y0, x1, y1];
+	const inicio = o.retangulo[1];
+	const seguintes = questoes
+		.filter((x) => x.numero > q.numero)
+		.flatMap((x) => x.origens)
+		.filter((p) => p.pagina === regiao.pagina && p.retangulo.length === 4 && p.retangulo[1] > inicio)
+		.map((p) => p.retangulo[1]);
+	// A área do modelo erra por dezenas de pontos — a da 25 do TJCE começava
+	// antes do fim da (E) da 24 —, então o trecho sobe um pouco e passa um pouco
+	// do começo da seguinte. A ponta da vizinha não atrapalha: vale a questão
+	// com o número pedido.
+	const altura = y1 - y0;
+	const topo = Math.max(y0, inicio - FOLGA_ACIMA * altura);
+	const pe = Math.min(y1, Math.min(...seguintes) + FOLGA_ABAIXO * altura);
 	return pe - topo >= 4 ? [x0, topo, x1, pe] : [x0, y0, x1, y1];
 }
+
+/**
+ * O retângulo que vai ao servidor: ordenado, dentro da região, com tamanho, e
+ * em centésimos de ponto. Arredondar pode passar da borda — 841,9199 (o pé da
+ * folha A4) vira 841,92 —, e o processador recusava o retângulo "fora da
+ * página": o trecho da 60 do TRT-15, no pé da página, nunca era lido. Depois de
+ * arredondar, ele volta para dentro. Nulo se não sobrar tamanho.
+ */
+export function retanguloParaEnviar(rect: number[], limite: number[]): number[] | null {
+	const dentro = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+	const arred = (v: number) => Math.round(v * 100) / 100;
+	const [x0, x1] = [Math.min(rect[0], rect[2]), Math.max(rect[0], rect[2])];
+	const [y0, y1] = [Math.min(rect[1], rect[3]), Math.max(rect[1], rect[3])];
+	const r = [
+		dentro(arred(x0), limite[0], limite[2]),
+		dentro(arred(y0), limite[1], limite[3]),
+		dentro(arred(x1), limite[0], limite[2]),
+		dentro(arred(y1), limite[1], limite[3])
+	];
+	return r[2] - r[0] >= 4 && r[3] - r[1] >= 4 ? r : null;
+}
+
+/** Folgas do trecho inicial, em fração da altura da região. */
+const FOLGA_ACIMA = 0.01;
+const FOLGA_ABAIXO = 0.04;
 
 /** Índice da próxima questão pendente depois de `atual`, dando a volta; -1 se não houver. */
 export function proximaPendente(questoes: Questao[], atual: number): number {

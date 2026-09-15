@@ -87,7 +87,9 @@
 	const faltam = $derived(imp ? numerosFaltando(imp.rascunho) : []);
 	const faixas = $derived(imp ? imp.regioes.flatMap((r, i) => (regiaoDoCaderno(r) ? [i] : [])) : []);
 	const regiaoTrecho = $derived<Origem | undefined>(imp?.regioes[trechoIdx]);
-	const inicialTrecho = $derived(regiaoTrecho ? trechoInicial(regiaoTrecho, q) : [0, 0, 0, 0]);
+	const inicialTrecho = $derived(
+		regiaoTrecho && imp ? trechoInicial(regiaoTrecho, q, imp.rascunho.questoes) : [0, 0, 0, 0]
+	);
 	// Importação anterior à posição exata da questão: a origem é a região toda.
 	// O trecho marcado não conta: ele já é o lugar da questão.
 	const soRegiao = $derived(
@@ -181,16 +183,18 @@
 	}
 
 	// A fila lê o rascunho salvo: o que foi editado vai antes, ou a leitura
-	// nova chegaria por cima e a edição se perderia.
+	// nova chegaria por cima e a edição se perderia. O erro sobe para o
+	// recorte, que o mostra ao lado do botão — no alto da página, no celular,
+	// ele ficava fora da vista e parecia que nada tinha acontecido.
 	async function relerTrecho(origem: Origem) {
-		await executar(async () => {
-			if (!imp || !q) return;
-			if (alterado) await salvar();
-			const numero = q.numero;
-			const nova = await provasApi.relerTrecho(imp.id, imp.versao, numero, origem);
-			voltarPara = { numero, alertas: imp.rascunho.alertas.length };
-			receber(nova);
-		});
+		if (!imp || !q) return;
+		erro = '';
+		aviso = '';
+		if (alterado) await salvar();
+		const numero = q.numero;
+		const nova = await provasApi.relerTrecho(imp.id, imp.versao, numero, origem);
+		voltarPara = { numero, alertas: imp.rascunho.alertas.length };
+		receber(nova);
 	}
 
 	/** O que o relógio traz enquanto a fila anda; ao voltar do trecho, a questão dele. */

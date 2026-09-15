@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { fetchAutenticado } from '$lib/api';
 	import { provasApi } from './api';
+	import { retanguloParaEnviar } from './revisao';
 	import type { Origem } from './types';
 
 	let {
@@ -78,10 +79,27 @@
 			`height:${(100 * (rect[3] - rect[1])) / altura}%`
 	);
 
-	type Modo = 'desenhar' | 'mover' | 'redimensionar';
-	let arraste: { modo: Modo; inicio: number[]; antes: number[] } | null = null;
+	type Modo = 'desenhar' | 'mover' | 'bordas';
+	type Borda = 'esquerda' | 'topo' | 'direita' | 'base';
+	let arraste: { modo: Modo; bordas: Borda[]; inicio: number[]; antes: number[] } | null = null;
 
 	const limitar = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+	/**
+	 * No quadro, perto de uma borda estica aquela borda; no meio, move. Só o
+	 * canto esticava, e com o dedo ninguém acertava os 12 px dele: o curador
+	 * mandava o retângulo como estava.
+	 */
+	function comecarNoQuadro(e: PointerEvent) {
+		const caixa = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const folga = Math.min(e.pointerType === 'touch' ? 24 : 10, caixa.width / 3, caixa.height / 3);
+		const bordas: Borda[] = [];
+		const [esq, dir] = [e.clientX - caixa.left, caixa.right - e.clientX];
+		const [cima, baixo] = [e.clientY - caixa.top, caixa.bottom - e.clientY];
+		if (Math.min(esq, dir) < folga) bordas.push(esq < dir ? 'esquerda' : 'direita');
+		if (Math.min(cima, baixo) < folga) bordas.push(cima < baixo ? 'topo' : 'base');
+		comecar(e, bordas.length ? 'bordas' : 'mover', bordas);
+	}
 
 	/** Posição do ponteiro em pontos do PDF, presa à região. */
 	function ponto(e: PointerEvent): number[] {
@@ -92,11 +110,11 @@
 		];
 	}
 
-	function comecar(e: PointerEvent, modo: Modo) {
+	function comecar(e: PointerEvent, modo: Modo, bordas: Borda[] = []) {
 		if (!area) return;
 		e.stopPropagation();
 		e.preventDefault();
-		arraste = { modo, inicio: ponto(e), antes: [...rect] };
+		arraste = { modo, bordas, inicio: ponto(e), antes: [...rect] };
 		area.setPointerCapture(e.pointerId);
 	}
 
@@ -113,7 +131,14 @@
 			const dy = limitar(py - iy, limite[1] - a[1], limite[3] - a[3]);
 			rect = [a[0] + dx, a[1] + dy, a[2] + dx, a[3] + dy];
 		} else {
-			rect = [a[0], a[1], Math.max(a[0] + 4, px), Math.max(a[1] + 4, py)];
+			const r = [...a];
+			for (const b of arraste.bordas) {
+				if (b === 'esquerda') r[0] = Math.min(px, a[2] - 4);
+				if (b === 'direita') r[2] = Math.max(px, a[0] + 4);
+				if (b === 'topo') r[1] = Math.min(py, a[3] - 4);
+				if (b === 'base') r[3] = Math.max(py, a[1] + 4);
+			}
+			rect = r;
 		}
 	}
 
@@ -121,21 +146,8 @@
 		arraste = null;
 	}
 
-	/** O retângulo que vai ao servidor: ordenado, dentro da região e com tamanho. */
-	function normalizado(): number[] | null {
-		const [x0, x1] = [Math.min(rect[0], rect[2]), Math.max(rect[0], rect[2])];
-		const [y0, y1] = [Math.min(rect[1], rect[3]), Math.max(rect[1], rect[3])];
-		const r = [
-			limitar(x0, limite[0], limite[2]),
-			limitar(y0, limite[1], limite[3]),
-			limitar(x1, limite[0], limite[2]),
-			limitar(y1, limite[1], limite[3])
-		];
-		return r[2] - r[0] >= 4 && r[3] - r[1] >= 4 ? r.map((v) => Math.round(v * 100) / 100) : null;
-	}
-
 	async function aplicar() {
-		const r = normalizado();
+		const r = retanguloParaEnviar(rect, limite);
 		if (!r) {
 			erro = 'o recorte precisa ter tamanho e ficar dentro da região';
 			return;
@@ -164,7 +176,7 @@
 			Zoom
 			<input type="range" min="60" max="220" bind:value={zoom} />
 		</label>
-		<span class="dica">Arraste para desenhar; arraste o quadro para mover e o canto para ajustar.</span>
+		<span class="dica">Arraste para desenhar; arraste as bordas do quadro para esticar e o meio para mover.</span>
 	</div>
 
 	<div class="janela">
@@ -182,11 +194,11 @@
 			>
 				<img src={url} alt="Região original da prova" draggable="false" />
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="quadro" style={estilo} onpointerdown={(e) => comecar(e, 'mover')}>
+				<div class="quadro" style={estilo} onpointerdown={comecarNoQuadro}>
 					<span
 						class="canto"
 						aria-hidden="true"
-						onpointerdown={(e) => comecar(e, 'redimensionar')}
+						onpointerdown={(e) => comecar(e, 'bordas', ['direita', 'base'])}
 					></span>
 				</div>
 			</div>
@@ -260,6 +272,16 @@
 		background: var(--accent);
 		border-radius: 2px;
 		cursor: se-resize;
+	}
+	/* O dedo precisa de alvo maior que o do mouse. */
+	@media (pointer: coarse) {
+		.canto {
+			right: -11px;
+			bottom: -11px;
+			width: 22px;
+			height: 22px;
+			border-radius: 50%;
+		}
 	}
 	.coordenadas {
 		display: flex;

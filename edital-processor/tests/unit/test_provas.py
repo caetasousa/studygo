@@ -68,6 +68,26 @@ def test_recorte_preserva_pixels_e_rotacao(tmp_path: Path, rotation: int) -> Non
         render(tmp_path, id, Origem(pagina=1, retangulo=[-1, 0, 100, 100]), settings)
 
 
+def test_recorte_no_pe_da_pagina_arredondado(tmp_path: Path) -> None:
+    """O pé da folha A4 é 841,9199…, e a tela manda 841,92: o trecho da 60 do
+    TRT-15, no pé da página, era recusado como fora dela."""
+    settings = Settings(provas_dir=tmp_path)
+    id = str(uuid.uuid4())
+    with pymupdf.open() as doc:
+        doc.new_page(width=595.44, height=841.92)
+        doc.save(arquivo(tmp_path, id, "pdf"))
+    with pymupdf.open(arquivo(tmp_path, id, "pdf")) as doc:
+        pe = doc[0].rect.y1
+
+    png, _ = render(
+        tmp_path, id, Origem(pagina=1, retangulo=[40, 704, 580, round(pe, 2) + 0.01]), settings
+    )
+
+    assert png
+    with pytest.raises(InvalidPDF):
+        render(tmp_path, id, Origem(pagina=1, retangulo=[40, 704, 580, pe + 5]), settings)
+
+
 def test_recorte_repetido_nao_grava_outro_arquivo(tmp_path: Path) -> None:
     """A tela pede a prévia da região a cada visita; com id aleatório, cada
     visita deixava um PNG permanente no volume."""

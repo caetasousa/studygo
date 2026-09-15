@@ -23,6 +23,7 @@ import {
 	regiaoDoTrecho,
 	removerApoio,
 	retanguloInicial,
+	retanguloParaEnviar,
 	trechoInicial,
 	eTrecho,
 	vincularApoio,
@@ -283,11 +284,32 @@ describe('trecho', () => {
 		expect(eTrecho(regioes[4]) && !eTrecho(regioes[3])).toBe(true);
 	});
 
-	it('o retângulo começa na altura da questão, com a largura da região', () => {
+	// O pé da folha A4 é 841,9199…: arredondado, virava 841,92, um centésimo
+	// fora da página, e o processador recusava o trecho da 60 do TRT-15.
+	it('o retângulo arredondado não passa da borda da região', () => {
+		const a4 = [0, 0, 595.4400024414062, 841.9199829101562];
+		const r = retanguloParaEnviar([40, 704.123, 700, 900], a4)!;
+		expect(r[1]).toBe(704.12);
+		expect(r[2]).toBeLessThanOrEqual(a4[2]);
+		expect(r[3]).toBeLessThanOrEqual(a4[3]);
+		expect(r[3]).toBeGreaterThan(841.91);
+		// Invertido vira ordenado; sem tamanho, não vai.
+		expect(retanguloParaEnviar([300, 500, 100, 200], a4)).toEqual([100, 200, 300, 500]);
+		expect(retanguloParaEnviar([10, 10, 12, 300], a4)).toBeNull();
+	});
+
+	// A 60 do TRT-15 foi lida só até o enunciado: o trecho que começava do
+	// tamanho dela relia o mesmo pedaço, sem as alternativas.
+	it('o retângulo vai do alto da questão até a seguinte, na largura da região', () => {
 		const q = lidaEm({ pagina: 2, retangulo: [80, 320, 500, 470], regiao: '2' });
-		expect(trechoInicial(regioes[2], q)).toEqual([0, 320, 600, 470]);
+		const anterior = { ...conferida(6), origens: [{ pagina: 2, retangulo: [80, 100, 500, 300], regiao: '2' }] };
+		const seguinte = { ...conferida(8), origens: [{ pagina: 2, retangulo: [80, 600, 500, 800], regiao: '2' }] };
+		// Com folga: 1% da altura acima, 4% depois do começo da seguinte.
+		expect(trechoInicial(regioes[2], q, [anterior, q, seguinte])).toEqual([0, 311.5, 600, 634]);
+		// A última da página vai até o pé da região.
+		expect(trechoInicial(regioes[2], q, [anterior, q])).toEqual([0, 311.5, 600, 850]);
 		// Em outra página, ou sem origem, a região inteira.
-		expect(trechoInicial(regioes[0], q)).toEqual([0, 0, 600, 850]);
+		expect(trechoInicial(regioes[0], q, [q])).toEqual([0, 0, 600, 850]);
 		expect(trechoInicial(regioes[0], undefined)).toEqual([0, 0, 600, 850]);
 	});
 });
