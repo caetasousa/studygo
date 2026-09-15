@@ -197,7 +197,8 @@ ambiente local, `*` libera qualquer conta); todo mundo autenticado consulta.
 provas_importacoes ──┬── provas_etapas                (resultado e duração de cada etapa)
       │              └── provas_importacao_arquivos ──► provas_arquivos
       └──► provas ──┬── provas_revisoes ──┬── provas_questoes ──► provas_questoes_conteudo
-                    │                     └── provas_apoios ───► provas_apoios_conteudo
+                    │                     ├── provas_apoios ───► provas_apoios_conteudo
+                    │                     └── provas_gabaritos ── provas_gabarito_respostas
                     └── provas_anotacoes  (a nota de cada estudante, por questão)
 ```
 
@@ -210,13 +211,25 @@ que herda os arquivos; a publicada fica no ar até a próxima.
 
 **Cada questão é guardada uma vez só.** A questão se divide no que ela é em
 qualquer prova — texto, alternativas, figuras (`ConteudoDeQuestao`) — e no
-lugar que ocupa numa prova — número, matéria, a resposta do gabarito dela, onde
-está no PDF (`LugarDaQuestao`). O conteúdo vai para `provas_questoes_conteudo`,
+lugar que ocupa numa prova — número, matéria, onde está no PDF
+(`LugarDaQuestao`). O conteúdo vai para `provas_questoes_conteudo`,
 identificado pela impressão (`Impressao`, que ignora espaços): a revisão nova
 que repete a anterior e o cargo que repete as Conhecimentos Gerais de outro
 apontam para a mesma linha. O texto de apoio segue o mesmo caminho. A revisão
-guarda só a identificação e o gabarito; publicada, a importação fica com a
-identificação, e o resultado bruto das etapas sai.
+guarda só a identificação; publicada, a importação fica com a identificação, e
+o resultado bruto das etapas sai.
+
+**O gabarito é uma entidade à parte da questão.** A questão é o que o caderno
+diz; a resposta é o que o gabarito diz — outro documento da banca. Publicado,
+o gabarito vai para `provas_gabaritos` (cargo, tipo do caderno, preliminar ou
+definitivo) e `provas_gabarito_respostas` (uma linha por número, com a letra —
+vazia na anulada, e o banco só aceita A a E — e a situação); nem a questão
+publicada nem a revisão guardam a resposta, e a leitura a traz do gabarito.
+Um gabarito por revisão, sem histórico: o que muda entra numa revisão nova. No
+rascunho da importação, que o curador edita, a resposta ainda anda junto de
+cada questão, e a publicação exige que as duas batam. As provas publicadas em
+staging antes da 000007 guardavam a resposta na questão e ficam sem ela: abrir
+revisão, trocar o gabarito e publicar de novo.
 
 **O mesmo concurso aproveita o que já foi publicado.** Na consolidação — e no
 botão "Procurar questões já cadastradas" da revisão —, cada questão é comparada

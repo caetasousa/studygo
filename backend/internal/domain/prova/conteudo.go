@@ -15,10 +15,13 @@ import (
 // Uma questão comum a vários cargos — as vinte de Conhecimentos Gerais do TJCE
 // caem iguais em todos os cargos de analista — é guardada uma vez só. Para
 // isso a questão se divide no que ela É, em qualquer prova (texto,
-// alternativas, figuras), e no LUGAR que ocupa numa prova (número, matéria, a
-// resposta do gabarito daquela prova, onde está no PDF dela). O conteúdo é
-// identificado pela impressão: o mesmo conteúdo dá a mesma impressão, e o
-// banco guarda uma linha só.
+// alternativas, figuras), e no LUGAR que ocupa numa prova (número, matéria,
+// onde está no PDF dela). O conteúdo é identificado pela impressão: o mesmo
+// conteúdo dá a mesma impressão, e o banco guarda uma linha só.
+//
+// A resposta não é de nenhum dos dois: é do gabarito da prova, outro documento
+// da banca, guardado à parte. A Questao montada a traz, mas nem o conteúdo nem
+// o lugar a guardam.
 
 // ConteudoDeQuestao é o que a questão é, em qualquer prova. As figuras vêm sem
 // a posição no PDF, que é de cada caderno.
@@ -34,13 +37,13 @@ type FiguraNoPDF struct {
 	Revisado bool
 }
 
-// LugarDaQuestao é o que a questão é numa prova.
+// LugarDaQuestao é o que a questão é numa prova — sem a resposta, que é do
+// gabarito.
 type LugarDaQuestao struct {
 	Numero             int
 	Disciplina         string
 	Apoios             []string
 	Origens            []Origem
-	Resposta, Situacao string
 	Revisada, Completa bool
 	// Figuras segue a ordem das figuras no conteúdo: enunciado, depois cada
 	// alternativa.
@@ -58,8 +61,7 @@ func (q Questao) Separar() (ConteudoDeQuestao, LugarDaQuestao) {
 
 	return c, LugarDaQuestao{
 		Numero: q.Numero, Disciplina: q.Disciplina, Apoios: q.Apoios, Origens: q.Origens,
-		Resposta: q.Resposta, Situacao: q.Situacao, Revisada: q.Revisada, Completa: q.Completa,
-		Figuras: figuras, IgualA: q.IgualA,
+		Revisada: q.Revisada, Completa: q.Completa, Figuras: figuras, IgualA: q.IgualA,
 	}
 }
 
@@ -69,8 +71,8 @@ func JuntarQuestao(c ConteudoDeQuestao, l LugarDaQuestao) Questao {
 	k := 0
 	q := Questao{
 		Numero: l.Numero, Disciplina: l.Disciplina, Apoios: l.Apoios, Origens: l.Origens,
-		Resposta: l.Resposta, Situacao: l.Situacao, Revisada: l.Revisada, Completa: l.Completa,
-		IgualA: l.IgualA, Blocos: comPosicao(c.Blocos, l.Figuras, &k),
+		Revisada: l.Revisada, Completa: l.Completa, IgualA: l.IgualA,
+		Blocos: comPosicao(c.Blocos, l.Figuras, &k),
 	}
 	for _, a := range c.Alternativas {
 		q.Alternativas = append(q.Alternativas, Alternativa{Letra: a.Letra, Blocos: comPosicao(a.Blocos, l.Figuras, &k)})
@@ -274,7 +276,10 @@ func (r *Rascunho) Reaproveitar(irmas []Publicacao) {
 		for k := range lugar.Figuras {
 			lugar.Figuras[k].Revisado = true
 		}
+		// A resposta é a do gabarito desta prova, não a de lá.
+		resposta, situacao := q.Resposta, q.Situacao
 		*q = JuntarQuestao(conteudo, lugar)
+		q.Resposta, q.Situacao = resposta, situacao
 		for j := range q.Alternativas {
 			conferirFiguras(q.Alternativas[j].Blocos)
 		}

@@ -25,8 +25,11 @@ func TestSepararEJuntar_NaoPerdeNada(t *testing.T) {
 			t.Fatalf("o conteúdo levou a posição do PDF: %+v", b)
 		}
 	}
-	if got := JuntarQuestao(c, l); !reflect.DeepEqual(got, q) {
-		t.Fatalf("remontada = %+v\nquer %+v", got, q)
+	// A resposta não vai nem no conteúdo nem no lugar: é do gabarito.
+	semResposta := q
+	semResposta.Resposta, semResposta.Situacao = "", ""
+	if got := JuntarQuestao(c, l); !reflect.DeepEqual(got, semResposta) {
+		t.Fatalf("remontada = %+v\nquer %+v", got, semResposta)
 	}
 
 	a := Apoio{ID: "t1", Blocos: []Bloco{{Tipo: "texto", Texto: "A vida"}}, Questoes: []int{1, 2}, Aviso: "Considere", Revisado: true}

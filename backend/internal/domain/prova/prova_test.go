@@ -874,6 +874,50 @@ func TestQuestaoDaReleitura(t *testing.T) {
 	}
 }
 
+// O gabarito vai para o banco em linhas, uma por questão, em ordem; e volta
+// igual. Situação sem resposta também é linha.
+func TestGabaritoEmLinhas(t *testing.T) {
+	t.Parallel()
+
+	g := Gabarito{
+		Cargo: "E05", Caderno: "5", Tipo: "preliminar",
+		Respostas: map[string]string{"10": "C", "2": "", "1": "B"},
+		Situacoes: map[string]string{"2": "Anulada", "3": "Gabarito sem alteração"},
+	}
+
+	linhas := g.Linhas()
+
+	quer := []RespostaDoGabarito{
+		{Numero: 1, Resposta: "B"}, {Numero: 2, Situacao: "Anulada"},
+		{Numero: 3, Situacao: "Gabarito sem alteração"}, {Numero: 10, Resposta: "C"},
+	}
+	if !reflect.DeepEqual(linhas, quer) {
+		t.Fatalf("linhas = %+v\nquer %+v", linhas, quer)
+	}
+	volta := GabaritoDasLinhas(g.Cargo, g.Caderno, g.Tipo, linhas)
+	if volta.Respostas["10"] != "C" || volta.Situacoes["2"] != "Anulada" || volta.Tipo != "preliminar" {
+		t.Fatalf("remontado = %+v", volta)
+	}
+	if g.Vazio() || !(Gabarito{}).Vazio() {
+		t.Fatal("Vazio errado")
+	}
+}
+
+// O banco só aceita A a E, ou vazia na anulada: a pendência pega antes.
+func TestPendencias_GabaritoComRespostaInvalida(t *testing.T) {
+	t.Parallel()
+
+	r := valida()
+	r.Gabarito.Respostas["x"] = "B"
+	r.Gabarito.Respostas["1"] = "F"
+
+	p := r.Pendencias(false)
+
+	if !contem(p, `"F" na questão "1"`) || !contem(p, `"B" na questão "x"`) {
+		t.Fatalf("pendências = %v", p)
+	}
+}
+
 func TestNomeDoArquivo(t *testing.T) {
 	t.Parallel()
 

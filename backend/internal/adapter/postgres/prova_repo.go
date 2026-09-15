@@ -514,10 +514,10 @@ func (r *ProvaRepo) Publicar(ctx context.Context, i prova.Importacao, usuario st
 		return "", fmt.Errorf("abrindo revisão da prova: %w", err)
 	}
 
-	// A revisão guarda a identificação e o gabarito; questões e textos vão
-	// para as tabelas de conteúdo, uma linha por conteúdo diferente.
+	// A revisão guarda a identificação; questões e textos vão para as tabelas
+	// de conteúdo, uma linha por conteúdo diferente, e o gabarito para as dele.
 	identificacao := i.Rascunho
-	identificacao.Questoes, identificacao.Apoios = nil, nil
+	identificacao.Questoes, identificacao.Apoios, identificacao.Gabarito = nil, nil, prova.Gabarito{}
 	conteudo, err := json.Marshal(identificacao)
 	if err != nil {
 		return "", fmt.Errorf("codificando conteúdo: %w", err)
@@ -531,6 +531,19 @@ func (r *ProvaRepo) Publicar(ctx context.Context, i prova.Importacao, usuario st
 	}
 
 	lote := &pgx.Batch{}
+	if g := i.Rascunho.Gabarito; !g.Vazio() {
+		lote.Queue(
+			`INSERT INTO provas_gabaritos (prova_id, revisao, cargo, caderno, tipo) VALUES ($1, $2, $3, $4, $5)`,
+			id, revisao, g.Cargo, g.Caderno, g.Tipo,
+		)
+		for _, l := range g.Linhas() {
+			lote.Queue(
+				`INSERT INTO provas_gabarito_respostas (prova_id, revisao, numero, resposta, situacao)
+				 VALUES ($1, $2, $3, $4, $5)`,
+				id, revisao, l.Numero, l.Resposta, l.Situacao,
+			)
+		}
+	}
 	for _, q := range i.Rascunho.Questoes {
 		c, l := q.Separar()
 		bc, err := json.Marshal(c)
@@ -574,11 +587,12 @@ func (r *ProvaRepo) Publicar(ctx context.Context, i prova.Importacao, usuario st
 		)
 	}
 	// Publicada, a importação é histórico: o rascunho fica com a identificação,
-	// e o resultado bruto de cada etapa sai — as questões moram na revisão.
+	// e o resultado bruto de cada etapa sai — as questões e o gabarito moram na
+	// revisão.
 	lote.Queue(
 		`UPDATE provas_importacoes
 		    SET estado = 'publicada', prova_id = $2, versao = versao + 1, atualizado_em = now(),
-		        rascunho = rascunho - 'Questoes' - 'Apoios'
+		        rascunho = rascunho - 'Questoes' - 'Apoios' - 'Gabarito'
 		  WHERE id = $1`,
 		i.ID, id,
 	)
@@ -594,17 +608,20 @@ func (r *ProvaRepo) Publicar(ctx context.Context, i prova.Importacao, usuario st
 	return id, nil
 }
 
-const selecionarPublicacao = `SELECT p.id::text, p.revisao, pr.conteudo, p.publicado_em
+const selecionarPublicacao = `SELECT p.id::text, p.revisao, pr.conteudo, p.publicado_em,
+	       coalesce(g.cargo, ''), coalesce(g.caderno, ''), coalesce(g.tipo, '')
 	  FROM provas p
 	  JOIN provas_revisoes pr ON pr.prova_id = p.id AND pr.revisao = p.revisao
+	  LEFT JOIN provas_gabaritos g ON g.prova_id = p.id AND g.revisao = p.revisao
 	 WHERE p.visivel`
 
 func escanearPublicacao(row pgx.Row) (prova.Publicacao, error) {
 	var (
-		p        prova.Publicacao
-		conteudo []byte
+		p                    prova.Publicacao
+		conteudo             []byte
+		cargo, caderno, tipo string
 	)
-	err := row.Scan(&p.ID, &p.Revisao, &conteudo, &p.PublicadoEm)
+	err := row.Scan(&p.ID, &p.Revisao, &conteudo, &p.PublicadoEm, &cargo, &caderno, &tipo)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return prova.Publicacao{}, prova.ErrNaoEncontrada
 	}
@@ -614,6 +631,8 @@ func escanearPublicacao(row pgx.Row) (prova.Publicacao, error) {
 	if err := json.Unmarshal(conteudo, &p.Conteudo); err != nil {
 		return prova.Publicacao{}, fmt.Errorf("decodificando prova publicada: %w", err)
 	}
+	// O gabarito é o da tabela dele — as respostas vêm em completar.
+	p.Conteudo.Gabarito = prova.GabaritoDasLinhas(cargo, caderno, tipo, nil)
 
 	return p, nil
 }
@@ -719,6 +738,9 @@ func (r *ProvaRepo) completar(ctx context.Context, p *prova.Publicacao) error {
 		return err
 	}
 	p.Conteudo.Questoes = questoes
+	if err := r.respostasDoGabarito(ctx, p); err != nil {
+		return err
+	}
 
 	rows, err := r.pool.Query(ctx,
 		`SELECT c.conteudo, a.lugar
@@ -769,9 +791,11 @@ func (r *ProvaRepo) Questoes(ctx context.Context, provaID string, numero int, di
 
 func (r *ProvaRepo) questoesDaRevisao(ctx context.Context, provaID string, revisao, numero int, disciplina string) ([]prova.Questao, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT c.conteudo, q.lugar
+		`SELECT c.conteudo, q.lugar, coalesce(g.resposta, ''), coalesce(g.situacao, '')
 		   FROM provas_questoes q
 		   JOIN provas_questoes_conteudo c ON c.id = q.conteudo_id
+		   LEFT JOIN provas_gabarito_respostas g
+		          ON g.prova_id = q.prova_id AND g.revisao = q.revisao AND g.numero = q.numero
 		  WHERE q.prova_id::text = $1 AND q.revisao = $2
 		    AND ($3 = 0 OR q.numero = $3)
 		    AND ($4 = '' OR q.disciplina ILIKE '%' || $4 || '%')
@@ -786,11 +810,12 @@ func (r *ProvaRepo) questoesDaRevisao(ctx context.Context, provaID string, revis
 	out := []prova.Questao{}
 	for rows.Next() {
 		var (
-			bc, bl []byte
-			c      prova.ConteudoDeQuestao
-			l      prova.LugarDaQuestao
+			bc, bl             []byte
+			c                  prova.ConteudoDeQuestao
+			l                  prova.LugarDaQuestao
+			resposta, situacao string
 		)
-		if err := rows.Scan(&bc, &bl); err != nil {
+		if err := rows.Scan(&bc, &bl, &resposta, &situacao); err != nil {
 			return nil, fmt.Errorf("lendo questão: %w", err)
 		}
 		if err := json.Unmarshal(bc, &c); err != nil {
@@ -799,10 +824,38 @@ func (r *ProvaRepo) questoesDaRevisao(ctx context.Context, provaID string, revis
 		if err := json.Unmarshal(bl, &l); err != nil {
 			return nil, fmt.Errorf("decodificando questão: %w", err)
 		}
-		out = append(out, prova.JuntarQuestao(c, l))
+		q := prova.JuntarQuestao(c, l)
+		q.Resposta, q.Situacao = resposta, situacao
+		out = append(out, q)
 	}
 
 	return out, rows.Err()
+}
+
+// respostasDoGabarito põe na publicação as respostas do gabarito dela.
+func (r *ProvaRepo) respostasDoGabarito(ctx context.Context, p *prova.Publicacao) error {
+	rows, err := r.pool.Query(ctx,
+		`SELECT numero, resposta, situacao FROM provas_gabarito_respostas
+		  WHERE prova_id = $1 AND revisao = $2 ORDER BY numero`,
+		p.ID, p.Revisao,
+	)
+	if err != nil {
+		return fmt.Errorf("consultando gabarito da prova: %w", err)
+	}
+	defer rows.Close()
+
+	var linhas []prova.RespostaDoGabarito
+	for rows.Next() {
+		var l prova.RespostaDoGabarito
+		if err := rows.Scan(&l.Numero, &l.Resposta, &l.Situacao); err != nil {
+			return fmt.Errorf("lendo gabarito da prova: %w", err)
+		}
+		linhas = append(linhas, l)
+	}
+	g := p.Conteudo.Gabarito
+	p.Conteudo.Gabarito = prova.GabaritoDasLinhas(g.Cargo, g.Caderno, g.Tipo, linhas)
+
+	return rows.Err()
 }
 
 // QuestoesAvulsas escolhe a ocorrência de cada conteúdo pela estreia da prova
@@ -817,7 +870,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		 uma_por_conteudo AS (
 		     SELECT DISTINCT ON (q.conteudo_id)
 		            q.prova_id, q.numero, q.disciplina,
-		            coalesce(q.lugar->>'Resposta', '') AS resposta,
+		            coalesce(g.resposta, '') AS resposta,
 		            coalesce(pr.conteudo->>'Orgao', '') AS orgao,
 		            coalesce((pr.conteudo->>'Ano')::int, 0) AS ano,
 		            coalesce(pr.conteudo->>'Cargo', '') AS cargo,
@@ -827,6 +880,8 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		       JOIN provas p ON p.id = q.prova_id AND p.revisao = q.revisao AND p.visivel
 		       JOIN provas_revisoes pr ON pr.prova_id = p.id AND pr.revisao = p.revisao
 		       JOIN estreia e ON e.prova_id = p.id
+		       LEFT JOIN provas_gabarito_respostas g
+		              ON g.prova_id = q.prova_id AND g.revisao = q.revisao AND g.numero = q.numero
 		      ORDER BY q.conteudo_id, e.em, p.id, q.numero
 		 )
 		 SELECT prova_id::text, numero, disciplina, resposta, orgao, ano, cargo, cargo_nome

@@ -453,6 +453,67 @@ func TestProvas_QuestaoComumAOutroCargoGuardadaUmaVez(t *testing.T) {
 
 // A questão comum aos dois cargos aparece uma vez no treino por matéria, e
 // sempre pela prova que estreou primeiro — até ela sair do catálogo.
+// O gabarito é uma entidade à parte: publicado, vai para as tabelas dele, e
+// nem a questão publicada nem a revisão guardam a resposta. A questão lida
+// volta com a resposta do gabarito, e a revisão aberta da publicada, com o
+// gabarito inteiro.
+func TestProvas_GabaritoSeparadoDasQuestoes(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	recorte := uuid.NewString()
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "gabarito"), 2); err != nil {
+		t.Fatal(err)
+	}
+	r := rascunhoPublicavel(recorte)
+	r.Questoes[0].Resposta, r.Questoes[0].Situacao = "D", "Gabarito sem alteração"
+	r.Gabarito = prova.Gabarito{
+		Cargo: "E05", Caderno: "4", Tipo: "preliminar",
+		Respostas: map[string]string{"1": "D"}, Situacoes: map[string]string{"1": "Gabarito sem alteração"},
+	}
+	i := levarARevisao(t, repo, r)
+	id, err := repo.Publicar(ctx, i, criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var comResposta, revisaoComRespostas, importacaoComGabarito bool
+	if err := pool.QueryRow(ctx,
+		`SELECT (SELECT bool_or(lugar ? 'Resposta') FROM provas_questoes WHERE prova_id = $1),
+		        (SELECT conteudo->'Gabarito'->'Respostas' <> 'null'::jsonb FROM provas_revisoes WHERE prova_id = $1),
+		        (SELECT rascunho ? 'Gabarito' FROM provas_importacoes WHERE id = $2)`,
+		id, i.ID,
+	).Scan(&comResposta, &revisaoComRespostas, &importacaoComGabarito); err != nil {
+		t.Fatal(err)
+	}
+	if comResposta || revisaoComRespostas || importacaoComGabarito {
+		t.Fatalf("resposta fora do gabarito: questão %v, revisão %v, importação %v",
+			comResposta, revisaoComRespostas, importacaoComGabarito)
+	}
+
+	questoes, err := repo.Questoes(ctx, id, 0, "")
+	if err != nil || len(questoes) != 1 || questoes[0].Resposta != "D" || questoes[0].Situacao != "Gabarito sem alteração" {
+		t.Fatalf("questões = %+v (%v); quer a resposta D do gabarito", questoes, err)
+	}
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := p.Conteudo.Gabarito; g.Tipo != "preliminar" || g.Cargo != "E05" || g.Respostas["1"] != "D" {
+		t.Fatalf("gabarito da publicação = %+v", g)
+	}
+
+	// Letra fora de A–E o banco recusa, mesmo que alguém passe da pendência.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO provas_gabarito_respostas (prova_id, revisao, numero, resposta) VALUES ($1, 1, 2, 'F')`, id,
+	); err == nil {
+		t.Fatal("o banco aceitou a resposta F")
+	}
+}
+
 func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	t.Parallel()
 
@@ -467,6 +528,7 @@ func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	}
 	e05 := rascunhoPublicavel(recorte)
 	e05.Questoes[0].Resposta = "C"
+	e05.Gabarito = prova.Gabarito{Cargo: "E05", Caderno: "4", Respostas: map[string]string{"1": "C"}}
 	e05ID, err := repo.Publicar(ctx, levarARevisao(t, repo, e05), criador)
 	if err != nil {
 		t.Fatal(err)
