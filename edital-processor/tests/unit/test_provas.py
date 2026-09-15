@@ -136,6 +136,26 @@ def test_gabarito_com_codigo_de_cargo_so_de_numeros(tmp_path: Path) -> None:
     assert g.respostas == {"1": "E", "2": ""}
 
 
+def test_gabarito_escaneado_com_as_trocas_do_ocr(tmp_path: Path) -> None:
+    """O do TRT-6 é imagem com texto de OCR: "Cargo: EO5" e a resposta C como
+    "c". O código ficava vazio e as questões de resposta C, sem resposta."""
+    cargo = "Cargo: EO5 - AN JUD - AREA APOIO ESP - ESP TEC DA INFORMAGAO. Tipo de Gabarito: 5"
+    id = str(uuid.uuid4())
+    with pymupdf.open() as doc:
+        doc.new_page().insert_text(
+            (20, 30),
+            f"PRELIMINAR\n{cargo}\n1 \nB \nGabarito sem alteração\n2 \nc \nGabarito sem alteragdo\n"
+            "3 \nx \nAnulada",
+        )
+        doc.save(arquivo(tmp_path, id, "pdf"))
+
+    g, _ = pipeline.ler_gabarito(tmp_path, id)
+
+    assert g.cargo == "E05" and g.caderno == "5"
+    assert g.respostas == {"1": "B", "2": "C", "3": ""}
+    assert g.situacoes["3"] == "Anulada"
+
+
 def test_gabarito_definitivo_que_cita_o_preliminar(tmp_path: Path) -> None:
     cabecalho = "GABARITO DEFINITIVO (após recursos contra o preliminar)"
     g, _ = pipeline.ler_gabarito(tmp_path, _gabarito(tmp_path, cabecalho))

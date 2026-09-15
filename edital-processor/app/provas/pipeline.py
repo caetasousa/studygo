@@ -1048,7 +1048,10 @@ def ler_gabarito(root: Path, documento: str) -> tuple[Gabarito, str]:
     número, letra e situação, uma por linha."""
     with pymupdf.open(original(root, documento)) as doc:
         text = "\n".join(str(p.get_text()) for p in doc)
-    cargo = re.search(rf"Cargo:\s*({CODIGO_DE_CARGO.pattern})\b", text)
+    # O gabarito escaneado traz o texto do OCR, com as trocas de sempre: o do
+    # TRT-6 dizia "Cargo: EO5" e escrevia a resposta C como "c" — o código
+    # ficava vazio e as onze questões de resposta C, sem resposta.
+    cargo = re.search(r"Cargo:\s*([A-Z0-9]{2,3})\b", text, re.IGNORECASE)
     caderno = re.search(r"Tipo de Gabarito:\s*(\d+)", text)
     # DEFINITIVO primeiro: o definitivo costuma citar o preliminar que substitui.
     maiusculo = text.upper()
@@ -1060,11 +1063,14 @@ def ler_gabarito(root: Path, documento: str) -> tuple[Gabarito, str]:
         else "nao_informado"
     )
     result = Gabarito(
-        cargo=cargo[1] if cargo else "", caderno=caderno[1] if caderno else "", tipo=tipo
+        cargo=_codigo(cargo[1]) if cargo else "",
+        caderno=caderno[1] if caderno else "",
+        tipo=tipo,
     )
-    for m in re.finditer(r"(?:^|\n)(\d+)\s*\n([A-E]|[X*])\s*\n([^\n]+)", text):
+    for m in re.finditer(r"(?:^|\n)(\d+)\s*\n([A-E]|[X*])\s*\n([^\n]+)", text, re.IGNORECASE):
         # X e * marcam questão anulada: fica sem letra, com a situação dita.
-        result.respostas[m[1]] = m[2] if m[2] in "ABCDE" else ""
+        letra = m[2].upper()
+        result.respostas[m[1]] = letra if letra in "ABCDE" else ""
         result.situacoes[m[1]] = m[3].strip()
     return result, text
 
