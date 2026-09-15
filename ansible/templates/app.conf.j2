@@ -41,9 +41,16 @@
 
     # A SPA é servida do próprio domínio e não carrega script de terceiro
     # nenhum — o package.json do frontend não tem uma dependência de runtime
-    # sequer. 'unsafe-inline' em style-src é o preço do CSS que o SvelteKit
-    # embute; script-src não precisa dele.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    # sequer. Cada exceção abaixo é uma coisa que o app faz de fato; sem ela, a
+    # tela quebra (aconteceu em staging, 2026-09-15):
+    #  - script-src 'unsafe-inline': o index.html do SvelteKit liga o app com um
+    #    <script> embutido. Sem ele a página fica em branco. O hash não serve
+    #    aqui: o script muda a cada build, e a borda não é reconstruída.
+    #  - style-src 'unsafe-inline': o CSS que o SvelteKit embute.
+    #  - fonts.googleapis.com / fonts.gstatic.com: as fontes do app.html.
+    #  - img-src blob:: as figuras das provas exigem o token, então chegam por
+    #    fetch e são mostradas por URL de blob.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
 {% endmacro %}
 {% macro proxy_para_frontend() %}
         proxy_pass http://127.0.0.1:{{ frontend_port }};
