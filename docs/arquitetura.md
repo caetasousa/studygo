@@ -306,7 +306,8 @@ derivado do documento e das coordenadas — pedir o mesmo recorte de novo não
 grava outro arquivo.
 
 **O cargo tem código e nome.** O código ("F06", de "Caderno de Prova 'F06'",
-na capa e no alto das páginas) é o que o gabarito cita e o que o confere; o
+na capa e no alto das páginas; em alguns concursos só número, como "24") é o
+que o gabarito cita e o que o confere; o
 nome por extenso (`CargoNome`) é o que o aluno lê e busca. A leitura da capa às
 vezes devolve o nome no lugar do código: o processador o passa para o nome
 (`acertar_cargo`), e a pendência diz onde achar o código, com um botão na
