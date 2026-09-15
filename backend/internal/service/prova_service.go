@@ -91,16 +91,24 @@ func (s *ProvaService) carregar(ctx context.Context, usuario, id string) (prova.
 	return s.Repo.Obter(ctx, id)
 }
 
+// EnvioDeProva são os PDFs de uma importação, com os nomes com que o curador
+// os enviou.
+type EnvioDeProva struct {
+	Prova, Gabarito         []byte
+	NomeProva, NomeGabarito string
+}
+
 // Importar guarda os PDFs e enfileira a extração.
 //
 // Os arquivos vão para o disco antes da linha, porque uma linha apontando para
 // arquivo inexistente quebraria o worker. Quando a linha não nasce — reenvio
 // dos mesmos PDFs, limite atingido, erro —, eles saem do disco: nenhuma linha
 // os referencia, e a limpeza só enxerga o que está no banco.
-func (s *ProvaService) Importar(ctx context.Context, usuario string, pdf, gabarito []byte) (ImportacaoDeProva, error) {
+func (s *ProvaService) Importar(ctx context.Context, usuario string, e EnvioDeProva) (ImportacaoDeProva, error) {
 	if err := s.autorizar(usuario); err != nil {
 		return ImportacaoDeProva{}, err
 	}
+	pdf, gabarito := e.Prova, e.Gabarito
 	if !parecePDF(pdf) || (len(gabarito) > 0 && !parecePDF(gabarito)) {
 		return ImportacaoDeProva{}, erroDeValidacao("envie a prova e o gabarito em PDF")
 	}
@@ -111,12 +119,13 @@ func (s *ProvaService) Importar(ctx context.Context, usuario string, pdf, gabari
 	h := sha256.Sum256(pdf)
 
 	i := prova.Importacao{
-		ID:        uuid.NewString(),
-		Criador:   usuario,
-		Hash:      hex.EncodeToString(h[:]),
-		Documento: uuid.NewString(),
-		Estado:    prova.EstadoNaFila,
-		Rascunho:  prova.Rascunho{Banca: "FCC"},
+		ID:            uuid.NewString(),
+		Criador:       usuario,
+		Hash:          hex.EncodeToString(h[:]),
+		Documento:     uuid.NewString(),
+		NomeDocumento: prova.NomeDoArquivo(e.NomeProva),
+		Estado:        prova.EstadoNaFila,
+		Rascunho:      prova.Rascunho{Banca: "FCC"},
 	}
 	gravados := []string{i.Documento + ".pdf"}
 	if err := s.Arquivos.Guardar(i.Documento, pdf); err != nil {
@@ -124,6 +133,7 @@ func (s *ProvaService) Importar(ctx context.Context, usuario string, pdf, gabari
 	}
 	if len(gabarito) > 0 {
 		i.GabaritoArquivo = uuid.NewString()
+		i.NomeGabarito = prova.NomeDoArquivo(e.NomeGabarito)
 		gravados = append(gravados, i.GabaritoArquivo+".pdf")
 		if err := s.Arquivos.Guardar(i.GabaritoArquivo, gabarito); err != nil {
 			s.descartar(gravados)
@@ -448,7 +458,7 @@ func (s *ProvaService) Recortar(ctx context.Context, usuario, id string, versao 
 
 // AtualizarGabarito troca o gabarito de um rascunho em revisão sem reextrair
 // as questões — é o caso do gabarito definitivo que sai depois do preliminar.
-func (s *ProvaService) AtualizarGabarito(ctx context.Context, usuario, id string, versao int, pdf []byte) (ImportacaoDeProva, error) {
+func (s *ProvaService) AtualizarGabarito(ctx context.Context, usuario, id string, versao int, pdf []byte, nome string) (ImportacaoDeProva, error) {
 	i, err := s.carregar(ctx, usuario, id)
 	if err != nil {
 		return ImportacaoDeProva{}, err
@@ -470,6 +480,7 @@ func (s *ProvaService) AtualizarGabarito(ctx context.Context, usuario, id string
 	}
 
 	i.GabaritoArquivo = arquivo
+	i.NomeGabarito = prova.NomeDoArquivo(nome)
 	i.Etapa = prova.EtapaSoGabarito
 	i.Estado = prova.EstadoNaFila
 	if err := s.Repo.Salvar(ctx, i, versao); err != nil {
@@ -499,6 +510,8 @@ func (s *ProvaService) Revisar(ctx context.Context, usuario, provaID string) (Im
 		Criador:         usuario,
 		Documento:       base.Documento,
 		GabaritoArquivo: base.GabaritoArquivo,
+		NomeDocumento:   base.NomeDocumento,
+		NomeGabarito:    base.NomeGabarito,
 		Estado:          prova.EstadoEmRevisao,
 		Etapa:           prova.TotalEtapas(len(base.Regioes)),
 		Regioes:         base.Regioes,
@@ -534,6 +547,8 @@ func (s *ProvaService) Reextrair(ctx context.Context, usuario, provaID string) (
 		Criador:         usuario,
 		Documento:       base.Documento,
 		GabaritoArquivo: base.GabaritoArquivo,
+		NomeDocumento:   base.NomeDocumento,
+		NomeGabarito:    base.NomeGabarito,
 		Estado:          prova.EstadoNaFila,
 		Rascunho:        prova.Rascunho{Banca: "FCC"},
 		ProvaID:         provaID,

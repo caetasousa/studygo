@@ -285,7 +285,7 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 	const estudante = "33333333-3333-3333-3333-333333333333"
 
 	escritas := map[string]func() error{
-		"Importar": func() error { _, err := s.Importar(ctx, estudante, pdfMinimo, nil); return err },
+		"Importar": func() error { _, err := s.Importar(ctx, estudante, EnvioDeProva{Prova: pdfMinimo}); return err },
 		"Obter":    func() error { _, err := s.Obter(ctx, estudante, "x"); return err },
 		"Listar":   func() error { _, err := s.Listar(ctx, estudante); return err },
 		"Salvar":   func() error { _, err := s.Salvar(ctx, estudante, "x", 1, prova.Rascunho{}); return err },
@@ -301,7 +301,7 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 			return err
 		},
 		"AtualizarGabarito": func() error {
-			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo)
+			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo, "definitivo.pdf")
 			return err
 		},
 		"Revisar": func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
@@ -339,7 +339,7 @@ func TestProvas_Excluir(t *testing.T) {
 			repo := novoFakeProvas()
 			s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 			ctx := context.Background()
-			nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+			nova, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -375,7 +375,7 @@ func TestProvas_CancelarSoltaOsPDFs(t *testing.T) {
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 	ctx := context.Background()
-	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	nova, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +400,7 @@ func TestProvas_TodosCuradoresLiberaQualquerConta(t *testing.T) {
 	ctx := context.Background()
 	const estudante = "33333333-3333-3333-3333-333333333333"
 
-	nova, err := s.Importar(ctx, estudante, pdfMinimo, nil)
+	nova, err := s.Importar(ctx, estudante, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatalf("Importar de uma conta qualquer: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestProvas_ReenvioNaoDeixaArquivoOrfao(t *testing.T) {
 	repo.existente = &prova.Importacao{ID: "existente", Estado: prova.EstadoEmRevisao}
 	s, volume := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 
-	i, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	i, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
 	if err != nil {
 		t.Fatalf("Importar: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestProvas_LimiteNaoDeixaArquivoOrfao(t *testing.T) {
 	repo.errCriar = prova.ErrLimite
 	s, volume := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 
-	if _, err := s.Importar(context.Background(), curador, pdfMinimo, nil); !errors.Is(err, prova.ErrLimite) {
+	if _, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo}); !errors.Is(err, prova.ErrLimite) {
 		t.Fatalf("err = %v, quer ErrLimite", err)
 	}
 	if len(volume.nomes) != 0 {
@@ -452,7 +452,7 @@ func TestProvas_ImportarRecusaQuemNaoEPDF(t *testing.T) {
 
 	s, _ := novoProvaServiceDeTeste(novoFakeProvas(), extratorDeDuasRegioes())
 
-	_, err := s.Importar(context.Background(), curador, []byte("<html>"), nil)
+	_, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: []byte("<html>")})
 
 	var v ErrValidacao
 	if !errors.As(err, &v) {
@@ -470,7 +470,7 @@ func TestProvas_FilaDaCapaAteARevisao(t *testing.T) {
 	extrator := extratorDeDuasRegioes()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
 
-	criada, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	criada, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
 	if err != nil {
 		t.Fatalf("Importar: %v", err)
 	}
@@ -512,7 +512,7 @@ func TestProvas_ClassificacaoRecusadaNaoFalhaAImportacao(t *testing.T) {
 	extrator := extratorDeDuasRegioes()
 	extrator.errClassificar = fmt.Errorf("%w: recusou", port.ErrDocumentoRecusado)
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
-	criada, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	criada, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +553,7 @@ func TestProvas_FalhaTransitoriaRepeteComEspera(t *testing.T) {
 			extrator := extratorDeDuasRegioes()
 			extrator.err = c.err
 			s, _ := novoProvaServiceDeTeste(repo, extrator)
-			nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+			nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -579,7 +579,7 @@ func TestProvas_TetoDeChamadasParaSemChamarOProcessador(t *testing.T) {
 	extrator := extratorDeDuasRegioes()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
 	s.MaxChamadas = 0
-	if _, err := s.Importar(context.Background(), curador, pdfMinimo, nil); err != nil {
+	if _, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -726,7 +726,7 @@ func TestProvas_NovoGabaritoNaoReextrai(t *testing.T) {
 	}
 	extrator.gabarito = prova.Gabarito{Tipo: "definitivo", Respostas: map[string]string{"1": "C"}}
 
-	if _, err := s.AtualizarGabarito(context.Background(), curador, "i", 1, pdfMinimo); err != nil {
+	if _, err := s.AtualizarGabarito(context.Background(), curador, "i", 1, pdfMinimo, "definitivo.pdf"); err != nil {
 		t.Fatalf("AtualizarGabarito: %v", err)
 	}
 	i := processarTudo(t, s, repo, "i")
@@ -763,7 +763,7 @@ func TestProvas_QuestaoCortadaGanhaReleitura(t *testing.T) {
 	}
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
-	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -811,7 +811,7 @@ func TestProvas_ReleituraRecusadaNaoDerrubaAImportacao(t *testing.T) {
 	}
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
-	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -851,7 +851,7 @@ func TestProvas_RelerQuestaoQueContinuouIncompleta(t *testing.T) {
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
 	ctx := context.Background()
-	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	nova, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,7 +892,7 @@ func emRevisaoPorPagina(t *testing.T) (*ProvaService, *fakeProvas, *fakeExtrator
 	}
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
-	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1004,7 +1004,7 @@ func TestProvas_ProvaNoCatalogoParaNaCapa(t *testing.T) {
 	repo.irmas = []prova.Publicacao{{ID: "publicada", Conteudo: prova.Rascunho{
 		Banca: "FCC", Orgao: "TJ-CE", Ano: 2026, Cargo: "E05", Caderno: "001",
 	}}}
-	nova, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1030,7 +1030,7 @@ func TestProvas_ProvaEmOutraImportacaoParaNaCapa(t *testing.T) {
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 	ctx := context.Background()
-	primeira, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	primeira, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1038,7 +1038,7 @@ func TestProvas_ProvaEmOutraImportacaoParaNaCapa(t *testing.T) {
 		t.Fatalf("primeira: estado %s", i.Estado)
 	}
 
-	segunda, err := s.Importar(ctx, curador, []byte("%PDF-1.7 outro arquivo da mesma prova"), nil)
+	segunda, err := s.Importar(ctx, curador, EnvioDeProva{Prova: []byte("%PDF-1.7 outro arquivo da mesma prova")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1086,6 +1086,43 @@ func TestProvas_PublicarRecusaProvaQueJaEstaNoCatalogo(t *testing.T) {
 	}
 }
 
+// A curadoria mostra de que arquivo veio cada importação: o nome do caderno e
+// o do gabarito, também o que foi trocado depois e o da revisão aberta da
+// publicada.
+func TestProvas_GuardaONomeDosArquivos(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, _ := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	ctx := context.Background()
+
+	nova, err := s.Importar(ctx, curador, EnvioDeProva{
+		Prova: pdfMinimo, Gabarito: pdfMinimo,
+		NomeProva: `C:\fakepath\fcc-2025-trt-15-tecnico-prova.pdf`, NomeGabarito: " fcc-2025-trt-15-tecnico-gabarito.pdf ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nova.NomeDocumento != "fcc-2025-trt-15-tecnico-prova.pdf" || nova.NomeGabarito != "fcc-2025-trt-15-tecnico-gabarito.pdf" {
+		t.Fatalf("nomes = %q, %q", nova.NomeDocumento, nova.NomeGabarito)
+	}
+
+	emRevisao := repo.importacoes[nova.ID]
+	emRevisao.Estado = prova.EstadoEmRevisao
+	repo.importacoes[nova.ID] = emRevisao
+	trocado, err := s.AtualizarGabarito(ctx, curador, nova.ID, emRevisao.Versao, pdfMinimo, "definitivo.pdf")
+	if err != nil || trocado.NomeGabarito != "definitivo.pdf" || trocado.NomeDocumento != nova.NomeDocumento {
+		t.Fatalf("depois de trocar o gabarito: %q, %q (%v)", trocado.NomeDocumento, trocado.NomeGabarito, err)
+	}
+
+	repo.importacoes["base"] = repo.importacoes[nova.ID]
+	revisao, err := s.Revisar(ctx, curador, "prova-1")
+	if err != nil || revisao.NomeDocumento != nova.NomeDocumento || revisao.NomeGabarito != "definitivo.pdf" {
+		t.Fatalf("revisão da publicada: %q, %q (%v)", revisao.NomeDocumento, revisao.NomeGabarito, err)
+	}
+}
+
 // O hash é o do caderno: a mesma prova com outro gabarito, ou sem ele, é o
 // mesmo reenvio.
 func TestProvas_HashEOCaderno(t *testing.T) {
@@ -1097,13 +1134,13 @@ func TestProvas_HashEOCaderno(t *testing.T) {
 
 	var hashes []string
 	for _, gabarito := range [][]byte{nil, pdfMinimo, []byte("%PDF-1.7 gabarito definitivo")} {
-		i, err := s.Importar(ctx, curador, pdfMinimo, gabarito)
+		i, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: gabarito})
 		if err != nil {
 			t.Fatal(err)
 		}
 		hashes = append(hashes, repo.importacoes[i.ID].Hash)
 	}
-	outra, err := s.Importar(ctx, curador, []byte("%PDF-1.7 outra prova"), nil)
+	outra, err := s.Importar(ctx, curador, EnvioDeProva{Prova: []byte("%PDF-1.7 outra prova")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1124,7 +1161,7 @@ func TestProvas_LigacaoParaTextoInexistenteNaoViraPendencia(t *testing.T) {
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
 	ctx := context.Background()
-	nova, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	nova, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1265,7 +1302,7 @@ func TestProvas_ImportacaoReaproveitaQuestaoDeOutroCargo(t *testing.T) {
 		Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E04", Questoes: []prova.Questao{publicada},
 	}}}
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
-	nova, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	nova, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1302,7 +1339,7 @@ func TestProvas_ProcurarCadastradasNaRevisao(t *testing.T) {
 	repo := novoFakeProvas()
 	s, _ := novoProvaServiceDeTeste(repo, extrator)
 	ctx := context.Background()
-	nova, err := s.Importar(ctx, curador, pdfMinimo, pdfMinimo)
+	nova, err := s.Importar(ctx, curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
 	if err != nil {
 		t.Fatal(err)
 	}

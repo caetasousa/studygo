@@ -390,7 +390,7 @@
 			await recarregar();
 			if (!imp) return;
 			if (page.url.searchParams.has('existente'))
-				aviso = 'Este caderno já tinha sido importado: esta é a importação dele, e nada foi importado de novo.';
+				aviso = `Este caderno${imp.nomeDocumento ? ` (${imp.nomeDocumento})` : ''} já tinha sido importado: esta é a importação dele, e nada foi importado de novo.`;
 			irPara(questoesProprias[0] ?? 0);
 			// Questão com defeito vem primeiro no mapa: é o que precisa de mão.
 			if (comProblema.length > 0) escolherFiltro('problema');
@@ -409,6 +409,15 @@
 		if (alterado && !confirm('Há alterações não salvas. Sair mesmo assim?')) cancel();
 	});
 </script>
+
+{#snippet arquivos()}
+	{#if imp?.nomeDocumento}
+		<p class="arquivos">
+			Caderno: <b>{imp.nomeDocumento}</b>
+			{#if imp.nomeGabarito}<br />Gabarito: <b>{imp.nomeGabarito}</b>{/if}
+		</p>
+	{/if}
+{/snippet}
 
 {#snippet cargoDoGabarito()}
 	<div class="callout warn cargo-gabarito">
@@ -460,6 +469,7 @@
 					</span>
 				</div>
 				<div class="card-body estado">
+					{@render arquivos()}
 					{#if andando && imp.etapa < 0}
 						<!-- Etapa negativa relê só uma parte — o gabarito novo ou um trecho
 						     marcado — e volta à revisão; não há "etapa X de Y" para mostrar. -->
@@ -531,6 +541,7 @@
 				{imp.rascunho.orgao || 'Órgão não identificado'} · {imp.rascunho.ano || '—'} ·
 				{imp.rascunho.cargoNome || `cargo ${imp.rascunho.cargo || '—'}`} · caderno {imp.rascunho.caderno || '—'}
 			</p>
+			{@render arquivos()}
 
 			<!-- A revisão em quatro etapas, na ordem em que se faz: o que é a prova, os
 			     textos que várias questões usam, as questões, e publicar. -->
@@ -1150,6 +1161,18 @@
 		margin: 0 0 10px;
 		font-size: 13.5px;
 		color: var(--text-muted);
+	}
+	/* O nome inteiro dos arquivos enviados, quebrando onde precisar. */
+	.arquivos {
+		margin: 0 0 10px;
+		font-size: 12.5px;
+		line-height: 1.5;
+		color: var(--text-muted);
+		overflow-wrap: anywhere;
+	}
+	.arquivos b {
+		font-weight: 500;
+		color: var(--text);
 	}
 
 	/* A barra fica no alto: as etapas e o salvar sempre à mão. */

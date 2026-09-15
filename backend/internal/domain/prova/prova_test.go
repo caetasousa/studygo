@@ -873,6 +873,25 @@ func TestQuestaoDaReleitura(t *testing.T) {
 	}
 }
 
+func TestNomeDoArquivo(t *testing.T) {
+	t.Parallel()
+
+	longo := strings.Repeat("á", 300) + ".pdf"
+	for enviado, quer := range map[string]string{
+		"fcc-2025-trt-15-regiao-sp-tecnico-judiciario-prova.pdf": "fcc-2025-trt-15-regiao-sp-tecnico-judiciario-prova.pdf",
+		`C:\fakepath\prova.pdf`:                                  "prova.pdf",
+		"/home/curador/Downloads/gabarito.pdf":                   "gabarito.pdf",
+		"  com espaço.pdf  ":                                     "com espaço.pdf",
+		"quebrado\xff.pdf":                                       "quebrado.pdf",
+		"":                                                       "",
+		longo:                                                    strings.Repeat("á", 255),
+	} {
+		if got := NomeDoArquivo(enviado); got != quer {
+			t.Errorf("NomeDoArquivo(%.40q) = %.40q, quer %.40q", enviado, got, quer)
+		}
+	}
+}
+
 // O trecho é o retângulo que o curador desenhou dentro de uma região da
 // página — nunca fora dela, onde o processador recusaria.
 func TestNovoTrecho(t *testing.T) {

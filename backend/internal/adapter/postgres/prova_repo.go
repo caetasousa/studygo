@@ -40,7 +40,8 @@ func NewProvaRepo(pool *pgxpool.Pool) *ProvaRepo {
 	return &ProvaRepo{pool: pool}
 }
 
-const colunasImportacao = `id::text, criador::text, hash, documento::text, gabarito_arquivo, estado,
+const colunasImportacao = `id::text, criador::text, hash, documento::text, gabarito_arquivo,
+	nome_documento, nome_gabarito, estado,
 	versao, etapa, falhas, processado_ms, chamadas, tentativa, erro, regioes, %s,
 	coalesce(prova_id::text, ''), criado_em, atualizado_em`
 
@@ -56,7 +57,8 @@ func escanearImportacao(row pgx.Row) (prova.Importacao, error) {
 		regioes, rascunho []byte
 	)
 	err := row.Scan(
-		&i.ID, &i.Criador, &i.Hash, &i.Documento, &i.GabaritoArquivo, &i.Estado,
+		&i.ID, &i.Criador, &i.Hash, &i.Documento, &i.GabaritoArquivo,
+		&i.NomeDocumento, &i.NomeGabarito, &i.Estado,
 		&i.Versao, &i.Etapa, &i.Falhas, &i.ProcessadoMS, &i.Chamadas, &i.Tentativa, &i.Erro,
 		&regioes, &rascunho, &i.ProvaID, &i.CriadoEm, &i.AtualizadoEm,
 	)
@@ -123,10 +125,11 @@ func (r *ProvaRepo) Criar(ctx context.Context, i prova.Importacao, limite int) (
 	}
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO provas_importacoes
-		     (id, criador, hash, documento, gabarito_arquivo, estado, etapa, regioes, rascunho, prova_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULLIF($10, '')::uuid)`,
-		i.ID, i.Criador, i.Hash, i.Documento, i.GabaritoArquivo, i.Estado, i.Etapa,
-		regioes, rascunho, i.ProvaID,
+		     (id, criador, hash, documento, gabarito_arquivo, nome_documento, nome_gabarito,
+		      estado, etapa, regioes, rascunho, prova_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULLIF($12, '')::uuid)`,
+		i.ID, i.Criador, i.Hash, i.Documento, i.GabaritoArquivo, i.NomeDocumento, i.NomeGabarito,
+		i.Estado, i.Etapa, regioes, rascunho, i.ProvaID,
 	); err != nil {
 		return prova.Importacao{}, fmt.Errorf("criando importação de prova: %w", err)
 	}
@@ -203,10 +206,10 @@ func (r *ProvaRepo) Salvar(ctx context.Context, i prova.Importacao, versao int) 
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE provas_importacoes
 		    SET rascunho = $3, estado = $4, erro = $5, gabarito_arquivo = $6, etapa = $7,
-		        hash = $8, regioes = $9, versao = versao + 1, atualizado_em = now(),
+		        hash = $8, regioes = $9, nome_gabarito = $10, versao = versao + 1, atualizado_em = now(),
 		        reserva_ate = NULL, tentativa = '', falhas = 0, disponivel_em = now()
 		  WHERE id = $1 AND versao = $2 AND estado <> 'publicada'`,
-		i.ID, versao, rascunho, i.Estado, i.Erro, i.GabaritoArquivo, i.Etapa, i.Hash, regioes,
+		i.ID, versao, rascunho, i.Estado, i.Erro, i.GabaritoArquivo, i.Etapa, i.Hash, regioes, i.NomeGabarito,
 	)
 	if err != nil {
 		return fmt.Errorf("salvando importação de prova: %w", err)

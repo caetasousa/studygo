@@ -81,6 +81,10 @@
 	let carregado = $state(false);
 	let arquivoProva = $state<HTMLInputElement | null>(null);
 	let arquivoGabarito = $state<HTMLInputElement | null>(null);
+	// O seletor do navegador corta o nome; o curador precisa dele inteiro para
+	// saber que prova está mandando.
+	let nomeProva = $state('');
+	let nomeGabarito = $state('');
 
 	$effect(() => {
 		// Antes de carregar, o filtro ainda não foi conferido com o catálogo.
@@ -328,11 +332,23 @@
 			<div class="importar">
 				<label class="arquivo">
 					<span>Caderno de prova</span>
-					<input type="file" accept="application/pdf" bind:this={arquivoProva} />
+					<input
+						type="file"
+						accept="application/pdf"
+						bind:this={arquivoProva}
+						onchange={(e) => (nomeProva = e.currentTarget.files?.[0]?.name ?? '')}
+					/>
+					{#if nomeProva}<span class="nome-arquivo">{nomeProva}</span>{/if}
 				</label>
 				<label class="arquivo">
 					<span>Gabarito oficial <em>opcional</em></span>
-					<input type="file" accept="application/pdf" bind:this={arquivoGabarito} />
+					<input
+						type="file"
+						accept="application/pdf"
+						bind:this={arquivoGabarito}
+						onchange={(e) => (nomeGabarito = e.currentTarget.files?.[0]?.name ?? '')}
+					/>
+					{#if nomeGabarito}<span class="nome-arquivo">{nomeGabarito}</span>{/if}
 				</label>
 				<button class="nbtn primario" type="button" disabled={ocupado} onclick={() => executar(importar)}>
 					Importar
@@ -354,6 +370,11 @@
 							<span class="sub">etapa {i.etapa} de {i.totalEtapas}</span>
 						{/if}
 						<span class="estado {i.estado}">{ESTADO[i.estado]}</span>
+						{#if i.nomeDocumento}
+							<span class="nome-arquivo">
+								{i.nomeDocumento}{#if i.nomeGabarito}<br />gabarito: {i.nomeGabarito}{/if}
+							</span>
+						{/if}
 						{#if i.erro}<span class="erro">{i.erro}</span>{/if}
 					</a>
 				{:else}
@@ -707,6 +728,18 @@
 		flex-basis: 100%;
 		font-size: 12.5px;
 		color: var(--danger);
+	}
+	/* O nome inteiro, quebrando onde precisar: é por ele que o curador sabe
+	   qual prova mandou. */
+	.nome-arquivo {
+		flex-basis: 100%;
+		max-width: 44ch;
+		font-size: 12.5px;
+		color: var(--text-muted);
+		overflow-wrap: anywhere;
+	}
+	.linha .nome-arquivo {
+		max-width: none;
 	}
 
 	@media (max-width: 560px) {

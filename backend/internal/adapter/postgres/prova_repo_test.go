@@ -177,6 +177,38 @@ func TestProvas_RepetidaParaNaCapaESeguraOHash(t *testing.T) {
 	}
 }
 
+// O nome com que o curador enviou cada PDF vai e volta do banco — na
+// importação, no resumo da lista e na troca do gabarito.
+func TestProvas_NomeDosArquivos(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	i := novaImportacao(criador, "nomes")
+	i.GabaritoArquivo = uuid.NewString()
+	i.NomeDocumento, i.NomeGabarito = "fcc-2025-trt-15-prova.pdf", "fcc-2025-trt-15-gabarito.pdf"
+
+	criada, err := repo.Criar(ctx, i, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	criada.NomeGabarito = "definitivo.pdf"
+	if err := repo.Salvar(ctx, criada, criada.Versao); err != nil {
+		t.Fatal(err)
+	}
+
+	lida, err := repo.Obter(ctx, i.ID)
+	if err != nil || lida.NomeDocumento != "fcc-2025-trt-15-prova.pdf" || lida.NomeGabarito != "definitivo.pdf" {
+		t.Fatalf("importação lida: %q, %q (%v)", lida.NomeDocumento, lida.NomeGabarito, err)
+	}
+	resumos, err := repo.ListarResumos(ctx)
+	if err != nil || len(resumos) != 1 || resumos[0].NomeDocumento != "fcc-2025-trt-15-prova.pdf" {
+		t.Fatalf("resumos = %+v (%v)", resumos, err)
+	}
+}
+
 func TestProvas_FilaAceitaSoATentativaQueDetemAReserva(t *testing.T) {
 	t.Parallel()
 

@@ -398,7 +398,9 @@ uma prova publicada ou de outra importação ativa (`MesmaProva`; o tipo do
 caderno não conta) para ali, sem ler gabarito nem questão — cancelada, com o
 motivo, e segurando o hash (`Importacao.JaImportada`). A revisão de uma
 publicada é ela mesma e não conta; e a publicação recusa a repetida que passou
-pela capa sem código.
+pela capa sem código. A curadoria mostra, inteiro, o nome com que cada PDF foi
+enviado (`nome_documento`, `nome_gabarito`; `prova.NomeDoArquivo`): é por ele
+que o curador reconhece a prova quando a capa foi mal lida.
 
 **Cancelar solta os PDFs; excluir apaga o rascunho.** Cancelada pelo curador,
 a importação perde o hash (`Importacao.Cancelar`) e os mesmos arquivos podem

@@ -6,6 +6,8 @@
   "estado": "string",
   "etapa": "number",
   "id": "string",
+  "nomeDocumento": "string",
+  "nomeGabarito": "string",
   "pendencias": [
     "string"
   ],

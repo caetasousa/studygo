@@ -627,12 +627,31 @@ type Rascunho struct {
 
 type Importacao struct {
 	ID, Criador, Hash, Documento, GabaritoArquivo string
-	Estado, Erro, Tentativa, ProvaID              string
-	ProcessadoMS                                  int64
-	Versao, Etapa, Falhas, Chamadas               int
-	Regioes                                       []Origem
-	Rascunho                                      Rascunho
-	CriadoEm, AtualizadoEm                        time.Time
+	// NomeDocumento e NomeGabarito são os nomes com que o curador enviou os
+	// PDFs (NomeDoArquivo): a curadoria mostra de que arquivo veio cada uma.
+	NomeDocumento, NomeGabarito      string
+	Estado, Erro, Tentativa, ProvaID string
+	ProcessadoMS                     int64
+	Versao, Etapa, Falhas, Chamadas  int
+	Regioes                          []Origem
+	Rascunho                         Rascunho
+	CriadoEm, AtualizadoEm           time.Time
+}
+
+// Tamanho máximo do nome guardado; o sistema de arquivos não passa disso.
+const maxNomeDoArquivo = 255
+
+// NomeDoArquivo é o nome do PDF como o curador o vê na pasta dele: sem o
+// caminho que alguns navegadores mandam, sem espaço nas pontas e sem passar do
+// tamanho de um nome de arquivo.
+func NomeDoArquivo(enviado string) string {
+	nome := enviado[strings.LastIndexAny(enviado, `/\`)+1:]
+	nome = strings.TrimSpace(strings.ToValidUTF8(nome, ""))
+	if r := []rune(nome); len(r) > maxNomeDoArquivo {
+		nome = string(r[:maxNomeDoArquivo])
+	}
+
+	return nome
 }
 
 // Cancelar tira a importação da fila e da revisão. Ela deixa de segurar os

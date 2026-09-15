@@ -238,7 +238,7 @@ func (h *ProvaHandler) Importar(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
 
-	pdf, err := h.lerArquivo(r, "prova")
+	pdf, nomePDF, err := h.lerArquivo(r, "prova")
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -247,13 +247,15 @@ func (h *ProvaHandler) Importar(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
-	gabarito, err := h.lerArquivo(r, "gabarito")
+	gabarito, nomeGabarito, err := h.lerArquivo(r, "gabarito")
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	i, err := h.provas.Importar(r.Context(), usuario, pdf, gabarito)
+	i, err := h.provas.Importar(r.Context(), usuario, service.EnvioDeProva{
+		Prova: pdf, Gabarito: gabarito, NomeProva: nomePDF, NomeGabarito: nomeGabarito,
+	})
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -489,7 +491,7 @@ func (h *ProvaHandler) AtualizarGabarito(w http.ResponseWriter, r *http.Request)
 	}
 	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
 
-	pdf, err := h.lerArquivo(r, "gabarito")
+	pdf, nome, err := h.lerArquivo(r, "gabarito")
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -500,7 +502,7 @@ func (h *ProvaHandler) AtualizarGabarito(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	i, err := h.provas.AtualizarGabarito(r.Context(), usuario, id, versao, pdf)
+	i, err := h.provas.AtualizarGabarito(r.Context(), usuario, id, versao, pdf, nome)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -522,17 +524,20 @@ func (h *ProvaHandler) lerMultipart(w http.ResponseWriter, r *http.Request, arqu
 
 // lerArquivo devolve nil quando o campo não veio. Lê um byte além do teto para
 // distinguir "coube exatamente" de "não coube", como lerPDF.
-func (h *ProvaHandler) lerArquivo(r *http.Request, campo string) ([]byte, error) {
-	f, _, err := r.FormFile(campo)
+// lerArquivo devolve o conteúdo e o nome com que o arquivo veio.
+func (h *ProvaHandler) lerArquivo(r *http.Request, campo string) ([]byte, string, error) {
+	f, cabecalho, err := r.FormFile(campo)
 	if errors.Is(err, http.ErrMissingFile) {
-		return nil, nil
+		return nil, "", nil
 	}
 	if err != nil {
-		return nil, errRequisicaoInvalida
+		return nil, "", errRequisicaoInvalida
 	}
 	defer f.Close()
 
-	return lerLimitado(f, h.maxPDF)
+	dados, err := lerLimitado(f, h.maxPDF)
+
+	return dados, cabecalho.Filename, err
 }
 
 func lerLimitado(f multipart.File, max int64) ([]byte, error) {

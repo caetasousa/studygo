@@ -97,16 +97,19 @@ type rascunhoDTO struct {
 }
 
 type importacaoProvaDTO struct {
-	ID          string      `json:"id"`
-	Estado      string      `json:"estado"`
-	Versao      int         `json:"versao"`
-	Etapa       int         `json:"etapa"`
-	TotalEtapas int         `json:"totalEtapas"`
-	Erro        string      `json:"erro"`
-	ProvaID     string      `json:"provaId"`
-	Regioes     []origemDTO `json:"regioes"`
-	Rascunho    rascunhoDTO `json:"rascunho"`
-	Pendencias  []string    `json:"pendencias"`
+	ID          string `json:"id"`
+	Estado      string `json:"estado"`
+	Versao      int    `json:"versao"`
+	Etapa       int    `json:"etapa"`
+	TotalEtapas int    `json:"totalEtapas"`
+	Erro        string `json:"erro"`
+	ProvaID     string `json:"provaId"`
+	// Os nomes com que o curador enviou os PDFs; vazios nas anteriores a eles.
+	NomeDocumento string      `json:"nomeDocumento"`
+	NomeGabarito  string      `json:"nomeGabarito"`
+	Regioes       []origemDTO `json:"regioes"`
+	Rascunho      rascunhoDTO `json:"rascunho"`
+	Pendencias    []string    `json:"pendencias"`
 	// ConferenciaObrigatoria diz se a falta de conferência entra nas
 	// pendências neste ambiente (PROVAS_EXIGIR_CONFERENCIA).
 	ConferenciaObrigatoria bool      `json:"conferenciaObrigatoria"`
@@ -115,19 +118,21 @@ type importacaoProvaDTO struct {
 }
 
 type importacaoResumoDTO struct {
-	ID           string    `json:"id"`
-	Estado       string    `json:"estado"`
-	Etapa        int       `json:"etapa"`
-	TotalEtapas  int       `json:"totalEtapas"`
-	Erro         string    `json:"erro"`
-	ProvaID      string    `json:"provaId"`
-	Orgao        string    `json:"orgao"`
-	Ano          int       `json:"ano"`
-	Cargo        string    `json:"cargo"`
-	CargoNome    string    `json:"cargoNome"`
-	Caderno      string    `json:"caderno"`
-	CriadoEm     time.Time `json:"criadoEm"`
-	AtualizadoEm time.Time `json:"atualizadoEm"`
+	ID            string    `json:"id"`
+	Estado        string    `json:"estado"`
+	Etapa         int       `json:"etapa"`
+	TotalEtapas   int       `json:"totalEtapas"`
+	Erro          string    `json:"erro"`
+	ProvaID       string    `json:"provaId"`
+	NomeDocumento string    `json:"nomeDocumento"`
+	NomeGabarito  string    `json:"nomeGabarito"`
+	Orgao         string    `json:"orgao"`
+	Ano           int       `json:"ano"`
+	Cargo         string    `json:"cargo"`
+	CargoNome     string    `json:"cargoNome"`
+	Caderno       string    `json:"caderno"`
+	CriadoEm      time.Time `json:"criadoEm"`
+	AtualizadoEm  time.Time `json:"atualizadoEm"`
 }
 
 type provaResumoDTO struct {
@@ -283,7 +288,8 @@ func rascunhoParaDTO(r prova.Rascunho) rascunhoDTO {
 func importacaoProvaParaDTO(i service.ImportacaoDeProva) importacaoProvaDTO {
 	return importacaoProvaDTO{
 		ID: i.ID, Estado: i.Estado, Versao: i.Versao, Etapa: i.Etapa, TotalEtapas: i.TotalEtapas,
-		Erro: i.Erro, ProvaID: i.ProvaID, Regioes: origensParaDTO(i.Regioes),
+		Erro: i.Erro, ProvaID: i.ProvaID, NomeDocumento: i.NomeDocumento, NomeGabarito: i.NomeGabarito,
+		Regioes:  origensParaDTO(i.Regioes),
 		Rascunho: rascunhoParaDTO(i.Rascunho), Pendencias: naoNula(i.Pendencias),
 		ConferenciaObrigatoria: i.ConferenciaObrigatoria,
 		CriadoEm:               i.CriadoEm, AtualizadoEm: i.AtualizadoEm,
@@ -293,7 +299,8 @@ func importacaoProvaParaDTO(i service.ImportacaoDeProva) importacaoProvaDTO {
 func importacaoResumoParaDTO(i prova.Importacao) importacaoResumoDTO {
 	return importacaoResumoDTO{
 		ID: i.ID, Estado: i.Estado, Etapa: i.Etapa, TotalEtapas: prova.TotalEtapas(len(i.Regioes)),
-		Erro: i.Erro, ProvaID: i.ProvaID, Orgao: i.Rascunho.Orgao, Ano: i.Rascunho.Ano,
+		Erro: i.Erro, ProvaID: i.ProvaID, NomeDocumento: i.NomeDocumento, NomeGabarito: i.NomeGabarito,
+		Orgao: i.Rascunho.Orgao, Ano: i.Rascunho.Ano,
 		Cargo: i.Rascunho.Cargo, CargoNome: i.Rascunho.CargoNome, Caderno: i.Rascunho.Caderno,
 		CriadoEm: i.CriadoEm, AtualizadoEm: i.AtualizadoEm,
 	}

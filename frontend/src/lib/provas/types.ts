@@ -111,6 +111,9 @@ export interface Importacao {
 	totalEtapas: number;
 	erro: string;
 	provaId: string;
+	/** Os nomes com que o curador enviou os PDFs; vazios nas importações anteriores a eles. */
+	nomeDocumento: string;
+	nomeGabarito: string;
 	regioes: Origem[];
 	rascunho: Rascunho;
 	pendencias: string[];
@@ -127,6 +130,8 @@ export interface ImportacaoResumo {
 	totalEtapas: number;
 	erro: string;
 	provaId: string;
+	nomeDocumento: string;
+	nomeGabarito: string;
 	orgao: string;
 	ano: number;
 	cargo: string;
