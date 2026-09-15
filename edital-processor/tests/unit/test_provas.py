@@ -88,14 +88,13 @@ def test_pdf_ausente_nao_e_erro_transitorio(tmp_path: Path) -> None:
         regioes(tmp_path, str(uuid.uuid4()), Settings(provas_dir=tmp_path))
 
 
-def _gabarito(root: Path, cabecalho: str) -> str:
+def _gabarito(root: Path, cabecalho: str, cargo: str = "Cargo: E05\nTipo de Gabarito: 4") -> str:
     id = str(uuid.uuid4())
     with pymupdf.open() as doc:
         p = doc.new_page()
         p.insert_text(
             (20, 30),
-            f"{cabecalho}\nCargo: E05\nTipo de Gabarito: 4\n"
-            "1\nE\nGabarito sem alteração\n2\nX\nAnulada",
+            f"{cabecalho}\n{cargo}\n1\nE\nGabarito sem alteração\n2\nX\nAnulada",
         )
         doc.save(arquivo(root, id, "pdf"))
     return id
@@ -106,6 +105,15 @@ def test_gabarito_fcc_preliminar(tmp_path: Path) -> None:
     assert g.cargo == "E05" and g.caderno == "4" and g.tipo == "preliminar"
     assert g.respostas == {"1": "E", "2": ""}
     assert g.situacoes["2"] == "Anulada"
+
+
+def test_gabarito_com_codigo_de_cargo_so_de_numeros(tmp_path: Path) -> None:
+    # Como no TRT-15: o código vem colado ao nome abreviado, na mesma linha
+    # do tipo de gabarito.
+    cargo = "Cargo: 24 - AN JUD - AREA APOIO ESP - ESP TEC DA INFORMACAO. Tipo de Gabarito: 1"
+    g, _ = pipeline.ler_gabarito(tmp_path, _gabarito(tmp_path, "PRELIMINAR", cargo))
+    assert g.cargo == "24" and g.caderno == "1"
+    assert g.respostas == {"1": "E", "2": ""}
 
 
 def test_gabarito_definitivo_que_cita_o_preliminar(tmp_path: Path) -> None:
@@ -288,6 +296,15 @@ NOME_SI = "Analista Judiciário \u2013 Área Técnico Administrativa Especialida
             {"cargo": NOME_SI},
             "Nome do Candidato\nCaderno de Prova \u2018f06\u2019, Tipo 004",
             ("F06", NOME_SI),
+        ),
+        # Há código só de números (TRT-15, TRF-4), lido na capa ou no texto.
+        ({"cargo": "24", "cargo_nome": NOME_SI}, "", ("24", NOME_SI)),
+        ({"cargo": NOME_SI}, "Nome do Candidato\nCaderno de Prova '03', Tipo 001", ("03", NOME_SI)),
+        # Mas um número no meio do nome não vira código.
+        (
+            {"cargo": "Técnico Judiciário - TRT 15"},
+            "",
+            ("", "Técnico Judiciário - TRT 15"),
         ),
     ],
 )
