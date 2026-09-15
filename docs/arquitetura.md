@@ -310,8 +310,10 @@ na capa e no alto das páginas; em alguns concursos só número, como "24") é o
 que o gabarito cita e o que o confere; o
 nome por extenso (`CargoNome`) é o que o aluno lê e busca. A leitura da capa às
 vezes devolve o nome no lugar do código: o processador o passa para o nome
-(`acertar_cargo`), e a pendência diz onde achar o código, com um botão na
-revisão que usa o do gabarito.
+(`acertar_cargo`) e tira o código do quadro do candidato — do texto do PDF ou,
+na capa escaneada, do OCR dela, que perdoa as trocas típicas ("Cademo de Prova
+'FO6, Tipo" é F06). Sem código mesmo assim, a pendência diz onde achá-lo, com
+um botão na revisão que usa o do gabarito.
 
 **O curador confere só o que tem problema.** No fim da importação, a questão
 inteira, com as cinco alternativas preenchidas, a resposta do gabarito, os

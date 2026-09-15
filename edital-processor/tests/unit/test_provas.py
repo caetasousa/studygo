@@ -257,7 +257,11 @@ async def test_recusa_dupla_nao_perde_a_regiao_em_silencio(
     assert "região 3" in result.alertas[0]
 
 
-async def test_metadados_vem_da_capa(tmp_path: Path) -> None:
+async def test_metadados_vem_da_capa(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def sem_ocr(png: bytes, s: Settings) -> str:
+        raise AssertionError("com o código lido, a capa não passa por OCR")
+
+    monkeypatch.setattr(pipeline, "ocr_image", sem_ocr)
     id = pdf(tmp_path)
     capa = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="0")
     provider = FakeProvider(
@@ -306,6 +310,14 @@ NOME_SI = "Analista Judiciário \u2013 Área Técnico Administrativa Especialida
             "",
             ("", "Técnico Judiciário - TRT 15"),
         ),
+        # O texto que vem de OCR, como saiu das capas do TJCE, TRT-1 e TRT-15:
+        # letras trocadas, dígito lido como letra e a aspa de fechar perdida.
+        ({"cargo": NOME_SI}, "Nº do Caderno [Gadero de Prova 'EOS; Tipo 004", ("E05", NOME_SI)),
+        ({"cargo": NOME_SI}, "Caderno de Prova 'FO6', Tipo 004 | MODELO", ("F06", NOME_SI)),
+        ({"cargo": NOME_SI}, "íCadernu de Prova 'Q17, Tipo 004", ("Q17", NOME_SI)),
+        ({"cargo": NOME_SI}, 'Cademo de Prova "28, Tipo 001', ("28", NOME_SI)),
+        # O que o OCR não deixa virar código fica com a leitura da IA.
+        ({"cargo": "F06"}, "Caderno de Prova 'F0X', Tipo 004", ("F06", "")),
     ],
 )
 def test_acertar_cargo(lido: dict[str, str], texto: str, esperado: tuple[str, str]) -> None:
@@ -314,7 +326,10 @@ def test_acertar_cargo(lido: dict[str, str], texto: str, esperado: tuple[str, st
     assert (m.cargo, m.cargo_nome) == esperado
 
 
-async def test_capa_recusada_deixa_a_identificacao_para_o_curador(tmp_path: Path) -> None:
+async def test_capa_recusada_deixa_a_identificacao_para_o_curador(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pipeline, "ocr_image", lambda png, s: "Caderno de Prova 'FO6', Tipo 004")
     id = pdf(tmp_path)
     capa = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="0")
 
@@ -322,7 +337,25 @@ async def test_capa_recusada_deixa_a_identificacao_para_o_curador(tmp_path: Path
         tmp_path, id, capa, FakeProvider(ProviderRefused("SAFETY")), Settings(provas_dir=tmp_path)
     )
 
-    assert m.orgao == "" and m.total == 0
+    # O resto fica para o curador; o código do cargo ainda sai do OCR.
+    assert m.orgao == "" and m.total == 0 and m.cargo == "F06"
+
+
+async def test_capa_escaneada_tira_o_codigo_do_ocr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A capa do TJCE é imagem pura, e a IA devolveu o nome no lugar do
+    código: o código ficava vazio. O OCR do quadro do candidato o traz."""
+    monkeypatch.setattr(
+        pipeline, "ocr_image", lambda png, s: "Nº do Caderno [Gadero de Prova 'EOS; Tipo 004"
+    )
+    id = pdf(tmp_path)
+    capa = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="0")
+    provider = FakeProvider({"Orgao": "TJCE", "Cargo": NOME_SI, "Caderno": "004"})
+
+    m = await pipeline.metadados(tmp_path, id, capa, provider, Settings(provas_dir=tmp_path))
+
+    assert (m.cargo, m.cargo_nome) == ("E05", NOME_SI)
 
 
 @pytest.mark.parametrize(

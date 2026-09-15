@@ -192,27 +192,56 @@ async def metadados(
         )
     except ProviderRefused:
         # Sem capa legível, a identificação fica vazia e vira pendência de
-        # publicação: o curador preenche olhando o original.
-        return Metadados()
-    return acertar_cargo(Metadados.model_validate(raw), texto)
+        # publicação: o curador preenche olhando o original. O código do cargo
+        # ainda pode sair do texto.
+        raw = {}
+    m = acertar_cargo(Metadados.model_validate(raw), texto)
+    if not m.cargo:
+        # A capa escaneada não tem texto, e a IA às vezes devolve o nome no
+        # lugar do código — no TJCE e no TRF-4, o código ficava vazio. O
+        # quadro do candidato, pelo OCR, ainda o diz.
+        m = acertar_cargo(m, await run_in_threadpool(_ocr_da_capa, png, settings))
+    return m
+
+
+def _ocr_da_capa(png: bytes, settings: Settings) -> str:
+    try:
+        return ocr_image(png, settings)
+    except OCRUnavailable:
+        return ""
 
 
 # O código de cargo da FCC: dois ou três dígitos, com ou sem uma letra antes —
 # "F06" no TJCE, "24" no TRT-15, "03" no TRF-4.
 CODIGO_DE_CARGO = re.compile(r"[A-Z]?\d{2,3}")
 _ASPAS = "\"'\u2018\u2019\u201c\u201d"
+# "Caderno de Prova 'F06', Tipo 004", no quadro do candidato e no alto das
+# páginas. O texto de PDF escaneado vem de OCR, que troca letras ("Cademo",
+# "Gadero", "Cadernu") e perde a aspa de fechar ("'Q17, Tipo"): a âncora é
+# "Prova", a aspa de abrir e o "Tipo" logo depois do código.
 _CADERNO_DE_PROVA = re.compile(
-    rf"Caderno\s+de\s+Prova\s*[{_ASPAS}]\s*({CODIGO_DE_CARGO.pattern})\s*[{_ASPAS}]",
-    re.IGNORECASE,
+    rf"Prova\s*[{_ASPAS}]\s*([A-Z0-9]{{2,3}})\s*[{_ASPAS}]?\s*[,;.]?\s*Tipo", re.IGNORECASE
 )
+# O que o OCR lê no lugar dos dígitos: "E05" vira "EOS", e "F06", "FO6".
+_DIGITOS_DO_OCR = str.maketrans("OQDILSZBG", "000115286")
+
+
+def _codigo(lido: str) -> str:
+    """O código como a FCC o escreve: a letra do começo, se houver, e depois
+    só dígitos — o que o OCR trocou por letra volta a ser dígito. Vazio se não
+    sobrar um código."""
+    s = lido.upper()
+    letra = s[0] if len(s) == 3 and s[0].isalpha() else ""
+    codigo = letra + s[len(letra) :].translate(_DIGITOS_DO_OCR)
+    return codigo if CODIGO_DE_CARGO.fullmatch(codigo) else ""
 
 
 def acertar_cargo(m: Metadados, texto: str) -> Metadados:
     """O código do cargo é o que confere o gabarito, e a leitura da capa às
-    vezes devolve o nome no lugar dele. Com texto nativo, o código sai do
-    "Caderno de Prova 'F06'". Sem, um nome no campo do código passa para o do
-    nome, e o código fica vazio para o curador conferir — melhor do que uma
-    pendência que não diz o que está errado."""
+    vezes devolve o nome no lugar dele. Com texto — o nativo, ou o do OCR da
+    capa —, o código sai do "Caderno de Prova 'F06'". Sem, um nome no campo do
+    código passa para o do nome, e o código fica vazio para o curador conferir —
+    melhor do que uma pendência que não diz o que está errado."""
     lido = m.cargo.strip()
     if lido and not CODIGO_DE_CARGO.fullmatch(lido):
         m.cargo_nome = m.cargo_nome or lido
@@ -221,7 +250,7 @@ def acertar_cargo(m: Metadados, texto: str) -> Metadados:
         codigo = re.search(r"\b([A-Z]\d{2,3})\b", lido)
         lido = codigo[1] if codigo else ""
     achado = _CADERNO_DE_PROVA.search(texto)
-    m.cargo = achado[1].upper() if achado else lido
+    m.cargo = (_codigo(achado[1]) if achado else "") or lido
     return m
 
 
