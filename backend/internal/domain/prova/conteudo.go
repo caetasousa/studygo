@@ -334,7 +334,7 @@ const semelhancaEmOutroNumero = 0.95
 func questaoIrma(q Questao, irmas []Publicacao) (Publicacao, Questao, bool) {
 	for _, p := range irmas {
 		for _, pub := range p.Conteudo.Questoes {
-			if pub.Numero == q.Numero && mesmaQuestao(q, pub) {
+			if pub.Numero == q.Numero && (mesmaQuestao(q, pub) || mesmaQuestaoIncompleta(q, pub)) {
 				return p, pub, true
 			}
 		}
@@ -418,6 +418,48 @@ func mesmaQuestao(a, b Questao) bool {
 
 	return contida >= contencaoDoEnunciado || semelhanca(ta, tb) >= semelhancaDoEnunciado ||
 		(fortes && contida >= contencaoComAlternativasFortes)
+}
+
+// Enunciado com isto de palavras decide sozinho que é a mesma questão;
+// "Considere a tabela abaixo." não decide.
+const palavrasParaOEnunciadoDecidir = 12
+
+// mesmaQuestaoIncompleta: a leitura nova perdeu alternativas — a 60 do TRT-15
+// veio sem elas —, e a publicada, que o curador completou, é a mesma questão
+// quando o enunciado é o mesmo e cada alternativa lida bate com a da mesma
+// letra. Sem nenhuma alternativa lida não decide: é a ordem delas que diz se
+// a resposta do gabarito desta prova vale para o conteúdo de lá.
+func mesmaQuestaoIncompleta(nova, publicada Questao) bool {
+	if len(publicada.Alternativas) != 5 {
+		return false
+	}
+	lidas := 0
+	for _, a := range nova.Alternativas {
+		if semConteudo(a.Blocos) {
+			continue
+		}
+		k := slices.IndexFunc(publicada.Alternativas, func(b Alternativa) bool { return b.Letra == a.Letra })
+		if k < 0 {
+			return false
+		}
+		xa, xb := textoDosBlocos(a.Blocos), textoDosBlocos(publicada.Alternativas[k].Blocos)
+		if !equivalentes(xa, xb) && semelhanca(xa, xb) < semelhancaDaAlternativa {
+			return false
+		}
+		lidas++
+	}
+	// Com as cinco lidas, quem decide é mesmaQuestao.
+	if lidas == 0 || lidas == 5 {
+		return false
+	}
+
+	ta, tb := textoDosBlocos(nova.Blocos), textoDosBlocos(publicada.Blocos)
+	ea, eb := palavras(ta), palavras(tb)
+	if min(len(ea), len(eb)) < palavrasParaOEnunciadoDecidir {
+		return false
+	}
+
+	return contencao(ea, eb) >= contencaoDoEnunciado || semelhanca(ta, tb) >= semelhancaDoEnunciado
 }
 
 // leituraDaQuestao junta enunciado e alternativas, com a letra de cada uma.

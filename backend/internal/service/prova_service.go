@@ -105,15 +105,15 @@ func (s *ProvaService) Importar(ctx context.Context, usuario string, pdf, gabari
 		return ImportacaoDeProva{}, erroDeValidacao("envie a prova e o gabarito em PDF")
 	}
 
-	h := sha256.New()
-	h.Write(pdf)
-	h.Write([]byte{0})
-	h.Write(gabarito)
+	// O hash é só o do caderno: a mesma prova com outro gabarito, ou sem ele,
+	// é a mesma prova — o gabarito novo entra por "Trocar o gabarito". Arquivo
+	// diferente da mesma prova é pego depois, pela capa (marcarSeRepetida).
+	h := sha256.Sum256(pdf)
 
 	i := prova.Importacao{
 		ID:        uuid.NewString(),
 		Criador:   usuario,
-		Hash:      hex.EncodeToString(h.Sum(nil)),
+		Hash:      hex.EncodeToString(h[:]),
 		Documento: uuid.NewString(),
 		Estado:    prova.EstadoNaFila,
 		Rascunho:  prova.Rascunho{Banca: "FCC"},
@@ -244,6 +244,18 @@ func (s *ProvaService) Publicar(ctx context.Context, usuario, id string, versao 
 	i.Rascunho.DimensionarFiguras()
 	if p := i.Rascunho.Pendencias(s.ExigirConferencia); len(p) > 0 {
 		return "", erroDeValidacao(fmt.Sprintf("ainda há %d pendências; a primeira: %s", len(p), p[0]))
+	}
+	// A capa sem código deixa a importação passar da conferência da capa; o
+	// curador preenche o cargo, e é aqui que a repetida para.
+	p, repetida, err := s.noCatalogo(ctx, i)
+	if err != nil {
+		return "", err
+	}
+	if repetida {
+		return "", erroDeValidacao(fmt.Sprintf(
+			"esta prova (%s) já está no catálogo; para corrigi-la, abra a publicada e use \"Abrir revisão\"",
+			p.Conteudo.Rotulo(),
+		))
 	}
 	if err := s.verificarArquivos(ctx, i.ID, i.Rascunho); err != nil {
 		return "", err
@@ -651,6 +663,9 @@ func (s *ProvaService) ProcessarUma(ctx context.Context, logger *slog.Logger) er
 
 	executada := i.Etapa
 	inicio := time.Now()
+	// O erro da tentativa anterior sai com o sucesso desta; o que a etapa
+	// deixar em Erro é o motivo de ela ter parado a importação.
+	i.Erro = ""
 	resultado, err := s.executarEtapa(etapaCtx, &i)
 	duracao := time.Since(inicio)
 	i.ProcessadoMS += duracao.Milliseconds()
@@ -674,7 +689,10 @@ func (s *ProvaService) ProcessarUma(ctx context.Context, logger *slog.Logger) er
 		return s.Repo.Falhar(ctx, i, err.Error(), espera)
 	}
 
-	i.Etapa, i.Estado = prova.ProximaEtapa(executada, len(i.Regioes))
+	// A etapa pode ter parado a importação — a prova já estava no catálogo.
+	if i.Estado != prova.EstadoCancelada {
+		i.Etapa, i.Estado = prova.ProximaEtapa(executada, len(i.Regioes))
+	}
 
 	return s.Repo.ConcluirEtapa(ctx, i, executada, resultado, duracao)
 }
@@ -731,6 +749,11 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 			return nil, err
 		}
 		i.Rascunho.AplicarMetadados(m)
+		// A capa já diz que prova é: repetida, para aqui, antes de pagar a
+		// leitura das questões.
+		if err := s.marcarSeRepetida(ctx, i); err != nil {
+			return nil, err
+		}
 
 		return m, nil
 
@@ -818,6 +841,54 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 // do mesmo concurso (banca, órgão e ano) já têm — as de Conhecimentos Gerais
 // repetem em todos os cargos. Os recortes delas são registrados nesta
 // importação: é o registro que deixa a figura ser vista e a guarda da limpeza.
+// marcarSeRepetida para a importação da prova que já está no catálogo ou em
+// outra importação ativa (prova.Importacao.JaImportada). A revisão de uma
+// prova publicada — Revisar, Reextrair — é ela mesma, e não conta.
+func (s *ProvaService) marcarSeRepetida(ctx context.Context, i *prova.Importacao) error {
+	if i.ProvaID != "" {
+		return nil
+	}
+	p, publicada, err := s.noCatalogo(ctx, *i)
+	if err != nil {
+		return err
+	}
+	if publicada {
+		i.JaImportada(p.Conteudo, true)
+		return nil
+	}
+	outras, err := s.Repo.ImportacoesAtivasDoAno(ctx, i.Rascunho.Banca, i.Rascunho.Ano, i.ID)
+	if err != nil {
+		return err
+	}
+	for _, o := range outras {
+		if o.ProvaID == "" && prova.MesmaProva(i.Rascunho, o.Rascunho) {
+			i.JaImportada(o.Rascunho, false)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// noCatalogo acha, entre as provas publicadas, a mesma prova da importação —
+// menos ela própria, quando a importação é a revisão de uma.
+func (s *ProvaService) noCatalogo(ctx context.Context, i prova.Importacao) (prova.Publicacao, bool, error) {
+	if i.Rascunho.Ano <= 0 {
+		return prova.Publicacao{}, false, nil
+	}
+	provas, err := s.Repo.ProvasDoAno(ctx, i.Rascunho.Banca, i.Rascunho.Ano, i.ProvaID)
+	if err != nil {
+		return prova.Publicacao{}, false, err
+	}
+	for _, p := range provas {
+		if prova.MesmaProva(i.Rascunho, p.Conteudo) {
+			return p, true, nil
+		}
+	}
+
+	return prova.Publicacao{}, false, nil
+}
+
 func (s *ProvaService) reaproveitar(ctx context.Context, i *prova.Importacao) (int, error) {
 	r := &i.Rascunho
 	if r.Orgao == "" || r.Ano == 0 {

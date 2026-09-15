@@ -165,6 +165,88 @@ func TestReaproveitar_OutroNumero(t *testing.T) {
 	}
 }
 
+// O caso da 60 do TRT-15 na segunda importação: a leitura nova perdeu as
+// alternativas C a E, e a publicada, que o curador completou, é a mesma
+// questão — antes, sem as cinco alternativas, ela aparecia como não cadastrada.
+func TestReaproveitar_LeituraQuePerdeuAlternativas(t *testing.T) {
+	t.Parallel()
+
+	enunciado := "Um Tribunal Regional do Trabalho está desenvolvendo um sistema de gestão de " +
+		"processos judiciais. O padrão de projeto mais adequado para alcançar essa flexibilidade é o"
+	publicada := questao(60, true, enunciado)
+	incompleta := questao(60, false, enunciado)
+	incompleta.Alternativas = incompleta.Alternativas[:2]
+	vazia := questao(60, false, enunciado)
+	vazia.Alternativas[3].Blocos[0].Texto = "" // a D lida em branco
+	outraOrdem := questao(60, false, enunciado)
+	outraOrdem.Alternativas = outraOrdem.Alternativas[:2]
+	outraOrdem.Alternativas[0].Blocos[0].Texto = "Decorator"
+	curto := questao(60, false, "Considere a tabela abaixo.")
+	curto.Alternativas = curto.Alternativas[:2]
+	semAlternativa := questao(60, false, enunciado)
+	semAlternativa.Alternativas = nil
+
+	for nome, c := range map[string]struct {
+		lida    Questao
+		reusada bool
+	}{
+		"perdeu C a E":             {incompleta, true},
+		"leu uma em branco":        {vazia, true},
+		"alternativa noutra ordem": {outraOrdem, false},
+		"enunciado de molde":       {curto, false},
+		// Sem alternativa lida, nada garante a mesma ordem, e a resposta do
+		// gabarito desta prova valeria para as alternativas de lá.
+		"nenhuma alternativa": {semAlternativa, false},
+	} {
+		r := Rascunho{Questoes: []Questao{c.lida}}
+
+		r.Reaproveitar([]Publicacao{irma(publicada)})
+
+		if got := r.Questoes[0].IgualA != ""; got != c.reusada {
+			t.Errorf("%s: reaproveitada = %v, quer %v", nome, got, c.reusada)
+		}
+		if c.reusada && len(r.Questoes[0].Alternativas) != 5 {
+			t.Errorf("%s: ficou com %d alternativas, quer as cinco da publicada", nome, len(r.Questoes[0].Alternativas))
+		}
+	}
+}
+
+func TestMesmaProva(t *testing.T) {
+	t.Parallel()
+
+	base := Rascunho{Banca: "FCC", Orgao: "TRT 15", Ano: 2025, Cargo: "28", Caderno: "001"}
+	mudar := func(f func(*Rascunho)) Rascunho {
+		r := base
+		f(&r)
+		return r
+	}
+
+	iguais := map[string]Rascunho{
+		"a mesma":                base,
+		"órgão escrito de outro": mudar(func(r *Rascunho) { r.Orgao = "TRT-15" }),
+		"outro tipo de caderno":  mudar(func(r *Rascunho) { r.Caderno = "004" }),
+		"código com o nome":      mudar(func(r *Rascunho) { r.Cargo = "28 - Técnico Judiciário" }),
+	}
+	for nome, outra := range iguais {
+		if !MesmaProva(base, outra) {
+			t.Errorf("%s: devia ser a mesma prova", nome)
+		}
+	}
+
+	for nome, outra := range map[string]Rascunho{
+		"outro cargo":  mudar(func(r *Rascunho) { r.Cargo = "24" }),
+		"outro ano":    mudar(func(r *Rascunho) { r.Ano = 2024 }),
+		"outro órgão":  mudar(func(r *Rascunho) { r.Orgao = "TRT 1" }),
+		"sem código":   mudar(func(r *Rascunho) { r.Cargo = "" }),
+		"ano não lido": mudar(func(r *Rascunho) { r.Ano = 0 }),
+		"outra banca":  mudar(func(r *Rascunho) { r.Banca = "CESPE" }),
+	} {
+		if MesmaProva(base, outra) || MesmaProva(outra, base) {
+			t.Errorf("%s: não devia ser a mesma prova", nome)
+		}
+	}
+}
+
 func TestMesmoOrgao(t *testing.T) {
 	t.Parallel()
 

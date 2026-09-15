@@ -224,7 +224,11 @@ com as das provas publicadas da mesma banca, ano e órgão (`MesmoOrgao`: "TRF 1
 é "TRF1"). É a mesma questão quando cada alternativa, na mesma letra, bate por
 letras (o OCR troca "Sêneca" por "Sâneca") e o enunciado de uma contém o da
 outra; com cinco alternativas de texto quase idênticas, o enunciado pode ter
-perdido um trecho na leitura. Com outro número, só a quase idêntica. A questão
+perdido um trecho na leitura. A leitura que perdeu alternativas também é a
+mesma, com o mesmo número, quando o enunciado bate e cada alternativa lida bate
+na mesma letra (`mesmaQuestaoIncompleta`) — sem nenhuma lida, não: é a ordem
+delas que diz se a resposta do gabarito desta prova vale para o conteúdo de lá.
+Com outro número, só a quase idêntica. A questão
 igual vira referência à já cadastrada (`Rascunho.Reaproveitar`): o conteúdo é o
 de lá, que o curador revisou, a resposta é a do gabarito desta prova, ela entra
 conferida e não aparece na revisão — um aviso lista as reaproveitadas. Uma
@@ -386,9 +390,19 @@ das questões: ligar "1-10" põe o texto nas dez de uma vez, e texto sem questã
 pendência. Na tela do aluno, cada questão mostra o seu texto num recolhível
 aberto; quem o fecha numa questão o encontra fechado nas outras que o usam.
 
-**Cancelar solta os PDFs; excluir apaga o rascunho.** Reenviar os mesmos PDFs
-acha a importação aberta (índice único no hash). Cancelada, ela perde o hash
-(`Importacao.Cancelar`) e os mesmos arquivos podem recomeçar do zero. Excluir
+**A mesma prova não entra duas vezes.** O hash é só o do caderno: reenviar o
+mesmo PDF, com outro gabarito ou sem ele, acha a importação que já existe
+(índice único no hash). Outro arquivo da mesma prova é pego pela capa: logo
+depois dela, a importação com a mesma banca, órgão, ano e código do cargo de
+uma prova publicada ou de outra importação ativa (`MesmaProva`; o tipo do
+caderno não conta) para ali, sem ler gabarito nem questão — cancelada, com o
+motivo, e segurando o hash (`Importacao.JaImportada`). A revisão de uma
+publicada é ela mesma e não conta; e a publicação recusa a repetida que passou
+pela capa sem código.
+
+**Cancelar solta os PDFs; excluir apaga o rascunho.** Cancelada pelo curador,
+a importação perde o hash (`Importacao.Cancelar`) e os mesmos arquivos podem
+recomeçar do zero. Excluir
 apaga a importação, com etapas e vínculos; a publicada é o histórico da prova e
 não sai, e a que está processando precisa parar antes.
 

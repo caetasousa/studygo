@@ -40,8 +40,28 @@ type fakeProvas struct {
 	irmas []prova.Publicacao
 }
 
-func (f *fakeProvas) ProvasDoAno(context.Context, string, int, string) ([]prova.Publicacao, error) {
-	return f.irmas, nil
+func (f *fakeProvas) ProvasDoAno(_ context.Context, _ string, _ int, exceto string) ([]prova.Publicacao, error) {
+	var out []prova.Publicacao
+	for _, p := range f.irmas {
+		if p.ID != exceto {
+			out = append(out, p)
+		}
+	}
+
+	return out, nil
+}
+
+func (f *fakeProvas) ImportacoesAtivasDoAno(_ context.Context, banca string, ano int, exceto string) ([]prova.Importacao, error) {
+	var out []prova.Importacao
+	for id, i := range f.importacoes {
+		ativa := i.Estado == prova.EstadoNaFila || i.Estado == prova.EstadoProcessando ||
+			i.Estado == prova.EstadoEmRevisao || i.Estado == prova.EstadoFalhou
+		if ativa && id != exceto && strings.EqualFold(i.Rascunho.Banca, banca) && i.Rascunho.Ano == ano {
+			out = append(out, i)
+		}
+	}
+
+	return out, nil
 }
 
 func (f *fakeProvas) Publicacao(_ context.Context, id string) (prova.Publicacao, error) {
@@ -968,6 +988,131 @@ func TestProvas_RelerTrechoRecusaOQueNaoDaParaLer(t *testing.T) {
 	naFila := repo.importacoes[revisao.ID]
 	if _, err := s.RelerTrecho(ctx, curador, revisao.ID, naFila.Versao, 2, trechoDaQuestao2); !errors.Is(err, prova.ErrConflito) {
 		t.Errorf("com um trecho na fila: err = %v, quer ErrConflito", err)
+	}
+}
+
+// O caso do TRT-15 em staging: a mesma prova importada de novo. A capa diz que
+// é a publicada, e a importação para ali — sem ler gabarito nem questão —,
+// cancelada com o motivo e segurando o hash, para o reenvio cair nela.
+func TestProvas_ProvaNoCatalogoParaNaCapa(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	// A capa lê "TJCE 2026 · E05"; a publicada foi lida "TJ-CE", tipo 001.
+	repo.irmas = []prova.Publicacao{{ID: "publicada", Conteudo: prova.Rascunho{
+		Banca: "FCC", Orgao: "TJ-CE", Ano: 2026, Cargo: "E05", Caderno: "001",
+	}}}
+	nova, err := s.Importar(context.Background(), curador, pdfMinimo, pdfMinimo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	final := processarTudo(t, s, repo, nova.ID)
+
+	if final.Estado != prova.EstadoCancelada || !strings.Contains(final.Erro, "já está no catálogo") {
+		t.Fatalf("estado = %s, erro = %q; quer cancelada com o motivo", final.Estado, final.Erro)
+	}
+	if len(extrator.extraidas) != 0 || !slices.Equal(repo.etapas, []int{prova.EtapaPreparar, prova.EtapaMetadados}) {
+		t.Fatalf("regiões lidas = %v, etapas = %v; quer só preparar e a capa", extrator.extraidas, repo.etapas)
+	}
+	if final.Hash == "" {
+		t.Fatal("a repetida soltou o hash: o reenvio dos mesmos PDFs abriria outra importação")
+	}
+}
+
+// A mesma prova numa importação que ainda está em revisão também conta; a
+// revisão de uma prova publicada, não — ela é a própria prova.
+func TestProvas_ProvaEmOutraImportacaoParaNaCapa(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	ctx := context.Background()
+	primeira, err := s.Importar(ctx, curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i := processarTudo(t, s, repo, primeira.ID); i.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("primeira: estado %s", i.Estado)
+	}
+
+	segunda, err := s.Importar(ctx, curador, []byte("%PDF-1.7 outro arquivo da mesma prova"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	final := processarTudo(t, s, repo, segunda.ID)
+
+	if final.Estado != prova.EstadoCancelada || !strings.Contains(final.Erro, "já está em outra importação") {
+		t.Fatalf("segunda: estado = %s, erro = %q", final.Estado, final.Erro)
+	}
+	if i := repo.importacoes[primeira.ID]; i.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("a primeira mudou: %s", i.Estado)
+	}
+}
+
+// Capa sem código: a importação passa da conferência da capa, o curador
+// preenche o cargo, e é a publicação que recusa a prova que já está no
+// catálogo.
+func TestProvas_PublicarRecusaProvaQueJaEstaNoCatalogo(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, volume := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	s.ExigirConferencia = false
+	volume.nomes["doc.pdf"] = true
+	repo.irmas = []prova.Publicacao{{ID: "publicada", Conteudo: prova.Rascunho{
+		Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", CargoNome: "Analista",
+	}}}
+	r := prova.Rascunho{Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 1,
+		Questoes: []prova.Questao{questaoExtraida(1, true)}}
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
+
+	_, err := s.Publicar(context.Background(), curador, "i", 1)
+
+	var v ErrValidacao
+	if !errors.As(err, &v) || !strings.Contains(err.Error(), "já está no catálogo") {
+		t.Fatalf("err = %v, quer ErrValidacao dizendo que a prova já está no catálogo", err)
+	}
+
+	// A revisão da própria publicada publica normalmente.
+	revisao := repo.importacoes["i"]
+	revisao.ProvaID = "publicada"
+	repo.importacoes["i"] = revisao
+	if _, err := s.Publicar(context.Background(), curador, "i", 1); err != nil {
+		t.Fatalf("revisão da publicada: %v", err)
+	}
+}
+
+// O hash é o do caderno: a mesma prova com outro gabarito, ou sem ele, é o
+// mesmo reenvio.
+func TestProvas_HashEOCaderno(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extratorDeDuasRegioes())
+	ctx := context.Background()
+
+	var hashes []string
+	for _, gabarito := range [][]byte{nil, pdfMinimo, []byte("%PDF-1.7 gabarito definitivo")} {
+		i, err := s.Importar(ctx, curador, pdfMinimo, gabarito)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hashes = append(hashes, repo.importacoes[i.ID].Hash)
+	}
+	outra, err := s.Importar(ctx, curador, []byte("%PDF-1.7 outra prova"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hashes[0] == "" || hashes[0] != hashes[1] || hashes[1] != hashes[2] {
+		t.Fatalf("hashes do mesmo caderno = %v, quer um só", hashes)
+	}
+	if repo.importacoes[outra.ID].Hash == hashes[0] {
+		t.Fatal("outra prova com o mesmo hash")
 	}
 }
 

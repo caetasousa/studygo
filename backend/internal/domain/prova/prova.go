@@ -643,6 +643,33 @@ func (i *Importacao) Cancelar() {
 	i.Hash = ""
 }
 
+// MesmaProva diz se os dois rascunhos são a mesma prova: banca, órgão, ano e
+// código do cargo. O tipo do caderno não conta — os tipos da FCC são a mesma
+// prova em outra ordem, e o catálogo teria o mesmo concurso duas vezes. Sem
+// ano ou sem código de um dos lados não dá para dizer, e não é.
+func MesmaProva(a, b Rascunho) bool {
+	if a.Ano <= 0 || a.Ano != b.Ano || !strings.EqualFold(a.Banca, b.Banca) || !MesmoOrgao(a.Orgao, b.Orgao) {
+		return false
+	}
+
+	return a.Cargo != "" && b.Cargo != "" && (mesmoCargo(a.Cargo, b.Cargo) || mesmoCargo(b.Cargo, a.Cargo))
+}
+
+// JaImportada para a importação que repete uma prova do catálogo ou de outra
+// importação: nada além da capa é lido. Ela fica cancelada, com o motivo, e
+// continua segurando o hash — reenviar os mesmos PDFs cai nela, e não numa
+// importação nova.
+func (i *Importacao) JaImportada(outra Rascunho, publicada bool) {
+	i.Estado = EstadoCancelada
+	if publicada {
+		i.Erro = fmt.Sprintf("Esta prova (%s) já está no catálogo, e nada foi importado de novo. "+
+			"Para corrigir a publicada, abra-a e use \"Abrir revisão\".", outra.Rotulo())
+		return
+	}
+	i.Erro = fmt.Sprintf("Esta prova (%s) já está em outra importação, e nada foi importado de novo. "+
+		"Continue por aquela, na curadoria; se ela não serve, exclua-a e importe de novo.", outra.Rotulo())
+}
+
 // Excluivel diz se a importação pode ser apagada. A publicada é o histórico
 // da prova; a que está processando teria o passo em andamento gravando
 // arquivos para ninguém — cancela-se antes.

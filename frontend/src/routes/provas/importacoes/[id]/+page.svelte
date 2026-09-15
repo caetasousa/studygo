@@ -389,6 +389,8 @@
 		void executar(async () => {
 			await recarregar();
 			if (!imp) return;
+			if (page.url.searchParams.has('existente'))
+				aviso = 'Este caderno já tinha sido importado: esta é a importação dele, e nada foi importado de novo.';
 			irPara(questoesProprias[0] ?? 0);
 			// Questão com defeito vem primeiro no mapa: é o que precisa de mão.
 			if (comProblema.length > 0) escolherFiltro('problema');

@@ -117,6 +117,66 @@ func TestProvas_ReenvioECancelamento(t *testing.T) {
 	}
 }
 
+// A conferência de prova repetida compara com as importações ativas da mesma
+// banca e ano; a que para na capa fica cancelada, com o motivo, e segura o
+// hash — o reenvio dos mesmos PDFs cai nela, e não numa importação nova.
+func TestProvas_RepetidaParaNaCapaESeguraOHash(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	criar := func(hash string, ano int) prova.Importacao {
+		t.Helper()
+		i := novaImportacao(criador, hash)
+		i.Rascunho = prova.Rascunho{Banca: "FCC", Orgao: "TRT15", Ano: ano, Cargo: "28"}
+		criada, err := repo.Criar(ctx, i, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return criada
+	}
+
+	// A mais antiga é a próxima da fila: é a que chega à capa.
+	nova := criar("nova", 2025)
+	ativa := criar("ativa", 2025)
+	criar("outro-ano", 2024)
+	cancelada := criar("cancelada", 2025)
+	cancelada.Cancelar()
+	if err := repo.Salvar(ctx, cancelada, cancelada.Versao); err != nil {
+		t.Fatal(err)
+	}
+
+	job, err := repo.Reservar(ctx)
+	if err != nil || job.ID != nova.ID {
+		t.Fatalf("reservou %v (%v), quer a nova", job.ID, err)
+	}
+	outras, err := repo.ImportacoesAtivasDoAno(ctx, "fcc", 2025, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outras) != 1 || outras[0].ID != ativa.ID || outras[0].Rascunho.Cargo != "28" {
+		t.Fatalf("ativas do ano = %+v, quer só a ativa de 2025", outras)
+	}
+
+	job.JaImportada(outras[0].Rascunho, false)
+	if err := repo.ConcluirEtapa(ctx, job, prova.EtapaMetadados, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	gravada, err := repo.Obter(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gravada.Estado != prova.EstadoCancelada || gravada.Erro != job.Erro || gravada.Erro == "" {
+		t.Fatalf("estado = %s, erro = %q; quer cancelada com o motivo", gravada.Estado, gravada.Erro)
+	}
+	reenvio, err := repo.Criar(ctx, novaImportacao(criador, "nova"), 10)
+	if err != nil || reenvio.ID != job.ID {
+		t.Fatalf("o reenvio abriu outra importação: %v %v", reenvio.ID, err)
+	}
+}
+
 func TestProvas_FilaAceitaSoATentativaQueDetemAReserva(t *testing.T) {
 	t.Parallel()
 

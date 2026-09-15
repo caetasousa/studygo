@@ -317,10 +317,10 @@ func (r *ProvaRepo) ConcluirEtapa(
 	tag, err := tx.Exec(ctx,
 		`UPDATE provas_importacoes
 		    SET rascunho = $3, regioes = $4, etapa = $5, estado = $6, processado_ms = $7,
-		        versao = versao + 1, falhas = 0, erro = '', reserva_ate = NULL, tentativa = '',
+		        versao = versao + 1, falhas = 0, erro = $8, reserva_ate = NULL, tentativa = '',
 		        disponivel_em = now(), atualizado_em = now()
 		  WHERE id = $1 AND tentativa = $2 AND estado = 'processando' AND reserva_ate > now()`,
-		i.ID, i.Tentativa, rascunho, regioes, i.Etapa, i.Estado, i.ProcessadoMS,
+		i.ID, i.Tentativa, rascunho, regioes, i.Etapa, i.Estado, i.ProcessadoMS, i.Erro,
 	)
 	if err != nil {
 		return fmt.Errorf("concluindo etapa: %w", err)
@@ -678,6 +678,32 @@ func (r *ProvaRepo) ProvasDoAno(ctx context.Context, banca string, ano int, exce
 			return nil, err
 		}
 		out = append(out, p)
+	}
+
+	return out, rows.Err()
+}
+
+func (r *ProvaRepo) ImportacoesAtivasDoAno(ctx context.Context, banca string, ano int, exceto string) ([]prova.Importacao, error) {
+	rows, err := r.pool.Query(ctx, selecionarResumo+`
+		 WHERE estado IN ('na_fila', 'processando', 'em_revisao', 'falhou')
+		   AND upper(rascunho->>'Banca') = upper($1)
+		   AND rascunho->>'Ano' = $2
+		   AND id::text <> $3
+		 ORDER BY criado_em`,
+		banca, strconv.Itoa(ano), exceto,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("consultando importações ativas do ano: %w", err)
+	}
+	defer rows.Close()
+
+	var out []prova.Importacao
+	for rows.Next() {
+		i, err := escanearImportacao(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, i)
 	}
 
 	return out, rows.Err()

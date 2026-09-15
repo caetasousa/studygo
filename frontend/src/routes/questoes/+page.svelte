@@ -159,7 +159,10 @@
 		const prova = arquivoProva?.files?.[0];
 		if (!prova) throw new Error('escolha o PDF da prova');
 		const nova = await provasApi.importar(prova, arquivoGabarito?.files?.[0] ?? null);
-		await goto(`/provas/importacoes/${nova.id}`);
+		// O mesmo caderno devolve a importação que já existe; a nova nasce na
+		// fila, na primeira versão.
+		const existente = nova.versao > 1 || nova.estado !== 'na_fila';
+		await goto(`/provas/importacoes/${nova.id}${existente ? '?existente=1' : ''}`);
 	}
 
 	onMount(() => {

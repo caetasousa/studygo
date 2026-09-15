@@ -30,9 +30,9 @@ type FiltroCatalogo struct {
 // caso do worker) e devolvem prova.ErrConflito quando ela já não vale: é assim
 // que um resultado atrasado não sobrescreve a revisão de um humano.
 type ProvaRepository interface {
-	// Criar grava a importação e registra seus arquivos. Mesmo hash de uma
-	// importação ativa devolve a existente; acima de limite pendentes por
-	// criador, prova.ErrLimite.
+	// Criar grava a importação e registra seus arquivos. Mesmo hash — o do
+	// caderno — de uma importação que ainda o segura devolve a existente; acima
+	// de limite pendentes por criador, prova.ErrLimite.
 	Criar(ctx context.Context, i prova.Importacao, limite int) (prova.Importacao, error)
 	Obter(ctx context.Context, id string) (prova.Importacao, error)
 	// ListarResumos traz as importações mais recentes com o rascunho SEM
@@ -45,8 +45,9 @@ type ProvaRepository interface {
 	// não houver nada ou se outra importação estiver em andamento.
 	Reservar(ctx context.Context) (prova.Importacao, error)
 	Renovar(ctx context.Context, id, tentativa string) (bool, error)
-	// ConcluirEtapa grava o avanço da importação e o resultado isolado da
-	// etapa executada, se a tentativa ainda detiver a reserva.
+	// ConcluirEtapa grava o avanço da importação — com o Erro que a etapa
+	// deixou, o motivo de ela ter parado ali — e o resultado isolado da etapa
+	// executada, se a tentativa ainda detiver a reserva.
 	ConcluirEtapa(ctx context.Context, i prova.Importacao, etapa int, resultado any, duracao time.Duration) error
 	// Excluir apaga a importação se ela continua como foi carregada — mesma
 	// versão e mesmo estado; senão, prova.ErrConflito.
@@ -74,6 +75,10 @@ type ProvaRepository interface {
 	// a ter as mesmas questões de uma importação (quem decide o órgão é o
 	// domínio, que lê "TRF 1" e "TRF1" como o mesmo).
 	ProvasDoAno(ctx context.Context, banca string, ano int, exceto string) ([]prova.Publicacao, error)
+	// ImportacoesAtivasDoAno devolve, sem as questões, as importações ainda na
+	// fila, processando, em revisão ou com falha da mesma banca e ano, menos
+	// `exceto`: as do mesmo órgão e cargo são a mesma prova entrando de novo.
+	ImportacoesAtivasDoAno(ctx context.Context, banca string, ano int, exceto string) ([]prova.Importacao, error)
 	// Anotacoes são as do usuário nas questões de uma prova, por número.
 	Anotacoes(ctx context.Context, usuario, provaID string) ([]prova.Anotacao, error)
 	// SalvarAnotacao grava a anotação da questão, criando ou substituindo.
