@@ -9,7 +9,9 @@
 		versao,
 		regiao,
 		inicial,
-		onaplicar
+		onaplicar,
+		onmarcar,
+		rotulo = 'Aplicar recorte'
 	}: {
 		importacao: string;
 		versao: number;
@@ -17,7 +19,10 @@
 		regiao: Origem;
 		/** Retângulo com que o seletor começa, em pontos do PDF. */
 		inicial: number[];
-		onaplicar: (arquivo: string, origem: Origem) => void;
+		onaplicar?: (arquivo: string, origem: Origem) => void;
+		/** No lugar do recorte, entrega o retângulo marcado — o trecho a reler. */
+		onmarcar?: (origem: Origem) => Promise<void>;
+		rotulo?: string;
 	} = $props();
 
 	let url = $state('');
@@ -139,8 +144,12 @@
 		erro = '';
 		try {
 			const origem: Origem = { ...regiao, retangulo: r };
-			const { arquivo } = await provasApi.recortar(importacao, versao, origem);
-			onaplicar(arquivo, origem);
+			if (onmarcar) {
+				await onmarcar(origem);
+			} else {
+				const { arquivo } = await provasApi.recortar(importacao, versao, origem);
+				onaplicar?.(arquivo, origem);
+			}
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'não foi possível recortar';
 		} finally {
@@ -197,7 +206,7 @@
 	</fieldset>
 
 	<button class="btn primary" type="button" disabled={ocupado || !url} onclick={aplicar}>
-		{ocupado ? 'Recortando…' : 'Aplicar recorte'}
+		{ocupado ? (onmarcar ? 'Enviando…' : 'Recortando…') : rotulo}
 	</button>
 	{#if erro && url}<p class="form-error">{erro}</p>{/if}
 </div>

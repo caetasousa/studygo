@@ -268,7 +268,17 @@ o número da questão (`QuestaoDaReleitura`), o OCR acha "42." na região, na
 página dela e nas vizinhas, e lê só a questão, do número até a seguinte
 (`localizar_questao`) — a posição que o modelo dá para as vizinhas chegou a
 errar a página. Na revisão, "Reler" faz o mesmo sob demanda,
-e o filtro "Com problema" mostra as questões com defeito. Quando o Gemini se
+e o filtro "Com problema" mostra as questões com defeito. Quando nem isso
+acerta, o curador marca no original o **trecho** que ficou errado ("Ler de
+novo", no painel ao lado da questão) — ela inteira, só o enunciado ou só as
+alternativas que faltaram: a etapa `EtapaTrecho` lê só aquele retângulo, como
+está, sem procurar a questão pelo número, e volta direto à revisão, sem
+consolidar de novo. O que o trecho trouxe entra sem comparar com a leitura
+antiga — quem apontou onde está foi o curador —: o enunciado, se veio, e cada
+alternativa pela letra; o resto da questão, a matéria, a resposta e os textos
+ligados ficam (`Rascunho.AplicarTrecho`). Sem o número dentro do trecho, o
+modelo chuta outro, e vale a única questão lida. O trecho é a última região da
+lista, rotulada `t<número>`. Quando o Gemini se
 recusa a transcrever o texto de apoio (recitação de obra publicada), o
 processador pede só a estrutura e transcreve o texto por OCR do retângulo, com
 alerta para o curador. Recusada até a estrutura — as questões citam trechos do
@@ -481,7 +491,7 @@ GET       /api/provas/{id}                     ← ?numero= e ?disciplina= filtr
 GET       /api/provas/arquivos/{id}            ← PDF ou recorte
 POST      /api/provas/{id}/{revisar,reextrair} DELETE /api/provas/{id}       ← curadoria
 GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
-POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,recortar,gabarito,materias}
+POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,materias}
 GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante
 ```
 

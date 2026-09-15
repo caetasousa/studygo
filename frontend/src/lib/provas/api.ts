@@ -91,6 +91,13 @@ export const provasApi = {
 	/** Volta à fila só para reler as questões incompletas. */
 	reler: (id: string, versao: number) => request<Importacao>(`${imp}/${id}/reler`, comVersao(versao)),
 
+	/** Volta à fila só para ler o trecho marcado; o que ele trouxer entra na questão. */
+	relerTrecho: (id: string, versao: number, questao: number, origem: Origem) =>
+		request<Importacao>(`${imp}/${id}/trecho`, {
+			method: 'POST',
+			body: JSON.stringify({ versao, questao, origem })
+		}),
+
 	/** Compara de novo com as provas publicadas do concurso e troca por referência as que elas já têm. */
 	procurarCadastradas: (id: string, versao: number) =>
 		request<Importacao>(`${imp}/${id}/cadastradas`, comVersao(versao)),

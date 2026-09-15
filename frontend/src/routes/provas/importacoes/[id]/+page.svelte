@@ -22,10 +22,14 @@
 		proximaPendente,
 		questaoPendente,
 		regiaoDaQuestao,
+		regiaoDoCaderno,
+		regiaoDoTrecho,
 		retanguloInicial,
 		rotuloDaRegiao,
 		temFigura,
-		escreverNumeros
+		escreverNumeros,
+		eTrecho,
+		trechoInicial
 	} from '$lib/provas/revisao';
 	import type { EstadoImportacao, Importacao, Origem } from '$lib/provas/types';
 
@@ -50,10 +54,14 @@
 	// O painel da direita mostra a questão no caderno; a região inteira e o
 	// recorte de figura só quando o curador pede — a maioria das questões nem
 	// tem figura.
-	let painel = $state<'questao' | 'regiao' | 'recorte'>('questao');
+	let painel = $state<'questao' | 'regiao' | 'recorte' | 'trecho'>('questao');
 	let zoom = $state(100);
 	let faltando = $state('');
 	let novoGabarito = $state<HTMLInputElement | null>(null);
+	// O trecho relido: em que faixa do caderno ele é marcado, e para qual
+	// questão voltar quando a leitura terminar — a fila devolve a tela ao começo.
+	let trechoIdx = $state(0);
+	let voltarPara = $state<{ numero: number; alertas: number } | null>(null);
 
 	type Etapa = 'dados' | 'textos' | 'questoes' | 'publicar';
 	const ETAPAS: { id: Etapa; nome: string }[] = [
@@ -77,14 +85,21 @@
 		regiao && q && imp ? retanguloInicial(regiao, blocoDoDestino(imp.rascunho, q, destino)) : [0, 0, 0, 0]
 	);
 	const faltam = $derived(imp ? numerosFaltando(imp.rascunho) : []);
+	const faixas = $derived(imp ? imp.regioes.flatMap((r, i) => (regiaoDoCaderno(r) ? [i] : [])) : []);
+	const regiaoTrecho = $derived<Origem | undefined>(imp?.regioes[trechoIdx]);
+	const inicialTrecho = $derived(regiaoTrecho ? trechoInicial(regiaoTrecho, q) : [0, 0, 0, 0]);
 	// Importação anterior à posição exata da questão: a origem é a região toda.
+	// O trecho marcado não conta: ele já é o lugar da questão.
 	const soRegiao = $derived(
 		!!q &&
 			!!imp &&
 			q.origens.length > 0 &&
 			q.origens.every((o) =>
 				imp!.regioes.some(
-					(r) => r.regiao === o.regiao && r.retangulo.every((v, k) => Math.abs(v - o.retangulo[k]) < 0.5)
+					(r) =>
+						!eTrecho(r) &&
+						r.regiao === o.regiao &&
+						r.retangulo.every((v, k) => Math.abs(v - o.retangulo[k]) < 0.5)
 				)
 			)
 	);
@@ -157,6 +172,38 @@
 	async function reler() {
 		if (!imp) return;
 		receber(await provasApi.reler(imp.id, imp.versao), false);
+	}
+
+	function abrirTrecho() {
+		if (!imp) return;
+		trechoIdx = regiaoDoTrecho(imp.regioes, q);
+		painel = 'trecho';
+	}
+
+	// A fila lê o rascunho salvo: o que foi editado vai antes, ou a leitura
+	// nova chegaria por cima e a edição se perderia.
+	async function relerTrecho(origem: Origem) {
+		await executar(async () => {
+			if (!imp || !q) return;
+			if (alterado) await salvar();
+			const numero = q.numero;
+			const nova = await provasApi.relerTrecho(imp.id, imp.versao, numero, origem);
+			voltarPara = { numero, alertas: imp.rascunho.alertas.length };
+			receber(nova);
+		});
+	}
+
+	/** O que o relógio traz enquanto a fila anda; ao voltar do trecho, a questão dele. */
+	function acompanhar(nova: Importacao) {
+		receber(nova, false);
+		if (nova.estado !== 'em_revisao' || !voltarPara) return;
+		const { numero, alertas } = voltarPara;
+		voltarPara = null;
+		irPara(nova.rascunho.questoes.findIndex((x) => x.numero === numero));
+		const novos = nova.rascunho.alertas.slice(alertas);
+		aviso = novos.length
+			? novos.join(' ')
+			: `A questão ${numero} foi lida de novo pelo trecho marcado. Confira com o original e marque como conferida.`;
 	}
 
 	async function procurarCadastradas() {
@@ -351,7 +398,7 @@
 			if (imp.rascunho.apoios.some((a) => !a.revisado || a.questoes.length === 0)) etapa = 'textos';
 		});
 		const relogio = setInterval(() => {
-			if (andando && !ocupado) provasApi.importacao(id).then((i) => receber(i, false)).catch(falhar);
+			if (andando && !ocupado) provasApi.importacao(id).then(acompanhar).catch(falhar);
 		}, 4000);
 		return () => clearInterval(relogio);
 	});
@@ -411,7 +458,15 @@
 					</span>
 				</div>
 				<div class="card-body estado">
-					{#if andando}
+					{#if andando && imp.etapa < 0}
+						<!-- Etapa negativa relê só uma parte — o gabarito novo ou um trecho
+						     marcado — e volta à revisão; não há "etapa X de Y" para mostrar. -->
+						<p>
+							Lendo de novo só o que você pediu; o resto do rascunho fica como está. A revisão
+							volta sozinha quando terminar.
+						</p>
+						<progress></progress>
+					{:else if andando}
 						<p>
 							Etapa {imp.etapa} de {imp.totalEtapas}. A extração continua mesmo com esta tela
 							fechada.
@@ -824,6 +879,8 @@
 						<div class="card-top">
 							{#if painel === 'recorte'}
 								Recortar figura · questão {q?.numero ?? '—'}
+							{:else if painel === 'trecho'}
+								Ler de novo · questão {q?.numero ?? '—'}
 							{:else if painel === 'regiao'}
 								Região do caderno
 							{:else}
@@ -850,9 +907,19 @@
 								>
 									Recortar figura
 								</button>
+								<button
+									class="btn"
+									class:primary={painel === 'trecho'}
+									type="button"
+									disabled={!q}
+									title="Para a questão que a extração leu mal: marque no caderno a parte que ficou errada, e a IA lê só esse trecho"
+									onclick={abrirTrecho}
+								>
+									Ler de novo
+								</button>
 							</div>
 
-							{#if painel !== 'recorte'}
+							{#if painel !== 'recorte' && painel !== 'trecho'}
 								<label class="zoom">
 									Zoom
 									<input type="range" min="60" max="220" step="10" bind:value={zoom} />
@@ -900,6 +967,34 @@
 										zoom={zoom}
 										rotulo="Página {regiao.pagina} · região {regiaoIdx + 1}"
 									/>
+								{/if}
+							{:else if painel === 'trecho'}
+								{#if q}
+									<p class="dim">
+										Desenhe o retângulo em volta da parte da questão {q.numero} que ficou errada — ela
+										inteira, só o enunciado ou só as alternativas que faltaram. A IA lê só esse trecho
+										e troca o que ele trouxer: o enunciado, se veio, e cada alternativa pela letra. O
+										resto da questão, a matéria, a resposta e os textos ligados ficam.
+									</p>
+									<Campo rotulo="Onde a questão está" ajuda="A faixa do caderno em que está a parte que ficou errada.">
+										{#snippet children({ id, ajuda })}
+											<select {id} aria-describedby={ajuda} bind:value={trechoIdx}>
+												{#each faixas as i (i)}
+													<option value={i}>{rotuloDaRegiao(imp!.regioes[i], i, imp!.regioes.length)}</option>
+												{/each}
+											</select>
+										{/snippet}
+									</Campo>
+									{#if regiaoTrecho}
+										<Recorte
+											importacao={imp.id}
+											versao={imp.versao}
+											regiao={regiaoTrecho}
+											inicial={inicialTrecho}
+											rotulo="Ler este trecho da questão {q.numero}"
+											onmarcar={relerTrecho}
+										/>
+									{/if}
 								{/if}
 							{:else}
 								<p class="dim">

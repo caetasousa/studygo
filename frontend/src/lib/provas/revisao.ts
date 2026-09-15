@@ -96,11 +96,51 @@ export function problemasDaQuestao(q: Questao, r: Rascunho): string[] {
 	return out;
 }
 
-/** O nome da região numa lista: as releituras dizem de qual questão são. */
+/** O nome da região numa lista: releituras e trechos dizem de qual questão são. */
 export function rotuloDaRegiao(regiao: Origem, indice: number, total: number): string {
 	const releitura = regiao.regiao.match(/^q(\d+)$/);
 	if (releitura) return `Página ${regiao.pagina} · releitura da questão ${releitura[1]}`;
+	const trecho = regiao.regiao.match(/^t(\d+)$/);
+	if (trecho) return `Página ${regiao.pagina} · trecho marcado da questão ${trecho[1]}`;
 	return `Página ${regiao.pagina} · região ${indice + 1} de ${total}`;
+}
+
+/** O trecho que o curador marcou para reler uma questão (prova.ETrecho no servidor). */
+export function eTrecho(o: Origem): boolean {
+	return /^t\d+$/.test(o.regiao);
+}
+
+/** Faixa do caderno — não a releitura nem o trecho de uma questão, que são pedaços dela. */
+export function regiaoDoCaderno(o: Origem): boolean {
+	return !/^[qt]\d+$/.test(o.regiao);
+}
+
+/**
+ * Em que região começar a marcar o trecho da questão: a faixa do caderno da
+ * página em que ela foi lida, a que contém o meio dela. Sem origem, a primeira.
+ */
+export function regiaoDoTrecho(regioes: Origem[], q: Questao | undefined): number {
+	const faixas = regioes.flatMap((r, i) => (regiaoDoCaderno(r) ? [i] : []));
+	const o = q?.origens.find((x) => x.retangulo.length === 4);
+	if (!o) return faixas[0] ?? 0;
+	const meio = (o.retangulo[1] + o.retangulo[3]) / 2;
+	const daPagina = faixas.filter((i) => regioes[i].pagina === o.pagina);
+	const comOMeio = daPagina.find((i) => regioes[i].retangulo[1] <= meio && meio <= regioes[i].retangulo[3]);
+	return comOMeio ?? daPagina[0] ?? faixas[0] ?? 0;
+}
+
+/**
+ * O retângulo com que o trecho começa: a faixa em que a questão foi lida, na
+ * largura da região — a área que o modelo dá erra para os lados, e a questão
+ * ocupa a coluna inteira. O curador estica até a alternativa que faltou.
+ */
+export function trechoInicial(regiao: Origem, q: Questao | undefined): number[] {
+	const [x0, y0, x1, y1] = regiao.retangulo;
+	const o = q?.origens.find((x) => x.pagina === regiao.pagina && x.retangulo.length === 4);
+	if (!o) return [x0, y0, x1, y1];
+	const topo = Math.max(y0, o.retangulo[1]);
+	const pe = Math.min(y1, o.retangulo[3]);
+	return pe - topo >= 4 ? [x0, topo, x1, pe] : [x0, y0, x1, y1];
 }
 
 /** Índice da próxima questão pendente depois de `atual`, dando a volta; -1 se não houver. */

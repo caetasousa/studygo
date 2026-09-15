@@ -142,6 +142,7 @@ func NewRouter(
 		protegida("POST "+imp+"/{id}/reprocessar", h.Prova.Reprocessar)
 		protegida("POST "+imp+"/{id}/excluir", h.Prova.Excluir)
 		limitada("POST "+imp+"/{id}/reler", limites.Edital, h.Prova.Reler)
+		limitada("POST "+imp+"/{id}/trecho", limites.Edital, h.Prova.RelerTrecho)
 		protegida("POST "+imp+"/{id}/cadastradas", h.Prova.ProcurarCadastradas)
 		limitada("POST "+imp+"/{id}/recortar", limites.Curadoria, h.Prova.Recortar)
 		limitada("POST "+imp+"/{id}/gabarito", limites.Edital, h.Prova.AtualizarGabarito)

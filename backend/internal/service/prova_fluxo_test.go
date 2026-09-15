@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -275,6 +276,10 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 			return err
 		},
 		"Recortar": func() error { _, err := s.Recortar(ctx, estudante, "x", 1, prova.Origem{}); return err },
+		"RelerTrecho": func() error {
+			_, err := s.RelerTrecho(ctx, estudante, "x", 1, 1, prova.Origem{})
+			return err
+		},
 		"AtualizarGabarito": func() error {
 			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo)
 			return err
@@ -852,6 +857,117 @@ func TestProvas_RelerQuestaoQueContinuouIncompleta(t *testing.T) {
 	var v ErrValidacao
 	if _, err := s.Reler(ctx, curador, nova.ID, final.Versao); !errors.As(err, &v) {
 		t.Fatalf("Reler sem incompleta: err = %v, quer ErrValidacao", err)
+	}
+}
+
+// emRevisaoPorPagina é a prova de duas regiões, uma por página, já na
+// revisão: é dentro das páginas que o curador marca os trechos.
+func emRevisaoPorPagina(t *testing.T) (*ProvaService, *fakeProvas, *fakeExtrator, prova.Importacao) {
+	t.Helper()
+
+	extrator := extratorDeDuasRegioes()
+	extrator.regioes = []prova.Origem{
+		{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 842}},
+		{Pagina: 2, Regiao: "1", Retangulo: []float64{0, 0, 595, 842}},
+	}
+	repo := novoFakeProvas()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	nova, err := s.Importar(context.Background(), curador, pdfMinimo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisao := processarTudo(t, s, repo, nova.ID)
+	extrator.extraidas = nil
+
+	return s, repo, extrator, revisao
+}
+
+var trechoDaQuestao2 = prova.Origem{Pagina: 2, Retangulo: []float64{30, 100, 560, 500}, Regiao: "1"}
+
+// A questão que nem a releitura acertou: o curador marca o trecho dela no
+// original, e a fila lê só ele — sem consolidar de novo, sem mexer nas outras.
+func TestProvas_RelerTrechoTrocaSoAQuestao(t *testing.T) {
+	t.Parallel()
+
+	s, repo, extrator, revisao := emRevisaoPorPagina(t)
+	ctx := context.Background()
+	primeira := revisao.Rascunho.Questoes[0]
+	relida := questaoExtraida(2, true)
+	relida.Blocos[0].Texto = "a questão 2 inteira"
+	extrator.porRegiao["t2"] = prova.Rascunho{Questoes: []prova.Questao{relida}}
+
+	marcada, err := s.RelerTrecho(ctx, curador, revisao.ID, revisao.Versao, 2, trechoDaQuestao2)
+	if err != nil {
+		t.Fatalf("RelerTrecho: %v", err)
+	}
+	if marcada.Estado != prova.EstadoNaFila || marcada.Etapa != prova.EtapaTrecho {
+		t.Fatalf("depois de marcar: estado %s, etapa %d", marcada.Estado, marcada.Etapa)
+	}
+
+	final := processarTudo(t, s, repo, revisao.ID)
+
+	if got := strings.Join(extrator.extraidas, ","); got != "t2" {
+		t.Fatalf("regiões lidas = %s, quer só t2", got)
+	}
+	if final.Estado != prova.EstadoEmRevisao || repo.etapas[len(repo.etapas)-1] != prova.EtapaTrecho {
+		t.Fatalf("estado = %s (%s), etapas = %v", final.Estado, final.Erro, repo.etapas)
+	}
+	if q := final.Rascunho.Questoes[1]; q.Blocos[0].Texto != "a questão 2 inteira" || q.Revisada {
+		t.Fatalf("questão 2 = %+v, quer a leitura do trecho, sem conferência", q)
+	}
+	if !reflect.DeepEqual(final.Rascunho.Questoes[0], primeira) {
+		t.Fatalf("a questão 1 mudou:\nantes  %+v\ndepois %+v", primeira, final.Rascunho.Questoes[0])
+	}
+}
+
+// Recusado pelo processador, o trecho não derruba a importação: ela volta à
+// revisão com a questão como estava e o motivo nos alertas.
+func TestProvas_TrechoRecusadoVoltaARevisao(t *testing.T) {
+	t.Parallel()
+
+	s, repo, extrator, revisao := emRevisaoPorPagina(t)
+	extrator.errRegiao = map[string]error{
+		"t2": fmt.Errorf("%w: a IA se recusou a ler o trecho", port.ErrDocumentoRecusado),
+	}
+	antes := revisao.Rascunho.Questoes[1]
+
+	if _, err := s.RelerTrecho(context.Background(), curador, revisao.ID, revisao.Versao, 2, trechoDaQuestao2); err != nil {
+		t.Fatalf("RelerTrecho: %v", err)
+	}
+	final := processarTudo(t, s, repo, revisao.ID)
+
+	if final.Estado != prova.EstadoEmRevisao || !reflect.DeepEqual(final.Rascunho.Questoes[1], antes) {
+		t.Fatalf("estado = %s, questão 2 = %+v", final.Estado, final.Rascunho.Questoes[1])
+	}
+	if !slices.ContainsFunc(final.Rascunho.Alertas, func(a string) bool {
+		return strings.Contains(a, "questão 2 não foi lido") && strings.Contains(a, "se recusou")
+	}) {
+		t.Fatalf("alertas = %v, quer o do trecho recusado", final.Rascunho.Alertas)
+	}
+}
+
+func TestProvas_RelerTrechoRecusaOQueNaoDaParaLer(t *testing.T) {
+	t.Parallel()
+
+	s, repo, _, revisao := emRevisaoPorPagina(t)
+	ctx := context.Background()
+
+	var v ErrValidacao
+	fora := prova.Origem{Pagina: 2, Retangulo: []float64{30, 100, 560, 900}}
+	if _, err := s.RelerTrecho(ctx, curador, revisao.ID, revisao.Versao, 2, fora); !errors.As(err, &v) {
+		t.Errorf("trecho fora da página: err = %v, quer ErrValidacao", err)
+	}
+	if _, err := s.RelerTrecho(ctx, curador, revisao.ID, revisao.Versao+1, 2, trechoDaQuestao2); !errors.Is(err, prova.ErrConflito) {
+		t.Errorf("versão velha: err = %v, quer ErrConflito", err)
+	}
+
+	// Na fila, o trecho anterior ainda não foi lido.
+	if _, err := s.RelerTrecho(ctx, curador, revisao.ID, revisao.Versao, 2, trechoDaQuestao2); err != nil {
+		t.Fatal(err)
+	}
+	naFila := repo.importacoes[revisao.ID]
+	if _, err := s.RelerTrecho(ctx, curador, revisao.ID, naFila.Versao, 2, trechoDaQuestao2); !errors.Is(err, prova.ErrConflito) {
+		t.Errorf("com um trecho na fila: err = %v, quer ErrConflito", err)
 	}
 }
 

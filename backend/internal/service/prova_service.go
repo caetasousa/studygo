@@ -306,6 +306,34 @@ func (s *ProvaService) Reler(ctx context.Context, usuario, id string, versao int
 	return s.Obter(ctx, usuario, id)
 }
 
+// RelerTrecho devolve à fila uma importação em revisão só para ler o trecho
+// que o curador marcou na questão `numero` — a parte que a extração leu mal
+// mesmo depois das releituras. O que o trecho trouxer entra na questão
+// (prova.Rascunho.AplicarTrecho); o resto do rascunho fica como está.
+func (s *ProvaService) RelerTrecho(ctx context.Context, usuario, id string, versao, numero int, o prova.Origem) (ImportacaoDeProva, error) {
+	i, err := s.carregar(ctx, usuario, id)
+	if err != nil {
+		return ImportacaoDeProva{}, err
+	}
+	if i.Versao != versao || i.Estado != prova.EstadoEmRevisao {
+		return ImportacaoDeProva{}, prova.ErrConflito
+	}
+	if s.estourouTeto(i) {
+		return ImportacaoDeProva{}, erroDeValidacao("esta importação atingiu o teto de chamadas ou de tempo")
+	}
+	trecho, ok := prova.NovoTrecho(i.Regioes, numero, o)
+	if !ok {
+		return ImportacaoDeProva{}, erroDeValidacao("marque o trecho da questão dentro de uma página do caderno")
+	}
+
+	i.RelerTrecho(trecho)
+	if err := s.Repo.Salvar(ctx, i, versao); err != nil {
+		return ImportacaoDeProva{}, err
+	}
+
+	return s.Obter(ctx, usuario, id)
+}
+
 // ProcurarCadastradas compara de novo a importação em revisão com as provas
 // publicadas do mesmo concurso — a irmã pode ter sido publicada depois que esta
 // foi importada — e troca por referência as questões que elas já têm.
@@ -719,6 +747,25 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 		}
 
 		return i.Rascunho.Gabarito, nil
+
+	case i.Etapa == prova.EtapaTrecho:
+		trecho, numero, ok := i.TrechoPendente()
+		if !ok {
+			return nil, fmt.Errorf("%w: não há trecho marcado para ler", port.ErrDocumentoRecusado)
+		}
+		lido, err := s.Processor.Extrair(ctx, i.Documento, trecho)
+		// Como a releitura, o trecho recusado não derruba a importação: o
+		// curador volta à revisão com a questão como estava e o motivo.
+		if errors.Is(err, port.ErrDocumentoRecusado) {
+			i.Rascunho.TrechoRecusado(numero, err.Error())
+			return map[string]string{"recusado": err.Error()}, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		i.Rascunho.AplicarTrecho(numero, lido)
+
+		return lido, nil
 
 	case i.Etapa >= primeira && i.Etapa < primeira+len(i.Regioes):
 		regiao := i.Regioes[i.Etapa-primeira]

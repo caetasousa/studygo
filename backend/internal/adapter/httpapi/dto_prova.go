@@ -183,6 +183,13 @@ type recorteRequest struct {
 	Origem origemDTO `json:"origem"`
 }
 
+// trechoRequest é o retângulo que o curador marcou em volta da questão.
+type trechoRequest struct {
+	Versao  int       `json:"versao"`
+	Questao int       `json:"questao"`
+	Origem  origemDTO `json:"origem"`
+}
+
 // --- domínio → transporte ---------------------------------------------------
 
 func origemParaDTO(o prova.Origem) origemDTO {

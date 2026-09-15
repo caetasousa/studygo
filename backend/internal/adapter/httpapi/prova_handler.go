@@ -418,6 +418,30 @@ func (h *ProvaHandler) Recortar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, map[string]string{"arquivo": arquivo})
 }
 
+func (h *ProvaHandler) RelerTrecho(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	id, ok := h.idDaRota(w, r)
+	if !ok {
+		return
+	}
+	var req trechoRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	i, err := h.provas.RelerTrecho(r.Context(), usuario, id, req.Versao, req.Questao, origemDoDTO(req.Origem))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, importacaoProvaParaDTO(i))
+}
+
 // SugerirMaterias devolve a matéria que a IA sugere para cada questão do
 // rascunho salvo. Nada é gravado: a tela aplica e o curador salva.
 func (h *ProvaHandler) SugerirMaterias(w http.ResponseWriter, r *http.Request) {

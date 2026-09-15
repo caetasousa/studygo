@@ -19,8 +19,12 @@ import {
 	escreverNumeros,
 	lerNumeros,
 	regiaoDaQuestao,
+	regiaoDoCaderno,
+	regiaoDoTrecho,
 	removerApoio,
 	retanguloInicial,
+	trechoInicial,
+	eTrecho,
 	vincularApoio,
 	temFigura
 } from './revisao';
@@ -253,8 +257,37 @@ describe('problemas da questão', () => {
 		expect(problemasDaQuestao(q, r)).toEqual(['A resposta (A) difere do gabarito (C).']);
 	});
 
-	it('a releitura diz de qual questão é', () => {
+	it('a releitura e o trecho dizem de qual questão são', () => {
 		expect(rotuloDaRegiao({ ...regiao, regiao: 'q22' }, 13, 16)).toBe('Página 1 · releitura da questão 22');
+		expect(rotuloDaRegiao({ ...regiao, regiao: 't22' }, 14, 16)).toBe('Página 1 · trecho marcado da questão 22');
 		expect(rotuloDaRegiao(regiao, 3, 13)).toBe('Página 1 · região 4 de 13');
+	});
+});
+
+describe('trecho', () => {
+	// Duas faixas na página 1, uma na 2, e a releitura e o trecho de questões.
+	const regioes: Origem[] = [
+		{ pagina: 1, retangulo: [0, 0, 600, 850], regiao: '0' },
+		{ pagina: 1, retangulo: [0, 700, 600, 1550], regiao: '1' },
+		{ pagina: 2, retangulo: [0, 0, 600, 850], regiao: '2' },
+		{ pagina: 2, retangulo: [0, 300, 600, 500], regiao: 'q7' },
+		{ pagina: 2, retangulo: [40, 310, 560, 480], regiao: 't7' }
+	];
+	const lidaEm = (o: Origem): Questao => ({ ...conferida(7), origens: [o] });
+
+	it('começa na faixa do caderno em que a questão foi lida, nunca numa releitura ou trecho', () => {
+		expect(regiaoDoTrecho(regioes, lidaEm(regioes[4]))).toBe(2);
+		expect(regiaoDoTrecho(regioes, lidaEm({ pagina: 1, retangulo: [80, 1000, 500, 1200], regiao: '1' }))).toBe(1);
+		expect(regiaoDoTrecho(regioes, undefined)).toBe(0);
+		expect(regiaoDoCaderno(regioes[3]) || regiaoDoCaderno(regioes[4])).toBe(false);
+		expect(eTrecho(regioes[4]) && !eTrecho(regioes[3])).toBe(true);
+	});
+
+	it('o retângulo começa na altura da questão, com a largura da região', () => {
+		const q = lidaEm({ pagina: 2, retangulo: [80, 320, 500, 470], regiao: '2' });
+		expect(trechoInicial(regioes[2], q)).toEqual([0, 320, 600, 470]);
+		// Em outra página, ou sem origem, a região inteira.
+		expect(trechoInicial(regioes[0], q)).toEqual([0, 0, 600, 850]);
+		expect(trechoInicial(regioes[0], undefined)).toEqual([0, 0, 600, 850]);
 	});
 });

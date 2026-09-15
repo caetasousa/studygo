@@ -1,6 +1,8 @@
 package prova
 
 import (
+	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -421,6 +423,7 @@ func TestProximaEtapa(t *testing.T) {
 		{EtapaPrimeiraRegiao + regioes - 1, EtapaPrimeiraRegiao + regioes, EstadoNaFila},
 		{EtapaPrimeiraRegiao + regioes, TotalEtapas(regioes), EstadoEmRevisao},
 		{EtapaSoGabarito, TotalEtapas(regioes), EstadoEmRevisao},
+		{EtapaTrecho, TotalEtapas(regioes), EstadoEmRevisao},
 	}
 	for _, c := range casos {
 		etapa, estado := ProximaEtapa(c.executada, regioes)
@@ -863,9 +866,202 @@ func TestQuestaoDaReleitura(t *testing.T) {
 	if n, ok := QuestaoDaReleitura(Origem{Regiao: "q42"}); !ok || n != 42 {
 		t.Fatalf("q42 = %d, %v", n, ok)
 	}
-	for _, rotulo := range []string{"4", "q", "qx", ""} {
+	for _, rotulo := range []string{"4", "q", "qx", "", "t42"} {
 		if _, ok := QuestaoDaReleitura(Origem{Regiao: rotulo}); ok {
 			t.Errorf("%q passou por releitura", rotulo)
+		}
+	}
+}
+
+// O trecho é o retângulo que o curador desenhou dentro de uma região da
+// página — nunca fora dela, onde o processador recusaria.
+func TestNovoTrecho(t *testing.T) {
+	t.Parallel()
+
+	regioes := []Origem{
+		{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 842}},
+		{Pagina: 2, Regiao: "1", Retangulo: []float64{0, 0, 595, 842}},
+		{Pagina: 2, Regiao: "q7", Retangulo: []float64{0, 300, 595, 700}},
+	}
+
+	got, ok := NovoTrecho(regioes, 7, Origem{Pagina: 2, Retangulo: []float64{40, 310.5, 560, 842.4}, Regiao: "1"})
+	if !ok || got.Regiao != "t7" || got.Pagina != 2 || got.Retangulo[3] != 842.4 {
+		t.Fatalf("trecho = %+v, %v; quer t7 na página 2 com o retângulo marcado", got, ok)
+	}
+
+	recusados := map[string]struct {
+		numero int
+		o      Origem
+	}{
+		"fora da página":      {7, Origem{Pagina: 2, Retangulo: []float64{40, 300, 560, 900}}},
+		"página sem região":   {7, Origem{Pagina: 3, Retangulo: []float64{40, 300, 560, 700}}},
+		"clique, não trecho":  {7, Origem{Pagina: 1, Retangulo: []float64{40, 300, 45, 700}}},
+		"sem retângulo":       {7, Origem{Pagina: 1}},
+		"questão sem número":  {0, Origem{Pagina: 1, Retangulo: []float64{40, 300, 560, 700}}},
+		"coordenada inválida": {7, Origem{Pagina: 1, Retangulo: []float64{math.NaN(), 300, 560, 700}}},
+		"infinito":            {7, Origem{Pagina: 1, Retangulo: []float64{math.Inf(-1), 300, 560, 700}}},
+	}
+	for nome, c := range recusados {
+		if got, ok := NovoTrecho(regioes, c.numero, c.o); ok {
+			t.Errorf("%s: aceitou %+v", nome, got)
+		}
+	}
+}
+
+// O trecho entra no fim das regiões, no lugar do anterior da mesma questão: é
+// lá que a etapa dele o procura.
+func TestRelerTrecho_UltimaRegiaoEOTrecho(t *testing.T) {
+	t.Parallel()
+
+	i := Importacao{
+		Estado: EstadoEmRevisao, Erro: "velho",
+		Regioes: []Origem{{Regiao: "0"}, {Regiao: "t7"}, {Regiao: "q9"}},
+	}
+	i.RelerTrecho(Origem{Pagina: 1, Regiao: "t7", Retangulo: []float64{1, 2, 300, 400}})
+
+	if got := regioesDe(i.Regioes); strings.Join(got, ",") != "0,q9,t7" {
+		t.Fatalf("regiões = %v, quer 0,q9,t7", got)
+	}
+	if i.Etapa != EtapaTrecho || i.Estado != EstadoNaFila || i.Erro != "" {
+		t.Fatalf("etapa %d, estado %s, erro %q", i.Etapa, i.Estado, i.Erro)
+	}
+	if o, n, ok := i.TrechoPendente(); !ok || n != 7 || o.Retangulo[2] != 300 {
+		t.Fatalf("TrechoPendente = %+v, %d, %v", o, n, ok)
+	}
+	if _, _, ok := (Importacao{Regioes: []Origem{{Regiao: "q9"}}}).TrechoPendente(); ok {
+		t.Fatal("releitura passou por trecho")
+	}
+}
+
+// A leitura do trecho troca a questão sem comparar com a antiga — foi o
+// curador que pediu —, mas o que não é leitura fica: matéria, resposta e
+// textos de apoio. A conferência cai.
+func TestAplicarTrecho_TrocaAQuestao(t *testing.T) {
+	t.Parallel()
+
+	antiga := questao(2, true, "lida sem as alternativas")
+	antiga.Alternativas = antiga.Alternativas[:2]
+	antiga.Disciplina, antiga.Resposta, antiga.Situacao = "Redes", "C", "Gabarito sem alteração"
+	antiga.IgualA = "TJCE 2026 · E05, questão 2"
+	r := Rascunho{
+		Questoes: []Questao{questao(1, true, "a primeira"), antiga},
+		Apoios:   []Apoio{{ID: "r0-t1", Questoes: []int{1, 2}}},
+		Gabarito: Gabarito{Respostas: map[string]string{"2": "D"}},
+	}
+	relida := questao(2, true, "inteira")
+	relida.Blocos = append(relida.Blocos, Bloco{Tipo: "texto"}) // vazio: sai
+	relida.Apoios = []string{"rt2-t1"}
+	vizinha := questao(3, false, "a ponta da vizinha")
+
+	r.AplicarTrecho(2, Rascunho{
+		Extracoes: []Extracao{{Regiao: "t2"}},
+		Questoes:  []Questao{vizinha, relida},
+		Apoios:    []Apoio{{ID: "rt2-t1"}},
+	})
+
+	q := r.Questoes[1]
+	if len(r.Questoes) != 2 || q.Blocos[0].Texto != "inteira" || len(q.Blocos) != 1 || len(q.Alternativas) != 5 {
+		t.Fatalf("questões = %+v, quer a 2 trocada pela leitura e a vizinha fora", r.Questoes)
+	}
+	if q.Revisada || q.IgualA != "" || q.Disciplina != "Redes" || q.Resposta != "C" || q.Situacao == "" {
+		t.Fatalf("questão 2 = %+v, quer sem conferência, própria, com matéria e resposta da antiga", q)
+	}
+	if len(q.Apoios) != 1 || q.Apoios[0] != "r0-t1" || len(r.Apoios) != 1 {
+		t.Fatalf("textos = %v / %+v, quer só o r0-t1 do rascunho", q.Apoios, r.Apoios)
+	}
+	if len(r.Extracoes) != 1 || len(r.Alertas) != 0 {
+		t.Fatalf("extrações = %v, alertas = %v", r.Extracoes, r.Alertas)
+	}
+}
+
+// Sem o número dentro do trecho, o modelo pode chutar outro: a única questão
+// lida é a pedida. Questão que faltou entra na ordem, com a resposta do
+// gabarito e a matéria da anterior.
+func TestAplicarTrecho_QuestaoQueFaltou(t *testing.T) {
+	t.Parallel()
+
+	primeira, terceira := questao(1, true, "a"), questao(3, true, "c")
+	primeira.Disciplina = "Português"
+	r := Rascunho{
+		Questoes: []Questao{primeira, terceira},
+		Gabarito: Gabarito{Respostas: map[string]string{"2": "B"}},
+	}
+
+	r.AplicarTrecho(2, Rascunho{Questoes: []Questao{questao(12, true, "a que faltou")}})
+
+	if len(r.Questoes) != 3 || r.Questoes[1].Numero != 2 || r.Questoes[1].Blocos[0].Texto != "a que faltou" {
+		t.Fatalf("questões = %+v, quer a 2 entre a 1 e a 3", r.Questoes)
+	}
+	if q := r.Questoes[1]; q.Resposta != "B" || q.Disciplina != "Português" {
+		t.Fatalf("questão 2 = %+v, quer resposta B e a matéria da 1", q)
+	}
+}
+
+// O caso da questão 60 do TRT-15: ela veio sem alternativas, e o curador marca
+// só elas. Sem o número no trecho, o modelo devolveu "questão 1", sem
+// enunciado e cortada — o enunciado que existe fica, as alternativas entram
+// pela letra, e a questão está inteira.
+func TestAplicarTrecho_SoAsAlternativasQueFaltaram(t *testing.T) {
+	t.Parallel()
+
+	sem := questao(60, false, "O padrão de projeto mais adequado é o")
+	sem.Alternativas = sem.Alternativas[:1]
+	sem.Alternativas[0].Blocos[0].Texto = "Singleton lido errado"
+	sem.Origens = []Origem{{Pagina: 15, Regiao: "14", Retangulo: []float64{58, 650, 572, 702}}}
+	r := Rascunho{Questoes: []Questao{sem}}
+	pedaco := questao(1, false, "")
+	pedaco.Blocos = nil
+	pedaco.Alternativas[0].Blocos[0].Texto = "Singleton."
+	pedaco.Origens = []Origem{{Pagina: 15, Regiao: "t60", Retangulo: []float64{40, 704, 580, 788}}}
+
+	r.AplicarTrecho(60, Rascunho{Questoes: []Questao{pedaco}})
+
+	q := r.Questoes[0]
+	if q.Numero != 60 || q.Blocos[0].Texto != "O padrão de projeto mais adequado é o" {
+		t.Fatalf("questão = %+v, quer a 60 com o enunciado que tinha", q)
+	}
+	if len(q.Alternativas) != 5 || q.Alternativas[0].Blocos[0].Texto != "Singleton." || !q.Completa || q.Revisada {
+		t.Fatalf("alternativas = %+v, completa %v; quer as cinco do trecho, inteira e por conferir", q.Alternativas, q.Completa)
+	}
+	if got := regioesDe(q.Origens); strings.Join(got, ",") != "14,t60" {
+		t.Fatalf("origens = %v, quer o enunciado e o trecho", got)
+	}
+	if len(r.Alertas) != 0 {
+		t.Fatalf("alertas = %v", r.Alertas)
+	}
+}
+
+// Só o enunciado marcado: as alternativas que estavam certas ficam.
+func TestAplicarTrecho_SoOEnunciado(t *testing.T) {
+	t.Parallel()
+
+	r := Rascunho{Questoes: []Questao{questao(7, true, "enunciado truncado")}}
+	lida := questao(7, false, "enunciado inteiro")
+	lida.Alternativas = nil
+
+	r.AplicarTrecho(7, Rascunho{Questoes: []Questao{lida}})
+
+	if q := r.Questoes[0]; q.Blocos[0].Texto != "enunciado inteiro" || len(q.Alternativas) != 5 || !q.Completa {
+		t.Fatalf("questão = %+v, quer o enunciado novo com as alternativas de antes", q)
+	}
+}
+
+// Trecho que não achou a questão — pegou outras, ou nada — não mexe nela.
+func TestAplicarTrecho_NaoAchouAQuestao(t *testing.T) {
+	t.Parallel()
+
+	for nome, lido := range map[string]Rascunho{
+		"outras questões": {Questoes: []Questao{questao(1, true, "a"), questao(3, true, "c")}},
+		"nada lido":       {},
+		"questão vazia":   {Questoes: []Questao{{Numero: 2, Completa: true}}},
+	} {
+		r := Rascunho{Questoes: []Questao{questao(2, false, "enunciado")}}
+		antes := r.Questoes[0]
+
+		r.AplicarTrecho(2, lido)
+
+		if !reflect.DeepEqual(r.Questoes[0], antes) || !contem(r.Alertas, "não achou a questão 2") {
+			t.Errorf("%s: questão = %+v, alertas = %v", nome, r.Questoes[0], r.Alertas)
 		}
 	}
 }
