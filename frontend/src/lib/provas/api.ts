@@ -1,4 +1,4 @@
-import { request } from '$lib/api';
+import { request, requestArquivo } from '$lib/api';
 import type {
 	Anotacao,
 	Importacao,
@@ -79,6 +79,16 @@ export const provasApi = {
 	},
 
 	importacao: (id: string) => request<Importacao>(`${imp}/${id}`),
+
+	/** O .zip da prova publicada — conteúdo, figuras e PDF — para levar a outro ambiente. */
+	exportarProva: (id: string) => requestArquivo(`/api/provas/pacotes/${id}`),
+
+	/** Publica aqui a prova de um pacote exportado em outro ambiente. */
+	importarPacote: (pacote: File) => {
+		const corpo = new FormData();
+		corpo.set('pacote', pacote);
+		return request<ProvaResumo>('/api/provas/pacotes', { method: 'POST', body: corpo });
+	},
 
 	salvar: (id: string, versao: number, rascunho: Rascunho) =>
 		request<Importacao>(`${imp}/${id}`, {

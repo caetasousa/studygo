@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"time"
 
 	"studygo/internal/domain/prova"
 	"studygo/internal/port"
@@ -212,6 +213,76 @@ func (h *ProvaHandler) RenomearProva(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ExportarProva baixa o pacote da prova para levar a outro ambiente.
+func (h *ProvaHandler) ExportarProva(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	id, ok := h.idDaRota(w, r)
+	if !ok {
+		return
+	}
+
+	p, err := h.provas.ExportarProva(r.Context(), usuario, id)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+nomeDoPacote(p.Conteudo)+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	// Com a resposta começada não dá mais para mudar o status: o erro fica no
+	// log, e o .zip chega truncado — o importador o recusa.
+	if err := escreverPacote(w, p, time.Now()); err != nil {
+		h.logger.ErrorContext(r.Context(), "escrevendo pacote de prova", "prova", id, "erro", err)
+	}
+}
+
+// ImportarPacote publica aqui o pacote vindo de outro ambiente: multipart com
+// "pacote", um .zip do tamanho de um caderno e seu gabarito.
+func (h *ProvaHandler) ImportarPacote(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	if !h.provas.Curador(usuario) {
+		writeError(w, r, h.logger, prova.ErrAcesso)
+		return
+	}
+	if err := h.lerMultipart(w, r, 2); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
+
+	f, _, err := r.FormFile("pacote")
+	if err != nil {
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+		return
+	}
+	defer f.Close()
+	dados, err := lerLimitado(f, 2*h.maxPDF)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	pct, err := lerPacote(dados, h.maxPDF)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	p, err := h.provas.ImportarPacote(r.Context(), usuario, pct)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusCreated, provaResumoParaDTO(p))
 }
 
 // Arquivo entrega um PDF ou recorte. O id é uuid e o caminho é montado pelo

@@ -133,6 +133,11 @@ func NewRouter(
 		protegida("DELETE /api/provas/{id}", h.Prova.Retirar)
 		protegida("PATCH /api/provas/{id}", h.Prova.RenomearProva)
 		protegida("POST /api/provas/{id}/excluir", h.Prova.ExcluirProva)
+		// Levar provas de um ambiente a outro. O segmento fixo antes do id evita
+		// o conflito com /api/provas/arquivos/{id}.
+		protegida("GET /api/provas/pacotes/{id}", h.Prova.ExportarProva)
+		// Sem IA nem fila: o teto é o da curadoria, e levar dezenas de provas de uma vez cabe nele.
+		limitada("POST /api/provas/pacotes", limites.Curadoria, h.Prova.ImportarPacote)
 
 		const imp = "/api/provas/importacoes"
 		protegida("GET "+imp, h.Prova.ListarImportacoes)

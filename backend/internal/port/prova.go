@@ -123,6 +123,9 @@ type ProvaProcessor interface {
 // ProvaArquivos é o volume durável dos PDFs e recortes.
 type ProvaArquivos interface {
 	Guardar(id string, conteudo []byte) error
+	// GuardarComo grava com outra extensão — as figuras que chegam num pacote
+	// de outro ambiente; as da extração, quem grava é o processador.
+	GuardarComo(id, extensao string, conteudo []byte) error
 	Remover(nome string) error
 	Existe(id, extensao string) bool
 	Caminho(id, extensao string) (string, error)

@@ -232,6 +232,73 @@
 		}
 	}
 
+	// Levar provas de um ambiente a outro: um .zip por prova, que é do tamanho
+	// do caderno — um só com todas passaria do limite de envio do servidor.
+	let pacotes = $state<HTMLInputElement | null>(null);
+	let levando = $state(false);
+	let resultadosDosPacotes = $state<{ arquivo: string; ok: boolean; msg: string; provaId?: string }[]>([]);
+
+	function salvarNoAparelho(blob: Blob, nome: string) {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = nome;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	}
+
+	function exportarProva(i: ImportacaoResumo) {
+		void naLinha(i.id, async () => {
+			const { blob, nome } = await provasApi.exportarProva(i.provaId);
+			salvarNoAparelho(blob, nome);
+		});
+	}
+
+	async function exportarTodas() {
+		levando = true;
+		erro = '';
+		try {
+			for (const [k, p] of provas.entries()) {
+				const { blob, nome } = await provasApi.exportarProva(p.id);
+				salvarNoAparelho(blob, nome);
+				// Um de cada vez: o navegador bloqueia downloads em rajada.
+				if (k < provas.length - 1) await new Promise((r) => setTimeout(r, 800));
+			}
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'não consegui exportar';
+		} finally {
+			levando = false;
+		}
+	}
+
+	async function importarPacotes() {
+		const arquivos = [...(pacotes?.files ?? [])];
+		if (!arquivos.length) return;
+		levando = true;
+		resultadosDosPacotes = [];
+		for (const arquivo of arquivos) {
+			try {
+				const p = await provasApi.importarPacote(arquivo);
+				resultadosDosPacotes = [
+					...resultadosDosPacotes,
+					{ arquivo: arquivo.name, ok: true, msg: `${p.orgao} ${p.ano} · ${p.cargoNome || p.cargo} publicada`, provaId: p.id }
+				];
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : 'erro inesperado';
+				resultadosDosPacotes = [...resultadosDosPacotes, { arquivo: arquivo.name, ok: false, msg }];
+			}
+		}
+		if (pacotes) pacotes.value = '';
+		levando = false;
+		// O catálogo, as questões por matéria e a curadoria ganharam as publicadas.
+		[provas, avulsas, importacoes] = await Promise.all([
+			provasApi.todasAsProvas(),
+			provasApi.questoes(),
+			provasApi.importacoes()
+		]);
+		respostas = Object.fromEntries(provas.map((p) => [p.id, lerRespostas(p.id)]));
+	}
+
 	async function importar() {
 		const prova = arquivoProva?.files?.[0];
 		if (!prova) throw new Error('escolha o PDF da prova');
@@ -431,6 +498,37 @@
 		</section>
 
 		<section>
+			<h2 class="grupo">Levar provas para outro ambiente</h2>
+			<p class="ajuda-curadoria">
+				Para passar o catálogo de staging para produção sem importar e revisar de novo: exporte aqui, e
+				importe os pacotes na curadoria do outro ambiente. Cada prova vira um .zip com as questões, as figuras e
+				o PDF; do outro lado, ela entra publicada. A que já estiver no catálogo de lá é recusada.
+			</p>
+			<div class="importar">
+				<button class="nbtn" type="button" disabled={levando || provas.length === 0} onclick={exportarTodas}>
+					Exportar as {provas.length} provas publicadas
+				</button>
+				<label class="arquivo">
+					<span>Pacotes exportados <em>.zip, um por prova</em></span>
+					<input type="file" accept=".zip,application/zip" multiple bind:this={pacotes} />
+				</label>
+				<button class="nbtn primario" type="button" disabled={levando} onclick={importarPacotes}>
+					{levando ? 'Levando…' : 'Importar pacotes'}
+				</button>
+			</div>
+			{#if resultadosDosPacotes.length > 0}
+				<ul class="resultados" aria-live="polite">
+					{#each resultadosDosPacotes as r, k (k)}
+						<li class:falhou={!r.ok}>
+							<b>{r.arquivo}</b>:
+							{#if r.ok && r.provaId}<a href="/provas/{r.provaId}">{r.msg}</a>{:else}{r.msg}{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+
+		<section>
 			<h2 class="grupo">Importações recentes</h2>
 			<div class="linhas">
 				{#each importacoes as i (i.id)}
@@ -486,6 +584,10 @@
 										>
 											Editar título
 											<small>O nome do cargo no catálogo e aqui</small>
+										</button>
+										<button type="button" disabled={ocupado} onclick={() => exportarProva(i)}>
+											Exportar
+											<small>O .zip para importar em outro ambiente</small>
 										</button>
 										<button type="button" class="perigo" disabled={ocupado} onclick={() => excluirProva(i)}>
 											Excluir prova
@@ -797,6 +899,27 @@
 	}
 	.linhas {
 		border-top: 1px solid var(--border);
+	}
+	.ajuda-curadoria {
+		margin: 0 0 12px;
+		max-width: 72ch;
+		font-size: 13.5px;
+		color: var(--text-muted);
+	}
+	.resultados {
+		display: grid;
+		gap: 4px;
+		margin: 12px 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: 13.5px;
+		overflow-wrap: anywhere;
+	}
+	.resultados li {
+		color: var(--good);
+	}
+	.resultados li.falhou {
+		color: var(--danger);
 	}
 	/* A linha e o menu dela lado a lado: botão dentro de link não é HTML válido. */
 	.item {

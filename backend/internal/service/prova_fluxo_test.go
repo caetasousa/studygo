@@ -168,8 +168,12 @@ func (f *fakeProvas) ArquivosDaImportacao(context.Context, string) ([]string, er
 type fakeVolume struct{ nomes map[string]bool }
 
 func (v *fakeVolume) Guardar(id string, _ []byte) error { v.nomes[id+".pdf"] = true; return nil }
-func (v *fakeVolume) Remover(nome string) error         { delete(v.nomes, nome); return nil }
-func (v *fakeVolume) Existe(id, ext string) bool        { return v.nomes[id+"."+ext] }
+func (v *fakeVolume) GuardarComo(id, ext string, _ []byte) error {
+	v.nomes[id+"."+ext] = true
+	return nil
+}
+func (v *fakeVolume) Remover(nome string) error  { delete(v.nomes, nome); return nil }
+func (v *fakeVolume) Existe(id, ext string) bool { return v.nomes[id+"."+ext] }
 func (v *fakeVolume) Caminho(id, ext string) (string, error) {
 	return "/provas/" + id + "." + ext, nil
 }
@@ -307,10 +311,15 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo, "definitivo.pdf")
 			return err
 		},
-		"Revisar":      func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
-		"Excluir":      func() error { return s.Excluir(ctx, estudante, "x", 1) },
-		"Retirar":      func() error { return s.Retirar(ctx, estudante, "x") },
-		"ExcluirProva": func() error { return s.ExcluirProva(ctx, estudante, "x") },
+		"Revisar":       func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
+		"Excluir":       func() error { return s.Excluir(ctx, estudante, "x", 1) },
+		"Retirar":       func() error { return s.Retirar(ctx, estudante, "x") },
+		"ExcluirProva":  func() error { return s.ExcluirProva(ctx, estudante, "x") },
+		"ExportarProva": func() error { _, err := s.ExportarProva(ctx, estudante, "x"); return err },
+		"ImportarPacote": func() error {
+			_, err := s.ImportarPacote(ctx, estudante, PacoteDeProva{Documento: pdfMinimo})
+			return err
+		},
 		"RenomearProva": func() error {
 			return s.RenomearProva(ctx, estudante, "x", "Técnico Judiciário")
 		},

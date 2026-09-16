@@ -1,0 +1,147 @@
+{
+  "documento": "string",
+  "exportadoEm": "string",
+  "formato": "string",
+  "gabarito": "string",
+  "nomeDocumento": "string",
+  "nomeGabarito": "string",
+  "prova": {
+    "alertas": [
+      "string"
+    ],
+    "ano": "number",
+    "anuladasExcluidas": [
+      "number"
+    ],
+    "apoios": [
+      {
+        "aviso": "string",
+        "blocos": [
+          {
+            "arquivo": "string",
+            "descricao": "string",
+            "formato": "string",
+            "largura": "number",
+            "origem": {
+              "pagina": "number",
+              "regiao": "string",
+              "retangulo": [
+                "number"
+              ]
+            },
+            "revisado": "bool",
+            "texto": "string",
+            "tipo": "string"
+          }
+        ],
+        "id": "string",
+        "igualA": "string",
+        "origens": [],
+        "questoes": [
+          "number"
+        ],
+        "revisado": "bool"
+      }
+    ],
+    "banca": "string",
+    "caderno": "string",
+    "cargo": "string",
+    "cargoNome": "string",
+    "extracoes": [
+      {
+        "modelo": "string",
+        "prompt": "string",
+        "regiao": "string",
+        "tokensEntrada": "number",
+        "tokensSaida": "number",
+        "versao": "string"
+      }
+    ],
+    "gabarito": {
+      "caderno": "string",
+      "cargo": "string",
+      "respostas": {
+        "44": "string"
+      },
+      "situacoes": {
+        "44": "string"
+      },
+      "tipo": "string"
+    },
+    "orgao": "string",
+    "questoes": [
+      {
+        "alternativas": [
+          {
+            "blocos": [
+              {
+                "arquivo": "string",
+                "descricao": "string",
+                "formato": "string",
+                "largura": "number",
+                "origem": {
+                  "pagina": "number",
+                  "regiao": "string",
+                  "retangulo": [
+                    "number"
+                  ]
+                },
+                "revisado": "bool",
+                "texto": "string",
+                "tipo": "string"
+              }
+            ],
+            "letra": "string"
+          }
+        ],
+        "apoios": [
+          "string"
+        ],
+        "blocos": [
+          {
+            "arquivo": "string",
+            "descricao": "string",
+            "formato": "string",
+            "largura": "number",
+            "origem": {
+              "pagina": "number",
+              "regiao": "string",
+              "retangulo": [
+                "number"
+              ]
+            },
+            "revisado": "bool",
+            "texto": "string",
+            "tipo": "string"
+          }
+        ],
+        "completa": "bool",
+        "disciplina": "string",
+        "igualA": "string",
+        "numero": "number",
+        "origens": [
+          {
+            "pagina": "number",
+            "regiao": "string",
+            "retangulo": [
+              "number"
+            ]
+          }
+        ],
+        "resposta": "string",
+        "revisada": "bool",
+        "situacao": "string"
+      }
+    ],
+    "total": "number"
+  },
+  "regioes": [
+    {
+      "pagina": "number",
+      "regiao": "string",
+      "retangulo": [
+        "number"
+      ]
+    }
+  ]
+}

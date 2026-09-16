@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"errors"
+	"math"
 	"slices"
 	"testing"
 	"time"
@@ -539,6 +540,51 @@ func TestProvas_ExcluirProvaApagaSoOQueEDela(t *testing.T) {
 	var conteudos int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM provas_questoes_conteudo`).Scan(&conteudos); err != nil || conteudos != 1 {
 		t.Fatalf("conteúdos = %d, %v; quer só o comum, que a F06 ainda usa", conteudos, err)
+	}
+}
+
+// A prova trazida de outro ambiente nasce em revisão, sem passar pela fila, e é
+// publicada na hora: a publicação e a base para abrir revisão ficam como as de
+// uma importação comum, com o PDF e as figuras registrados.
+func TestProvas_ImportacaoCriadaEmRevisaoPublica(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	recorte := uuid.NewString()
+
+	i := novaImportacao(criador, "pacote")
+	i.Estado, i.Rascunho = prova.EstadoEmRevisao, rascunhoPublicavel(recorte)
+	i.Regioes = []prova.Origem{{Pagina: 1, Regiao: "0", Retangulo: []float64{0, 0, 595, 842}}}
+	i.NomeDocumento = "trt18-prova.pdf"
+	// O teto de pendentes não segura: essa importação sai para o catálogo já.
+	criada, err := repo.Criar(ctx, i, math.MaxInt32)
+	if err != nil || criada.ID != i.ID || criada.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("Criar: %+v, %v", criada, err)
+	}
+	id, err := repo.Publicar(ctx, criada, criador)
+	if err != nil {
+		t.Fatalf("Publicar: %v", err)
+	}
+
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil || len(p.Conteudo.Questoes) != 1 || p.Conteudo.Questoes[0].Blocos[1].Arquivo != recorte {
+		t.Fatalf("publicada = %+v, %v", p.Conteudo.Questoes, err)
+	}
+	base, err := repo.ImportacaoDaPublicacao(ctx, id)
+	if err != nil || base.ID != i.ID || len(base.Regioes) != 1 || base.Documento != i.Documento || base.NomeDocumento != "trt18-prova.pdf" {
+		t.Fatalf("base da revisão = %+v, %v", base, err)
+	}
+	// A figura é servida a quem não é curador, porque está numa prova publicada.
+	if ext, err := repo.Arquivo(ctx, recorte, false); err != nil || ext != "png" {
+		t.Fatalf("figura: %q, %v", ext, err)
+	}
+
+	// O mesmo caderno de novo cai na importação que já existe.
+	if outra, err := repo.Criar(ctx, novaImportacao(criador, "pacote"), math.MaxInt32); err != nil || outra.ID != i.ID {
+		t.Fatalf("mesmo hash: %+v, %v", outra, err)
 	}
 }
 

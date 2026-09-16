@@ -419,6 +419,17 @@ das questões: ligar "1-10" põe o texto nas dez de uma vez, e texto sem questã
 pendência. Na tela do aluno, cada questão mostra o seu texto num recolhível
 aberto; quem o fecha numa questão o encontra fechado nas outras que o usam.
 
+**A prova vai de um ambiente a outro por pacote.** Para estrear o catálogo em
+produção sem importar e revisar de novo, a curadoria exporta cada prova
+publicada num .zip (`GET /api/provas/pacotes/{id}`: manifest.json com o conteúdo
+da revisão em vigor, as regiões e os nomes, e arquivos/ com o PDF, o gabarito e
+as figuras) e importa do outro lado (`POST /api/provas/pacotes`). A prova entra
+publicada, sem fila nem conferência — já foi revisada lá —, mas não com pendência
+de integridade, nem se já está no catálogo ou se o caderno (pelo hash) já foi
+importado ali. As figuras mantêm o id, que é o que os blocos citam; o PDF ganha
+id novo. Um pacote por prova: com todas, o envio passaria do limite do nginx. O
+formato é contrato (`testdata/prova_pacote.json`, `formatoDoPacote`).
+
 **A prova importada duas vezes sai pela curadoria.** "Excluir prova" apaga de vez
 a prova e tudo o que veio dela — revisões, questões, textos, gabarito, anotações e
 as importações que a publicaram ou revisam (`ProvaRepo.ExcluirProva`, numa
@@ -567,6 +578,7 @@ GET       /api/provas/{id}                     ← ?numero= e ?disciplina= filtr
 GET       /api/provas/arquivos/{id}            ← PDF ou recorte
 POST      /api/provas/{id}/{revisar,reextrair,excluir}                     ← curadoria
 PATCH|DELETE /api/provas/{id}                     ← título; tirar do catálogo
+GET       /api/provas/pacotes/{id}   POST /api/provas/pacotes   ← levar a outro ambiente
 GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
 POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,materias}
 GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante

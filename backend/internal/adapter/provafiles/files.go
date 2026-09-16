@@ -33,7 +33,15 @@ func (s Store) Caminho(id, ext string) (string, error) {
 //
 // Grava num temporário e renomeia: o worker nunca enxerga um PDF pela metade.
 func (s Store) Guardar(id string, conteudo []byte) error {
-	destino, err := s.Caminho(id, "pdf")
+	return s.GuardarComo(id, "pdf", conteudo)
+}
+
+// GuardarComo é Guardar com a extensão dada, só as que o volume conhece.
+func (s Store) GuardarComo(id, ext string, conteudo []byte) error {
+	if ext != "pdf" && ext != "png" {
+		return os.ErrInvalid
+	}
+	destino, err := s.Caminho(id, ext)
 	if err != nil {
 		return err
 	}
