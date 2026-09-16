@@ -497,6 +497,102 @@ _INICIO_DO_APOIO = 400
 _INICIO_DE_QUESTAO = re.compile(r"\s*\d{1,3}\s*[.)]\s")
 
 
+# O trecho que o curador marcou em volta de um texto de apoio que a extração
+# leu mal: só o texto interessa, e questão que o retângulo pegue na ponta não.
+INSTRUCAO_TEXTO_DE_APOIO = (
+    INSTRUCAO_REGIAO
+    + """
+IMPORTANTE: a imagem é o trecho que o curador marcou em volta de UM texto
+compartilhado que a extração leu mal. Devolva só esse texto, em Apoios e num
+apoio só: a frase de aviso, se aparecer, o texto inteiro do começo ao fim —
+título e todos os parágrafos — e a fonte. A lista Questoes vai vazia, mesmo que
+apareça o começo de uma questão.
+"""
+)
+# Menos letras que isto no texto do PDF é cabeçalho ou página escaneada, não o
+# texto de apoio.
+_LETRAS_DE_UM_TEXTO = 40
+
+
+async def texto_de_apoio(
+    root: Path, documento: str, origem: Origem, provider: LLMProvider, settings: Settings
+) -> Rascunho:
+    """Relê só o texto de apoio do trecho marcado. É obra publicada, e o Gemini
+    costuma recusar: aí o texto vem do próprio PDF, quando o caderno tem texto, e
+    senão do OCR do trecho. O curador já apontou onde o texto está, então não há
+    estrutura a pedir antes."""
+    png, nativo = await run_in_threadpool(render, root, documento, origem, settings)
+    leitura = _Leitura(root, documento, origem, settings)
+    resultado = Rascunho()
+    blocos: list[Bloco] = []
+    questoes: set[int] = set()
+    try:
+        raw = await provider.extract_structured(
+            _pedido(
+                INSTRUCAO_TEXTO_DE_APOIO,
+                f"Transcreva o texto de apoio deste trecho (página física {origem.pagina}).",
+                nativo,
+                [png],
+                RegiaoLida.model_json_schema(by_alias=True),
+                settings,
+            )
+        )
+        lida = RegiaoLida.model_validate(raw)
+        for a in lida.apoios:
+            blocos += await leitura.blocos(a.blocos, "texto de apoio do trecho")
+            questoes |= set(a.questoes)
+        resultado.extracoes = [
+            Extracao(
+                modelo=str(raw.get("_modelo", "")),
+                tokens_entrada=int(str(raw.get("_entrada", 0))),
+                tokens_saida=int(str(raw.get("_saida", 0))),
+                regiao=origem.regiao,
+                prompt=PROMPT + "-apoio",
+                versao=VERSAO,
+            )
+        ]
+    except ProviderRefused:
+        pass
+
+    if not any(b.texto.strip() or b.arquivo for b in blocos):
+        letras = sum(c.isalpha() for c in nativo)
+        if letras >= _LETRAS_DE_UM_TEXTO:
+            corpo, de_onde = nativo.strip(), "do texto do PDF"
+        else:
+            try:
+                corpo = (await run_in_threadpool(ocr_image, png, settings)).strip()
+            except OCRUnavailable:
+                corpo = ""
+            de_onde = "do OCR do trecho"
+        blocos = [Bloco(texto=corpo)] if corpo else []
+        resultado.extracoes = [
+            Extracao(
+                modelo="pdf" if de_onde == "do texto do PDF" else "ocr",
+                regiao=origem.regiao,
+                prompt=PROMPT + "-apoio",
+                versao=VERSAO,
+            )
+        ]
+        if corpo:
+            leitura.alertas.append(
+                f"O texto de apoio do trecho marcado veio {de_onde}, porque a IA não o "
+                "transcreveu; confira parágrafos e destaques com o original."
+            )
+
+    if blocos:
+        resultado.apoios = [
+            Apoio(
+                id=f"r{origem.regiao}-t1",
+                blocos=so_o_texto(blocos),
+                questoes=sorted(questoes | _questoes_citadas(" ".join(b.texto for b in blocos))),
+                aviso=aviso_do_apoio(blocos),
+                origens=[origem],
+            )
+        ]
+    resultado.alertas = leitura.alertas
+    return resultado
+
+
 def so_o_texto(blocos: list[Bloco]) -> list[Bloco]:
     """Deixa no material de apoio só o texto e a fonte, como vêm em toda prova
     da FCC: título da seção, aviso ("Considere o texto … questões de 1 a 10") e
@@ -1077,9 +1173,7 @@ def _tipos_da_relacao(texto: str) -> dict[str, dict[str, str]]:
     return tipos
 
 
-def ler_gabarito(
-    root: Path, documento: str, caderno_da_prova: str = ""
-) -> tuple[Gabarito, str]:
+def ler_gabarito(root: Path, documento: str, caderno_da_prova: str = "") -> tuple[Gabarito, str]:
     """Leitura determinística do gabarito da FCC, que vem com texto nativo:
     número, letra e situação, uma por linha; ou a relação com todos os tipos,
     de onde sai o do caderno da prova."""

@@ -13,10 +13,13 @@
 		novoApoio,
 		numerosDoAviso,
 		regiaoDoApoio,
+		regiaoDoCaderno,
+		regiaoDoTrechoDeApoio,
 		removerApoio,
 		retanguloInicial,
 		rotuloDaRegiao,
 		rotuloDoApoio,
+		trechoDeApoioInicial,
 		vincularApoio
 	} from './revisao';
 	import type { Origem, Rascunho } from './types';
@@ -28,7 +31,8 @@
 		versao,
 		regioes,
 		onalterar,
-		onabrirQuestao
+		onabrirQuestao,
+		onreler
 	}: {
 		rascunho: Rascunho;
 		/** O texto aberto, em `rascunho.apoios`. */
@@ -39,10 +43,15 @@
 		onalterar: () => void;
 		/** Leva à questão, na etapa de questões. */
 		onabrirQuestao: (numero: number) => void;
+		/** Põe na fila a leitura do trecho marcado em volta do texto; o erro volta ao recorte. */
+		onreler: (apoio: string, origem: Origem) => Promise<void>;
 	} = $props();
 
 	let marcar = $state<((marca: string) => void) | null>(null);
-	let painel = $state<'texto' | 'regiao'>('texto');
+	let painel = $state<'texto' | 'regiao' | 'trecho'>('texto');
+	/** A faixa do caderno em que o trecho do texto é marcado. */
+	let trechoIdx = $state(0);
+	const faixas = $derived(regioes.flatMap((r, i) => (regiaoDoCaderno(r) ? [i] : [])));
 	let zoom = $state(100);
 	let regiaoIdx = $state(0);
 	/** A figura do texto sendo recortada de novo ("p:id:índice"). */
@@ -72,6 +81,7 @@
 		void apoioId;
 		untrack(() => {
 			regiaoIdx = regiaoDoApoio(regioes, apoio);
+			trechoIdx = regiaoDoTrechoDeApoio(regioes, apoio);
 			painel = apoio?.origens.length ? 'texto' : 'regiao';
 			ajustando = null;
 		});
@@ -293,7 +303,9 @@
 			</section>
 
 			<aside class="card lateral">
-				<div class="card-top">{ajustando ? 'Recortar a figura do texto' : 'O texto no caderno original'}</div>
+				<div class="card-top">
+					{ajustando ? 'Recortar a figura do texto' : painel === 'trecho' ? 'Ler de novo · texto' : 'O texto no caderno original'}
+				</div>
 				<div class="card-body lateral-corpo">
 					{#if ajustando && regioes[regiaoIdx]}
 						<p class="ajuda">Desenhe o retângulo sobre a figura e aplique. O recorte sai do PDF original.</p>
@@ -324,13 +336,52 @@
 							<button class="btn" class:primary={painel === 'regiao'} type="button" onclick={() => (painel = 'regiao')}>
 								Região inteira
 							</button>
+							<button
+								class="btn"
+								class:primary={painel === 'trecho'}
+								type="button"
+								title="Para o texto que a extração leu mal: marque no caderno o texto inteiro, e a IA lê só esse trecho"
+								onclick={() => (painel = 'trecho')}
+							>
+								Ler de novo
+							</button>
 						</div>
-						<label class="zoom">
-							Zoom
-							<input type="range" min="60" max="220" step="10" bind:value={zoom} />
-							<span>{zoom}%</span>
-						</label>
-						{#if painel === 'texto' && apoio.origens[0]}
+						{#if painel !== 'trecho'}
+							<label class="zoom">
+								Zoom
+								<input type="range" min="60" max="220" step="10" bind:value={zoom} />
+								<span>{zoom}%</span>
+							</label>
+						{/if}
+						{#if painel === 'trecho'}
+							<p class="ajuda">
+								Desenhe o retângulo em volta do texto inteiro — do título, ou da frase "Considere o texto…",
+								até a fonte. A IA lê só esse trecho e troca o texto; as questões ligadas ficam. Se ela se
+								recusar a transcrever a obra, o texto vem do próprio PDF ou do OCR, e um aviso pede para
+								conferir.
+							</p>
+							<Campo rotulo="Onde o texto está" ajuda="A faixa do caderno em que o texto está.">
+								{#snippet children({ id, ajuda })}
+									<select {id} aria-describedby={ajuda} bind:value={trechoIdx}>
+										{#each faixas as i (i)}
+											<option value={i}>{rotuloDaRegiao(regioes[i], i, regioes.length)}</option>
+										{/each}
+									</select>
+								{/snippet}
+							</Campo>
+							{#if regioes[trechoIdx]}
+								{#key trechoIdx}
+									<Recorte
+										{importacao}
+										{versao}
+										regiao={regioes[trechoIdx]}
+										inicial={trechoDeApoioInicial(regioes[trechoIdx], apoio)}
+										rotulo="Ler este trecho do texto"
+										onmarcar={(origem) => onreler(apoio.id, origem)}
+									/>
+								{/key}
+							{/if}
+						{:else if painel === 'texto' && apoio.origens[0]}
 							<PreviaDoOriginal
 								{importacao}
 								{versao}

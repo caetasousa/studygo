@@ -356,6 +356,36 @@ func (s *ProvaService) RelerTrecho(ctx context.Context, usuario, id string, vers
 	return s.Obter(ctx, usuario, id)
 }
 
+// RelerTextoDeApoio põe na fila a leitura do trecho que o curador marcou em
+// volta de um texto de apoio que a extração leu mal — cortado, com parágrafo
+// faltando. Como o da questão, só o trecho é lido.
+func (s *ProvaService) RelerTextoDeApoio(ctx context.Context, usuario, id string, versao int, apoio string, o prova.Origem) (ImportacaoDeProva, error) {
+	i, err := s.carregar(ctx, usuario, id)
+	if err != nil {
+		return ImportacaoDeProva{}, err
+	}
+	if i.Versao != versao || i.Estado != prova.EstadoEmRevisao {
+		return ImportacaoDeProva{}, prova.ErrConflito
+	}
+	if s.estourouTeto(i) {
+		return ImportacaoDeProva{}, erroDeValidacao("esta importação atingiu o teto de chamadas ou de tempo")
+	}
+	if !slices.ContainsFunc(i.Rascunho.Apoios, func(a prova.Apoio) bool { return a.ID == apoio }) {
+		return ImportacaoDeProva{}, erroDeValidacao("o texto de apoio não existe no rascunho salvo; salve a revisão antes")
+	}
+	trecho, ok := prova.NovoTrechoDeApoio(i.Regioes, apoio, o)
+	if !ok {
+		return ImportacaoDeProva{}, erroDeValidacao("marque o trecho do texto dentro de uma página do caderno")
+	}
+
+	i.RelerTrecho(trecho)
+	if err := s.Repo.Salvar(ctx, i, versao); err != nil {
+		return ImportacaoDeProva{}, err
+	}
+
+	return s.Obter(ctx, usuario, id)
+}
+
 // ProcurarCadastradas compara de novo a importação em revisão com as provas
 // publicadas do mesmo concurso — a irmã pode ter sido publicada depois que esta
 // foi importada — e troca por referência as questões que elas já têm.
@@ -819,6 +849,19 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 		return i.Rascunho.Gabarito, nil
 
 	case i.Etapa == prova.EtapaTrecho:
+		if trecho, apoio, ok := i.TrechoDeApoioPendente(); ok {
+			lido, err := s.Processor.Extrair(ctx, i.Documento, trecho)
+			if errors.Is(err, port.ErrDocumentoRecusado) {
+				i.Rascunho.TrechoDeApoioRecusado(apoio, err.Error())
+				return map[string]string{"recusado": err.Error()}, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			i.Rascunho.AplicarTrechoDeApoio(apoio, lido)
+
+			return lido, nil
+		}
 		trecho, numero, ok := i.TrechoPendente()
 		if !ok {
 			return nil, fmt.Errorf("%w: não há trecho marcado para ler", port.ErrDocumentoRecusado)

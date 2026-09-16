@@ -38,6 +38,8 @@ class PedidoRegiao(BaseModel):
 class PedidoLeitura(PedidoRegiao):
     # A releitura de uma questão diz qual: o processador a acha pelo número.
     questao: int = 0
+    # O trecho marcado em volta de um texto de apoio: lê só o texto.
+    apoio: bool = False
 
 
 @router.post("/preparar")
@@ -64,6 +66,11 @@ async def extrair(
     settings: Settings = Depends(get_settings),
     provider: LLMProvider = Depends(get_provider),
 ) -> object:
+    if body.apoio:
+        lido = await pipeline.texto_de_apoio(
+            settings.provas_dir, body.documento, body.origem, provider, settings
+        )
+        return lido.model_dump(by_alias=True)
     result = await pipeline.extrair(
         settings.provas_dir, body.documento, body.origem, provider, settings, questao=body.questao
     )

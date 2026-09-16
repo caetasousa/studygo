@@ -1070,6 +1070,98 @@ func TestRelerTrecho_UltimaRegiaoEOTrecho(t *testing.T) {
 // A leitura do trecho troca a questão sem comparar com a antiga — foi o
 // curador que pediu —, mas o que não é leitura fica: matéria, resposta e
 // textos de apoio. A conferência cai.
+func TestNovoTrechoDeApoio(t *testing.T) {
+	t.Parallel()
+
+	regioes := []Origem{{Pagina: 4, Regiao: "3", Retangulo: []float64{0, 0, 595, 842}}}
+	marcado := Origem{Pagina: 4, Retangulo: []float64{30, 500, 560, 842.3}, Regiao: "3"}
+
+	got, ok := NovoTrechoDeApoio(regioes, "r3-t1", marcado)
+	if !ok || got.Regiao != "ta:r3-t1" || got.Retangulo[3] != 842 || !ETrechoDeApoio(got) {
+		t.Fatalf("trecho = %+v, %v; quer ta:r3-t1 na borda da página", got, ok)
+	}
+	i := Importacao{Regioes: append(slices.Clone(regioes), got)}
+	if _, id, ok := i.TrechoDeApoioPendente(); !ok || id != "r3-t1" {
+		t.Fatalf("TrechoDeApoioPendente = %q, %v", id, ok)
+	}
+	// O da questão não confunde com o do texto, e vice-versa.
+	if _, _, ok := i.TrechoPendente(); ok {
+		t.Fatal("o trecho do texto passou por trecho de questão")
+	}
+	if _, ok := NovoTrechoDeApoio(regioes, " ", marcado); ok {
+		t.Fatal("aceitou texto sem id")
+	}
+	if _, ok := NovoTrechoDeApoio(regioes, "r3-t1", Origem{Pagina: 5, Retangulo: []float64{30, 500, 560, 800}}); ok {
+		t.Fatal("aceitou trecho fora das páginas do caderno")
+	}
+}
+
+// O texto das questões 14 a 17 do TRT-18 veio só com o primeiro parágrafo.
+func TestAplicarTrechoDeApoio(t *testing.T) {
+	t.Parallel()
+
+	rascunho := func() Rascunho {
+		r := valida()
+		r.Questoes[0].Numero = 14
+		r.Apoios = []Apoio{{
+			ID: "r3-t1", Questoes: []int{14}, Revisado: true, IgualA: "TRT 18 2023 · L12",
+			Aviso:   "Para responder às questões de números 14 a 17",
+			Blocos:  []Bloco{{Tipo: "texto", Texto: "No voo da caneta. Numa das cartas…"}},
+			Origens: []Origem{{Pagina: 4, Regiao: "3"}},
+		}}
+		r.AcertarApoios()
+		return r
+	}
+	trecho := Origem{Pagina: 4, Regiao: "ta:r3-t1", Retangulo: []float64{30, 500, 560, 842}}
+	lido := Rascunho{
+		Alertas: []string{"O texto de apoio do trecho marcado veio do texto do PDF"},
+		Apoios: []Apoio{{
+			ID: "rta:r3-t1-t1", Questoes: []int{14, 15, 16, 17}, Origens: []Origem{trecho},
+			Blocos: []Bloco{{Tipo: "texto", Texto: "No voo da caneta. Numa das cartas… (quatro parágrafos) (Adaptado de …)"}},
+		}},
+	}
+
+	r := rascunho()
+	r.AplicarTrechoDeApoio("r3-t1", lido)
+	a := r.Apoios[0]
+	if !strings.Contains(a.Blocos[0].Texto, "quatro parágrafos") || a.Revisado || a.IgualA != "" {
+		t.Fatalf("texto = %+v; quer a leitura do trecho, sem conferência nem reaproveitamento", a)
+	}
+	if !slices.Equal(a.Questoes, []int{14}) || !slices.Equal(r.Questoes[0].Apoios, []string{"r3-t1"}) {
+		t.Fatalf("ligação = %v / %v; as questões ligadas são do curador", a.Questoes, r.Questoes[0].Apoios)
+	}
+	if a.Aviso != "Para responder às questões de números 14 a 17" || !reflect.DeepEqual(a.Origens, []Origem{trecho}) {
+		t.Fatalf("aviso %q, origens %+v", a.Aviso, a.Origens)
+	}
+	if !contem(r.Alertas, "veio do texto do PDF") {
+		t.Fatalf("o aviso da leitura sumiu: %v", r.Alertas)
+	}
+
+	// Sem nenhuma questão ligada, ganha as que o aviso lido cita.
+	r = rascunho()
+	r.Apoios[0].Questoes = nil
+	r.AplicarTrechoDeApoio("r3-t1", lido)
+	if !slices.Equal(r.Apoios[0].Questoes, []int{14, 15, 16, 17}) || !slices.Equal(r.Questoes[0].Apoios, []string{"r3-t1"}) {
+		t.Fatalf("texto sem questões: %v / %v", r.Apoios[0].Questoes, r.Questoes[0].Apoios)
+	}
+
+	// Leitura vazia, ou texto que não existe mais: fica como estava, e avisa.
+	r = rascunho()
+	antes := r.Apoios[0]
+	r.AplicarTrechoDeApoio("r3-t1", Rascunho{Apoios: []Apoio{{Blocos: []Bloco{{Tipo: "texto", Texto: ""}}}}})
+	if !reflect.DeepEqual(r.Apoios[0], antes) || !contem(r.Alertas, "não achou texto para o texto de apoio das questões 14") {
+		t.Fatalf("leitura vazia: %+v, %v", r.Apoios[0], r.Alertas)
+	}
+	r.AplicarTrechoDeApoio("sumiu", lido)
+	if !contem(r.Alertas, "não está mais no rascunho") {
+		t.Fatalf("texto removido: %v", r.Alertas)
+	}
+	r.TrechoDeApoioRecusado("r3-t1", "a IA se recusou")
+	if !contem(r.Alertas, "O trecho marcado para o texto de apoio das questões 14 não foi lido (a IA se recusou)") {
+		t.Fatalf("recusa: %v", r.Alertas)
+	}
+}
+
 func TestAplicarTrecho_TrocaAQuestao(t *testing.T) {
 	t.Parallel()
 

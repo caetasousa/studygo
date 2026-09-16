@@ -292,6 +292,85 @@ async def test_recitacao_pede_a_estrutura_e_le_o_apoio_por_ocr(
     assert result.extracoes[0].prompt.endswith("-estrutura")
 
 
+def _pagina_com_texto(root: Path, texto: str) -> str:
+    id = str(uuid.uuid4())
+    with pymupdf.open() as doc:
+        doc.new_page(width=595, height=800).insert_textbox(pymupdf.Rect(30, 30, 565, 770), texto)
+        doc.save(arquivo(root, id, "pdf"))
+    return id
+
+
+CRONICA = (
+    "Atenção: Para responder às questões de números 14 a 17, baseie-se no texto abaixo:\n"
+    "No voo da caneta\n"
+    "Numa das cartas ao seu amigo Mário de Andrade, assegurava-lhe o poeta que era com uma "
+    "caneta na mão que costumava viver as suas maiores emoções.\n"
+    "Comentando isso numa das minhas aulas de Literatura, atentei para a reação de um aluno.\n"
+    "(Adaptado de: Aldair Rômulo Siqueira)"
+)
+
+
+async def test_trecho_de_apoio_le_so_o_texto(tmp_path: Path) -> None:
+    """O texto das questões 14 a 17 do TRT-18 veio só com o primeiro parágrafo; o
+    curador marca o texto inteiro, e o trecho não traz questão, nem a da ponta."""
+    id = _pagina_com_texto(tmp_path, CRONICA)
+    trecho = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="ta:r3-t1")
+    provider = FakeProvider(
+        {
+            "Apoios": [{"Id": "t1", "Questoes": [14, 15, 16, 17], "Blocos": [{"Texto": CRONICA}]}],
+            "Questoes": [dict(QUESTAO_44, Numero=14)],
+        }
+    )
+
+    result = await pipeline.texto_de_apoio(
+        tmp_path, id, trecho, provider, Settings(provas_dir=tmp_path)
+    )
+
+    assert provider.pedidos[0].instruction == pipeline.INSTRUCAO_TEXTO_DE_APOIO
+    assert result.questoes == [] and len(result.apoios) == 1
+    apoio = result.apoios[0]
+    assert apoio.questoes == [14, 15, 16, 17] and "14 a 17" in apoio.aviso
+    assert apoio.blocos[0].texto.startswith("No voo da caneta")
+    assert "maiores emoções" in apoio.blocos[0].texto and apoio.origens == [trecho]
+    assert result.alertas == []
+
+
+async def test_trecho_de_apoio_recusado_vem_do_texto_do_pdf(tmp_path: Path) -> None:
+    id = _pagina_com_texto(tmp_path, CRONICA)
+    trecho = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="ta:r3-t1")
+
+    result = await pipeline.texto_de_apoio(
+        tmp_path,
+        id,
+        trecho,
+        FakeProvider(ProviderRefused("RECITATION")),
+        Settings(provas_dir=tmp_path),
+    )
+
+    apoio = result.apoios[0]
+    assert "Comentando isso" in apoio.blocos[0].texto and apoio.questoes == [14, 15, 16, 17]
+    assert "texto do PDF" in result.alertas[0] and result.extracoes[0].modelo == "pdf"
+
+
+async def test_trecho_de_apoio_escaneado_recusado_vem_do_ocr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pipeline, "ocr_image", lambda png, s: CRONICA)
+    id = pdf(tmp_path)  # só "Texto original": pouco texto para ser o do apoio
+    trecho = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="ta:r3-t1")
+
+    result = await pipeline.texto_de_apoio(
+        tmp_path,
+        id,
+        trecho,
+        FakeProvider(ProviderRefused("RECITATION")),
+        Settings(provas_dir=tmp_path),
+    )
+
+    assert result.apoios[0].blocos[0].texto.startswith("No voo da caneta")
+    assert "OCR" in result.alertas[0] and result.extracoes[0].modelo == "ocr"
+
+
 async def test_sem_tesseract_o_apoio_fica_como_recorte(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

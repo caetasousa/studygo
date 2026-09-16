@@ -25,6 +25,8 @@ import {
 	regiaoDaQuestao,
 	regiaoDoCaderno,
 	regiaoDoTrecho,
+	regiaoDoTrechoDeApoio,
+	trechoDeApoioInicial,
 	removerApoio,
 	retanguloInicial,
 	retanguloParaEnviar,
@@ -291,6 +293,9 @@ describe('problemas da questão', () => {
 	it('a releitura e o trecho dizem de qual questão são', () => {
 		expect(rotuloDaRegiao({ ...regiao, regiao: 'q22' }, 13, 16)).toBe('Página 1 · releitura da questão 22');
 		expect(rotuloDaRegiao({ ...regiao, regiao: 't22' }, 14, 16)).toBe('Página 1 · trecho marcado da questão 22');
+		expect(rotuloDaRegiao({ ...regiao, regiao: 'ta:r3-t1' }, 15, 16)).toBe(
+			'Página 1 · trecho marcado de um texto de apoio'
+		);
 		expect(rotuloDaRegiao(regiao, 3, 13)).toBe('Página 1 · região 4 de 13');
 	});
 });
@@ -312,6 +317,28 @@ describe('trecho', () => {
 		expect(regiaoDoTrecho(regioes, undefined)).toBe(0);
 		expect(regiaoDoCaderno(regioes[3]) || regiaoDoCaderno(regioes[4])).toBe(false);
 		expect(eTrecho(regioes[4]) && !eTrecho(regioes[3])).toBe(true);
+	});
+
+	it('o trecho do texto de apoio começa na faixa e no começo dele, e vai até o pé', () => {
+		const comTexto = [...regioes, { pagina: 2, retangulo: [40, 100, 560, 800], regiao: 'ta:r2-t1' }];
+		const apoio = (o: Origem) => ({ ...novoApoio([]), origens: [o] });
+		// O texto inteiro cabe só na primeira faixa da página 1.
+		expect(regiaoDoTrechoDeApoio(comTexto, apoio({ pagina: 1, retangulo: [40, 100, 560, 600], regiao: '0' }))).toBe(0);
+		expect(regiaoDoTrechoDeApoio(comTexto, apoio({ pagina: 1, retangulo: [40, 900, 560, 1400], regiao: '1' }))).toBe(1);
+		expect(regiaoDoTrechoDeApoio(comTexto, undefined)).toBe(0);
+		expect(regiaoDoCaderno(comTexto[5]) || !eTrecho(comTexto[5])).toBe(false);
+
+		const faixa = regioes[0];
+		expect(trechoDeApoioInicial(faixa, apoio({ pagina: 1, retangulo: [40, 400, 560, 450], regiao: '0' }))).toEqual([
+			0,
+			400 - 0.01 * 850,
+			600,
+			850
+		]);
+		// Sem origem na faixa, a faixa inteira.
+		expect(trechoDeApoioInicial(faixa, apoio({ pagina: 2, retangulo: [40, 400, 560, 450], regiao: '2' }))).toEqual(
+			faixa.retangulo
+		);
 	});
 
 	// O pé da folha A4 é 841,9199…: arredondado, virava 841,92, um centésimo

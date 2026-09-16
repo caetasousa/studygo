@@ -46,6 +46,8 @@ type pedido struct {
 	Origem    *prova.Origem `json:"origem,omitempty"`
 	// Questao é o número que a releitura procura na página.
 	Questao int `json:"questao,omitempty"`
+	// Apoio pede só o texto de apoio do trecho marcado em volta dele.
+	Apoio bool `json:"apoio,omitempty"`
 	// Caderno é o da prova, para o gabarito que traz vários tipos.
 	Caderno string `json:"caderno,omitempty"`
 }
@@ -125,6 +127,7 @@ func (c *Client) Extrair(ctx context.Context, documento string, regiao prova.Ori
 	if n, ok := prova.QuestaoDaReleitura(regiao); ok {
 		p.Questao = n
 	}
+	p.Apoio = prova.ETrechoDeApoio(regiao)
 	err := c.chamar(ctx, "extrair", p, &r)
 
 	return r, err

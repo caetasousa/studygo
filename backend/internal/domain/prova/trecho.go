@@ -17,6 +17,8 @@ import (
 // está foi o curador.
 const (
 	prefixoTrecho = "t"
+	// O trecho de um texto de apoio leva o id do texto: "ta:r3-t1".
+	prefixoTrechoDeApoio = "ta:"
 	// Menor que isto, em pontos do PDF, é clique, não trecho.
 	ladoMinimoDoTrecho = 10
 	// O retângulo chega arredondado da tela; meio ponto fora da região é a
@@ -31,8 +33,30 @@ func eTrecho(o Origem) bool { return strings.HasPrefix(o.Regiao, prefixoTrecho) 
 // marcou. Falso se o retângulo não cabe numa região da mesma página: é dentro
 // delas que a tela deixa desenhar, e fora da página o processador recusaria.
 func NovoTrecho(regioes []Origem, numero int, o Origem) (Origem, bool) {
+	if numero < 1 {
+		return Origem{}, false
+	}
+
+	return trechoMarcado(regioes, o, fmt.Sprintf("%s%d", prefixoTrecho, numero))
+}
+
+// NovoTrechoDeApoio é a região que relê o texto de apoio `id` no retângulo que o
+// curador marcou, com as mesmas regras de NovoTrecho.
+func NovoTrechoDeApoio(regioes []Origem, id string, o Origem) (Origem, bool) {
+	if strings.TrimSpace(id) == "" {
+		return Origem{}, false
+	}
+
+	return trechoMarcado(regioes, o, prefixoTrechoDeApoio+id)
+}
+
+// ETrechoDeApoio diz se a região é o trecho marcado em volta de um texto de
+// apoio: o processador lê dela só o texto.
+func ETrechoDeApoio(o Origem) bool { return strings.HasPrefix(o.Regiao, prefixoTrechoDeApoio) }
+
+func trechoMarcado(regioes []Origem, o Origem, rotulo string) (Origem, bool) {
 	r := o.Retangulo
-	if numero < 1 || len(r) != 4 || r[2]-r[0] < ladoMinimoDoTrecho || r[3]-r[1] < ladoMinimoDoTrecho {
+	if len(r) != 4 || r[2]-r[0] < ladoMinimoDoTrecho || r[3]-r[1] < ladoMinimoDoTrecho {
 		return Origem{}, false
 	}
 	// Comparações com NaN e infinito dão falso: retângulo inválido não cabe.
@@ -51,7 +75,7 @@ func NovoTrecho(regioes []Origem, numero int, o Origem) (Origem, bool) {
 	c := regioes[k].Retangulo
 	dentro := []float64{max(r[0], c[0]), max(r[1], c[1]), min(r[2], c[2]), min(r[3], c[3])}
 
-	return Origem{Pagina: o.Pagina, Retangulo: dentro, Regiao: fmt.Sprintf("%s%d", prefixoTrecho, numero)}, true
+	return Origem{Pagina: o.Pagina, Retangulo: dentro, Regiao: rotulo}, true
 }
 
 // RelerTrecho põe a leitura do trecho na fila. Ele entra no fim das regiões,
@@ -164,6 +188,70 @@ func (r *Rascunho) AplicarTrecho(numero int, lido Rascunho) {
 		r.Questoes[j].Disciplina = r.Questoes[j-1].Disciplina
 	}
 	r.AcertarApoios()
+}
+
+// TrechoDeApoioPendente é o trecho de texto de apoio que a EtapaTrecho lê — o
+// último das regiões — e o id do texto.
+func (i Importacao) TrechoDeApoioPendente() (Origem, string, bool) {
+	if len(i.Regioes) == 0 {
+		return Origem{}, "", false
+	}
+	t := i.Regioes[len(i.Regioes)-1]
+	id := strings.TrimPrefix(t.Regiao, prefixoTrechoDeApoio)
+
+	return t, id, ETrechoDeApoio(t) && id != ""
+}
+
+// AplicarTrechoDeApoio põe no texto de apoio `id` o que a leitura do trecho
+// marcado trouxe: o texto, a frase do aviso, se veio, e onde ele está no
+// caderno. As questões ligadas são decisão do curador e ficam; só o texto que
+// não tem nenhuma ganha as que o aviso lido cita. A conferência cai, porque o
+// conteúdo é outro. Os avisos da leitura sobem — o texto que veio do PDF ou do
+// OCR, porque a IA recusou a obra, precisa ser conferido.
+func (r *Rascunho) AplicarTrechoDeApoio(id string, lido Rascunho) {
+	r.Extracoes = append(r.Extracoes, lido.Extracoes...)
+	r.Alertas = append(r.Alertas, lido.Alertas...)
+	j := slices.IndexFunc(r.Apoios, func(a Apoio) bool { return a.ID == id })
+	if j < 0 {
+		r.Alertas = append(r.Alertas, "O texto de apoio do trecho marcado não está mais no rascunho, e nada mudou.")
+		return
+	}
+	a := &r.Apoios[j]
+	k := slices.IndexFunc(lido.Apoios, func(l Apoio) bool { return !semConteudo(limparBlocos(l.Blocos)) })
+	if k < 0 {
+		r.Alertas = append(r.Alertas, fmt.Sprintf(
+			"A leitura do trecho marcado não achou texto para o %s, e ele ficou como estava. "+
+				"Marque o texto inteiro, do título à fonte.", a.rotulo(),
+		))
+		return
+	}
+
+	lida := lido.Apoios[k]
+	a.Blocos = limparBlocos(lida.Blocos)
+	dimensionar(a.Blocos, larguraDaArea(lida.Origens))
+	if lida.Aviso != "" {
+		a.Aviso = lida.Aviso
+	}
+	if len(lida.Origens) > 0 {
+		a.Origens = lida.Origens
+	}
+	if len(a.Questoes) == 0 {
+		a.Questoes = lida.Questoes
+	}
+	a.Revisado, a.IgualA = false, ""
+	r.AcertarApoios()
+}
+
+// TrechoDeApoioRecusado registra que o processador recusou o trecho do texto:
+// ele fica como estava, e o curador sabe por quê.
+func (r *Rascunho) TrechoDeApoioRecusado(id, motivo string) {
+	rotulo := "texto de apoio"
+	if j := slices.IndexFunc(r.Apoios, func(a Apoio) bool { return a.ID == id }); j >= 0 {
+		rotulo = r.Apoios[j].rotulo()
+	}
+	r.Alertas = append(r.Alertas, fmt.Sprintf(
+		"O trecho marcado para o %s não foi lido (%s), e ele ficou como estava.", rotulo, motivo,
+	))
 }
 
 // TrechoRecusado registra que o processador recusou o trecho: a questão fica

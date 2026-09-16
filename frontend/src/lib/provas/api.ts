@@ -105,6 +105,13 @@ export const provasApi = {
 			body: JSON.stringify({ versao, questao, origem })
 		}),
 
+	/** Lê de novo só o texto de apoio, no trecho que o curador marcou em volta dele. */
+	relerTextoDeApoio: (id: string, versao: number, apoio: string, origem: Origem) =>
+		request<Importacao>(`${imp}/${id}/trecho`, {
+			method: 'POST',
+			body: JSON.stringify({ versao, apoio, origem })
+		}),
+
 	/** Compara de novo com as provas publicadas do concurso e troca por referência as que elas já têm. */
 	procurarCadastradas: (id: string, versao: number) =>
 		request<Importacao>(`${imp}/${id}/cadastradas`, comVersao(versao)),

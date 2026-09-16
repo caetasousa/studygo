@@ -991,6 +991,51 @@ func TestProvas_RelerTrechoTrocaSoAQuestao(t *testing.T) {
 	}
 }
 
+// O texto de apoio cortado: o curador marca o texto inteiro, e a fila lê só
+// ele, pedindo ao processador só o texto — sem mexer nas questões.
+func TestProvas_RelerTextoDeApoio(t *testing.T) {
+	t.Parallel()
+
+	s, repo, extrator, revisao := emRevisaoPorPagina(t)
+	ctx := context.Background()
+	i := repo.importacoes[revisao.ID]
+	i.Rascunho.Apoios = []prova.Apoio{{
+		ID: "r1-t1", Questoes: []int{1, 2}, Revisado: true,
+		Blocos: []prova.Bloco{{Tipo: "texto", Texto: "só o primeiro parágrafo"}},
+	}}
+	i.Rascunho.AcertarApoios()
+	repo.importacoes[revisao.ID] = i
+	questoes := slices.Clone(i.Rascunho.Questoes)
+	extrator.porRegiao["ta:r1-t1"] = prova.Rascunho{Apoios: []prova.Apoio{{
+		ID: "x", Blocos: []prova.Bloco{{Tipo: "texto", Texto: "o texto inteiro, do título à fonte"}},
+	}}}
+
+	var v ErrValidacao
+	if _, err := s.RelerTextoDeApoio(ctx, curador, revisao.ID, i.Versao, "nao-existe", trechoDaQuestao2); !errors.As(err, &v) {
+		t.Fatalf("texto que não existe: err = %v, quer ErrValidacao", err)
+	}
+	fora := prova.Origem{Pagina: 3, Retangulo: []float64{30, 100, 560, 500}}
+	if _, err := s.RelerTextoDeApoio(ctx, curador, revisao.ID, i.Versao, "r1-t1", fora); !errors.As(err, &v) {
+		t.Fatalf("trecho fora do caderno: err = %v, quer ErrValidacao", err)
+	}
+	marcada, err := s.RelerTextoDeApoio(ctx, curador, revisao.ID, i.Versao, "r1-t1", trechoDaQuestao2)
+	if err != nil || marcada.Estado != prova.EstadoNaFila || marcada.Etapa != prova.EtapaTrecho {
+		t.Fatalf("RelerTextoDeApoio: %+v, %v", marcada.Importacao, err)
+	}
+
+	final := processarTudo(t, s, repo, revisao.ID)
+
+	if got := strings.Join(extrator.extraidas, ","); got != "ta:r1-t1" || final.Estado != prova.EstadoEmRevisao {
+		t.Fatalf("regiões lidas = %s, estado = %s (%s)", got, final.Estado, final.Erro)
+	}
+	if a := final.Rascunho.Apoios[0]; a.Blocos[0].Texto != "o texto inteiro, do título à fonte" || a.Revisado || !slices.Equal(a.Questoes, []int{1, 2}) {
+		t.Fatalf("texto = %+v", a)
+	}
+	if !reflect.DeepEqual(final.Rascunho.Questoes, questoes) {
+		t.Fatalf("as questões mudaram:\nantes  %+v\ndepois %+v", questoes, final.Rascunho.Questoes)
+	}
+}
+
 // Recusado pelo processador, o trecho não derruba a importação: ela volta à
 // revisão com a questão como estava e o motivo nos alertas.
 func TestProvas_TrechoRecusadoVoltaARevisao(t *testing.T) {

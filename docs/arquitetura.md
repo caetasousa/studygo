@@ -292,7 +292,11 @@ está, sem procurar a questão pelo número, e volta direto à revisão, sem
 consolidar de novo. O que o trecho trouxe entra sem comparar com a leitura
 antiga — quem apontou onde está foi o curador —: o enunciado, se veio, e cada
 alternativa pela letra; o resto da questão, a matéria, a resposta e os textos
-ligados ficam (`Rascunho.AplicarTrecho`). Sem o número dentro do trecho, o
+ligados ficam (`Rascunho.AplicarTrecho`). O texto de apoio tem o mesmo "Ler de
+novo" (trecho `ta:<id>`): o processador pede só o texto (`texto_de_apoio`) e, se
+a IA não o transcreve — obra publicada, recitação —, usa o texto do PDF naquele
+retângulo ou o OCR dele, com aviso para conferir; do texto ficam as questões
+ligadas (`Rascunho.AplicarTrechoDeApoio`). Sem o número dentro do trecho, o
 modelo chuta outro, e vale a única questão lida. O retângulo começa do alto da
 questão até pouco depois do começo da seguinte (`trechoInicial`) — a área que a
 extração deu é só o que ela leu, e na questão sem alternativas era o enunciado —,

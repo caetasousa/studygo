@@ -478,7 +478,13 @@ func (h *ProvaHandler) RelerTrecho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	i, err := h.provas.RelerTrecho(r.Context(), usuario, id, req.Versao, req.Questao, origemDoDTO(req.Origem))
+	var i service.ImportacaoDeProva
+	var err error
+	if req.Apoio != "" {
+		i, err = h.provas.RelerTextoDeApoio(r.Context(), usuario, id, req.Versao, req.Apoio, origemDoDTO(req.Origem))
+	} else {
+		i, err = h.provas.RelerTrecho(r.Context(), usuario, id, req.Versao, req.Questao, origemDoDTO(req.Origem))
+	}
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return

@@ -73,7 +73,7 @@
 	// O trecho relido: em que faixa do caderno ele é marcado, e para qual
 	// questão voltar quando a leitura terminar — a fila devolve a tela ao começo.
 	let trechoIdx = $state(0);
-	let voltarPara = $state<{ numero: number; alertas: number } | null>(null);
+	let voltarPara = $state<{ numero?: number; apoio?: string; alertas: number } | null>(null);
 
 	type Etapa = 'dados' | 'textos' | 'questoes' | 'publicar';
 	const ETAPAS: { id: Etapa; nome: string }[] = [
@@ -209,12 +209,33 @@
 		receber(nova);
 	}
 
-	/** O que o relógio traz enquanto a fila anda; ao voltar do trecho, a questão dele. */
+	// O mesmo para o texto de apoio: salva antes, e a volta é para o texto.
+	async function relerTextoDeApoio(apoio: string, origem: Origem) {
+		if (!imp) return;
+		erro = '';
+		aviso = '';
+		if (alterado) await salvar();
+		const nova = await provasApi.relerTextoDeApoio(imp.id, imp.versao, apoio, origem);
+		voltarPara = { apoio, alertas: imp.rascunho.alertas.length };
+		receber(nova);
+	}
+
+	/** O que o relógio traz enquanto a fila anda; ao voltar do trecho, a questão ou o texto dele. */
 	function acompanhar(nova: Importacao) {
 		receber(nova, false);
 		if (nova.estado !== 'em_revisao' || !voltarPara) return;
-		const { numero, alertas } = voltarPara;
+		const { numero, apoio, alertas } = voltarPara;
 		voltarPara = null;
+		if (apoio) {
+			const i = nova.rascunho.apoios.findIndex((a) => a.id === apoio);
+			if (i >= 0) textoIdx = i;
+			etapa = 'textos';
+			const lidos = nova.rascunho.alertas.slice(alertas);
+			aviso = lidos.length
+				? lidos.join(' ')
+				: 'O texto foi lido de novo pelo trecho marcado. Confira com o original e marque como conferido.';
+			return;
+		}
 		irPara(nova.rascunho.questoes.findIndex((x) => x.numero === numero));
 		const novos = nova.rascunho.alertas.slice(alertas);
 		aviso = novos.length
@@ -805,6 +826,7 @@
 					regioes={imp.regioes}
 					onalterar={alterar}
 					onabrirQuestao={abrirQuestao}
+					onreler={relerTextoDeApoio}
 				/>
 			{:else if etapa === 'questoes'}
 				<div class="cabeca-etapa">

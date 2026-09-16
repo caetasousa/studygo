@@ -196,9 +196,11 @@ type recorteRequest struct {
 }
 
 // trechoRequest é o retângulo que o curador marcou em volta da questão.
+// trechoRequest relê a questão `questao` ou, com `apoio`, o texto de apoio.
 type trechoRequest struct {
 	Versao  int       `json:"versao"`
 	Questao int       `json:"questao"`
+	Apoio   string    `json:"apoio"`
 	Origem  origemDTO `json:"origem"`
 }
 

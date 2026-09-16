@@ -103,17 +103,18 @@ export function rotuloDaRegiao(regiao: Origem, indice: number, total: number): s
 	if (releitura) return `Página ${regiao.pagina} · releitura da questão ${releitura[1]}`;
 	const trecho = regiao.regiao.match(/^t(\d+)$/);
 	if (trecho) return `Página ${regiao.pagina} · trecho marcado da questão ${trecho[1]}`;
+	if (regiao.regiao.startsWith('ta:')) return `Página ${regiao.pagina} · trecho marcado de um texto de apoio`;
 	return `Página ${regiao.pagina} · região ${indice + 1} de ${total}`;
 }
 
-/** O trecho que o curador marcou para reler uma questão (prova.ETrecho no servidor). */
+/** O trecho que o curador marcou para reler uma questão ou um texto de apoio ("t7", "ta:r3-t1"). */
 export function eTrecho(o: Origem): boolean {
-	return /^t\d+$/.test(o.regiao);
+	return /^(?:t\d+$|ta:)/.test(o.regiao);
 }
 
-/** Faixa do caderno — não a releitura nem o trecho de uma questão, que são pedaços dela. */
+/** Faixa do caderno — não a releitura nem os trechos marcados, que são pedaços dela. */
 export function regiaoDoCaderno(o: Origem): boolean {
-	return !/^[qt]\d+$/.test(o.regiao);
+	return !/^(?:[qt]\d+$|ta:)/.test(o.regiao);
 }
 
 /**
@@ -121,13 +122,29 @@ export function regiaoDoCaderno(o: Origem): boolean {
  * página em que ela foi lida, a que contém o meio dela. Sem origem, a primeira.
  */
 export function regiaoDoTrecho(regioes: Origem[], q: Questao | undefined): number {
+	return faixaDaOrigem(regioes, q?.origens);
+}
+
+/** O mesmo, para o texto de apoio: a faixa que o contém inteiro, se houver uma. */
+export function regiaoDoTrechoDeApoio(regioes: Origem[], apoio: Apoio | undefined): number {
+	return faixaDaOrigem(regioes, apoio?.origens);
+}
+
+function faixaDaOrigem(regioes: Origem[], origens: Origem[] | undefined): number {
 	const faixas = regioes.flatMap((r, i) => (regiaoDoCaderno(r) ? [i] : []));
-	const o = q?.origens.find((x) => x.retangulo.length === 4);
+	const o = origens?.find((x) => x.retangulo.length === 4);
 	if (!o) return faixas[0] ?? 0;
-	const meio = (o.retangulo[1] + o.retangulo[3]) / 2;
+	const [, topo, , pe] = o.retangulo;
+	const meio = (topo + pe) / 2;
 	const daPagina = faixas.filter((i) => regioes[i].pagina === o.pagina);
-	const comOMeio = daPagina.find((i) => regioes[i].retangulo[1] <= meio && meio <= regioes[i].retangulo[3]);
-	return comOMeio ?? daPagina[0] ?? faixas[0] ?? 0;
+	const cobre = (i: number, a: number, b: number) => regioes[i].retangulo[1] <= a && b <= regioes[i].retangulo[3];
+	return (
+		daPagina.find((i) => cobre(i, topo, pe)) ??
+		daPagina.find((i) => cobre(i, meio, meio)) ??
+		daPagina[0] ??
+		faixas[0] ??
+		0
+	);
 }
 
 /**
@@ -155,6 +172,20 @@ export function trechoInicial(regiao: Origem, q: Questao | undefined, questoes: 
 	const topo = Math.max(y0, inicio - FOLGA_ACIMA * altura);
 	const pe = Math.min(y1, Math.min(...seguintes) + FOLGA_ABAIXO * altura);
 	return pe - topo >= 4 ? [x0, topo, x1, pe] : [x0, y0, x1, y1];
+}
+
+/**
+ * O retângulo com que o trecho do texto de apoio começa: de um pouco acima do
+ * começo dele até o pé da região. O que a extração leu é justamente o que veio
+ * cortado — o texto das questões 14 a 17 do TRT-18 era só o primeiro parágrafo
+ * —, então o fim dele não diz onde o texto acaba; a questão que o retângulo
+ * pegar embaixo o processador ignora.
+ */
+export function trechoDeApoioInicial(regiao: Origem, apoio: Apoio | undefined): number[] {
+	const [x0, y0, x1, y1] = regiao.retangulo;
+	const o = apoio?.origens.find((x) => x.pagina === regiao.pagina && x.retangulo.length === 4);
+	if (!o || o.retangulo[1] <= y0 || o.retangulo[1] >= y1) return [x0, y0, x1, y1];
+	return [x0, Math.max(y0, o.retangulo[1] - FOLGA_ACIMA * (y1 - y0)), x1, y1];
 }
 
 /**
