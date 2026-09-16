@@ -46,6 +46,8 @@ type pedido struct {
 	Origem    *prova.Origem `json:"origem,omitempty"`
 	// Questao é o número que a releitura procura na página.
 	Questao int `json:"questao,omitempty"`
+	// Caderno é o da prova, para o gabarito que traz vários tipos.
+	Caderno string `json:"caderno,omitempty"`
 }
 
 type wireErro struct {
@@ -128,9 +130,9 @@ func (c *Client) Extrair(ctx context.Context, documento string, regiao prova.Ori
 	return r, err
 }
 
-func (c *Client) Gabarito(ctx context.Context, arquivo string) (prova.Gabarito, error) {
+func (c *Client) Gabarito(ctx context.Context, arquivo, caderno string) (prova.Gabarito, error) {
 	var g prova.Gabarito
-	err := c.chamar(ctx, "gabarito", pedido{Documento: arquivo}, &g)
+	err := c.chamar(ctx, "gabarito", pedido{Documento: arquivo, Caderno: caderno}, &g)
 
 	return g, err
 }

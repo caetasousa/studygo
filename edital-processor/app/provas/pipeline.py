@@ -1043,15 +1043,54 @@ async def classificar(
     return Classificacao.model_validate(raw)
 
 
-def ler_gabarito(root: Path, documento: str) -> tuple[Gabarito, str]:
+# A "Relação dos gabaritos" que o site da FCC imprime: todos os tipos de um
+# cargo num arquivo só, cada um com o cabeçalho "Tipo gabarito 3" em cima e as
+# respostas "001 - A" em colunas embaixo.
+_TIPO_DA_RELACAO = re.compile(r"Tipo\s+(?:de\s+)?gabarito:?\s*(\d+)", re.IGNORECASE)
+# Sem letra ou dígito colado: "L12 - TÉCNICO" é o cargo, e "A01 - ANALISTA" não
+# é a resposta A.
+_RESPOSTA_DA_RELACAO = re.compile(
+    r"(?<![A-Z0-9])(\d{1,3})\s*-\s*([A-E]|[X*])(?![A-Z0-9])", re.IGNORECASE
+)
+
+
+def _sem_zeros(tipo: str) -> str:
+    """O tipo pelos dígitos, sem zeros à esquerda: a capa diz "Tipo 001" ou
+    "TIPO-004", e a relação, "Tipo gabarito 1"."""
+    return "".join(c for c in tipo if c.isdigit()).lstrip("0")
+
+
+def _tipos_da_relacao(texto: str) -> dict[str, dict[str, str]]:
+    """As respostas de cada tipo da relação, pelo tipo sem zeros. O texto vem
+    na ordem da página, porque é o cabeçalho mais recente acima que diz de que
+    tipo a resposta é — na ordem do PDF, as respostas vinham antes de todos os
+    cabeçalhos."""
+    tipos: dict[str, dict[str, str]] = {}
+    atual: dict[str, str] | None = None
+    for linha in texto.splitlines():
+        if cabecalho := _TIPO_DA_RELACAO.search(linha):
+            atual = tipos.setdefault(_sem_zeros(cabecalho[1]), {})
+        for r in _RESPOSTA_DA_RELACAO.finditer(linha):
+            if atual is not None:
+                letra = r[2].upper()
+                atual[str(int(r[1]))] = letra if letra in "ABCDE" else ""
+    return tipos
+
+
+def ler_gabarito(
+    root: Path, documento: str, caderno_da_prova: str = ""
+) -> tuple[Gabarito, str]:
     """Leitura determinística do gabarito da FCC, que vem com texto nativo:
-    número, letra e situação, uma por linha."""
+    número, letra e situação, uma por linha; ou a relação com todos os tipos,
+    de onde sai o do caderno da prova."""
     with pymupdf.open(original(root, documento)) as doc:
         text = "\n".join(str(p.get_text()) for p in doc)
+        na_ordem_da_pagina = "\n".join(str(p.get_text(sort=True)) for p in doc)
     # O gabarito escaneado traz o texto do OCR, com as trocas de sempre: o do
     # TRT-6 dizia "Cargo: EO5" e escrevia a resposta C como "c" — o código
     # ficava vazio e as onze questões de resposta C, sem resposta.
-    cargo = re.search(r"Cargo:\s*([A-Z0-9]{2,3})\b", text, re.IGNORECASE)
+    # A relação escreve "Cargo ou opção L12 - TÉCNICO JUD…".
+    cargo = re.search(r"Cargo(?::|\s+ou\s+op\S*)\s*([A-Z0-9]{2,3})\b", text, re.IGNORECASE)
     caderno = re.search(r"Tipo de Gabarito:\s*(\d+)", text)
     # DEFINITIVO primeiro: o definitivo costuma citar o preliminar que substitui.
     maiusculo = text.upper()
@@ -1072,13 +1111,23 @@ def ler_gabarito(root: Path, documento: str) -> tuple[Gabarito, str]:
         letra = m[2].upper()
         result.respostas[m[1]] = letra if letra in "ABCDE" else ""
         result.situacoes[m[1]] = m[3].strip()
+    if result.respostas:
+        return result, text
+
+    # Na relação, o tipo é escolhido pelo caderno da prova. Sem ele, ou com um
+    # que a relação não traz, fica o primeiro: o backend compara o tipo com o
+    # caderno e aponta a diferença — nunca um gabarito vazio que passa calado.
+    if tipos := _tipos_da_relacao(na_ordem_da_pagina):
+        pedido = _sem_zeros(caderno_da_prova)
+        result.caderno = pedido if pedido in tipos else next(iter(tipos))
+        result.respostas = tipos[result.caderno]
     return result, text
 
 
 async def gabarito(
-    root: Path, documento: str, provider: LLMProvider, settings: Settings
+    root: Path, documento: str, caderno: str, provider: LLMProvider, settings: Settings
 ) -> Gabarito:
-    result, texto = await run_in_threadpool(ler_gabarito, root, documento)
+    result, texto = await run_in_threadpool(ler_gabarito, root, documento, caderno)
     if result.respostas:
         return result
 
@@ -1088,9 +1137,15 @@ async def gabarito(
     if len(todas) > 8:
         raise InvalidPDF("o gabarito não tem texto e passa de oito regiões; confira o arquivo")
     imagens = [(await run_in_threadpool(render, root, documento, r, settings))[0] for r in todas]
+    instrucao = INSTRUCAO_GABARITO
+    if caderno.strip():
+        instrucao += (
+            f"- Se o documento traz mais de um tipo de gabarito, transcreva só o tipo "
+            f"{caderno.strip()}.\n"
+        )
     raw = await provider.extract_structured(
         _pedido(
-            INSTRUCAO_GABARITO,
+            instrucao,
             "Transcreva o gabarito oficial.",
             texto,
             imagens,

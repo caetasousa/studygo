@@ -184,6 +184,8 @@ type fakeExtrator struct {
 	// errRegiao é o erro de uma região só, pelo rótulo.
 	errRegiao map[string]error
 	extraidas []string
+	// cadernoDoGabarito é o caderno que a leitura do gabarito recebeu.
+	cadernoDoGabarito string
 }
 
 func (e *fakeExtrator) Preparar(context.Context, string) ([]prova.Origem, error) {
@@ -202,7 +204,8 @@ func (e *fakeExtrator) Extrair(_ context.Context, _ string, o prova.Origem) (pro
 	return e.porRegiao[o.Regiao], e.err
 }
 
-func (e *fakeExtrator) Gabarito(context.Context, string) (prova.Gabarito, error) {
+func (e *fakeExtrator) Gabarito(_ context.Context, _, caderno string) (prova.Gabarito, error) {
+	e.cadernoDoGabarito = caderno
 	return e.gabarito, e.err
 }
 
@@ -722,7 +725,7 @@ func TestProvas_NovoGabaritoNaoReextrai(t *testing.T) {
 	q.Resposta, q.Revisada = "B", true
 	repo.importacoes["i"] = prova.Importacao{
 		ID: "i", Estado: prova.EstadoEmRevisao, Versao: 1, Regioes: extrator.regioes,
-		Rascunho: prova.Rascunho{Questoes: []prova.Questao{q}},
+		Rascunho: prova.Rascunho{Caderno: "003", Questoes: []prova.Questao{q}},
 	}
 	extrator.gabarito = prova.Gabarito{Tipo: "definitivo", Respostas: map[string]string{"1": "C"}}
 
@@ -736,6 +739,11 @@ func TestProvas_NovoGabaritoNaoReextrai(t *testing.T) {
 	}
 	if got := i.Rascunho.Questoes[0]; got.Resposta != "C" || got.Revisada {
 		t.Fatalf("questão = %+v, quer resposta C e conferência desfeita", got)
+	}
+	// O arquivo novo pode ser a relação com todos os tipos: vai o caderno
+	// conferido na revisão.
+	if extrator.cadernoDoGabarito != "003" {
+		t.Fatalf("caderno enviado à leitura do gabarito = %q, quer 003", extrator.cadernoDoGabarito)
 	}
 }
 

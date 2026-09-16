@@ -102,7 +102,10 @@ type ProvaProcessor interface {
 	Preparar(ctx context.Context, documento string) ([]prova.Origem, error)
 	Metadados(ctx context.Context, documento string, capa prova.Origem) (prova.Metadados, error)
 	Extrair(ctx context.Context, documento string, regiao prova.Origem) (prova.Rascunho, error)
-	Gabarito(ctx context.Context, arquivo string) (prova.Gabarito, error)
+	// Gabarito lê o gabarito oficial. O caderno é o da prova: a relação que o
+	// site da FCC imprime traz todos os tipos num arquivo, e é por ele que o
+	// processador escolhe qual ler.
+	Gabarito(ctx context.Context, arquivo, caderno string) (prova.Gabarito, error)
 	// Classificar sugere a matéria de cada questão, pelo número. Só lê texto:
 	// não recebe o PDF.
 	Classificar(ctx context.Context, questoes []prova.ResumoDeQuestao) (map[int]string, error)

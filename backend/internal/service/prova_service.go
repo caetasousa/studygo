@@ -774,7 +774,9 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 
 	case i.Etapa == prova.EtapaGabarito || i.Etapa == prova.EtapaSoGabarito:
 		if i.GabaritoArquivo != "" {
-			g, err := s.Processor.Gabarito(ctx, i.GabaritoArquivo)
+			// A capa já foi lida (e, na troca, conferida): o caderno dela
+			// escolhe o tipo quando o arquivo traz vários.
+			g, err := s.Processor.Gabarito(ctx, i.GabaritoArquivo, i.Rascunho.Caderno)
 			if err != nil {
 				return nil, err
 			}

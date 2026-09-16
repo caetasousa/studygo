@@ -162,6 +162,41 @@ def test_gabarito_definitivo_que_cita_o_preliminar(tmp_path: Path) -> None:
     assert g.tipo == "definitivo"
 
 
+def _relacao(root: Path) -> str:
+    """A "Relação dos gabaritos" impressa do site da FCC, como a do TRT-18: um
+    tipo embaixo do outro, as respostas em colunas lado a lado — e, no PDF,
+    todas as respostas gravadas antes de qualquer cabeçalho."""
+    id = str(uuid.uuid4())
+    tipos = {100: ["001 - A", "002 - B", "003 - C"], 250: ["001 - D", "002 - E", "003 - X"]}
+    with pymupdf.open() as doc:
+        p = doc.new_page()
+        for y, respostas in tipos.items():
+            for k, resposta in enumerate(respostas):
+                p.insert_text((60 + 90 * (k % 2), y + 40 + 15 * (k // 2)), resposta)
+        for n, y in enumerate(tipos, start=1):
+            p.insert_text(
+                (30, y),
+                "Cargo ou opção L12 - TÉCNICO JUD - APOIO ESP - ESP TEC DA INFORMAÇÃO\n"
+                f"Tipo gabarito {n}",
+            )
+        doc.save(arquivo(root, id, "pdf"))
+    return id
+
+
+def test_relacao_de_gabaritos_le_o_tipo_do_caderno_da_prova(tmp_path: Path) -> None:
+    g, _ = pipeline.ler_gabarito(tmp_path, _relacao(tmp_path), "TIPO-002")
+    assert g.cargo == "L12" and g.caderno == "2" and g.tipo == "nao_informado"
+    assert g.respostas == {"1": "D", "2": "E", "3": ""}
+
+
+@pytest.mark.parametrize("caderno", ["", "9"])
+def test_relacao_sem_o_tipo_do_caderno_fica_com_o_primeiro(tmp_path: Path, caderno: str) -> None:
+    # O backend compara o tipo com o caderno e mostra a diferença ao curador.
+    g, _ = pipeline.ler_gabarito(tmp_path, _relacao(tmp_path), caderno)
+    assert g.caderno == "1"
+    assert g.respostas == {"1": "A", "2": "B", "3": "C"}
+
+
 class FakeProvider:
     """Responde com o que a fila de respostas mandar; uma exceção na fila é
     levantada no lugar da resposta."""

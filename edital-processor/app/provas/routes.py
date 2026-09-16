@@ -25,6 +25,11 @@ class PedidoDocumento(BaseModel):
     documento: str
 
 
+class PedidoGabarito(PedidoDocumento):
+    # O caderno da prova: a relação da FCC traz todos os tipos num arquivo.
+    caderno: str = ""
+
+
 class PedidoRegiao(BaseModel):
     documento: str
     origem: Origem
@@ -91,9 +96,11 @@ async def recortar_rota(
 
 @router.post("/gabarito")
 async def gabarito(
-    body: PedidoDocumento,
+    body: PedidoGabarito,
     settings: Settings = Depends(get_settings),
     provider: LLMProvider = Depends(get_provider),
 ) -> object:
-    result = await pipeline.gabarito(settings.provas_dir, body.documento, provider, settings)
+    result = await pipeline.gabarito(
+        settings.provas_dir, body.documento, body.caderno, provider, settings
+    )
     return result.model_dump(by_alias=True)
