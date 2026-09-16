@@ -9,6 +9,16 @@
 #}
 {% set zona = vhost_file | regex_replace('\.conf$', '') | regex_replace('[^a-zA-Z0-9]', '_') %}
 {% macro comum() %}
+    # 429 e não o 503 padrão: a semântica é "você excedeu", não "eu caí", e o
+    # frontend já sabe ler 429.
+    #
+    # Dentro do server, e não no topo do arquivo: staging e produção moram na
+    # mesma VPS, e no nível http a diretiva duplicaria entre os dois vhosts —
+    # "limit_req_status directive is duplicate", e o nginx recusa a
+    # configuração inteira. As zonas não têm esse problema porque o nome delas
+    # leva o vhost.
+    limit_req_status 429;
+
     # A versão do nginx não ajuda ninguém a usar o site, e ajuda quem procura
     # uma versão com CVE conhecido.
     server_tokens off;
@@ -91,10 +101,6 @@
 # passou por aqui. 10 MB de zona guardam da ordem de 160 mil endereços.
 limit_req_zone $binary_remote_addr zone=geral_{{ zona }}:10m rate=240r/m;
 limit_req_zone $binary_remote_addr zone=auth_{{ zona }}:5m rate=20r/m;
-
-# 429 e não o 503 padrão: a semântica é "você excedeu", não "eu caí", e o
-# frontend já sabe ler 429.
-limit_req_status 429;
 
 server {
     listen 80;
