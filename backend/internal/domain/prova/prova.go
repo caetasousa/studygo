@@ -215,6 +215,32 @@ type Rascunho struct {
 	AnuladasExcluidas []int
 }
 
+// faltando diz quais números a pendência de total não achou — "O rascunho tem
+// 59 questões" não dizia qual procurar.
+func (r Rascunho) faltando() string {
+	presentes := map[int]bool{}
+	for _, q := range r.Questoes {
+		presentes[q.Numero] = true
+	}
+	for _, n := range r.AnuladasExcluidas {
+		presentes[n] = true
+	}
+	faltam := []string{}
+	for n := 1; n <= r.Total; n++ {
+		if !presentes[n] {
+			faltam = append(faltam, strconv.Itoa(n))
+		}
+	}
+	switch len(faltam) {
+	case 0:
+		return ""
+	case 1:
+		return " Falta a questão " + faltam[0] + "."
+	default:
+		return " Faltam as questões " + strings.Join(faltam, ", ") + "."
+	}
+}
+
 // QuestoesNaProva é quantas questões a prova publicada tem: o total da capa
 // sem as anuladas excluídas.
 func (r Rascunho) QuestoesNaProva() int { return r.Total - len(r.AnuladasExcluidas) }
@@ -725,7 +751,7 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 	}
 	if r.Total <= 0 || len(r.Questoes) != r.QuestoesNaProva() {
 		out = append(out, fmt.Sprintf(
-			"O rascunho tem %d questões e o total esperado é %d.", len(r.Questoes), r.QuestoesNaProva(),
+			"O rascunho tem %d questões e o total esperado é %d.%s", len(r.Questoes), r.QuestoesNaProva(), r.faltando(),
 		))
 	}
 	// A exclusão vale enquanto o gabarito anular a questão: trocado por um que

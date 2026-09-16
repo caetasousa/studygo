@@ -747,6 +747,45 @@ func TestProvas_NovoGabaritoNaoReextrai(t *testing.T) {
 	}
 }
 
+// Reenviar o mesmo gabarito, ou o definitivo que mudou uma resposta, não pode
+// desfazer a conferência das questões que continuam iguais.
+func TestProvas_NovoGabaritoSoDesconfereOQueMudou(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+	q1, q2, q3 := questaoExtraida(1, true), questaoExtraida(2, true), questaoExtraida(3, true)
+	q1.Resposta, q2.Resposta, q3.Resposta = "A", "B", "C"
+	q1.Revisada, q2.Revisada, q3.Revisada = true, true, true
+	repo.importacoes["i"] = prova.Importacao{
+		ID: "i", Estado: prova.EstadoEmRevisao, Versao: 1, Regioes: extrator.regioes,
+		Rascunho: prova.Rascunho{Questoes: []prova.Questao{q1, q2, q3}},
+	}
+	// O definitivo escreve a situação em todas; na 1, só isso mudou.
+	extrator.gabarito = prova.Gabarito{
+		Tipo:      "definitivo",
+		Respostas: map[string]string{"1": "A", "2": "D", "3": ""},
+		Situacoes: map[string]string{"1": "Gabarito sem alteração", "2": "Alterada", "3": "Anulada"},
+	}
+
+	if _, err := s.AtualizarGabarito(context.Background(), curador, "i", 1, pdfMinimo, "definitivo.pdf"); err != nil {
+		t.Fatalf("AtualizarGabarito: %v", err)
+	}
+	i := processarTudo(t, s, repo, "i")
+
+	conferidas := map[int]bool{}
+	for _, q := range i.Rascunho.Questoes {
+		conferidas[q.Numero] = q.Revisada
+	}
+	if !conferidas[1] || conferidas[2] || conferidas[3] {
+		t.Fatalf("conferidas = %v; quer só a 1, a única com a mesma letra", conferidas)
+	}
+	if q := i.Rascunho.Questoes[0]; q.Situacao != "Gabarito sem alteração" {
+		t.Fatalf("situação da 1 = %q; a situação nova entra mesmo sem desconferir", q.Situacao)
+	}
+}
+
 // O caso da prova do TJCE: a região 0 corta a questão 2 no fim, e a região 1,
 // que a via inteira, a pula. Depois da última região, a questão ganha uma
 // leitura só dela, e o texto de apoio que apareça no recorte não se repete.

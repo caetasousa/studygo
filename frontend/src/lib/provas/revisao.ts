@@ -201,6 +201,20 @@ export function definirResposta(r: Rascunho, q: Questao, letra: string) {
 	q.revisada = false;
 }
 
+/**
+ * O que foi enviado conferido e voltou do servidor sem a conferência: a questão
+ * alterada e conferida na mesma gravação não vale (o curador confere o que está
+ * salvo). Sem avisar, parecia que a revisão tinha se desfeito.
+ */
+export function conferenciasQueCairam(enviado: Rascunho, recebido: Rascunho): { questoes: number[]; textos: number } {
+	const conferidas = new Set(enviado.questoes.filter((x) => x.revisada).map((x) => x.numero));
+	const textos = new Set(enviado.apoios.filter((a) => a.revisado).map((a) => a.id));
+	return {
+		questoes: recebido.questoes.filter((x) => !x.revisada && conferidas.has(x.numero)).map((x) => x.numero),
+		textos: recebido.apoios.filter((a) => !a.revisado && textos.has(a.id)).length
+	};
+}
+
 /** O gabarito anula a questão: tem a linha dela, sem letra. */
 export function anulada(r: Rascunho, numero: number): boolean {
 	return r.gabarito.respostas[String(numero)] === '';

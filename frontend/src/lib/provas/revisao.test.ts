@@ -15,6 +15,7 @@ import {
 	novaQuestao,
 	novoBloco,
 	numerosFaltando,
+	conferenciasQueCairam,
 	anulada,
 	excluirAnulada,
 	devolverAnulada,
@@ -93,6 +94,15 @@ it('a anulada excluída sai da prova sem virar questão que falta, e devolvida v
 	devolverAnulada(r, 2);
 	expect(r.anuladasExcluidas).toEqual([]);
 	expect(numerosFaltando(r)).toEqual([2]);
+});
+
+it('conferenciasQueCairam aponta o que foi enviado conferido e voltou sem a marca', () => {
+	const enviado = rascunho([conferida(1), conferida(2), conferida(3)]);
+	enviado.questoes[2].revisada = false;
+	const recebido = structuredClone(enviado);
+	recebido.questoes[1].revisada = false;
+	expect(conferenciasQueCairam(enviado, recebido)).toEqual({ questoes: [2], textos: 0 });
+	expect(conferenciasQueCairam(enviado, enviado)).toEqual({ questoes: [], textos: 0 });
 });
 
 it('definirResposta leva a letra ao gabarito e desfaz a conferência', () => {

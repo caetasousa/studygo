@@ -926,6 +926,10 @@ func TestPendencias_AnuladaExcluida(t *testing.T) {
 		t.Fatalf("anulada excluída: %v, %d na prova", p, r.QuestoesNaProva())
 	}
 
+	if p := semA2().Pendencias(true); !contem(p, "Falta a questão 2.") {
+		t.Fatalf("a pendência de total não diz qual falta: %v", p)
+	}
+
 	r = semA2()
 	r.AnuladasExcluidas = []int{2}
 	r.Gabarito.Respostas["2"] = "C"

@@ -9,6 +9,7 @@
 	import IconButton from './IconButton.svelte';
 	import PlanoPicker from './PlanoPicker.svelte';
 	import type { NavIconName } from './NavIcon.svelte';
+	import { esquecerRascunhosLocais } from '$lib/provas/rascunhoLocal';
 
 	let {
 		open = $bindable(false),
@@ -145,6 +146,7 @@
 				onclick={() => {
 					concursoStore.limpar();
 					planoStore.limpar();
+					esquecerRascunhosLocais();
 					auth.logout();
 				}}>Sair</button
 			>

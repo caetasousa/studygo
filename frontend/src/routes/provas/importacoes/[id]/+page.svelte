@@ -11,10 +11,17 @@
 	import Recorte from '$lib/provas/Recorte.svelte';
 	import { provasApi } from '$lib/provas/api';
 	import {
+		apagarRascunhoLocal,
+		destinoDaCopia,
+		guardarRascunhoLocal,
+		lerRascunhoLocal
+	} from '$lib/provas/rascunhoLocal';
+	import {
 		anulada,
 		aplicarMaterias,
 		aplicarRecorte,
 		blocoDoDestino,
+		conferenciasQueCairam,
 		destinosDoRecorte,
 		devolverAnulada,
 		excluirAnulada,
@@ -51,6 +58,8 @@
 	let conflito = $state(false);
 	let ocupado = $state(false);
 	let alterado = $state(false);
+	/** Conta as alterações: é o que agenda a cópia local, sem ler o rascunho inteiro a cada tecla. */
+	let edicoes = $state(0);
 	let indice = $state(0);
 	let regiaoIdx = $state(0);
 	let destino = $state('novo:q');
@@ -122,7 +131,7 @@
 			textos: r.apoios.length ? { texto: `${textosOk}/${r.apoios.length}`, falta: textosOk < r.apoios.length } : null,
 			questoes: { texto: `${conferidas}/${r.questoes.length}`, falta: conferidas < r.questoes.length },
 			publicar: imp.pendencias.length
-				? { texto: `${imp.pendencias.length} pendências`, falta: true }
+				? { texto: imp.pendencias.length === 1 ? '1 pendência' : `${imp.pendencias.length} pendências`, falta: true }
 				: { texto: 'pronta', falta: false }
 		};
 	});
@@ -244,6 +253,8 @@
 	function receber(nova: Importacao, manterPosicao = true) {
 		imp = nova;
 		alterado = false;
+		// O que o servidor devolveu é o salvo: a cópia local já não tem o que guardar.
+		apagarRascunhoLocal(nova.id);
 		conflito = false;
 		if (!manterPosicao) indice = 0;
 		indice = Math.min(indice, Math.max(0, nova.rascunho.questoes.length - 1));
@@ -293,11 +304,20 @@
 
 	function alterar() {
 		alterado = true;
+		edicoes++;
 	}
 
 	async function salvar() {
 		if (!imp) return;
-		receber(await provasApi.salvar(imp.id, imp.versao, $state.snapshot(imp.rascunho)));
+		const enviado = $state.snapshot(imp.rascunho);
+		receber(await provasApi.salvar(imp.id, imp.versao, enviado));
+		const { questoes, textos } = conferenciasQueCairam(enviado, imp.rascunho);
+		const partes = [
+			questoes.length === 1 ? `a questão ${questoes[0]}` : questoes.length ? `as questões ${questoes.join(', ')}` : '',
+			textos === 1 ? '1 texto de apoio' : textos ? `${textos} textos de apoio` : ''
+		].filter(Boolean);
+		if (partes.length)
+			aviso = `Salvo, mas ${partes.join(' e ')} ${questoes.length + textos === 1 ? 'voltou' : 'voltaram'} a pedir conferência: houve alteração junto com a conferência, e ela vale para o que já está salvo. Confira de novo.`;
 	}
 
 	// O gabarito cita o cargo pelo código; a leitura da capa às vezes traz o nome
@@ -319,6 +339,7 @@
 	async function publicar() {
 		if (!imp) return;
 		const { provaId } = await provasApi.publicar(imp.id, imp.versao);
+		apagarRascunhoLocal(imp.id);
 		await goto(`/provas/${provaId}`);
 	}
 
@@ -327,11 +348,18 @@
 	async function salvarEPublicar() {
 		if (!imp) return;
 		if (alterado) await salvar();
-		if (imp.pendencias.length === 0) await publicar();
+		if (imp.pendencias.length === 0) {
+			await publicar();
+			return;
+		}
+		const n = imp.pendencias.length;
+		erro = `Não publicado: ${n === 1 ? 'sobrou 1 pendência' : `sobraram ${n} pendências`}. Veja a lista na etapa Publicar.`;
 	}
 
 	/** Aonde levar o curador para resolver a pendência. */
 	function destinoDaPendencia(p: string): { rotulo: string; ir: () => void } | null {
+		// Falta questão: é na etapa Questões que se adiciona ou se exclui a anulada.
+		if (/total esperado/i.test(p)) return { rotulo: 'Abrir as questões', ir: () => (etapa = 'questoes') };
 		const numero = p.match(/quest(?:ão|ao)\s+(\d+)/i)?.[1];
 		if (numero) return { rotulo: `Abrir a questão ${numero}`, ir: () => abrirQuestao(Number(numero)) };
 		if (/texto de apoio/i.test(p)) return { rotulo: 'Abrir os textos', ir: () => (etapa = 'textos') };
@@ -351,7 +379,10 @@
 	}
 
 	function removerQuestao() {
-		if (!imp || !q || !confirm(`Remover a questão ${q.numero} do rascunho?`)) return;
+		if (!imp || !q) return;
+		// Tirar a anulada é excluí-la da prova; removida à parte, ela faltaria e travaria a publicação.
+		if (anulada(imp.rascunho, q.numero)) return excluirQuestaoAnulada();
+		if (!confirm(`Remover a questão ${q.numero} do rascunho?`)) return;
 		imp.rascunho.questoes = imp.rascunho.questoes.filter((_, k) => k !== indice);
 		irPara(Math.max(0, indice - 1));
 		alterar();
@@ -401,6 +432,7 @@
 		await provasApi.excluir(imp.id, imp.versao);
 		// Não há mais o que salvar: a saída não pede confirmação.
 		alterado = false;
+		apagarRascunhoLocal(imp.id);
 		await goto('/questoes?aba=curadoria');
 	}
 
@@ -412,8 +444,20 @@
 
 	onMount(() => {
 		void executar(async () => {
+			// Lida antes de carregar: receber() apaga a cópia.
+			const copia = lerRascunhoLocal(id);
 			await recarregar();
 			if (!imp) return;
+			const destinoCopia = emRevisao && imp.id === id ? destinoDaCopia(copia, imp) : copia ? 'descartar' : 'nenhuma';
+			if (destinoCopia === 'recuperar' && copia) {
+				imp.rascunho = copia.rascunho;
+				alterar();
+				aviso =
+					'Recuperei o que você tinha alterado neste aparelho e não chegou a salvar (a página foi recarregada). Confira e salve a revisão.';
+			} else if (destinoCopia === 'descartar') {
+				aviso =
+					'Havia alterações não salvas neste aparelho, mas a revisão foi salva depois em outro lugar; ficou a versão salva.';
+			}
 			if (page.url.searchParams.has('existente'))
 				aviso = `Este caderno${imp.nomeDocumento ? ` (${imp.nomeDocumento})` : ''} já tinha sido importado: esta é a importação dele, e nada foi importado de novo.`;
 			irPara(questoesProprias[0] ?? 0);
@@ -431,9 +475,40 @@
 	});
 
 	beforeNavigate(({ cancel }) => {
-		if (alterado && !confirm('Há alterações não salvas. Sair mesmo assim?')) cancel();
+		if (!alterado) return;
+		if (confirm('Há alterações não salvas. Sair mesmo assim?')) apagarRascunhoLocal(id);
+		else cancel();
+	});
+
+	// A cópia local do que não foi salvo: o celular descarta a aba em segundo
+	// plano sem avisar, e ela volta recarregada.
+	function guardarCopia() {
+		if (imp && alterado && emRevisao) guardarRascunhoLocal(imp.id, { versao: imp.versao, rascunho: $state.snapshot(imp.rascunho) });
+	}
+	$effect(() => {
+		if (edicoes === 0) return;
+		const espera = setTimeout(guardarCopia, 500);
+		return () => clearTimeout(espera);
 	});
 </script>
+
+{#snippet mensagens()}
+	{#if aviso}
+		<p class="callout mensagem" role="status">
+			<span>{aviso}</span>
+			<button class="fechar" type="button" aria-label="Fechar o aviso" onclick={() => (aviso = '')}>×</button>
+		</p>
+	{/if}
+	{#if erro}
+		<div class="form-error mensagem" role="alert">
+			<span>{erro}</span>
+			{#if conflito}
+				<button class="btn" type="button" onclick={() => executar(recarregar)}>Recarregar</button>
+			{/if}
+			<button class="fechar" type="button" aria-label="Fechar o erro" onclick={() => (erro = '')}>×</button>
+		</div>
+	{/if}
+{/snippet}
 
 {#snippet arquivos()}
 	{#if imp?.nomeDocumento}
@@ -462,6 +537,11 @@
 		if (alterado) e.preventDefault();
 	}}
 />
+<svelte:document
+	onvisibilitychange={() => {
+		if (document.visibilityState === 'hidden') guardarCopia();
+	}}
+/>
 
 <PageHead
 	icone="prova"
@@ -473,15 +553,9 @@
 <div class="page">
 	<a class="voltar" href="/questoes?aba=curadoria">← Curadoria</a>
 
-	{#if aviso}<p class="callout" role="status"><span>{aviso}</span></p>{/if}
-	{#if erro}
-		<div class="form-error" role="alert">
-			{erro}
-			{#if conflito}
-				<button class="btn" type="button" onclick={() => executar(recarregar)}>Recarregar</button>
-			{/if}
-		</div>
-	{/if}
+	<!-- Na revisão, as mensagens ficam na barra fixa: no celular, o botão de
+	     publicar está lá embaixo, e o erro no alto da página ninguém via. -->
+	{#if !imp || !emRevisao}{@render mensagens()}{/if}
 
 	{#if imp}
 		{#if !emRevisao}
@@ -591,6 +665,7 @@
 				<button class="btn primary" type="button" disabled={ocupado || !alterado} onclick={() => executar(salvar)}>
 					Salvar revisão
 				</button>
+				{#if aviso || erro}<div class="mensagens">{@render mensagens()}</div>{/if}
 			</div>
 
 			{#if etapa === 'dados'}
@@ -688,7 +763,7 @@
 						</div>
 						<Campo
 							rotulo="Trocar o gabarito"
-							ajuda="Envie o PDF novo — por exemplo, o definitivo depois dos recursos. Só o gabarito é lido de novo; as questões e a sua revisão ficam. Salve a revisão antes."
+							ajuda="Envie o PDF novo — por exemplo, o definitivo depois dos recursos. Só o gabarito é lido de novo; as questões e a sua revisão ficam, e só a questão cuja resposta mudar volta a pedir conferência. Salve a revisão antes."
 						>
 							{#snippet children({ id, ajuda })}
 								<div class="gabarito-novo">
@@ -856,7 +931,9 @@
 					</button>
 					{#if faltam.length > 0}
 						<span class="faltam">
-							<span class="dim">A extração não achou as questões {faltam.join(', ')}.</span>
+							<span class="dim"
+								>A extração não achou {faltam.length === 1 ? 'a questão' : 'as questões'} {faltam.join(', ')}.</span
+							>
 							<select bind:value={faltando} aria-label="Questão que faltou">
 								<option value="">Escolha uma para transcrever…</option>
 								{#each faltam as n (n)}<option value={String(n)}>Questão {n}</option>{/each}
@@ -1536,6 +1613,30 @@
 	}
 	.callout {
 		margin: 0;
+	}
+	.barra .mensagens {
+		flex-basis: 100%;
+		display: grid;
+		gap: 6px;
+	}
+	.mensagem {
+		display: flex;
+		gap: 10px;
+		align-items: flex-start;
+		margin: 0;
+	}
+	.mensagem > span {
+		flex: 1;
+	}
+	.fechar {
+		font: inherit;
+		font-size: 18px;
+		line-height: 1;
+		color: inherit;
+		background: none;
+		border: 0;
+		padding: 0 2px;
+		cursor: pointer;
 	}
 	.aviso-figura,
 	.aviso-anulada {

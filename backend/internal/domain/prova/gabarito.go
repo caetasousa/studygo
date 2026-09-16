@@ -68,13 +68,19 @@ func GabaritoDasLinhas(cargo, caderno, tipo string, linhas []RespostaDoGabarito)
 // AplicarGabarito copia as respostas oficiais para as questões. A resposta de
 // uma questão nunca vem da IA: sem gabarito, ela fica vazia.
 //
-// A questão volta a pedir conferência porque a resposta mudou por baixo dela.
+// Só a questão cuja resposta mudou volta a pedir conferência. Trocar o
+// preliminar pelo definitivo, ou reenviar o mesmo arquivo, desmarcava a prova
+// inteira — sessenta questões para conferir de novo por causa de uma ou duas. A
+// situação não conta: é o texto da banca ao lado da letra, e o definitivo a
+// escreve em todas ("Gabarito sem alteração") onde o preliminar não escrevia; a
+// anulação muda a letra, e essa conta.
 func (r *Rascunho) AplicarGabarito() {
 	for j := range r.Questoes {
 		q := &r.Questoes[j]
 		chave := strconv.Itoa(q.Numero)
-		q.Resposta = r.Gabarito.Respostas[chave]
+		if resposta := r.Gabarito.Respostas[chave]; q.Resposta != resposta {
+			q.Resposta, q.Revisada = resposta, false
+		}
 		q.Situacao = r.Gabarito.Situacoes[chave]
-		q.Revisada = false
 	}
 }
