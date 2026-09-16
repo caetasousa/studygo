@@ -171,6 +171,11 @@ type questaoAvulsaDTO struct {
 	CargoNome  string `json:"cargoNome"`
 }
 
+// provaRenomeRequest corrige o título da prova publicada.
+type provaRenomeRequest struct {
+	CargoNome string `json:"cargoNome"`
+}
+
 type importacaoEdicaoRequest struct {
 	Versao   int         `json:"versao"`
 	Rascunho rascunhoDTO `json:"rascunho"`

@@ -560,6 +560,36 @@ func (s *ProvaService) Reextrair(ctx context.Context, usuario, provaID string) (
 	return s.montar(criada), nil
 }
 
+// ExcluirProva apaga de vez a prova e tudo o que veio dela — é o caso da mesma
+// prova importada duas vezes, com títulos diferentes. Diferente de Retirar,
+// não tem volta.
+func (s *ProvaService) ExcluirProva(ctx context.Context, usuario, provaID string) error {
+	if err := s.autorizar(usuario); err != nil {
+		return err
+	}
+	err := s.Repo.ExcluirProva(ctx, provaID)
+	if errors.Is(err, prova.ErrConflito) {
+		return erroDeValidacao("uma importação desta prova está processando; espere terminar ou cancele-a antes de excluir")
+	}
+
+	return err
+}
+
+// RenomearProva corrige o título da prova publicada sem abrir revisão. Só o
+// nome: o código do cargo confere o gabarito e acha a prova repetida, e muda
+// pela revisão, que passa pelas pendências.
+func (s *ProvaService) RenomearProva(ctx context.Context, usuario, provaID, cargoNome string) error {
+	if err := s.autorizar(usuario); err != nil {
+		return err
+	}
+	nome, ok := prova.NomeDoCargo(cargoNome)
+	if !ok {
+		return erroDeValidacao("o título precisa ter de 1 a 200 caracteres")
+	}
+
+	return s.Repo.RenomearProva(ctx, provaID, nome)
+}
+
 // Retirar tira a prova do catálogo. As revisões continuam gravadas.
 func (s *ProvaService) Retirar(ctx context.Context, usuario, provaID string) error {
 	if err := s.autorizar(usuario); err != nil {

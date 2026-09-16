@@ -965,6 +965,24 @@ func TestPendencias_GabaritoComRespostaInvalida(t *testing.T) {
 	}
 }
 
+func TestNomeDoCargo(t *testing.T) {
+	t.Parallel()
+
+	for digitado, quer := range map[string]string{
+		"  Técnico Judiciário   -  Tecnologia da Informação ": "Técnico Judiciário - Tecnologia da Informação",
+		"Analista\tJudiciário\n":                              "Analista Judiciário",
+	} {
+		if got, ok := NomeDoCargo(digitado); !ok || got != quer {
+			t.Errorf("NomeDoCargo(%q) = %q, %v; quer %q", digitado, got, ok, quer)
+		}
+	}
+	for _, invalido := range []string{"", "   ", strings.Repeat("a", 201)} {
+		if _, ok := NomeDoCargo(invalido); ok {
+			t.Errorf("NomeDoCargo(%.20q) aceitou", invalido)
+		}
+	}
+}
+
 func TestNomeDoArquivo(t *testing.T) {
 	t.Parallel()
 

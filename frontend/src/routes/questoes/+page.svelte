@@ -10,6 +10,7 @@
 	import { provasApi } from '$lib/provas/api';
 	import { corDaMateria } from '$lib/provas/resolucao';
 	import { lerRespostas } from '$lib/provas/respostas';
+	import { comTitulo, semAProva, tituloDigitado } from '$lib/provas/curadoria';
 	import {
 		ajustarAoCatalogo,
 		enderecoDoTreino,
@@ -159,6 +160,78 @@
 		}
 	}
 
+	// Ações de uma importação na lista. O erro fica na linha: o do alto da
+	// página, no celular, some quando a lista é comprida.
+	let erroDaLinha = $state<{ id: string; msg: string } | null>(null);
+	let editando = $state<{ id: string; provaId: string; titulo: string } | null>(null);
+
+	async function naLinha(id: string, fn: () => Promise<void>) {
+		fecharMenus();
+		ocupado = true;
+		erroDaLinha = null;
+		try {
+			await fn();
+		} catch (e) {
+			erroDaLinha = { id, msg: e instanceof Error ? e.message : 'erro inesperado' };
+		} finally {
+			ocupado = false;
+		}
+	}
+
+	function tituloDaImportacao(i: ImportacaoResumo): string {
+		return [i.orgao, i.ano || '', i.cargoNome || (i.cargo && `cargo ${i.cargo}`)].filter(Boolean).join(' ');
+	}
+
+	function excluirImportacao(i: ImportacaoResumo) {
+		if (!confirm(`Excluir a importação ${tituloDaImportacao(i) || i.nomeDocumento}? O rascunho e o que a extração leu somem de vez.`))
+			return;
+		void naLinha(i.id, async () => {
+			const atual = await provasApi.importacao(i.id);
+			await provasApi.excluir(i.id, atual.versao);
+			importacoes = importacoes.filter((x) => x.id !== i.id);
+		});
+	}
+
+	function excluirProva(i: ImportacaoResumo) {
+		if (
+			!confirm(
+				`Excluir de vez a prova ${tituloDaImportacao(i)}? Ela sai do catálogo com as questões, o gabarito, as importações dela e as anotações que os alunos fizeram. Não tem volta — para só escondê-la, use "Tirar do catálogo" na prova.`
+			)
+		)
+			return;
+		void naLinha(i.id, async () => {
+			await provasApi.excluirProva(i.provaId);
+			importacoes = semAProva(importacoes, i.provaId);
+			provas = provas.filter((p) => p.id !== i.provaId);
+			avulsas = avulsas.filter((q) => q.provaId !== i.provaId);
+		});
+	}
+
+	function salvarTitulo() {
+		if (!editando) return;
+		const { id, provaId } = editando;
+		const titulo = tituloDigitado(editando.titulo);
+		void naLinha(id, async () => {
+			await provasApi.renomearProva(provaId, titulo);
+			importacoes = comTitulo(importacoes, provaId, titulo);
+			provas = provas.map((p) => (p.id === provaId ? { ...p, cargoNome: titulo } : p));
+			editando = null;
+		});
+	}
+
+	/** O campo aberto já com o teclado: `autofocus` não vale para o que entra depois da carga. */
+	function focar(el: HTMLInputElement) {
+		el.focus();
+		el.select();
+	}
+
+	function fecharMenus(e?: MouseEvent) {
+		const alvo = e?.target as HTMLElement | undefined;
+		for (const m of document.querySelectorAll<HTMLDetailsElement>('details.acoes[open]')) {
+			if (!alvo || !m.contains(alvo)) m.open = false;
+		}
+	}
+
 	async function importar() {
 		const prova = arquivoProva?.files?.[0];
 		if (!prova) throw new Error('escolha o PDF da prova');
@@ -189,6 +262,7 @@
 </script>
 
 <svelte:head><title>Questões</title></svelte:head>
+<svelte:window onclick={fecharMenus} />
 
 <PageHead
 	icone="questoes"
@@ -360,23 +434,74 @@
 			<h2 class="grupo">Importações recentes</h2>
 			<div class="linhas">
 				{#each importacoes as i (i.id)}
-					<a class="linha" href="/provas/importacoes/{i.id}">
-						<span class="titulo">
-							{i.orgao || 'Prova sem identificação'}
-							{i.ano || ''}
-							<span class="sub">{i.cargoNome || `cargo ${i.cargo || '—'}`}</span>
-						</span>
-						{#if i.estado === 'na_fila' || i.estado === 'processando'}
-							<span class="sub">etapa {i.etapa} de {i.totalEtapas}</span>
+					<div class="item">
+						{#if editando?.id === i.id}
+							<form
+								class="editar-titulo"
+								onsubmit={(e) => {
+									e.preventDefault();
+									salvarTitulo();
+								}}
+							>
+								<label>
+									<span class="sub">Título da prova ({i.orgao} {i.ano} · código {i.cargo || '—'})</span>
+									<input type="text" maxlength="200" bind:value={editando.titulo} use:focar />
+								</label>
+								<button class="nbtn primario" type="submit" disabled={ocupado || !tituloDigitado(editando.titulo)}>
+									Salvar
+								</button>
+								<button class="nbtn" type="button" onclick={() => (editando = null)}>Cancelar</button>
+							</form>
+						{:else}
+							<a class="linha" href="/provas/importacoes/{i.id}">
+								<span class="titulo">
+									{i.orgao || 'Prova sem identificação'}
+									{i.ano || ''}
+									<span class="sub">{i.cargoNome || `cargo ${i.cargo || '—'}`}</span>
+								</span>
+								{#if i.estado === 'na_fila' || i.estado === 'processando'}
+									<span class="sub">etapa {i.etapa} de {i.totalEtapas}</span>
+								{/if}
+								<span class="estado {i.estado}">{ESTADO[i.estado]}</span>
+								{#if i.nomeDocumento}
+									<span class="nome-arquivo">
+										{i.nomeDocumento}{#if i.nomeGabarito}<br />gabarito: {i.nomeGabarito}{/if}
+									</span>
+								{/if}
+								{#if i.erro}<span class="erro">{i.erro}</span>{/if}
+							</a>
 						{/if}
-						<span class="estado {i.estado}">{ESTADO[i.estado]}</span>
-						{#if i.nomeDocumento}
-							<span class="nome-arquivo">
-								{i.nomeDocumento}{#if i.nomeGabarito}<br />gabarito: {i.nomeGabarito}{/if}
-							</span>
+						{#if i.estado !== 'processando'}
+							<details class="acoes">
+								<summary aria-label="Ações desta importação" title="Ações desta importação">•••</summary>
+								<div class="acoes-corpo">
+									{#if i.estado === 'publicada' && i.provaId}
+										<button
+											type="button"
+											disabled={ocupado}
+											onclick={() => {
+												fecharMenus();
+												editando = { id: i.id, provaId: i.provaId, titulo: i.cargoNome };
+											}}
+										>
+											Editar título
+											<small>O nome do cargo no catálogo e aqui</small>
+										</button>
+										<button type="button" class="perigo" disabled={ocupado} onclick={() => excluirProva(i)}>
+											Excluir prova
+											<small>Some do catálogo, com tudo o que veio dela</small>
+										</button>
+									{:else}
+										<button type="button" class="perigo" disabled={ocupado} onclick={() => excluirImportacao(i)}>
+											Excluir importação
+											<small>O rascunho some; nada do catálogo muda</small>
+										</button>
+									{/if}
+								</div>
+							</details>
 						{/if}
-						{#if i.erro}<span class="erro">{i.erro}</span>{/if}
-					</a>
+						{#if erroDaLinha?.id === i.id}<p class="erro erro-da-linha" role="alert">{erroDaLinha.msg}</p>{/if}
+					</div>
 				{:else}
 					<p class="vazio">Nenhuma importação ainda.</p>
 				{/each}
@@ -672,6 +797,98 @@
 	}
 	.linhas {
 		border-top: 1px solid var(--border);
+	}
+	/* A linha e o menu dela lado a lado: botão dentro de link não é HTML válido. */
+	.item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		border-bottom: 1px solid var(--border);
+	}
+	.item .linha {
+		flex: 1;
+		min-width: 0;
+		border-bottom: 0;
+	}
+	.acoes {
+		position: relative;
+		padding: 8px 4px;
+	}
+	.acoes summary {
+		list-style: none;
+		padding: 2px 10px;
+		border-radius: 5px;
+		color: var(--text-muted);
+		cursor: pointer;
+		letter-spacing: 1px;
+	}
+	.acoes summary::-webkit-details-marker {
+		display: none;
+	}
+	.acoes summary:hover,
+	.acoes[open] summary {
+		background: var(--bg-hover);
+	}
+	.acoes-corpo {
+		position: absolute;
+		right: 0;
+		top: calc(100% - 4px);
+		z-index: 10;
+		display: grid;
+		width: min(280px, calc(100vw - 32px));
+		padding: 6px;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: var(--shadow-pop);
+	}
+	.acoes-corpo button {
+		display: grid;
+		gap: 1px;
+		padding: 7px 10px;
+		text-align: left;
+		font: inherit;
+		font-size: 14px;
+		color: var(--text);
+		background: transparent;
+		border: 0;
+		border-radius: 5px;
+		cursor: pointer;
+	}
+	.acoes-corpo button:hover:not(:disabled) {
+		background: var(--bg-hover);
+	}
+	.acoes-corpo button.perigo {
+		color: var(--danger);
+	}
+	.acoes-corpo small {
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+	.editar-titulo {
+		flex: 1;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: flex-end;
+		padding: 9px 6px;
+	}
+	.editar-titulo label {
+		flex: 1 1 280px;
+		display: grid;
+		gap: 4px;
+	}
+	.editar-titulo input {
+		font: inherit;
+		font-size: 14px;
+		padding: 6px 8px;
+		color: var(--text);
+		background: var(--bg-soft);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+	}
+	.erro-da-linha {
+		margin: 0 6px 8px;
 	}
 	.linha {
 		display: flex;

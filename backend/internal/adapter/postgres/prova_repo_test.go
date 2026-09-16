@@ -451,6 +451,136 @@ func TestProvas_QuestaoComumAOutroCargoGuardadaUmaVez(t *testing.T) {
 	}
 }
 
+// A mesma prova importada duas vezes, com títulos diferentes: excluir uma apaga
+// tudo o que veio dela — e só dela. A questão guardada uma vez para os dois
+// cargos continua na outra.
+func TestProvas_ExcluirProvaApagaSoOQueEDela(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	recorte := uuid.NewString()
+
+	// A E05 tem a questão comum e uma só dela, gabarito e anotação.
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "e05"), 2); err != nil {
+		t.Fatal(err)
+	}
+	r := rascunhoPublicavel(recorte)
+	so := r.Questoes[0]
+	so.Numero, so.Blocos = 2, []prova.Bloco{{Tipo: "texto", Texto: "Só da E05"}}
+	r.Total, r.Questoes = 2, append(r.Questoes, so)
+	r.Gabarito = prova.Gabarito{Cargo: "E05", Caderno: "4", Tipo: "definitivo", Respostas: map[string]string{"1": "A", "2": ""}}
+	e05, err := repo.Publicar(ctx, levarARevisao(t, repo, r), criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.SalvarAnotacao(ctx, criador, e05, prova.Anotacao{Numero: 1, Texto: "porque sim"}); err != nil {
+		t.Fatal(err)
+	}
+	// E uma revisão aberta dela.
+	revisao := novaImportacao(criador, "e05-revisao")
+	if _, err := repo.Criar(ctx, revisao, 5); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE provas_importacoes SET prova_id = $1, estado = 'em_revisao' WHERE id = $2`, e05, revisao.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "f06"), 5); err != nil {
+		t.Fatal(err)
+	}
+	f := rascunhoPublicavel(recorte)
+	f.Cargo = "F06"
+	f06, err := repo.Publicar(ctx, levarARevisao(t, repo, f), criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.ExcluirProva(ctx, uuid.NewString()); !errors.Is(err, prova.ErrNaoEncontrada) {
+		t.Fatalf("prova que não existe: err = %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE provas_importacoes SET estado = 'processando' WHERE id = $1`, revisao.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.ExcluirProva(ctx, e05); !errors.Is(err, prova.ErrConflito) {
+		t.Fatalf("com importação processando: err = %v, quer ErrConflito", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE provas_importacoes SET estado = 'em_revisao' WHERE id = $1`, revisao.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.ExcluirProva(ctx, e05); err != nil {
+		t.Fatalf("ExcluirProva: %v", err)
+	}
+
+	var sobras int
+	if err := pool.QueryRow(ctx,
+		`SELECT (SELECT count(*) FROM provas WHERE id = $1)
+		      + (SELECT count(*) FROM provas_revisoes WHERE prova_id = $1)
+		      + (SELECT count(*) FROM provas_questoes WHERE prova_id = $1)
+		      + (SELECT count(*) FROM provas_gabaritos WHERE prova_id = $1)
+		      + (SELECT count(*) FROM provas_gabarito_respostas WHERE prova_id = $1)
+		      + (SELECT count(*) FROM provas_anotacoes WHERE prova_id = $1)
+		      + (SELECT count(*) FROM provas_importacoes WHERE prova_id = $1 OR id = $2)`,
+		e05, revisao.ID,
+	).Scan(&sobras); err != nil || sobras != 0 {
+		t.Fatalf("sobrou %d linhas da E05 (%v)", sobras, err)
+	}
+	if _, err := repo.Publicacao(ctx, e05); !errors.Is(err, prova.ErrNaoEncontrada) {
+		t.Fatalf("Publicacao da excluída: err = %v", err)
+	}
+
+	p, err := repo.Publicacao(ctx, f06)
+	if err != nil || len(p.Conteudo.Questoes) != 1 || p.Conteudo.Questoes[0].Blocos[0].Texto != "Enunciado" {
+		t.Fatalf("a F06 perdeu a questão comum: %+v, %v", p.Conteudo.Questoes, err)
+	}
+	var conteudos int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM provas_questoes_conteudo`).Scan(&conteudos); err != nil || conteudos != 1 {
+		t.Fatalf("conteúdos = %d, %v; quer só o comum, que a F06 ainda usa", conteudos, err)
+	}
+}
+
+// O título corrigido aparece no catálogo e na curadoria, sem abrir revisão.
+func TestProvas_RenomearProva(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "renomear"), 2); err != nil {
+		t.Fatal(err)
+	}
+	i := levarARevisao(t, repo, rascunhoPublicavel(uuid.NewString()))
+	id, err := repo.Publicar(ctx, i, criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const titulo = "Técnico Judiciário – Tecnologia da Informação"
+	if err := repo.RenomearProva(ctx, id, titulo); err != nil {
+		t.Fatalf("RenomearProva: %v", err)
+	}
+	if err := repo.RenomearProva(ctx, uuid.NewString(), titulo); !errors.Is(err, prova.ErrNaoEncontrada) {
+		t.Fatalf("prova que não existe: err = %v", err)
+	}
+
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil || p.Conteudo.CargoNome != titulo || p.Conteudo.Cargo != "E05" || len(p.Conteudo.Questoes) != 1 {
+		t.Fatalf("publicada = %q (cargo %q, %d questões), %v", p.Conteudo.CargoNome, p.Conteudo.Cargo, len(p.Conteudo.Questoes), err)
+	}
+	resumos, err := repo.ListarResumos(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := slices.IndexFunc(resumos, func(r prova.Importacao) bool { return r.ID == i.ID })
+	if k < 0 || resumos[k].Rascunho.CargoNome != titulo {
+		t.Fatalf("curadoria não viu o título novo: %+v", resumos)
+	}
+}
+
 // A questão comum aos dois cargos aparece uma vez no treino por matéria, e
 // sempre pela prova que estreou primeiro — até ela sair do catálogo.
 // O gabarito é uma entidade à parte: publicado, vai para as tabelas dele, e

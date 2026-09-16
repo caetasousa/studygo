@@ -307,9 +307,13 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 			_, err := s.AtualizarGabarito(ctx, estudante, "x", 1, pdfMinimo, "definitivo.pdf")
 			return err
 		},
-		"Revisar": func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
-		"Excluir": func() error { return s.Excluir(ctx, estudante, "x", 1) },
-		"Retirar": func() error { return s.Retirar(ctx, estudante, "x") },
+		"Revisar":      func() error { _, err := s.Revisar(ctx, estudante, "x"); return err },
+		"Excluir":      func() error { return s.Excluir(ctx, estudante, "x", 1) },
+		"Retirar":      func() error { return s.Retirar(ctx, estudante, "x") },
+		"ExcluirProva": func() error { return s.ExcluirProva(ctx, estudante, "x") },
+		"RenomearProva": func() error {
+			return s.RenomearProva(ctx, estudante, "x", "Técnico Judiciário")
+		},
 	}
 	for nome, escrever := range escritas {
 		if err := escrever(); !errors.Is(err, prova.ErrAcesso) {

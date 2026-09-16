@@ -52,6 +52,13 @@ export const provasApi = {
 
 	retirar: (id: string) => request<void>(`/api/provas/${id}`, { method: 'DELETE' }),
 
+	/** Apaga de vez a prova e tudo o que veio dela — importações, gabarito, anotações. */
+	excluirProva: (id: string) => request<void>(`/api/provas/${id}/excluir`, { method: 'POST' }),
+
+	/** Corrige o título (nome do cargo) da prova publicada, sem abrir revisão. */
+	renomearProva: (id: string, cargoNome: string) =>
+		request<void>(`/api/provas/${id}`, { method: 'PATCH', body: JSON.stringify({ cargoNome }) }),
+
 	/** As anotações do estudante nas questões da prova. */
 	anotacoes: (provaId: string) => request<Anotacao[]>(`/api/provas/anotacoes/${provaId}`),
 

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 var (
@@ -272,6 +273,18 @@ func NomeDoArquivo(enviado string) string {
 	}
 
 	return nome
+}
+
+// Tamanho máximo do nome do cargo: o mais longo da FCC ("Analista Judiciário -
+// Área Apoio Especializado - Especialidade Tecnologia da Informação") tem 90.
+const maxNomeDoCargo = 200
+
+// NomeDoCargo é o título da prova no catálogo e na curadoria, como o curador o
+// digitou: espaços repetidos viram um, e vazio ou longo demais não vale.
+func NomeDoCargo(digitado string) (string, bool) {
+	nome := strings.Join(strings.Fields(strings.ToValidUTF8(digitado, "")), " ")
+
+	return nome, nome != "" && utf8.RuneCountInString(nome) <= maxNomeDoCargo
 }
 
 // Cancelar tira a importação da fila e da revisão. Ela deixa de segurar os

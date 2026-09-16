@@ -415,6 +415,15 @@ das questões: ligar "1-10" põe o texto nas dez de uma vez, e texto sem questã
 pendência. Na tela do aluno, cada questão mostra o seu texto num recolhível
 aberto; quem o fecha numa questão o encontra fechado nas outras que o usam.
 
+**A prova importada duas vezes sai pela curadoria.** "Excluir prova" apaga de vez
+a prova e tudo o que veio dela — revisões, questões, textos, gabarito, anotações e
+as importações que a publicaram ou revisam (`ProvaRepo.ExcluirProva`, numa
+transação); o conteúdo guardado uma vez para dois cargos fica na outra prova, e os
+PDFs sem dono saem na limpeza do worker. Recusa enquanto uma importação dela
+processa. "Tirar do catálogo" só esconde. "Editar título" troca o nome do cargo
+da publicada sem revisão (`RenomearProva`); o código do cargo muda pela revisão,
+porque confere o gabarito e acha a repetida.
+
 **A mesma prova não entra duas vezes.** O hash é só o do caderno: reenviar o
 mesmo PDF, com outro gabarito ou sem ele, acha a importação que já existe
 (índice único no hash). Outro arquivo da mesma prova é pego pela capa: logo
@@ -552,7 +561,8 @@ POST      …/plano/tec{,/preview}
 GET       /api/provas                          ← catálogo (?ano, orgao, cargo, disciplina, offset)
 GET       /api/provas/{id}                     ← ?numero= e ?disciplina= filtram as questões
 GET       /api/provas/arquivos/{id}            ← PDF ou recorte
-POST      /api/provas/{id}/{revisar,reextrair} DELETE /api/provas/{id}       ← curadoria
+POST      /api/provas/{id}/{revisar,reextrair,excluir}                     ← curadoria
+PATCH|DELETE /api/provas/{id}                     ← título; tirar do catálogo
 GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
 POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,materias}
 GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante

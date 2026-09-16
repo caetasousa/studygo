@@ -936,6 +936,111 @@ func (r *ProvaRepo) Retirar(ctx context.Context, id string) error {
 	return nil
 }
 
+// ExcluirProva apaga, numa transação, na ordem das chaves estrangeiras. Os
+// conteúdos de questão e texto são guardados uma vez só e podem ser de outra
+// prova (a mesma questão em dois cargos): saem só os que ficaram sem prova. Os
+// PDFs e recortes das importações apagadas saem na limpeza do worker, que acha
+// os arquivos sem dono.
+func (r *ProvaRepo) ExcluirProva(ctx context.Context, id string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("iniciando transação: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	var processando bool
+	err = tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM provas_importacoes WHERE prova_id = p.id AND estado = 'processando')
+		   FROM provas p WHERE p.id = $1 FOR UPDATE`,
+		id,
+	).Scan(&processando)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return prova.ErrNaoEncontrada
+	}
+	if err != nil {
+		return fmt.Errorf("travando a prova: %w", err)
+	}
+	if processando {
+		return prova.ErrConflito
+	}
+
+	for _, sql := range []string{
+		`DELETE FROM provas_gabarito_respostas WHERE prova_id = $1`,
+		`DELETE FROM provas_gabaritos WHERE prova_id = $1`,
+		`CREATE TEMP TABLE conteudos_da_prova ON COMMIT DROP AS
+		   SELECT conteudo_id AS id, 'questao' AS tipo FROM provas_questoes WHERE prova_id = $1
+		   UNION SELECT conteudo_id, 'apoio' FROM provas_apoios WHERE prova_id = $1`,
+		`DELETE FROM provas_questoes WHERE prova_id = $1`,
+		`DELETE FROM provas_apoios WHERE prova_id = $1`,
+		`DELETE FROM provas_revisoes WHERE prova_id = $1`,
+		`DELETE FROM provas_importacoes WHERE prova_id = $1`,
+		`DELETE FROM provas WHERE id = $1`,
+	} {
+		if _, err := tx.Exec(ctx, sql, id); err != nil {
+			return fmt.Errorf("excluindo prova: %w", err)
+		}
+	}
+	for _, sql := range []string{
+		`DELETE FROM provas_questoes_conteudo c
+		  USING conteudos_da_prova d
+		  WHERE d.tipo = 'questao' AND c.id = d.id
+		    AND NOT EXISTS (SELECT 1 FROM provas_questoes q WHERE q.conteudo_id = c.id)`,
+		`DELETE FROM provas_apoios_conteudo c
+		  USING conteudos_da_prova d
+		  WHERE d.tipo = 'apoio' AND c.id = d.id
+		    AND NOT EXISTS (SELECT 1 FROM provas_apoios a WHERE a.conteudo_id = c.id)`,
+	} {
+		if _, err := tx.Exec(ctx, sql); err != nil {
+			return fmt.Errorf("excluindo conteúdos sem prova: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("confirmando exclusão da prova: %w", err)
+	}
+
+	return nil
+}
+
+// RenomearProva escreve o nome na identificação gravada em jsonb, com o nome
+// do campo do domínio. As importações em revisão ficam como estão: o nome de
+// lá é o que o curador está editando.
+func (r *ProvaRepo) RenomearProva(ctx context.Context, id, cargoNome string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("iniciando transação: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	tag, err := tx.Exec(ctx,
+		`UPDATE provas_revisoes pr
+		    SET conteudo = jsonb_set(pr.conteudo, '{CargoNome}', to_jsonb($2::text))
+		   FROM provas p
+		  WHERE p.id = $1 AND pr.prova_id = p.id AND pr.revisao = p.revisao`,
+		id, cargoNome,
+	)
+	if err != nil {
+		return fmt.Errorf("renomeando prova: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return prova.ErrNaoEncontrada
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE provas_importacoes
+		    SET rascunho = jsonb_set(rascunho, '{CargoNome}', to_jsonb($2::text)), atualizado_em = now()
+		  WHERE prova_id = $1 AND estado = 'publicada'`,
+		id, cargoNome,
+	); err != nil {
+		return fmt.Errorf("renomeando importações da prova: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("confirmando novo título: %w", err)
+	}
+
+	return nil
+}
+
 const msgRascunhoExpirado = "Rascunho expirado após 30 dias sem alteração."
 
 func (r *ProvaRepo) Expirar(ctx context.Context, antes time.Time) error {

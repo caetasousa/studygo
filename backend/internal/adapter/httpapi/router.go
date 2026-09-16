@@ -131,6 +131,8 @@ func NewRouter(
 		protegida("POST /api/provas/{id}/revisar", h.Prova.Revisar)
 		limitada("POST /api/provas/{id}/reextrair", limites.Edital, h.Prova.Reextrair)
 		protegida("DELETE /api/provas/{id}", h.Prova.Retirar)
+		protegida("PATCH /api/provas/{id}", h.Prova.RenomearProva)
+		protegida("POST /api/provas/{id}/excluir", h.Prova.ExcluirProva)
 
 		const imp = "/api/provas/importacoes"
 		protegida("GET "+imp, h.Prova.ListarImportacoes)

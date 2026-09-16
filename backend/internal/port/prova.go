@@ -88,6 +88,14 @@ type ProvaRepository interface {
 	// base de uma nova revisão.
 	ImportacaoDaPublicacao(ctx context.Context, provaID string) (prova.Importacao, error)
 	Retirar(ctx context.Context, id string) error
+	// ExcluirProva apaga a prova e tudo o que vem dela: revisões, questões,
+	// textos, gabarito, anotações dos estudantes e as importações que a
+	// publicaram ou revisam. prova.ErrConflito enquanto uma delas processa;
+	// prova.ErrNaoEncontrada se a prova não existe.
+	ExcluirProva(ctx context.Context, id string) error
+	// RenomearProva troca o nome do cargo na revisão em vigor e nas importações
+	// publicadas da prova, que são o que o catálogo e a curadoria mostram.
+	RenomearProva(ctx context.Context, id, cargoNome string) error
 
 	// Expirar cancela rascunhos parados desde antes de `antes`.
 	Expirar(ctx context.Context, antes time.Time) error

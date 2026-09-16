@@ -173,6 +173,47 @@ func (h *ProvaHandler) Retirar(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *ProvaHandler) ExcluirProva(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	id, ok := h.idDaRota(w, r)
+	if !ok {
+		return
+	}
+
+	if err := h.provas.ExcluirProva(r.Context(), usuario, id); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ProvaHandler) RenomearProva(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	id, ok := h.idDaRota(w, r)
+	if !ok {
+		return
+	}
+	var req provaRenomeRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	if err := h.provas.RenomearProva(r.Context(), usuario, id, req.CargoNome); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Arquivo entrega um PDF ou recorte. O id é uuid e o caminho é montado pelo
 // service; nada da requisição vira caminho.
 func (h *ProvaHandler) Arquivo(w http.ResponseWriter, r *http.Request) {
