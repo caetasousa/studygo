@@ -903,6 +903,49 @@ func TestGabaritoEmLinhas(t *testing.T) {
 	}
 }
 
+// A anulada excluída sai da conta, mas só enquanto o gabarito a anular.
+func TestPendencias_AnuladaExcluida(t *testing.T) {
+	t.Parallel()
+
+	semA2 := func() Rascunho {
+		r := valida()
+		r.Total = 3
+		q3 := questao(3, true, "Terceira")
+		q3.Resposta = "A"
+		r.Questoes = append(r.Questoes, q3)
+		r.Gabarito.Respostas = map[string]string{"1": "E", "2": "", "3": "A"}
+		return r
+	}
+
+	r := semA2()
+	if p := r.Pendencias(true); !contem(p, "tem 2 questões e o total esperado é 3") {
+		t.Fatalf("anulada que só falta, sem exclusão: %v", p)
+	}
+	r.AnuladasExcluidas = []int{2}
+	if p := r.Pendencias(true); len(p) > 0 || r.QuestoesNaProva() != 2 {
+		t.Fatalf("anulada excluída: %v, %d na prova", p, r.QuestoesNaProva())
+	}
+
+	r = semA2()
+	r.AnuladasExcluidas = []int{2}
+	r.Gabarito.Respostas["2"] = "C"
+	if p := r.Pendencias(true); !contem(p, "questão 2 foi excluída como anulada, mas o gabarito não a anula") {
+		t.Fatalf("gabarito trocado por um que dá a resposta: %v", p)
+	}
+
+	r = semA2()
+	r.AnuladasExcluidas = []int{3, 2}
+	if p := r.Pendencias(true); !contem(p, "questão 3 está no rascunho e entre as anuladas excluídas") {
+		t.Fatalf("excluída e presente: %v", p)
+	}
+
+	r = semA2()
+	r.AnuladasExcluidas = []int{2, 2, 9}
+	if p := r.Pendencias(true); !contem(p, "anuladas excluídas: 2.") || !contem(p, "anuladas excluídas: 9.") {
+		t.Fatalf("repetida ou fora do total: %v", p)
+	}
+}
+
 // O banco só aceita A a E, ou vazia na anulada: a pendência pega antes.
 func TestPendencias_GabaritoComRespostaInvalida(t *testing.T) {
 	t.Parallel()

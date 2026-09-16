@@ -28,9 +28,10 @@ export function novaQuestao(numero: number, origem?: Origem): Questao {
 	};
 }
 
-/** Números de 1 ao total que não têm questão no rascunho. */
+/** Números de 1 ao total que não têm questão no rascunho. A anulada excluída
+ * não falta: saiu da prova por decisão do curador. */
 export function numerosFaltando(r: Rascunho): number[] {
-	const presentes = new Set(r.questoes.map((q) => q.numero));
+	const presentes = new Set([...r.questoes.map((q) => q.numero), ...r.anuladasExcluidas]);
 	const faltam: number[] = [];
 	for (let n = 1; n <= r.total; n++) if (!presentes.has(n)) faltam.push(n);
 	return faltam;
@@ -198,6 +199,26 @@ export function definirResposta(r: Rascunho, q: Questao, letra: string) {
 	q.resposta = letra;
 	r.gabarito.respostas[String(q.numero)] = letra;
 	q.revisada = false;
+}
+
+/** O gabarito anula a questão: tem a linha dela, sem letra. */
+export function anulada(r: Rascunho, numero: number): boolean {
+	return r.gabarito.respostas[String(numero)] === '';
+}
+
+/** Tira da prova a questão anulada. O servidor só aceita enquanto o gabarito a
+ * anular. */
+export function excluirAnulada(r: Rascunho, numero: number) {
+	r.questoes = r.questoes.filter((q) => q.numero !== numero);
+	if (!r.anuladasExcluidas.includes(numero)) {
+		r.anuladasExcluidas = [...r.anuladasExcluidas, numero].sort((a, b) => a - b);
+	}
+}
+
+/** Desfaz a exclusão. O conteúdo não volta: a questão passa a faltar, e o
+ * curador a transcreve ou lê de novo como qualquer outra que falte. */
+export function devolverAnulada(r: Rascunho, numero: number) {
+	r.anuladasExcluidas = r.anuladasExcluidas.filter((n) => n !== numero);
 }
 
 /** Índice, em `regioes`, da primeira região em que a questão foi lida. */

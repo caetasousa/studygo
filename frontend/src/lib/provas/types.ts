@@ -93,6 +93,8 @@ export interface Rascunho {
 	alertas: string[];
 	/** Só leitura: o servidor ignora o que vier aqui. */
 	extracoes: Extracao[];
+	/** Questões que a banca anulou e o curador tirou da prova; o total segue o da capa. */
+	anuladasExcluidas: number[];
 }
 
 export type EstadoImportacao =

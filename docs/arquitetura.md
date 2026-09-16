@@ -360,7 +360,10 @@ no mapa, aviso na questão.
 publicação enquanto houver questão não conferida ou incompleta, figura sem
 recorte, número fora da sequência, ou gabarito de outro cargo ou caderno. A
 resposta de uma questão só vem do gabarito oficial, nunca da IA, e editar algo
-desfaz a conferência dele (`InvalidarEdicoes`). `PROVAS_EXIGIR_CONFERENCIA=false`
+desfaz a conferência dele (`InvalidarEdicoes`). A questão anulada pode sair da
+prova (`Rascunho.AnuladasExcluidas`): deixa de ser esperada enquanto o gabarito
+a anular, `Total` continua o da capa, e o catálogo conta só as que ficaram
+(`QuestoesNaProva`). `PROVAS_EXIGIR_CONFERENCIA=false`
 tira a conferência das pendências — para testar o fluxo antes de haver quem
 revise —, mas a integridade continua bloqueando.
 

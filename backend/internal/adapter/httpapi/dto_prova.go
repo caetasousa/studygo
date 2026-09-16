@@ -94,6 +94,8 @@ type rascunhoDTO struct {
 	Gabarito  gabaritoDTO   `json:"gabarito"`
 	Alertas   []string      `json:"alertas"`
 	Extracoes []extracaoDTO `json:"extracoes"`
+	// AnuladasExcluidas são as questões anuladas que o curador tirou da prova.
+	AnuladasExcluidas []int `json:"anuladasExcluidas"`
 }
 
 type importacaoProvaDTO struct {
@@ -282,6 +284,7 @@ func rascunhoParaDTO(r prova.Rascunho) rascunhoDTO {
 		Banca: r.Banca, Orgao: r.Orgao, Ano: r.Ano, Cargo: r.Cargo, CargoNome: r.CargoNome, Caderno: r.Caderno,
 		Total: r.Total, Questoes: questoesParaDTO(r.Questoes), Apoios: apoiosParaDTO(r.Apoios),
 		Gabarito: gabaritoParaDTO(r.Gabarito), Alertas: naoNula(r.Alertas), Extracoes: extracoes,
+		AnuladasExcluidas: naoNula(r.AnuladasExcluidas),
 	}
 }
 
@@ -311,7 +314,7 @@ func provaResumoParaDTO(p prova.Publicacao) provaResumoDTO {
 
 	return provaResumoDTO{
 		ID: p.ID, Revisao: p.Revisao, Banca: c.Banca, Orgao: c.Orgao, Ano: c.Ano, Cargo: c.Cargo,
-		CargoNome: c.CargoNome, Caderno: c.Caderno, Total: c.Total, GabaritoTipo: c.Gabarito.Tipo,
+		CargoNome: c.CargoNome, Caderno: c.Caderno, Total: c.QuestoesNaProva(), GabaritoTipo: c.Gabarito.Tipo,
 		PublicadoEm: p.PublicadoEm,
 	}
 }
@@ -362,7 +365,8 @@ func rascunhoDoDTO(d rascunhoDTO) prova.Rascunho {
 			Cargo: d.Gabarito.Cargo, Caderno: d.Gabarito.Caderno, Tipo: d.Gabarito.Tipo,
 			Respostas: d.Gabarito.Respostas, Situacoes: d.Gabarito.Situacoes,
 		},
-		Alertas: d.Alertas,
+		Alertas:           d.Alertas,
+		AnuladasExcluidas: d.AnuladasExcluidas,
 	}
 	for _, q := range d.Questoes {
 		alternativas := make([]prova.Alternativa, 0, len(q.Alternativas))

@@ -15,6 +15,9 @@ import {
 	novaQuestao,
 	novoBloco,
 	numerosFaltando,
+	anulada,
+	excluirAnulada,
+	devolverAnulada,
 	proximaPendente,
 	escreverNumeros,
 	lerNumeros,
@@ -50,7 +53,8 @@ function rascunho(questoes: Questao[], total = questoes.length): Rascunho {
 		apoios: [],
 		gabarito: { cargo: 'E05', caderno: '4', tipo: 'preliminar', respostas: {}, situacoes: {} },
 		alertas: [],
-		extracoes: []
+		extracoes: [],
+		anuladasExcluidas: []
 	};
 }
 
@@ -73,6 +77,22 @@ describe('proximaPendente', () => {
 
 it('numerosFaltando aponta a questão que a extração perdeu', () => {
 	expect(numerosFaltando(rascunho([conferida(1), conferida(3)], 4))).toEqual([2, 4]);
+});
+
+it('a anulada excluída sai da prova sem virar questão que falta, e devolvida volta a faltar', () => {
+	const r = rascunho([conferida(1), conferida(2), conferida(3)], 3);
+	r.gabarito.respostas = { '1': 'A', '2': '', '3': 'C' };
+	expect([anulada(r, 1), anulada(r, 2), anulada(r, 9)]).toEqual([false, true, false]);
+
+	excluirAnulada(r, 2);
+	excluirAnulada(r, 2);
+	expect(r.questoes.map((q) => q.numero)).toEqual([1, 3]);
+	expect(r.anuladasExcluidas).toEqual([2]);
+	expect(numerosFaltando(r)).toEqual([]);
+
+	devolverAnulada(r, 2);
+	expect(r.anuladasExcluidas).toEqual([]);
+	expect(numerosFaltando(r)).toEqual([2]);
 });
 
 it('definirResposta leva a letra ao gabarito e desfaz a conferência', () => {

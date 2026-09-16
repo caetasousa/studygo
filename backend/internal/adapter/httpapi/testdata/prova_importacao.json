@@ -17,6 +17,7 @@
       "string"
     ],
     "ano": "number",
+    "anuladasExcluidas": [],
     "apoios": [
       {
         "aviso": "string",

@@ -209,7 +209,15 @@ type Rascunho struct {
 	Apoios                    []Apoio
 	Gabarito                  Gabarito
 	Alertas                   []string
+	// AnuladasExcluidas são os números das questões que a banca anulou e o
+	// curador tirou da prova. Total continua sendo o da capa: é a numeração do
+	// caderno, e a anulada excluída só deixa de ser esperada.
+	AnuladasExcluidas []int
 }
+
+// QuestoesNaProva é quantas questões a prova publicada tem: o total da capa
+// sem as anuladas excluídas.
+func (r Rascunho) QuestoesNaProva() int { return r.Total - len(r.AnuladasExcluidas) }
 
 type Importacao struct {
 	ID, Criador, Hash, Documento, GabaritoArquivo string
@@ -715,10 +723,24 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 	if r.Banca != "FCC" || r.Orgao == "" || r.Ano < 1900 || r.Cargo == "" || r.Caderno == "" {
 		out = append(out, "Confira banca FCC, órgão, ano, cargo e caderno.")
 	}
-	if r.Total <= 0 || len(r.Questoes) != r.Total {
+	if r.Total <= 0 || len(r.Questoes) != r.QuestoesNaProva() {
 		out = append(out, fmt.Sprintf(
-			"O rascunho tem %d questões e o total esperado é %d.", len(r.Questoes), r.Total,
+			"O rascunho tem %d questões e o total esperado é %d.", len(r.Questoes), r.QuestoesNaProva(),
 		))
+	}
+	// A exclusão vale enquanto o gabarito anular a questão: trocado por um que
+	// dá a resposta, ela volta a ser esperada.
+	excluidas := map[int]bool{}
+	for _, n := range r.AnuladasExcluidas {
+		resposta, noGabarito := r.Gabarito.Respostas[strconv.Itoa(n)]
+		if excluidas[n] || n < 1 || n > r.Total {
+			out = append(out, fmt.Sprintf("Numeração inválida entre as anuladas excluídas: %d.", n))
+		} else if !noGabarito || resposta != "" {
+			out = append(out, fmt.Sprintf(
+				"A questão %d foi excluída como anulada, mas o gabarito não a anula; devolva-a à prova.", n,
+			))
+		}
+		excluidas[n] = true
 	}
 	if g := r.Gabarito.Cargo; g != "" && !mesmoCargo(r.Cargo, g) {
 		// A mensagem diz o que conferir: o código está na capa, em "Caderno de
@@ -767,6 +789,11 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 			out = append(out, fmt.Sprintf("Numeração inválida: %d.", q.Numero))
 		}
 		numeros[q.Numero] = true
+		if excluidas[q.Numero] {
+			out = append(out, fmt.Sprintf(
+				"A questão %d está no rascunho e entre as anuladas excluídas; remova-a ou devolva-a à prova.", q.Numero,
+			))
+		}
 
 		if !q.Completa || len(q.Blocos) == 0 || len(q.Alternativas) != 5 {
 			out = append(out, fmt.Sprintf("A %s está incompleta.", local))

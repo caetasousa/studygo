@@ -514,6 +514,48 @@ func TestProvas_GabaritoSeparadoDasQuestoes(t *testing.T) {
 	}
 }
 
+// A anulada excluída não vai para as questões, mas continua no gabarito e na
+// identificação: a revisão reaberta da publicada sabe que ela saiu.
+func TestProvas_AnuladaExcluidaSobreviveAPublicacao(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "anulada"), 2); err != nil {
+		t.Fatal(err)
+	}
+	r := rascunhoPublicavel(uuid.NewString())
+	r.Total, r.AnuladasExcluidas = 2, []int{2}
+	r.Questoes[0].Resposta = "D"
+	r.Gabarito = prova.Gabarito{
+		Cargo: "E05", Caderno: "4", Tipo: "definitivo",
+		Respostas: map[string]string{"1": "D", "2": ""}, Situacoes: map[string]string{"2": "Anulada"},
+	}
+	if p := r.Pendencias(false); len(p) > 0 {
+		t.Fatalf("rascunho do teste com pendências: %v", p)
+	}
+	id, err := repo.Publicar(ctx, levarARevisao(t, repo, r), criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := p.Conteudo; !slices.Equal(c.AnuladasExcluidas, []int{2}) || c.QuestoesNaProva() != 1 || len(c.Questoes) != 1 {
+		t.Fatalf("publicada: excluídas %v, %d na prova, %d questões", c.AnuladasExcluidas, c.QuestoesNaProva(), len(c.Questoes))
+	}
+	if resposta, ok := p.Conteudo.Gabarito.Respostas["2"]; !ok || resposta != "" {
+		t.Fatalf("gabarito da publicada = %+v, quer a 2 anulada", p.Conteudo.Gabarito)
+	}
+	if pend := p.Conteudo.Pendencias(false); len(pend) > 0 {
+		t.Fatalf("a revisão reaberta nasceria com pendências: %v", pend)
+	}
+}
+
 func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	t.Parallel()
 

@@ -11,10 +11,13 @@
 	import Recorte from '$lib/provas/Recorte.svelte';
 	import { provasApi } from '$lib/provas/api';
 	import {
+		anulada,
 		aplicarMaterias,
 		aplicarRecorte,
 		blocoDoDestino,
 		destinosDoRecorte,
+		devolverAnulada,
+		excluirAnulada,
 		incompleta,
 		novaQuestao,
 		numerosFaltando,
@@ -351,6 +354,24 @@
 		if (!imp || !q || !confirm(`Remover a questão ${q.numero} do rascunho?`)) return;
 		imp.rascunho.questoes = imp.rascunho.questoes.filter((_, k) => k !== indice);
 		irPara(Math.max(0, indice - 1));
+		alterar();
+	}
+
+	// A anulada pode ficar na prova, sem resposta certa, ou sair dela. Saindo,
+	// não conta como questão que falta nem vai para o catálogo.
+	function excluirQuestaoAnulada() {
+		if (!imp || !q) return;
+		if (!confirm(`Excluir da prova a questão ${q.numero}, anulada pela banca? Ela sai do rascunho e não vai para o catálogo.`))
+			return;
+		excluirAnulada(imp.rascunho, q.numero);
+		irPara(Math.max(0, indice - 1));
+		alterar();
+	}
+
+	function devolverQuestaoAnulada(numero: number) {
+		if (!imp) return;
+		devolverAnulada(imp.rascunho, numero);
+		aviso = `A questão ${numero} voltou para a prova e está entre as que faltam: adicione-a para transcrever.`;
 		alterar();
 	}
 
@@ -843,6 +864,22 @@
 							<button class="btn" type="button" disabled={!faltando} onclick={adicionarFaltando}>Adicionar</button>
 						</span>
 					{/if}
+					{#if imp.rascunho.anuladasExcluidas.length > 0}
+						<span class="faltam dim">
+							Anuladas fora da prova:
+							{#each imp.rascunho.anuladasExcluidas as n (n)}
+								<span>
+									{n}
+									<button
+										class="link"
+										type="button"
+										title="Devolver a questão {n} à prova"
+										onclick={() => devolverQuestaoAnulada(n)}>devolver</button
+									>
+								</span>
+							{/each}
+						</span>
+					{/if}
 				</div>
 
 				<div class="revisao">
@@ -867,6 +904,14 @@
 										<b>Esta questão tem figura.</b> Compare cada recorte com o original ao lado — a figura inteira,
 										com título e legenda, sem pedaço da questão vizinha — e marque "Conferi o recorte". Conferidos
 										todos, a questão fica conferida ao salvar.
+									</span>
+								</p>
+							{/if}
+							{#if q && anulada(imp.rascunho, q.numero)}
+								<p class="callout aviso-anulada">
+									<span>
+										<b>A banca anulou esta questão.</b> Ela pode ficar na prova, sem resposta certa, ou
+										<button class="link" type="button" onclick={excluirQuestaoAnulada}>sair da prova</button>.
 									</span>
 								</p>
 							{/if}
@@ -1492,8 +1537,18 @@
 	.callout {
 		margin: 0;
 	}
-	.aviso-figura {
+	.aviso-figura,
+	.aviso-anulada {
 		margin: 0 0 12px;
+	}
+	.link {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: 0;
+		padding: 0;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 	.reaproveitada {
 		color: var(--accent);
