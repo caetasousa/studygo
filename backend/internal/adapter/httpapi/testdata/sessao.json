@@ -1,0 +1,10 @@
+{
+  "accessExpiresAt": "string",
+  "accessToken": "string",
+  "usuario": {
+    "email": "string",
+    "id": "string",
+    "nome": "string",
+    "temaUi": "string"
+  }
+}

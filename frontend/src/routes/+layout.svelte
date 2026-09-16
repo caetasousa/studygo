@@ -13,6 +13,11 @@
 
 	let { children } = $props();
 
+	// Primeira coisa da carga: perguntar ao servidor, pelo cookie, se há sessão.
+	// Nada mais no app pode decidir rota antes desta resposta — é o que
+	// `auth.pronto` marca, e o que substituiu ler o token do localStorage.
+	auth.iniciar();
+
 	let menuOpen = $state(false);
 	let botaoMenu = $state<HTMLButtonElement | null>(null);
 
@@ -49,6 +54,10 @@
 	);
 
 	$effect(() => {
+		// Enquanto a renovação de boot não responde não se sabe nada: redirecionar
+		// aqui mandaria para /login todo mundo que recarregou a página.
+		if (!auth.pronto) return;
+
 		if (!auth.isAuthenticated && !isPublic) {
 			goto('/login');
 		} else if (auth.isAuthenticated && isPublic) {
@@ -98,7 +107,11 @@
 	}}
 />
 
-{#if isPublic}
+{#if !auth.pronto}
+	<!-- A sessão está sendo restaurada pelo cookie. Uma ida ao servidor, e só
+	     depois dela se sabe se esta é a tela de login ou o app. -->
+	<p class="page-sub" style="padding:32px">Carregando…</p>
+{:else if isPublic}
 	{@render children()}
 {:else if auth.isAuthenticated}
 	<button

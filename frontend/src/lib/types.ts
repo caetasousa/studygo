@@ -11,11 +11,16 @@ export interface Usuario {
 	temaUi: 'light' | 'dark' | 'system';
 }
 
+/**
+ * O que login, cadastro e renovação devolvem — os três iguais.
+ *
+ * Não há `refreshToken` aqui de propósito: ele vem em cookie HttpOnly, que o
+ * JavaScript não lê. Se este campo reaparecer, alguém desfez isso.
+ */
 export interface AuthResponse {
 	usuario: Usuario;
 	accessToken: string;
 	accessExpiresAt: string;
-	refreshToken: string;
 }
 
 export interface ConcursoResumo {

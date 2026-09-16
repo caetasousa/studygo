@@ -114,19 +114,36 @@ func (s *AuthService) Entrar(
 
 // Renovar gira o token: o refresh apresentado é revogado e um par novo é
 // emitido.
-func (s *AuthService) Renovar(ctx context.Context, refreshToken string) (ParDeTokens, error) {
+//
+// A conta volta junto porque renovar é também como a sessão é RESTAURADA — o
+// cliente não guarda mais nada entre uma carga e outra da página, e quem abre o
+// app precisa saber, na mesma ida, quem está logado.
+func (s *AuthService) Renovar(
+	ctx context.Context,
+	refreshToken string,
+) (usuario.Usuario, ParDeTokens, error) {
 	hash := hashDoToken(refreshToken)
 
 	usuarioID, err := s.usuarios.RefreshTokenValido(ctx, hash)
 	if err != nil {
-		return ParDeTokens{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
 	if err := s.usuarios.RevogarRefreshToken(ctx, hash); err != nil {
-		return ParDeTokens{}, err
+		return usuario.Usuario{}, ParDeTokens{}, err
 	}
 
-	return s.emitirPar(ctx, usuarioID)
+	conta, err := s.usuarios.PorID(ctx, usuarioID)
+	if err != nil {
+		return usuario.Usuario{}, ParDeTokens{}, err
+	}
+
+	par, err := s.emitirPar(ctx, usuarioID)
+	if err != nil {
+		return usuario.Usuario{}, ParDeTokens{}, err
+	}
+
+	return conta, par, nil
 }
 
 // Sair revoga um refresh token; um token desconhecido não faz nada.

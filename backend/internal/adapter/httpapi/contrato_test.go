@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"studygo/internal/domain/usuario"
 	"studygo/internal/service"
 
 	"github.com/google/uuid"
@@ -135,6 +136,25 @@ func TestContratoHTTP_Caderno(t *testing.T) {
 	}
 
 	compararComGolden(t, "caderno.json", forma(t, cadernoParaDTO(c)))
+}
+
+// A sessão é o contrato mais sensível do frontend: é a mesma resposta para
+// cadastro, login e renovação, e o refresh token NÃO está nela — ele sai em
+// cookie HttpOnly. Um campo `refreshToken` reaparecendo aqui é a regressão que
+// este golden existe para pegar.
+func TestContratoHTTP_Sessao(t *testing.T) {
+	t.Parallel()
+
+	u := usuario.Usuario{
+		ID: uuid.New(), Email: "a@b.c", Nome: "Ana", TemaUI: usuario.TemaPadrao,
+	}
+	par := service.ParDeTokens{
+		AccessToken:    "jwt",
+		AccessExpiraEm: time.Now(),
+		RefreshToken:   "nao-pode-sair-no-corpo",
+	}
+
+	compararComGolden(t, "sessao.json", forma(t, toAuthResponse(u, par)))
 }
 
 // forma serializa v e troca cada escalar pelo nome do tipo, reduzindo listas ao

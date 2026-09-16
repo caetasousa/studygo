@@ -498,10 +498,32 @@ ATUALIZAR_CONTRATO=1 go test ./internal/adapter/httpapi
 Regrave e diga no commit qual campo mudou. `frontend/src/lib/types.ts` é o
 espelho desses DTOs e muda junto.
 
+### Sessão
+
+Dois tokens, guardados em lugares diferentes de propósito:
+
+| | Onde fica | Vida | Quem lê |
+|---|---|---|---|
+| access | memória do JavaScript | 15 min | o próprio app, no header `Authorization` |
+| refresh | cookie `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` | 30 dias | só o servidor |
+
+Nada de sessão é gravado no `localStorage`. O refresh token é o que vale um
+mês, e é justamente o que o JavaScript não alcança — um XSS consegue agir
+enquanto a aba está aberta, não levar a conta embora.
+
+Como o access token não sobrevive a um F5, **abrir o app começa por
+`POST /api/auth/refresh`**: ele gira o cookie e devolve a conta junto, e só
+depois dessa resposta o frontend decide entre a tela de login e o app
+(`auth.pronto`, em `stores/auth.svelte.ts`).
+
+Não há token de CSRF, e não falta: o cookie não viaja em requisição de outro
+site (`SameSite=Strict`) e as rotas que mudam dados nem olham para ele — exigem
+o header `Authorization`, que um formulário de terceiro não monta.
+
 ### Rotas
 
 ```
-POST   /api/auth/{register,login,refresh,logout}
+POST   /api/auth/{register,login,refresh,logout}   ← refresh e logout leem o cookie
 GET    /api/me                          PUT /api/me/tema
 GET    /api/concursos                   POST /api/concursos
 GET    /api/concursos/{slug}            PUT|DELETE /api/concursos/{slug}

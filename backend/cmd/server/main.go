@@ -92,7 +92,7 @@ func run(logger *slog.Logger) error {
 		Health: httpapi.NewHealthHandler(
 			service.NewHealthService(pool, db.NovoSchema(pool), cfg.Versao, cfg.Deploy), logger,
 		),
-		Auth: httpapi.NewAuthHandler(authService, logger),
+		Auth: httpapi.NewAuthHandler(authService, cfg.RefreshTTL, logger),
 		Concurso: httpapi.NewConcursoHandler(
 			service.NewConcursoService(concursoRepo, editalProc), logger,
 		),

@@ -109,6 +109,11 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 // aqui deixaria qualquer site chamar a API com a credencial de quem estivesse
 // logado. Em produção o navegador nem passa por aqui — a SPA e a API são
 // servidas da mesma origem —, mas o desenvolvimento local usa duas portas.
+//
+// Repare no que NÃO está aqui: Access-Control-Allow-Credentials. Sem ele o
+// navegador recusa mandar cookie para outra origem, e é assim que tem de ser —
+// o refresh token só vale de onde a SPA é servida. Quem roda o `npm run dev`
+// chega pelo proxy do vite, na mesma origem, e nem passa por este middleware.
 func CORS(origin string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
