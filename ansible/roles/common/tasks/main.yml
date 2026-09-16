@@ -14,7 +14,39 @@
       - curl
       - git
       - ufw
+      # A VPS passa semanas sem ninguém olhando: correção de segurança do
+      # sistema entra sozinha, e o SSH ganha quem banize quem fica tentando.
+      - unattended-upgrades
+      - fail2ban
     state: present
+
+- name: Apply security updates automatically
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    mode: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+# Só o SSH: a borda já tem limite de requisição por IP, e banir ali pelo
+# nginx levaria junto quem está atrás do mesmo NAT.
+- name: Ban repeated SSH failures
+  copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    mode: '0644'
+    content: |
+      [sshd]
+      enabled = true
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+  notify: restart fail2ban
+
+- name: Ensure fail2ban is enabled and running
+  systemd:
+    name: fail2ban
+    enabled: true
+    state: started
 
 - name: Allow SSH through firewall
   ufw:

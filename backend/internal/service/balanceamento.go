@@ -47,7 +47,7 @@ func montarBalanceamento(
 			Codigo:         d.Codigo,
 			Nome:           d.Nome,
 			Bloco:          string(d.Bloco),
-			Cor:            i % concurso.TotalCoresDisciplinas,
+			Cor:            concurso.Cor(i),
 			Questoes:       cfg.Questoes[d.Codigo],
 			QuestoesEdital: d.QuestoesPadrao,
 			Delta:          cfg.Questoes[d.Codigo] - d.QuestoesPadrao,

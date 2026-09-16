@@ -45,7 +45,10 @@
     # tela quebra (aconteceu em staging, 2026-09-15):
     #  - script-src 'unsafe-inline': o index.html do SvelteKit liga o app com um
     #    <script> embutido. Sem ele a página fica em branco. O hash não serve
-    #    aqui: o script muda a cada build, e a borda não é reconstruída.
+    #    aqui: o script muda a cada build, e a borda não é reconstruída — quem
+    #    o exige é a política que o próprio build põe num <meta> da página
+    #    (kit.csp em frontend/svelte.config.js). O navegador cobra as duas, e
+    #    vale a mais estrita: script embutido injetado não executa.
     #  - style-src 'unsafe-inline': o CSS que o SvelteKit embute.
     #  - fonts.googleapis.com / fonts.gstatic.com: as fontes do app.html.
     #  - img-src blob:: as figuras das provas exigem o token, então chegam por

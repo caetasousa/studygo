@@ -55,8 +55,11 @@ No backend:
 Regras que valem sem exceção:
 
 - O domínio não conhece HTTP, JSON, SQL nem framework algum.
-- **Toda tag JSON vive em `adapter/httpapi`.** Os casos de uso devolvem tipos
-  sem tag (`service.PlanoMontado` e companhia) e o adapter os traduz em DTO.
+- **Tag JSON só em adapter.** O contrato da API vive em `adapter/httpapi`; os
+  clientes dos serviços internos (`adapter/editalproc`, `adapter/provaproc`)
+  carregam as tags do contrato deles. `domain/` e `service/` não têm nenhuma:
+  os casos de uso devolvem tipos sem tag (`service.PlanoMontado` e companhia)
+  e o adapter os traduz em DTO.
 - **Todo SQL vive em `adapter/postgres`.** Nenhuma consulta em service ou handler.
 - Handlers autenticam, decodificam, chamam um caso de uso e serializam. Nada mais.
 - Repositories persistem; não decidem política. Atribuir código de disciplina,

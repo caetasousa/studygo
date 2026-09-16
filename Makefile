@@ -111,6 +111,17 @@ lint: ## Lint do backend (golangci-lint; veja backend/.golangci.yml)
 	}
 	cd backend && golangci-lint run
 
+cobertura: ## Cobertura dos testes, com os de integração (exige Docker)
+	cd backend && go test -tags=integration -coverprofile=coverage.out ./... \
+		&& go tool cover -func=coverage.out | tail -1
+
+# Fora do `check` porque depende da rede e de banco de vulnerabilidade que muda
+# sozinho: um `check` que falha sem ninguém ter mexido no código vira ruído.
+seguranca: ## Varredura de vulnerabilidade nas dependências dos três serviços
+	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	cd frontend && npm audit --omit=dev
+	cd edital-processor && uv run --with pip-audit pip-audit
+
 fmt: ## Formata o código Go e o Python do processor
 	cd backend && gofmt -w .
 	cd edital-processor && uv run ruff format .

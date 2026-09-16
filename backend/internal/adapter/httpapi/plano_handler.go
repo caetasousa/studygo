@@ -621,7 +621,7 @@ func (h *PlanoHandler) PreviewTEC(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxCorpoPlanilha)
 
-	if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil {
+	if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil { //nolint:gosec // corpo limitado na linha acima
 		writeError(w, r, h.logger, traduzirCorpo(err))
 
 		return
@@ -796,7 +796,9 @@ func (h *PlanoHandler) ExportarCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="plano-`+slug+`.csv"`)
 	w.WriteHeader(http.StatusOK)
 
-	if _, err := w.Write(dados); err != nil {
+	// Planilha do próprio usuário, servida como anexo text/csv: o navegador
+	// baixa, não interpreta.
+	if _, err := w.Write(dados); err != nil { //nolint:gosec // anexo CSV, não HTML
 		h.logger.ErrorContext(r.Context(), "escrevendo csv", slog.Any("error", err))
 	}
 }

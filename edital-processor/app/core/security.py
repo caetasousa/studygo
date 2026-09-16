@@ -30,18 +30,18 @@ def require_service_token(
 ) -> None:
     """FastAPI dependency: reject a call without the shared service token.
 
-    When no token is configured the guard is disabled — useful for local unit
-    runs, never for a deployed service (compose always sets it).
+    Sem token configurado, recusa também. Antes ficava aberto, para facilitar
+    o teste local — mas um serviço que fala com o Gemini e escreve no volume
+    das provas não pode acabar sem porteiro porque faltou uma variável de
+    ambiente. Quem testa passa o token que vai usar (tests/unit/test_api.py).
     """
     expected = settings.service_token
-    if not expected:
-        return
 
     presented = ""
     if authorization and authorization.lower().startswith("bearer "):
         presented = authorization[7:]
 
-    if not secrets.compare_digest(presented, expected):
+    if not expected or not secrets.compare_digest(presented, expected):
         raise Unauthorized("invalid or missing service token")
 
 

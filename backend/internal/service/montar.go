@@ -173,7 +173,7 @@ func montarConcurso(c concurso.Concurso) ConcursoDoPlano {
 			Nome:        d.Nome,
 			Bloco:       string(d.Bloco),
 			Peso:        d.Peso,
-			Cor:         i % concurso.TotalCoresDisciplinas,
+			Cor:         concurso.Cor(i),
 			CadernoURL:  d.CadernoURL,
 			NotebookURL: d.NotebookURL,
 			Temas:       temas,

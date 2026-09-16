@@ -195,7 +195,9 @@ func (h *ProvaHandler) Arquivo(w http.ResponseWriter, r *http.Request) {
 	// do catálogo), então o cache é curto e só do navegador.
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, caminho)
+	// O caminho sai de um id conferido por uuid.Parse (provafiles.Caminho):
+	// não há como um ".." chegar até aqui.
+	http.ServeFile(w, r, caminho) //nolint:gosec // caminho derivado de UUID
 }
 
 // --- curadoria --------------------------------------------------------------
@@ -515,7 +517,7 @@ func (h *ProvaHandler) AtualizarGabarito(w http.ResponseWriter, r *http.Request)
 // enquadramento, e recusa com 413 o que passar.
 func (h *ProvaHandler) lerMultipart(w http.ResponseWriter, r *http.Request, arquivos int64) error {
 	r.Body = http.MaxBytesReader(w, r.Body, arquivos*h.maxPDF+(1<<20))
-	if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil {
+	if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil { //nolint:gosec // corpo limitado na linha acima
 		return traduzirCorpo(err)
 	}
 

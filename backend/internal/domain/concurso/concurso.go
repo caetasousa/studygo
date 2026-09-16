@@ -48,6 +48,10 @@ const (
 	TotalCoresDisciplinas = 13
 )
 
+// Cor é a casa da paleta de uma disciplina, pela posição dela na lista do
+// concurso. A conta é a mesma em toda tela que pinta matéria.
+func Cor(posicao int) int { return posicao % TotalCoresDisciplinas }
+
 // Bloco é o grupo de questões a que uma disciplina pertence.
 type Bloco string
 

@@ -277,10 +277,12 @@ func paraInts(xs []int32) []int {
 	return out
 }
 
+// Posições e ordens do domínio, sempre pequenas: a conversão não tem como
+// estourar o int32 do Postgres.
 func paraInt32s(xs []int) []int32 {
 	out := make([]int32, len(xs))
 	for i, x := range xs {
-		out[i] = int32(x)
+		out[i] = int32(x) //nolint:gosec // posição do domínio, não entrada externa
 	}
 
 	return out

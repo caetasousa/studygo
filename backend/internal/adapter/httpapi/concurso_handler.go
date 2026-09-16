@@ -204,7 +204,7 @@ func lerUploadEdital(w http.ResponseWriter, r *http.Request) (port.EditalUpload,
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		r.Body = http.MaxBytesReader(w, r.Body, maxCorpoEdital)
 
-		if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil {
+		if err := r.ParseMultipartForm(maxMemoriaUpload); err != nil { //nolint:gosec // corpo limitado na linha acima
 			return port.EditalUpload{}, extras, traduzirCorpo(err)
 		}
 

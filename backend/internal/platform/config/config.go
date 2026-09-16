@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -80,14 +81,13 @@ func Load() (Config, error) {
 		EditalProcessorToken: os.Getenv("EDITAL_PROCESSOR_TOKEN"),
 		Versao:               getEnv("APP_VERSAO", "dev"),
 		Deploy:               os.Getenv("APP_DEPLOY"),
-		Argon2: Argon2Params{
-			Memory:      uint32(getEnvInt("ARGON2_MEMORY_KIB", 19*1024)),
-			Iterations:  uint32(getEnvInt("ARGON2_ITERATIONS", 2)),
-			Parallelism: uint8(getEnvInt("ARGON2_PARALLELISM", 1)),
-			SaltLength:  16,
-			KeyLength:   32,
-		},
 	}
+
+	argon2, err := lerArgon2()
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Argon2 = argon2
 
 	accessTTL, err := time.ParseDuration(getEnv("JWT_ACCESS_TTL", "15m"))
 	if err != nil {
@@ -182,6 +182,42 @@ func getEnv(key, fallback string) string {
 	}
 
 	return fallback
+}
+
+// lerArgon2 lê os parâmetros do hash de senha, recusando o que não cabe no
+// tipo que a biblioteca espera. Convertido sem conferir, "ARGON2_MEMORY_KIB=-1"
+// viraria 4 bilhões de KiB e o servidor subiria pedindo memória que não existe.
+func lerArgon2() (Argon2Params, error) {
+	memoria, err := inteiroNaFaixa("ARGON2_MEMORY_KIB", 19*1024, 8, math.MaxUint32)
+	if err != nil {
+		return Argon2Params{}, err
+	}
+	iteracoes, err := inteiroNaFaixa("ARGON2_ITERATIONS", 2, 1, math.MaxUint32)
+	if err != nil {
+		return Argon2Params{}, err
+	}
+	paralelismo, err := inteiroNaFaixa("ARGON2_PARALLELISM", 1, 1, math.MaxUint8)
+	if err != nil {
+		return Argon2Params{}, err
+	}
+
+	// As três faixas foram conferidas em inteiroNaFaixa, logo acima.
+	return Argon2Params{
+		Memory:      uint32(memoria),    //nolint:gosec // faixa conferida
+		Iterations:  uint32(iteracoes),  //nolint:gosec // faixa conferida
+		Parallelism: uint8(paralelismo), //nolint:gosec // faixa conferida
+		SaltLength:  16,
+		KeyLength:   32,
+	}, nil
+}
+
+func inteiroNaFaixa(chave string, padrao, minimo, maximo int) (int, error) {
+	v := getEnvInt(chave, padrao)
+	if v < minimo || v > maximo {
+		return 0, fmt.Errorf("%s = %d: precisa estar entre %d e %d", chave, v, minimo, maximo)
+	}
+
+	return v, nil
 }
 
 func getEnvInt(key string, fallback int) int {

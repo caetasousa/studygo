@@ -76,7 +76,8 @@ func (h *Argon2Hasher) Conferir(password, encodedHash string) (bool, error) {
 		params.Iterations,
 		params.Memory,
 		params.Parallelism,
-		uint32(len(hash)),
+		// O hash decodificado tem 32 bytes (KeyLength); len nunca estoura.
+		uint32(len(hash)), //nolint:gosec // tamanho de hash, não entrada externa
 	)
 
 	return subtle.ConstantTimeCompare(hash, other) == 1, nil

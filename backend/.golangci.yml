@@ -35,6 +35,9 @@ linters:
     # Chamada dentro de laço que ignora o erro anterior, e afins.
     - nilerr
     - noctx
+    # O que o vet não vê e aqui importa: permissão de arquivo, aleatoriedade
+    # fraca, caminho de arquivo montado com entrada de fora.
+    - gosec
 
   settings:
     errcheck:
@@ -57,6 +60,8 @@ linters:
         linters:
           - errcheck
           - noctx
+          # Permissão de diretório temporário e caminho de fixture.
+          - gosec
 
 formatters:
   enable:

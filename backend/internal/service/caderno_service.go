@@ -82,7 +82,7 @@ func cadernoPorDisciplina(
 		out = append(out, CadernoDaDisciplina{
 			Codigo: d.Codigo,
 			Nome:   d.Nome,
-			Cor:    i % concurso.TotalCoresDisciplinas,
+			Cor:    concurso.Cor(i),
 			Itens:  temas,
 		})
 	}

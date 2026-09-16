@@ -10,6 +10,8 @@ services:
   frontend:
     image: "{{ frontend_image }}"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - backend
     ports:
@@ -18,6 +20,8 @@ services:
   backend:
     image: "{{ backend_image }}"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 {% if mem_limit_backend is defined %}
     # Teto de memória: os dois ambientes dividem a mesma VPS, e sem limite um
     # vazamento em homologação derruba a produção por OOM.
@@ -47,6 +51,8 @@ services:
   edital-processor:
     image: "{{ edital_processor_image }}"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 {% if mem_limit_processor is defined %}
     mem_limit: "{{ mem_limit_processor }}"
 {% endif %}
@@ -68,6 +74,8 @@ services:
     volumes:
       - provas_data:/var/lib/provas
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
@@ -87,6 +95,8 @@ services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
 {% if mem_limit_postgres is defined %}
     mem_limit: "{{ mem_limit_postgres }}"
 {% endif %}

@@ -37,7 +37,9 @@ func (s Store) Guardar(id string, conteudo []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(s.Root, 0o770); err != nil {
+	// 0770, e não 0750: o processador roda com outro usuário, no mesmo grupo
+	// (ver o setgid 2770 nos Dockerfiles).
+	if err := os.MkdirAll(s.Root, 0o770); err != nil { //nolint:gosec // grupo compartilhado
 		return err
 	}
 
@@ -49,12 +51,12 @@ func (s Store) Guardar(id string, conteudo []byte) error {
 	defer os.Remove(tmp)
 
 	if _, err := f.Write(conteudo); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	// 0660 porque o processador roda com outro usuário, no mesmo grupo.
 	if err := f.Chmod(0o660); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
