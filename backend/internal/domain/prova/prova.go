@@ -362,8 +362,8 @@ const (
 	folgaDoTrecho = 0.5
 )
 
-// ETrecho diz se a região é um trecho marcado pelo curador.
-func ETrecho(o Origem) bool { return strings.HasPrefix(o.Regiao, prefixoTrecho) }
+// eTrecho diz se a região é um trecho marcado pelo curador.
+func eTrecho(o Origem) bool { return strings.HasPrefix(o.Regiao, prefixoTrecho) }
 
 // NovoTrecho é a região que relê a questão `numero` no retângulo que o curador
 // marcou. Falso se o retângulo não cabe numa região da mesma página: é dentro
@@ -410,7 +410,7 @@ func (i Importacao) TrechoPendente() (Origem, int, bool) {
 	t := i.Regioes[len(i.Regioes)-1]
 	n, err := strconv.Atoi(strings.TrimPrefix(t.Regiao, prefixoTrecho))
 
-	return t, n, ETrecho(t) && err == nil && n > 0
+	return t, n, eTrecho(t) && err == nil && n > 0
 }
 
 // AplicarTrecho põe na questão `numero` o que a leitura do trecho marcado

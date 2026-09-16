@@ -4,10 +4,13 @@
 *.retry
 .vault_pass
 
+# As duas primeiras linhas guardam o que sobrou do formato antigo de
+# inventário (um só, sem ambiente) na máquina de quem provisionou antes dele.
 inventory/hosts.ini
+inventory/group_vars/vps/secrets.yml
+
 inventory/*/hosts.ini
 !inventory/*/hosts.ini.example
 
-inventory/group_vars/vps/secrets.yml
 inventory/*/group_vars/app/secrets.yml
 !inventory/*/group_vars/app/secrets.yml.example

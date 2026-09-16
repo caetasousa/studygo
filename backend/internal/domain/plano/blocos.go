@@ -284,10 +284,6 @@ func AproveitamentoDoTema(
 	return 0, false
 }
 
-// maxTemasRevisao caps how many topics one review block names. Past a handful
-// the block stops being a plan and becomes a list nobody works through.
-const maxTemasRevisao = 4
-
 // ordinais names the study blocks of a day; past the sixth the number is used.
 var ordinais = []string{"1º bloco", "2º bloco", "3º bloco", "4º bloco", "5º bloco", "6º bloco"}
 

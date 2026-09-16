@@ -411,17 +411,6 @@ func (c *Concurso) MarcoPorID(id uuid.UUID) *Marco {
 	return nil
 }
 
-// CorDisciplina mapeia a posição de uma disciplina para uma casa da paleta.
-func (c *Concurso) CorDisciplina(codigo string) int {
-	for i, d := range c.Disciplinas {
-		if d.Codigo == codigo {
-			return i % TotalCoresDisciplinas
-		}
-	}
-
-	return 0
-}
-
 func linhasLimpas(xs []string) []string {
 	out := make([]string, 0, len(xs))
 

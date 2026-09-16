@@ -119,19 +119,6 @@ func TotaisDoDia(
 	return horas, questoes, acertos
 }
 
-// ConcluidasNoDia conta quantas atividades do dia estão concluídas.
-func ConcluidasNoDia(atividades []Atividade, registros Registros, dt time.Time) int {
-	n := 0
-
-	for _, a := range AtividadesDoDia(atividades, dt) {
-		if registros.Concluida(a.ID) {
-			n++
-		}
-	}
-
-	return n
-}
-
 // AcertosValidos corta acertos maiores que as questões, que é a única
 // combinação que quebra a estatística. Devolve nil quando não há acertos.
 func AcertosValidos(questoes, acertos *int) *int {

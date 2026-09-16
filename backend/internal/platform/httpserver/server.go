@@ -19,16 +19,8 @@ func WithHandler(h http.Handler) Option {
 	return func(s *Server) { s.httpServer.Handler = h }
 }
 
-func WithReadTimeout(d time.Duration) Option {
-	return func(s *Server) { s.httpServer.ReadTimeout = d }
-}
-
 func WithWriteTimeout(d time.Duration) Option {
 	return func(s *Server) { s.httpServer.WriteTimeout = d }
-}
-
-func WithShutdownTimeout(d time.Duration) Option {
-	return func(s *Server) { s.shutdownTimeout = d }
 }
 
 func New(addr string, opts ...Option) *Server {

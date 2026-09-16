@@ -10,7 +10,7 @@ import (
 	"studygo/internal/domain/plano"
 )
 
-// fixtureConcurso mirrors the JS constants dumped by scratchpad/gen_golden.mjs.
+// fixtureConcurso mirrors the JS constants dumped by scripts/seed/gen_golden.mjs.
 type fixtureConcurso struct {
 	Disciplinas []struct {
 		Codigo         string   `json:"codigo"`

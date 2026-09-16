@@ -377,16 +377,6 @@ func PorID(atividades []Atividade, id uuid.UUID) (Atividade, bool) {
 	return Atividade{}, false
 }
 
-// MinutosPlanejados soma os minutos planejados de um dia.
-func MinutosPlanejados(atividades []Atividade, dt time.Time, padraoMin int) int {
-	total := 0
-	for _, a := range doDia(atividades, dt) {
-		total += a.Duracao(padraoMin)
-	}
-
-	return total
-}
-
 // AplicarNosDias preenche os itens de cada dia a partir do cronograma gravado.
 // É a única direção que existe agora: o que está guardado descreve o dia, sem
 // reconciliação com nada.

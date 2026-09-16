@@ -266,8 +266,3 @@ func parseName(entry string) (int, string, error) {
 // ErrNoRows re-exports pgx.ErrNoRows so adapters can match it without importing
 // pgx directly through the port layer.
 var ErrNoRows = pgx.ErrNoRows
-
-// IsNoRows reports whether err is a "no rows" result.
-func IsNoRows(err error) bool {
-	return errors.Is(err, pgx.ErrNoRows)
-}

@@ -132,7 +132,6 @@ usuarios ──┬── refresh_tokens
            │               ├── marcos
            │               └── conteudo_programatico
            └── planos ─────┬── plano_disciplinas ──► disciplinas
-                           ├── plano_ciclo
                            ├── marco_checks ──► marcos
                            ├── anotacoes ──► disciplinas
                            ├── registros_dia

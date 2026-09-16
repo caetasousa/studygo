@@ -62,15 +62,17 @@ cd ansible
 # autoriza — não troque para studygo_deploy sem reprovisionar o servidor.
 ssh-keygen -t ed25519 -f ~/.ssh/annygo_deploy -N "" -C "annygo-deploy"
 
-# 2. inventário e segredos (arquivos .example → reais; os reais são gitignored)
-cp inventory/hosts.ini.example inventory/hosts.ini
+# 2. inventário e segredos, um por ambiente (staging e production); os
+#    arquivos .example viram os reais, que são gitignored
+cp inventory/production/hosts.ini.example inventory/production/hosts.ini
 #   edite: ansible_host = IP da VPS
 
-cp inventory/group_vars/vps/secrets.yml.example inventory/group_vars/vps/secrets.yml
+cp inventory/production/group_vars/app/secrets.yml.example \
+   inventory/production/group_vars/app/secrets.yml
 #   edite: letsencrypt_email, jwt_secret, postgres_password
 #   opcional: gemini_api_key + edital_processor_token (liga a importação de edital por IA)
 
-#   ajuste o domínio em inventory/group_vars/vps/main.yml (app_domain)
+#   ajuste o domínio em inventory/production/group_vars/app/main.yml (app_domain)
 
 # 3. cria o usuário sudo com sua chave (pede a senha de root)
 ansible-playbook bootstrap.yml -e ansible_user=root --ask-pass
@@ -168,9 +170,12 @@ que o CSV não leva é a conta em si (cadastre de novo).
 
 | | Onde | Arquivo | Contém |
 |---|---|---|---|
-| 🗒️ | Inventário | `ansible/inventory/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
-| 🔐 | Segredos | `ansible/inventory/group_vars/vps/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token`, `provas_curadores` |
-| 📄 | Não-secreto | `ansible/inventory/group_vars/vps/main.yml` (versionado) | `app_domain`, portas, nome do banco |
+| 🗒️ | Inventário | `ansible/inventory/<ambiente>/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
+| 🔐 | Segredos | `ansible/inventory/<ambiente>/group_vars/app/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token`, `provas_curadores` |
+| 📄 | Não-secreto | `ansible/inventory/<ambiente>/group_vars/app/main.yml` (versionado) | `app_domain`, portas, nome do banco |
+
+`<ambiente>` é `staging` ou `production`: cada um tem inventário e segredos
+próprios, e nenhum comando escolhe um deles por omissão.
 
 ---
 

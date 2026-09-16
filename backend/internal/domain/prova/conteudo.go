@@ -523,23 +523,6 @@ func trigramas(s string) map[string]int {
 	return out
 }
 
-func contarFiguras(q Questao) int {
-	n := 0
-	contar := func(bs []Bloco) {
-		for _, b := range bs {
-			if b.Tipo == "imagem" {
-				n++
-			}
-		}
-	}
-	contar(q.Blocos)
-	for _, a := range q.Alternativas {
-		contar(a.Blocos)
-	}
-
-	return n
-}
-
 func textoDosBlocos(bs []Bloco) string {
 	var s strings.Builder
 	for _, b := range bs {
