@@ -16,6 +16,7 @@ import (
 	"slices"
 
 	"studygo/internal/domain/prova"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )
@@ -86,6 +87,44 @@ func (s *ProvaService) ExportarProva(ctx context.Context, usuario, provaID strin
 		if err := levar(id, "png"); err != nil {
 			return ProvaParaLevar{}, err
 		}
+	}
+
+	return out, nil
+}
+
+// ExportarCatalogo junta as provas para levar: a pedida, ou todas as do
+// catálogo, num pacote só.
+func (s *ProvaService) ExportarCatalogo(ctx context.Context, usuario, provaID string) ([]ProvaParaLevar, error) {
+	if err := s.autorizar(usuario); err != nil {
+		return nil, err
+	}
+	ids := []string{provaID}
+	if provaID == "" {
+		ids = nil
+		for offset := 0; ; offset += PorPaginaCatalogo {
+			pagina, err := s.Repo.Catalogo(ctx, port.FiltroCatalogo{Offset: offset, Limite: PorPaginaCatalogo})
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range pagina {
+				ids = append(ids, p.ID)
+			}
+			if len(pagina) < PorPaginaCatalogo {
+				break
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil, erroDeValidacao("não há prova publicada para exportar")
+	}
+
+	out := make([]ProvaParaLevar, 0, len(ids))
+	for _, id := range ids {
+		p, err := s.ExportarProva(ctx, usuario, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
 	}
 
 	return out, nil

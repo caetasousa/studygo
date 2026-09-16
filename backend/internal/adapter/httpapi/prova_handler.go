@@ -215,35 +215,48 @@ func (h *ProvaHandler) RenomearProva(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ExportarProva baixa o pacote da prova para levar a outro ambiente.
-func (h *ProvaHandler) ExportarProva(w http.ResponseWriter, r *http.Request) {
+// ExportarProvas baixa num .zip só as provas do catálogo — todas, ou a de
+// ?prova= — para levar a outro ambiente.
+func (h *ProvaHandler) ExportarProvas(w http.ResponseWriter, r *http.Request) {
 	usuario, ok := h.usuario(w, r)
 	if !ok {
 		return
 	}
-	id, ok := h.idDaRota(w, r)
-	if !ok {
-		return
+	provaID := r.URL.Query().Get("prova")
+	if provaID != "" {
+		if _, err := uuid.Parse(provaID); err != nil {
+			writeError(w, r, h.logger, errRequisicaoInvalida)
+			return
+		}
 	}
 
-	p, err := h.provas.ExportarProva(r.Context(), usuario, id)
+	provas, err := h.provas.ExportarCatalogo(r.Context(), usuario, provaID)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
+	nome := "studygo-provas-" + time.Now().Format("2006-01-02") + ".zip"
+	if provaID != "" {
+		nome = nomeDoPacote(provas[0].Conteudo)
+	}
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+nomeDoPacote(p.Conteudo)+`"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+nome+`"`)
 	w.Header().Set("Cache-Control", "no-store")
+	// Dez cadernos passam de 60 MiB: pela rede do celular, sem o nginx na
+	// frente, o prazo padrão de escrita não daria.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(15 * time.Minute))
 	// Com a resposta começada não dá mais para mudar o status: o erro fica no
-	// log, e o .zip chega truncado — o importador o recusa.
-	if err := escreverPacote(w, p, time.Now()); err != nil {
-		h.logger.ErrorContext(r.Context(), "escrevendo pacote de prova", "prova", id, "erro", err)
+	// log, e o .zip chega truncado — o navegador não o consegue ler.
+	if err := escreverPacote(w, provas, time.Now()); err != nil {
+		h.logger.ErrorContext(r.Context(), "escrevendo pacote de provas", "erro", err)
 	}
 }
 
-// ImportarPacote publica aqui o pacote vindo de outro ambiente: multipart com
-// "pacote", um .zip do tamanho de um caderno e seu gabarito.
+// ImportarPacote publica aqui uma prova do pacote exportado em outro
+// ambiente. O navegador abre o .zip e envia uma pasta por vez — multipart com
+// "prova" (o prova.json) e "arquivos" (os PDFs e as figuras, pelo nome) —,
+// porque o pacote inteiro passaria do limite de envio.
 func (h *ProvaHandler) ImportarPacote(w http.ResponseWriter, r *http.Request) {
 	usuario, ok := h.usuario(w, r)
 	if !ok {
@@ -259,18 +272,33 @@ func (h *ProvaHandler) ImportarPacote(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
 
-	f, _, err := r.FormFile("pacote")
+	f, _, err := r.FormFile("prova")
 	if err != nil {
 		writeError(w, r, h.logger, errRequisicaoInvalida)
 		return
 	}
 	defer f.Close()
-	dados, err := lerLimitado(f, 2*h.maxPDF)
+	manifesto, err := lerLimitado(f, maxManifesto)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
-	pct, err := lerPacote(dados, h.maxPDF)
+	arquivos := map[string][]byte{}
+	for _, cabecalho := range r.MultipartForm.File["arquivos"] {
+		a, err := cabecalho.Open()
+		if err != nil {
+			writeError(w, r, h.logger, errRequisicaoInvalida)
+			return
+		}
+		dados, err := lerLimitado(a, h.maxPDF)
+		_ = a.Close()
+		if err != nil {
+			writeError(w, r, h.logger, err)
+			return
+		}
+		arquivos[cabecalho.Filename] = dados
+	}
+	pct, err := provaDoEnvio(manifesto, arquivos)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return

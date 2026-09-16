@@ -3,10 +3,14 @@ package httpapi
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -56,22 +60,100 @@ func provaParaLevar(t *testing.T) service.ProvaParaLevar {
 	}
 }
 
-// O que sai de um ambiente entra no outro igual: conteúdo, regiões, nomes,
-// PDFs e figuras.
-func TestPacoteDeProva_IdaEVolta(t *testing.T) {
+// entradasDoZip lê o .zip como o navegador lê: nome → conteúdo, sem descompactar.
+func entradasDoZip(t *testing.T, dados []byte) map[string][]byte {
+	t.Helper()
+
+	zr, err := zip.NewReader(bytes.NewReader(dados), int64(len(dados)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string][]byte{}
+	for _, f := range zr.File {
+		if f.Method != zip.Store {
+			t.Errorf("%s está comprimido; o navegador lê o pacote sem descompactar", f.Name)
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		conteudo, _ := io.ReadAll(rc)
+		_ = rc.Close()
+		out[f.Name] = conteudo
+	}
+
+	return out
+}
+
+// Um arquivo só, com uma pasta por prova e as figuras com nome que se reconhece.
+func TestPacoteDeProvas_UmZipComUmaPastaPorProva(t *testing.T) {
 	t.Parallel()
 
 	p := provaParaLevar(t)
-	var zip bytes.Buffer
-	if err := escreverPacote(&zip, p, time.Unix(0, 0)); err != nil {
+	outra := provaParaLevar(t)
+	outra.GabaritoArquivo = ""
+	var buf bytes.Buffer
+	if err := escreverPacote(&buf, []service.ProvaParaLevar{p, outra}, time.Unix(0, 0)); err != nil {
 		t.Fatal(err)
 	}
 
-	pct, err := lerPacote(zip.Bytes(), 1<<20)
-	if err != nil {
-		t.Fatalf("lerPacote: %v", err)
+	entradas := entradasDoZip(t, buf.Bytes())
+	nomes := slices.Sorted(func(yield func(string) bool) {
+		for k := range entradas {
+			if !yield(k) {
+				return
+			}
+		}
+	})
+	figura := "figuras/questao-44-" + figuraDoPacote + ".png"
+	quer := []string{
+		"LEIA-ME.txt",
+		"tjce-2026-e05-2/figuras/questao-44-" + figuraDoPacote + ".png",
+		"tjce-2026-e05-2/prova.json",
+		"tjce-2026-e05-2/prova.pdf",
+		"tjce-2026-e05/" + figura,
+		"tjce-2026-e05/gabarito.pdf",
+		"tjce-2026-e05/prova.json",
+		"tjce-2026-e05/prova.pdf",
 	}
-	if !reflect.DeepEqual(rascunhoParaDTO(pct.Conteudo), rascunhoParaDTO(rascunhoSemExtracoes(p.Conteudo))) {
+	if !slices.Equal(nomes, quer) {
+		t.Fatalf("entradas =\n%s\nquer\n%s", strings.Join(nomes, "\n"), strings.Join(quer, "\n"))
+	}
+	if !bytes.Equal(entradas["tjce-2026-e05/"+figura], pngMinimo) || !bytes.Equal(entradas["tjce-2026-e05/prova.pdf"], pdfMinimo) {
+		t.Fatal("a figura ou o PDF não são os do volume")
+	}
+}
+
+// O que sai de um ambiente entra no outro igual: conteúdo, regiões, nomes,
+// PDFs e figuras.
+func TestPacoteDeProvas_IdaEVolta(t *testing.T) {
+	t.Parallel()
+
+	p := provaParaLevar(t)
+	var buf bytes.Buffer
+	if err := escreverPacote(&buf, []service.ProvaParaLevar{p}, time.Unix(0, 0)); err != nil {
+		t.Fatal(err)
+	}
+
+	// O navegador manda a pasta: o prova.json e os arquivos pelo nome, sem a pasta.
+	envio := map[string][]byte{}
+	var manifesto []byte
+	for nome, conteudo := range entradasDoZip(t, buf.Bytes()) {
+		switch {
+		case nome == "tjce-2026-e05/prova.json":
+			manifesto = conteudo
+		case strings.HasPrefix(nome, "tjce-2026-e05/"):
+			envio[path.Base(nome)] = conteudo
+		}
+	}
+	pct, err := provaDoEnvio(manifesto, envio)
+	if err != nil {
+		t.Fatalf("provaDoEnvio: %v", err)
+	}
+
+	semExtracoes := p.Conteudo
+	semExtracoes.Extracoes = nil
+	if !reflect.DeepEqual(rascunhoParaDTO(pct.Conteudo), rascunhoParaDTO(semExtracoes)) {
 		t.Fatalf("conteúdo mudou na ida e volta:\n%+v\n%+v", pct.Conteudo, p.Conteudo)
 	}
 	if !reflect.DeepEqual(pct.Regioes, p.Regioes) || pct.NomeDocumento != p.NomeDocumento || pct.NomeGabarito != p.NomeGabarito {
@@ -85,52 +167,24 @@ func TestPacoteDeProva_IdaEVolta(t *testing.T) {
 	}
 }
 
-// As extrações são o registro das chamadas do ambiente de lá: o rascunho que
-// chega não as traz (rascunhoDoDTO as ignora, como no salvar).
-func rascunhoSemExtracoes(r prova.Rascunho) prova.Rascunho {
-	r.Extracoes = nil
-	return r
-}
-
-func zipCom(t *testing.T, arquivos map[string][]byte) []byte {
-	t.Helper()
-
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for nome, conteudo := range arquivos {
-		f, err := zw.Create(nome)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, _ = f.Write(conteudo)
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	return buf.Bytes()
-}
-
-// Só entra o que o formato prevê: caminho forjado, arquivo gigante, formato de
-// outra versão e lixo recusam o pacote com o motivo.
-func TestPacoteDeProva_RecusaOQueNaoEPacote(t *testing.T) {
+// Só entra o que o formato prevê: nome forjado, formato de outra versão e lixo
+// recusam o envio com o motivo.
+func TestPacoteDeProvas_RecusaOQueNaoEProva(t *testing.T) {
 	t.Parallel()
 
-	manifesto := []byte(`{"formato":"studygo.prova/1","prova":{},"documento":"` + documentoDoPacote + `.pdf"}`)
+	manifesto, _ := json.Marshal(provaDoPacoteDTO{Formato: formatoDoPacote, PDFDaProva: "prova.pdf"})
 	casos := map[string]struct {
-		dados []byte
-		quer  string
+		manifesto []byte
+		arquivos  map[string][]byte
+		quer      string
 	}{
-		"não é zip":          {[]byte("não sou zip"), "não é um .zip"},
-		"sem manifesto":      {zipCom(t, map[string][]byte{"arquivos/" + documentoDoPacote + ".pdf": pdfMinimo}), "não tem manifest.json"},
-		"caminho forjado":    {zipCom(t, map[string][]byte{"manifest.json": manifesto, "../../etc/passwd": []byte("x")}), "não é de prova"},
-		"extensão estranha":  {zipCom(t, map[string][]byte{"manifest.json": manifesto, "arquivos/" + documentoDoPacote + ".exe": []byte("x")}), "não é de prova"},
-		"arquivo grande":     {zipCom(t, map[string][]byte{"manifest.json": manifesto, "arquivos/" + documentoDoPacote + ".pdf": bytes.Repeat([]byte("a"), 2048)}), "tamanho máximo"},
-		"outro formato":      {zipCom(t, map[string][]byte{"manifest.json": []byte(`{"formato":"studygo.prova/9"}`)}), "formato de pacote desconhecido"},
-		"manifesto quebrado": {zipCom(t, map[string][]byte{"manifest.json": []byte(`{`)}), "não é válido"},
+		"caminho forjado":    {manifesto, map[string][]byte{"../../etc/passwd": []byte("x")}, "não é de prova"},
+		"executável":         {manifesto, map[string][]byte{"prova.exe": []byte("x")}, "não é de prova"},
+		"outro formato":      {[]byte(`{"formato":"studygo.prova/1"}`), nil, "formato de pacote desconhecido"},
+		"manifesto quebrado": {[]byte(`{`), nil, "não é válido"},
 	}
 	for nome, c := range casos {
-		_, err := lerPacote(c.dados, 1024)
+		_, err := provaDoEnvio(c.manifesto, c.arquivos)
 		var v service.ErrValidacao
 		if !errors.As(err, &v) || !strings.Contains(v.Msg, c.quer) {
 			t.Errorf("%s: err = %v; quer recusa com %q", nome, err, c.quer)
@@ -150,15 +204,16 @@ func TestNomeDoPacote(t *testing.T) {
 	}
 }
 
-// O manifesto é o que um ambiente manda ao outro: contrato.
+// O prova.json é o que um ambiente manda ao outro: contrato.
 func TestContratoHTTP_PacoteDeProva(t *testing.T) {
 	t.Parallel()
 
 	p := provaParaLevar(t)
-	m := pacoteDeProvaDTO{
+	m := provaDoPacoteDTO{
 		Formato: formatoDoPacote, ExportadoEm: time.Unix(0, 0), Prova: rascunhoParaDTO(p.Conteudo),
-		Regioes: origensParaDTO(p.Regioes), Documento: documentoDoPacote + ".pdf", Gabarito: gabaritoDoPacote + ".pdf",
+		Regioes: origensParaDTO(p.Regioes), PDFDaProva: "prova.pdf", PDFDoGabarito: "gabarito.pdf",
 		NomeDocumento: p.NomeDocumento, NomeGabarito: p.NomeGabarito,
+		Figuras: map[string]string{figuraDoPacote: "questao-44-" + figuraDoPacote + ".png"},
 	}
 
 	compararComGolden(t, "prova_pacote.json", forma(t, m))

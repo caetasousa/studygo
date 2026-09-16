@@ -11,6 +11,7 @@
 	import { corDaMateria } from '$lib/provas/resolucao';
 	import { lerRespostas } from '$lib/provas/respostas';
 	import { comTitulo, semAProva, tituloDigitado } from '$lib/provas/curadoria';
+	import { provasDoPacote } from '$lib/provas/pacote';
 	import {
 		ajustarAoCatalogo,
 		enderecoDoTreino,
@@ -232,10 +233,11 @@
 		}
 	}
 
-	// Levar provas de um ambiente a outro: um .zip por prova, que é do tamanho
-	// do caderno — um só com todas passaria do limite de envio do servidor.
-	let pacotes = $state<HTMLInputElement | null>(null);
-	let levando = $state(false);
+	// Levar provas de um ambiente a outro: um .zip só com todas. Ao importar, o
+	// navegador o abre e envia uma prova por vez — o arquivo inteiro passaria do
+	// limite de envio do servidor.
+	let pacote = $state<HTMLInputElement | null>(null);
+	let levando = $state('');
 	let resultadosDosPacotes = $state<{ arquivo: string; ok: boolean; msg: string; provaId?: string }[]>([]);
 
 	function salvarNoAparelho(blob: Blob, nome: string) {
@@ -249,47 +251,51 @@
 
 	function exportarProva(i: ImportacaoResumo) {
 		void naLinha(i.id, async () => {
-			const { blob, nome } = await provasApi.exportarProva(i.provaId);
+			const { blob, nome } = await provasApi.exportarProvas(i.provaId);
 			salvarNoAparelho(blob, nome);
 		});
 	}
 
 	async function exportarTodas() {
-		levando = true;
-		erro = '';
+		levando = `Preparando o .zip com ${provas.length} provas…`;
+		erroDosPacotes = '';
 		try {
-			for (const [k, p] of provas.entries()) {
-				const { blob, nome } = await provasApi.exportarProva(p.id);
-				salvarNoAparelho(blob, nome);
-				// Um de cada vez: o navegador bloqueia downloads em rajada.
-				if (k < provas.length - 1) await new Promise((r) => setTimeout(r, 800));
-			}
+			const { blob, nome } = await provasApi.exportarProvas();
+			salvarNoAparelho(blob, nome);
 		} catch (e) {
-			erro = e instanceof Error ? e.message : 'não consegui exportar';
+			erroDosPacotes = e instanceof Error ? e.message : 'não consegui exportar';
 		} finally {
-			levando = false;
+			levando = '';
 		}
 	}
 
-	async function importarPacotes() {
-		const arquivos = [...(pacotes?.files ?? [])];
-		if (!arquivos.length) return;
-		levando = true;
+	let erroDosPacotes = $state('');
+
+	async function importarPacote() {
+		const arquivo = pacote?.files?.[0];
+		if (!arquivo) return;
+		erroDosPacotes = '';
 		resultadosDosPacotes = [];
-		for (const arquivo of arquivos) {
-			try {
-				const p = await provasApi.importarPacote(arquivo);
-				resultadosDosPacotes = [
-					...resultadosDosPacotes,
-					{ arquivo: arquivo.name, ok: true, msg: `${p.orgao} ${p.ano} · ${p.cargoNome || p.cargo} publicada`, provaId: p.id }
-				];
-			} catch (e) {
-				const msg = e instanceof Error ? e.message : 'erro inesperado';
-				resultadosDosPacotes = [...resultadosDosPacotes, { arquivo: arquivo.name, ok: false, msg }];
+		try {
+			const lidas = await provasDoPacote(arquivo);
+			for (const [k, p] of lidas.entries()) {
+				levando = `Importando ${k + 1} de ${lidas.length}: ${p.pasta}…`;
+				try {
+					const r = await provasApi.importarProvaDoPacote(p);
+					resultadosDosPacotes = [
+						...resultadosDosPacotes,
+						{ arquivo: p.pasta, ok: true, msg: `${r.orgao} ${r.ano} · ${r.cargoNome || r.cargo} publicada`, provaId: r.id }
+					];
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : 'erro inesperado';
+					resultadosDosPacotes = [...resultadosDosPacotes, { arquivo: p.pasta, ok: false, msg }];
+				}
 			}
+		} catch (e) {
+			erroDosPacotes = e instanceof Error ? e.message : 'não consegui ler o pacote';
 		}
-		if (pacotes) pacotes.value = '';
-		levando = false;
+		if (pacote) pacote.value = '';
+		levando = '';
 		// O catálogo, as questões por matéria e a curadoria ganharam as publicadas.
 		[provas, avulsas, importacoes] = await Promise.all([
 			provasApi.todasAsProvas(),
@@ -500,22 +506,25 @@
 		<section>
 			<h2 class="grupo">Levar provas para outro ambiente</h2>
 			<p class="ajuda-curadoria">
-				Para passar o catálogo de staging para produção sem importar e revisar de novo: exporte aqui, e
-				importe os pacotes na curadoria do outro ambiente. Cada prova vira um .zip com as questões, as figuras e
-				o PDF; do outro lado, ela entra publicada. A que já estiver no catálogo de lá é recusada.
+				Para passar o catálogo de staging para produção sem importar e revisar de novo: exporte aqui um .zip só,
+				com uma pasta por prova — as questões, as figuras de cada questão e o PDF —, e importe esse mesmo arquivo
+				na curadoria do outro ambiente, sem descompactar. Lá, cada prova entra publicada; a que já estiver no
+				catálogo é recusada.
 			</p>
 			<div class="importar">
-				<button class="nbtn" type="button" disabled={levando || provas.length === 0} onclick={exportarTodas}>
+				<button class="nbtn" type="button" disabled={!!levando || provas.length === 0} onclick={exportarTodas}>
 					Exportar as {provas.length} provas publicadas
 				</button>
 				<label class="arquivo">
-					<span>Pacotes exportados <em>.zip, um por prova</em></span>
-					<input type="file" accept=".zip,application/zip" multiple bind:this={pacotes} />
+					<span>Pacote exportado <em>o .zip, inteiro</em></span>
+					<input type="file" accept=".zip,application/zip" bind:this={pacote} />
 				</label>
-				<button class="nbtn primario" type="button" disabled={levando} onclick={importarPacotes}>
-					{levando ? 'Levando…' : 'Importar pacotes'}
+				<button class="nbtn primario" type="button" disabled={!!levando} onclick={importarPacote}>
+					Importar provas
 				</button>
 			</div>
+			{#if levando}<p class="sub" role="status">{levando}</p>{/if}
+			{#if erroDosPacotes}<p class="erro" role="alert">{erroDosPacotes}</p>{/if}
 			{#if resultadosDosPacotes.length > 0}
 				<ul class="resultados" aria-live="polite">
 					{#each resultadosDosPacotes as r, k (k)}
@@ -586,8 +595,8 @@
 											<small>O nome do cargo no catálogo e aqui</small>
 										</button>
 										<button type="button" disabled={ocupado} onclick={() => exportarProva(i)}>
-											Exportar
-											<small>O .zip para importar em outro ambiente</small>
+											Exportar só esta
+											<small>O .zip dela para importar em outro ambiente</small>
 										</button>
 										<button type="button" class="perigo" disabled={ocupado} onclick={() => excluirProva(i)}>
 											Excluir prova

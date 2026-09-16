@@ -420,15 +420,18 @@ pendência. Na tela do aluno, cada questão mostra o seu texto num recolhível
 aberto; quem o fecha numa questão o encontra fechado nas outras que o usam.
 
 **A prova vai de um ambiente a outro por pacote.** Para estrear o catálogo em
-produção sem importar e revisar de novo, a curadoria exporta cada prova
-publicada num .zip (`GET /api/provas/pacotes/{id}`: manifest.json com o conteúdo
-da revisão em vigor, as regiões e os nomes, e arquivos/ com o PDF, o gabarito e
-as figuras) e importa do outro lado (`POST /api/provas/pacotes`). A prova entra
-publicada, sem fila nem conferência — já foi revisada lá —, mas não com pendência
-de integridade, nem se já está no catálogo ou se o caderno (pelo hash) já foi
-importado ali. As figuras mantêm o id, que é o que os blocos citam; o PDF ganha
-id novo. Um pacote por prova: com todas, o envio passaria do limite do nginx. O
-formato é contrato (`testdata/prova_pacote.json`, `formatoDoPacote`).
+produção sem importar e revisar de novo, a curadoria exporta as provas publicadas
+num .zip só (`GET /api/provas/pacotes`, ou `?prova=` para uma): um LEIA-ME e uma
+pasta por prova, com `prova.json` (conteúdo da revisão em vigor, regiões, nomes e
+o mapa das figuras), `prova.pdf`, `gabarito.pdf` e `figuras/questao-11-<uuid>.png`.
+Tudo sem compressão: o navegador lê o .zip sem biblioteca (`lib/provas/pacote.ts`)
+e importa uma prova por vez (`POST /api/provas/pacotes`, multipart com o
+prova.json e os arquivos), porque o pacote inteiro passaria do limite de envio do
+nginx. A prova entra publicada, sem fila nem conferência — já foi revisada lá —,
+mas não com pendência de integridade, nem se já está no catálogo ou se o caderno
+(pelo hash) já foi importado ali. As figuras mantêm o id, que é o que os blocos
+citam; o PDF ganha id novo. O prova.json é contrato (`testdata/prova_pacote.json`,
+`formatoDoPacote`).
 
 **A prova importada duas vezes sai pela curadoria.** "Excluir prova" apaga de vez
 a prova e tudo o que veio dela — revisões, questões, textos, gabarito, anotações e
@@ -578,7 +581,7 @@ GET       /api/provas/{id}                     ← ?numero= e ?disciplina= filtr
 GET       /api/provas/arquivos/{id}            ← PDF ou recorte
 POST      /api/provas/{id}/{revisar,reextrair,excluir}                     ← curadoria
 PATCH|DELETE /api/provas/{id}                     ← título; tirar do catálogo
-GET       /api/provas/pacotes/{id}   POST /api/provas/pacotes   ← levar a outro ambiente
+GET|POST  /api/provas/pacotes                   ← levar a outro ambiente (.zip; uma prova por envio)
 GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
 POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,materias}
 GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante

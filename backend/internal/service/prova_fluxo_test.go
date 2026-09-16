@@ -316,6 +316,10 @@ func TestProvas_SoCuradorEscreve(t *testing.T) {
 		"Retirar":       func() error { return s.Retirar(ctx, estudante, "x") },
 		"ExcluirProva":  func() error { return s.ExcluirProva(ctx, estudante, "x") },
 		"ExportarProva": func() error { _, err := s.ExportarProva(ctx, estudante, "x"); return err },
+		"ExportarCatalogo": func() error {
+			_, err := s.ExportarCatalogo(ctx, estudante, "")
+			return err
+		},
 		"ImportarPacote": func() error {
 			_, err := s.ImportarPacote(ctx, estudante, PacoteDeProva{Documento: pdfMinimo})
 			return err

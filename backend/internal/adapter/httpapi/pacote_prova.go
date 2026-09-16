@@ -1,18 +1,27 @@
 package httpapi
 
-// O pacote de prova: um .zip com manifest.json e arquivos/<uuid>.<pdf|png>.
-// É o formato que sai de um ambiente e entra em outro, então é contrato — o
-// snapshot em testdata/prova_pacote.json falha se o manifesto mudar.
+// O pacote de provas: um .zip só, com uma pasta por prova —
+//
+//	LEIA-ME.txt
+//	tjce-2026-e05/prova.json        o conteúdo publicado, as regiões e os nomes
+//	tjce-2026-e05/prova.pdf         o caderno original
+//	tjce-2026-e05/gabarito.pdf
+//	tjce-2026-e05/figuras/questao-11-<uuid>.png
+//
+// Tudo sem compressão (PDF e PNG já vêm comprimidos): o navegador lê o .zip
+// sem biblioteca e envia uma prova por vez, porque o arquivo inteiro passaria
+// do limite de envio do servidor. O prova.json é contrato entre ambientes — o
+// snapshot em testdata/prova_pacote.json falha se ele mudar.
 
 import (
 	"archive/zip"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,61 +29,101 @@ import (
 	"studygo/internal/service"
 )
 
-// formatoDoPacote muda quando o manifesto muda de um jeito que o importador
+// formatoDoPacote muda quando o prova.json muda de um jeito que o importador
 // antigo não entende.
-const formatoDoPacote = "studygo.prova/1"
+const formatoDoPacote = "studygo.prova/2"
 
-type pacoteDeProvaDTO struct {
+type provaDoPacoteDTO struct {
 	Formato     string      `json:"formato"`
 	ExportadoEm time.Time   `json:"exportadoEm"`
 	Prova       rascunhoDTO `json:"prova"`
 	Regioes     []origemDTO `json:"regioes"`
-	// Documento e Gabarito são nomes dentro de arquivos/, como "<uuid>.pdf".
-	Documento     string `json:"documento"`
-	Gabarito      string `json:"gabarito"`
+	// Os arquivos da pasta da prova, pelo nome.
+	PDFDaProva    string `json:"pdfDaProva"`
+	PDFDoGabarito string `json:"pdfDoGabarito"`
 	NomeDocumento string `json:"nomeDocumento"`
 	NomeGabarito  string `json:"nomeGabarito"`
+	// Figuras leva o id que os blocos citam ao arquivo em figuras/.
+	Figuras map[string]string `json:"figuras"`
 }
 
-var arquivoDoPacote = regexp.MustCompile(`^arquivos/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(pdf|png)$`)
+const leiaMe = `Provas exportadas do studygo.
 
-// Teto do manifest.json: sessenta questões com texto de apoio ficam longe de 1 MiB.
+Cada pasta é uma prova publicada: prova.json (questões, textos de apoio e
+gabarito), prova.pdf (o caderno original), gabarito.pdf e figuras/, com as
+imagens das questões pelo número.
+
+Para levar a outro ambiente, importe ESTE .zip inteiro em Questões > Curadoria >
+"Importar provas" no ambiente de destino. Não descompacte nem troque os nomes.
+`
+
+// Teto do prova.json: sessenta questões com texto de apoio ficam longe de 1 MiB.
 const maxManifesto = 8 << 20
 
-// escreverPacote grava o .zip. PDF e PNG já vêm comprimidos: vão sem compressão.
-func escreverPacote(w io.Writer, p service.ProvaParaLevar, agora time.Time) error {
-	manifesto := pacoteDeProvaDTO{
-		Formato: formatoDoPacote, ExportadoEm: agora.UTC(),
-		Prova: rascunhoParaDTO(p.Conteudo), Regioes: origensParaDTO(p.Regioes),
-		Documento: p.Documento + ".pdf", NomeDocumento: p.NomeDocumento, NomeGabarito: p.NomeGabarito,
-	}
-	if p.GabaritoArquivo != "" {
-		manifesto.Gabarito = p.GabaritoArquivo + ".pdf"
-	}
+// Nomes que um envio de prova pode ter: os PDFs e as figuras que o prova.json cita.
+var nomeNoEnvio = regexp.MustCompile(`^(?:prova\.pdf|gabarito\.pdf|[a-z0-9-]*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png)$`)
 
+// escreverPacote grava o .zip com as provas, cada uma na sua pasta.
+func escreverPacote(w io.Writer, provas []service.ProvaParaLevar, agora time.Time) error {
 	zw := zip.NewWriter(w)
-	f, err := zw.Create("manifest.json")
-	if err != nil {
+	if err := entradaDoZip(zw, "LEIA-ME.txt", strings.NewReader(leiaMe)); err != nil {
 		return err
 	}
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(manifesto); err != nil {
-		return err
-	}
-	for _, nome := range slices.Sorted(func(yield func(string) bool) {
-		for k := range p.Arquivos {
-			if !yield(k) {
-				return
+	pastas := map[string]bool{}
+	for _, p := range provas {
+		pasta := pastaDaProva(p.Conteudo, pastas)
+		manifesto := provaDoPacoteDTO{
+			Formato: formatoDoPacote, ExportadoEm: agora.UTC(),
+			Prova: rascunhoParaDTO(p.Conteudo), Regioes: origensParaDTO(p.Regioes),
+			PDFDaProva: "prova.pdf", NomeDocumento: p.NomeDocumento, NomeGabarito: p.NomeGabarito,
+			Figuras: map[string]string{},
+		}
+		if p.GabaritoArquivo != "" {
+			manifesto.PDFDoGabarito = "gabarito.pdf"
+		}
+		for _, id := range p.Conteudo.Arquivos() {
+			manifesto.Figuras[id] = nomeDaFigura(p.Conteudo, id)
+		}
+
+		json, err := json.MarshalIndent(manifesto, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := entradaDoZip(zw, pasta+"/prova.json", strings.NewReader(string(json))); err != nil {
+			return err
+		}
+		if err := copiarParaOZip(zw, pasta+"/prova.pdf", p.Arquivos[p.Documento+".pdf"]); err != nil {
+			return err
+		}
+		if p.GabaritoArquivo != "" {
+			if err := copiarParaOZip(zw, pasta+"/gabarito.pdf", p.Arquivos[p.GabaritoArquivo+".pdf"]); err != nil {
+				return err
 			}
 		}
-	}) {
-		if err := copiarParaOZip(zw, "arquivos/"+nome, p.Arquivos[nome]); err != nil {
-			return err
+		for _, id := range slices.Sorted(func(yield func(string) bool) {
+			for k := range manifesto.Figuras {
+				if !yield(k) {
+					return
+				}
+			}
+		}) {
+			if err := copiarParaOZip(zw, pasta+"/figuras/"+manifesto.Figuras[id], p.Arquivos[id+".png"]); err != nil {
+				return err
+			}
 		}
 	}
 
 	return zw.Close()
+}
+
+func entradaDoZip(zw *zip.Writer, nome string, conteudo io.Reader) error {
+	destino, err := zw.CreateHeader(&zip.FileHeader{Name: nome, Method: zip.Store, Modified: time.Now()})
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(destino, conteudo)
+
+	return err
 }
 
 func copiarParaOZip(zw *zip.Writer, nome, caminho string) error {
@@ -83,103 +132,78 @@ func copiarParaOZip(zw *zip.Writer, nome, caminho string) error {
 		return err
 	}
 	defer origem.Close()
-	destino, err := zw.CreateHeader(&zip.FileHeader{Name: nome, Method: zip.Store, Modified: time.Now()})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(destino, origem)
 
-	return err
+	return entradaDoZip(zw, nome, origem)
 }
 
-// lerPacote desmonta o .zip enviado. Só entra o que o formato prevê — nome
-// fora do padrão, arquivo acima do teto ou total acima do dobro dele recusam
-// o pacote inteiro: é o que impede caminho forjado e bomba de descompressão.
-func lerPacote(dados []byte, maxArquivo int64) (service.PacoteDeProva, error) {
-	zr, err := zip.NewReader(bytes.NewReader(dados), int64(len(dados)))
-	if err != nil {
-		return service.PacoteDeProva{}, errPacote("o arquivo não é um .zip de prova")
+// pastaDaProva é "tjce-2026-e05"; a segunda com o mesmo nome ganha "-2".
+func pastaDaProva(r prova.Rascunho, usadas map[string]bool) string {
+	base := strings.TrimSuffix(strings.TrimPrefix(nomeDoPacote(r), "prova-"), ".zip")
+	if base == "prova.zip" || base == "" {
+		base = "prova"
+	}
+	pasta := base
+	for n := 2; usadas[pasta]; n++ {
+		pasta = base + "-" + strconv.Itoa(n)
+	}
+	usadas[pasta] = true
+
+	return pasta
+}
+
+// nomeDaFigura diz de onde a figura é — "questao-11-<uuid>.png" ou
+// "texto-<uuid>.png" —, para quem abre o .zip reconhecer as imagens.
+func nomeDaFigura(r prova.Rascunho, id string) string {
+	usa := func(bs []prova.Bloco) bool {
+		return slices.ContainsFunc(bs, func(b prova.Bloco) bool { return b.Arquivo == id })
+	}
+	for _, q := range r.Questoes {
+		if usa(q.Blocos) || slices.ContainsFunc(q.Alternativas, func(a prova.Alternativa) bool { return usa(a.Blocos) }) {
+			return fmt.Sprintf("questao-%d-%s.png", q.Numero, id)
+		}
 	}
 
-	var manifesto []byte
-	arquivos := map[string][]byte{}
-	var total int64
-	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		limite := maxArquivo
-		if f.Name == "manifest.json" {
-			limite = maxManifesto
-		} else if !arquivoDoPacote.MatchString(f.Name) {
-			return service.PacoteDeProva{}, errPacote(fmt.Sprintf("o pacote tem um arquivo que não é de prova: %q", f.Name))
-		}
-		if f.UncompressedSize64 > uint64(limite) { //nolint:gosec // limite positivo
-			return service.PacoteDeProva{}, errPacote(fmt.Sprintf("%s passa do tamanho máximo", f.Name))
-		}
-		conteudo, err := lerDoZip(f, limite)
-		if err != nil {
-			return service.PacoteDeProva{}, err
-		}
-		if total += int64(len(conteudo)); total > 2*maxArquivo+maxManifesto {
-			return service.PacoteDeProva{}, errPacote("o pacote descompactado passa do tamanho máximo")
-		}
-		if f.Name == "manifest.json" {
-			manifesto = conteudo
-		} else {
-			arquivos[strings.TrimPrefix(f.Name, "arquivos/")] = conteudo
-		}
-	}
-	if manifesto == nil {
-		return service.PacoteDeProva{}, errPacote("o pacote não tem manifest.json")
-	}
+	return "texto-" + id + ".png"
+}
 
-	var m pacoteDeProvaDTO
+// provaDoEnvio monta a prova de uma pasta do pacote, que o navegador envia
+// como o prova.json e os arquivos pelo nome. Nome fora do que o formato prevê
+// recusa o envio.
+func provaDoEnvio(manifesto []byte, arquivos map[string][]byte) (service.PacoteDeProva, error) {
+	for nome := range arquivos {
+		if !nomeNoEnvio.MatchString(nome) {
+			return service.PacoteDeProva{}, errPacote(fmt.Sprintf("o envio tem um arquivo que não é de prova: %q", nome))
+		}
+	}
+	var m provaDoPacoteDTO
 	if err := json.Unmarshal(manifesto, &m); err != nil {
-		return service.PacoteDeProva{}, errPacote("o manifest.json do pacote não é válido")
+		return service.PacoteDeProva{}, errPacote("o prova.json não é válido")
 	}
 	if m.Formato != formatoDoPacote {
-		return service.PacoteDeProva{}, errPacote(fmt.Sprintf("formato de pacote desconhecido: %q", m.Formato))
+		return service.PacoteDeProva{}, errPacote(fmt.Sprintf(
+			"formato de pacote desconhecido: %q; exporte de novo do outro ambiente", m.Formato,
+		))
 	}
 
 	pct := service.PacoteDeProva{
-		Conteudo: rascunhoDoDTO(m.Prova), Documento: arquivos[m.Documento],
+		Conteudo: rascunhoDoDTO(m.Prova), Documento: arquivos[m.PDFDaProva],
 		NomeDocumento: m.NomeDocumento, NomeGabarito: m.NomeGabarito,
 		Figuras: map[string][]byte{},
 	}
-	if m.Gabarito != "" {
-		pct.Gabarito = arquivos[m.Gabarito]
+	if m.PDFDoGabarito != "" {
+		pct.Gabarito = arquivos[m.PDFDoGabarito]
 	}
 	for _, o := range m.Regioes {
 		pct.Regioes = append(pct.Regioes, origemDoDTO(o))
 	}
-	for nome, conteudo := range arquivos {
-		if id, ok := strings.CutSuffix(nome, ".png"); ok {
-			pct.Figuras[id] = conteudo
-		}
+	for id, nome := range m.Figuras {
+		pct.Figuras[id] = arquivos[nome]
 	}
 
 	return pct, nil
 }
 
-func lerDoZip(f *zip.File, limite int64) ([]byte, error) {
-	rc, err := f.Open()
-	if err != nil {
-		return nil, errPacote(fmt.Sprintf("não consegui ler %s do pacote", f.Name))
-	}
-	defer rc.Close()
-	conteudo, err := io.ReadAll(io.LimitReader(rc, limite+1))
-	if err != nil {
-		return nil, errPacote(fmt.Sprintf("não consegui ler %s do pacote", f.Name))
-	}
-	if int64(len(conteudo)) > limite {
-		return nil, errPacote(fmt.Sprintf("%s passa do tamanho máximo", f.Name))
-	}
-
-	return conteudo, nil
-}
-
-// nomeDoPacote é o nome do .zip baixado: "prova-trt-18-2023-l12.zip".
+// nomeDoPacote é o nome do .zip de uma prova só: "prova-trt-18-2023-l12.zip".
 func nomeDoPacote(r prova.Rascunho) string {
 	partes := []string{"prova"}
 	for _, p := range []string{r.Orgao, fmt.Sprint(r.Ano), r.Cargo} {
@@ -201,5 +225,5 @@ func nomeDoPacote(r prova.Rascunho) string {
 	return strings.Join(partes, "-") + ".zip"
 }
 
-// errPacote é a recusa do pacote enviado: 422 com o motivo, que o curador lê.
+// errPacote é a recusa do envio: 422 com o motivo, que o curador lê.
 func errPacote(msg string) error { return service.ErrValidacao{Msg: msg} }

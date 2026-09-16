@@ -1,4 +1,5 @@
 import { request, requestArquivo } from '$lib/api';
+import type { ProvaNoPacote } from './pacote';
 import type {
 	Anotacao,
 	Importacao,
@@ -80,13 +81,15 @@ export const provasApi = {
 
 	importacao: (id: string) => request<Importacao>(`${imp}/${id}`),
 
-	/** O .zip da prova publicada — conteúdo, figuras e PDF — para levar a outro ambiente. */
-	exportarProva: (id: string) => requestArquivo(`/api/provas/pacotes/${id}`),
+	/** Um .zip só com as provas publicadas — todas, ou a pedida —, para levar a outro ambiente. */
+	exportarProvas: (provaId?: string) =>
+		requestArquivo(`/api/provas/pacotes${provaId ? `?prova=${encodeURIComponent(provaId)}` : ''}`),
 
-	/** Publica aqui a prova de um pacote exportado em outro ambiente. */
-	importarPacote: (pacote: File) => {
+	/** Publica aqui uma prova do pacote: o prova.json e os arquivos da pasta dela. */
+	importarProvaDoPacote: (p: ProvaNoPacote) => {
 		const corpo = new FormData();
-		corpo.set('pacote', pacote);
+		corpo.set('prova', p.manifesto, 'prova.json');
+		for (const a of p.arquivos) corpo.append('arquivos', a.conteudo, a.nome);
 		return request<ProvaResumo>('/api/provas/pacotes', { method: 'POST', body: corpo });
 	},
 

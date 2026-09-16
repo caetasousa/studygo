@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"studygo/internal/domain/prova"
+	"studygo/internal/port"
 )
 
 const figuraLevada = "11111111-2222-3333-4444-555555555555"
@@ -25,6 +26,13 @@ type fakeLevar struct {
 
 func (f *fakeLevar) Publicacao(context.Context, string) (prova.Publicacao, error) {
 	return f.publicada, nil
+}
+
+func (f *fakeLevar) Catalogo(context.Context, port.FiltroCatalogo) ([]prova.Publicacao, error) {
+	if f.publicada.ID == "" {
+		return nil, nil
+	}
+	return []prova.Publicacao{f.publicada}, nil
 }
 
 func (f *fakeLevar) ImportacaoDaPublicacao(context.Context, string) (prova.Importacao, error) {
@@ -89,6 +97,25 @@ func TestProvas_ExportarLevaOConteudoEOsArquivos(t *testing.T) {
 	})
 	if !slices.Equal(nomes, []string{figuraLevada + ".png", "doc.pdf", "gab.pdf"}) || p.NomeDocumento != "trt18.pdf" || len(p.Regioes) != 1 {
 		t.Fatalf("exportado = %v, %+v", nomes, p)
+	}
+}
+
+// "Exportar todas" leva o catálogo inteiro num pacote só; sem prova, recusa.
+func TestProvas_ExportarCatalogo(t *testing.T) {
+	t.Parallel()
+
+	s, repo, volume := novoLevar(t)
+	var v ErrValidacao
+	if _, err := s.ExportarCatalogo(context.Background(), curador, ""); !errors.As(err, &v) {
+		t.Fatalf("catálogo vazio: err = %v", err)
+	}
+	repo.publicada = prova.Publicacao{ID: "p", Conteudo: rascunhoLevado()}
+	repo.base = prova.Importacao{Documento: "doc"}
+	volume.nomes["doc.pdf"], volume.nomes[figuraLevada+".png"] = true, true
+
+	provas, err := s.ExportarCatalogo(context.Background(), curador, "")
+	if err != nil || len(provas) != 1 || provas[0].Documento != "doc" {
+		t.Fatalf("ExportarCatalogo = %+v, %v", provas, err)
 	}
 }
 
