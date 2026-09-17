@@ -399,6 +399,29 @@ func (r *Rascunho) AplicarMetadados(m Metadados) {
 	}
 }
 
+// TotalPeloGabarito completa o total que a capa não declarou — o caderno sem
+// capa, a capa noutro formato. Sem total, a prova não publica, e o gabarito do
+// cargo tem uma linha por questão, anulada inclusive. Fica o alerta para o
+// curador conferir.
+func (r *Rascunho) TotalPeloGabarito() {
+	if r.Total > 0 {
+		return
+	}
+	maior := 0
+	for chave := range r.Gabarito.Respostas {
+		if n, err := strconv.Atoi(chave); err == nil && n > maior {
+			maior = n
+		}
+	}
+	if maior == 0 {
+		return
+	}
+	r.Total = maior
+	r.Alertas = append(r.Alertas, fmt.Sprintf(
+		"A capa não diz quantas questões a prova tem: o total ficou %d, o da numeração do gabarito. Confira na etapa Dados.", maior,
+	))
+}
+
 // OrdenarQuestoes deixa as questões na ordem do caderno.
 func (r *Rascunho) OrdenarQuestoes() {
 	slices.SortStableFunc(r.Questoes, func(a, b Questao) int { return a.Numero - b.Numero })
@@ -764,19 +787,25 @@ func semConteudo(bs []Bloco) bool {
 // O caderno do gabarito é comparado pelos dígitos (ver normalizarCaderno).
 func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 	out := []string{}
-	if r.Banca != "FCC" || r.Orgao == "" || r.Ano < 1900 || r.Cargo == "" || r.Caderno == "" {
-		out = append(out, "Confira banca FCC, órgão, ano, cargo e caderno.")
+	if falta := r.identificacaoQueFalta(); len(falta) > 0 {
+		out = append(out, "Confira na etapa Dados: "+strings.Join(falta, ", ")+".")
 	}
-	if r.Total <= 0 || len(r.Questoes) != r.QuestoesNaProva() {
+	// Sem total, cada questão estaria fora da numeração: a pendência é uma só,
+	// e diz onde se resolve.
+	semTotal := r.Total <= 0
+	if semTotal {
+		out = append(out, "A capa não disse quantas questões a prova tem: preencha o Total de questões na etapa Dados.")
+	} else if len(r.Questoes) != r.QuestoesNaProva() {
 		out = append(out, fmt.Sprintf(
 			"O rascunho tem %d questões e o total esperado é %d.%s", len(r.Questoes), r.QuestoesNaProva(), r.faltando(),
 		))
 	}
+	foraDaNumeracao := func(n int) bool { return n < 1 || (!semTotal && n > r.Total) }
 	// Excluir é decisão do curador, com ou sem anulação: a prova publicada só
 	// não tem aquele número. O gabarito continua inteiro.
 	excluidas := map[int]bool{}
 	for _, n := range r.Excluidas {
-		if excluidas[n] || n < 1 || n > r.Total {
+		if excluidas[n] || foraDaNumeracao(n) {
 			out = append(out, fmt.Sprintf("Numeração inválida entre as excluídas: %d.", n))
 		}
 		excluidas[n] = true
@@ -796,9 +825,15 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 	if r.Gabarito.Caderno != "" && normalizarCaderno(r.Gabarito.Caderno) != normalizarCaderno(r.Caderno) {
 		out = append(out, "O tipo de gabarito não corresponde ao caderno da prova.")
 	}
-	if len(r.Gabarito.Respostas) > 0 &&
-		(r.Gabarito.Cargo == "" || r.Gabarito.Caderno == "" || len(r.Gabarito.Respostas) != r.Total) {
-		out = append(out, "Confira a identificação e a quantidade de respostas do gabarito.")
+	if len(r.Gabarito.Respostas) > 0 && (r.Gabarito.Cargo == "" || r.Gabarito.Caderno == "") {
+		out = append(out,
+			"O gabarito veio sem o código do cargo ou o tipo do caderno: preencha Cargo no gabarito e Caderno no gabarito na etapa Dados.")
+	}
+	if n := len(r.Gabarito.Respostas); n > 0 && !semTotal && n != r.Total {
+		out = append(out, fmt.Sprintf(
+			"O gabarito tem %d respostas e o caderno, %d questões: confira o Total de questões na etapa Dados ou troque o gabarito.",
+			n, r.Total,
+		))
 	}
 	for _, chave := range slices.Sorted(maps.Keys(r.Gabarito.Respostas)) {
 		letra := r.Gabarito.Respostas[chave]
@@ -822,10 +857,11 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 	}
 
 	numeros := map[int]bool{}
+	invalidas := []string{}
 	for _, q := range r.Questoes {
 		local := fmt.Sprintf("questão %d", q.Numero)
-		if numeros[q.Numero] || q.Numero < 1 || q.Numero > r.Total {
-			out = append(out, fmt.Sprintf("Numeração inválida: %d.", q.Numero))
+		if numeros[q.Numero] || foraDaNumeracao(q.Numero) {
+			invalidas = append(invalidas, strconv.Itoa(q.Numero))
 		}
 		numeros[q.Numero] = true
 		if excluidas[q.Numero] {
@@ -867,8 +903,37 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 		}
 		out = append(out, pendenciasDosBlocos(q.Blocos, local, exigirConferencia)...)
 	}
+	if len(invalidas) > 0 {
+		out = append(out, fmt.Sprintf(
+			"Numeração repetida ou fora do total na etapa Questões: %s.", strings.Join(invalidas, ", "),
+		))
+	}
 
 	return out
+}
+
+// identificacaoQueFalta nomeia os campos da etapa Dados que impedem publicar:
+// "Confira banca, órgão, ano, cargo e caderno" fazia o curador reler todos para
+// achar o vazio.
+func (r Rascunho) identificacaoQueFalta() []string {
+	falta := []string{}
+	if r.Banca != "FCC" {
+		falta = append(falta, "banca FCC")
+	}
+	if r.Orgao == "" {
+		falta = append(falta, "órgão")
+	}
+	if r.Ano < 1900 {
+		falta = append(falta, "ano")
+	}
+	if r.Cargo == "" {
+		falta = append(falta, "código do cargo")
+	}
+	if r.Caderno == "" {
+		falta = append(falta, "tipo do caderno")
+	}
+
+	return falta
 }
 
 // LimparBlocos tira o que não carrega nada: bloco de texto vazio, código em

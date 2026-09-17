@@ -190,6 +190,8 @@ type fakeExtrator struct {
 	extraidas []string
 	// cadernoDoGabarito é o caderno que a leitura do gabarito recebeu.
 	cadernoDoGabarito string
+	// capa, quando dada, é o que a leitura da capa devolve.
+	capa *prova.Metadados
 }
 
 func (e *fakeExtrator) Preparar(context.Context, string) ([]prova.Origem, error) {
@@ -197,6 +199,9 @@ func (e *fakeExtrator) Preparar(context.Context, string) ([]prova.Origem, error)
 }
 
 func (e *fakeExtrator) Metadados(context.Context, string, prova.Origem) (prova.Metadados, error) {
+	if e.capa != nil {
+		return *e.capa, e.err
+	}
 	return prova.Metadados{Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 2}, e.err
 }
 
@@ -520,6 +525,36 @@ func TestProvas_FilaDaCapaAteARevisao(t *testing.T) {
 	}
 	if r.Questoes[1].Disciplina != "Matéria 2" {
 		t.Errorf("disciplina = %q, quer a matéria sugerida na consolidação", r.Questoes[1].Disciplina)
+	}
+}
+
+// O caderno do MPEAL chegou sem capa legível: sem total, cada questão virava
+// "Numeração inválida". O gabarito do cargo diz quantas são.
+func TestProvas_CapaSemTotalFicaComOTotalDoGabarito(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	extrator.capa = &prova.Metadados{Orgao: "MPEAL", CargoNome: "CONHECIMENTOS GERAIS", Caderno: "004"}
+	s, _ := novoProvaServiceDeTeste(repo, extrator)
+
+	criada, err := s.Importar(context.Background(), curador, EnvioDeProva{Prova: pdfMinimo, Gabarito: pdfMinimo})
+	if err != nil {
+		t.Fatalf("Importar: %v", err)
+	}
+	r := processarTudo(t, s, repo, criada.ID).Rascunho
+
+	if r.Total != 2 || !slices.ContainsFunc(r.Alertas, func(a string) bool { return strings.Contains(a, "o total ficou 2") }) {
+		t.Fatalf("total = %d, alertas %v; quer o total do gabarito, avisado", r.Total, r.Alertas)
+	}
+	// Sobra o que a capa não disse, nomeado, e o código que o gabarito sugere.
+	quer := []string{
+		"Confira na etapa Dados: ano, código do cargo.",
+		`O gabarito é do cargo E05 e a prova está sem o código do cargo. Se a capa diz "Caderno de Prova 'E05'", ` +
+			"use esse código na etapa Dados; se não, o gabarito é de outro cargo.",
+	}
+	if p := r.Pendencias(false); !slices.Equal(p, quer) {
+		t.Fatalf("pendências = %q", p)
 	}
 }
 

@@ -359,6 +359,12 @@ na capa escaneada, do OCR dela, que perdoa as trocas típicas ("Cademo de Prova
 'FO6, Tipo" é F06). Sem código mesmo assim, a pendência diz onde achá-lo, com
 um botão na revisão que usa o do gabarito.
 
+**Capa que não diz o total não trava a prova.** Caderno sem capa, ou com capa
+noutro formato (o do MPEAL), chegava com total 0, e cada questão virava uma
+pendência de numeração. O total vem então da numeração do gabarito do cargo
+(`TotalPeloGabarito`, com alerta para conferir), e as pendências nomeiam o
+campo vazio e a etapa em que se preenche, em vez de pedir para conferir tudo.
+
 **O curador confere só o que tem problema.** No fim da importação, a questão
 inteira, com as cinco alternativas preenchidas, a resposta do gabarito, os
 textos que cita ligados e nenhum alerta da extração falando dela já vem

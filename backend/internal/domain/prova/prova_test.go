@@ -903,6 +903,65 @@ func TestGabaritoEmLinhas(t *testing.T) {
 	}
 }
 
+// A capa não lida deixava total 0, e cada questão virava uma "Numeração
+// inválida": 59 pendências escondiam as três que diziam o que preencher.
+func TestPendencias_CapaNaoLida(t *testing.T) {
+	t.Parallel()
+
+	r := valida()
+	r.Ano, r.Cargo, r.Total = 0, "", 0
+	r.Questoes = append(r.Questoes, questao(2, true, "Segunda"), questao(3, true, "Terceira"))
+	r.Gabarito = Gabarito{Tipo: "preliminar", Respostas: map[string]string{"1": "E", "2": "", "3": ""}}
+
+	quer := []string{
+		"Confira na etapa Dados: ano, código do cargo.",
+		"A capa não disse quantas questões a prova tem: preencha o Total de questões na etapa Dados.",
+		"O gabarito veio sem o código do cargo ou o tipo do caderno: preencha Cargo no gabarito e Caderno no gabarito na etapa Dados.",
+	}
+	if p := r.Pendencias(false); !slices.Equal(p, quer) {
+		t.Fatalf("pendências:\n%s\nquer:\n%s", strings.Join(p, "\n"), strings.Join(quer, "\n"))
+	}
+}
+
+func TestPendencias_NumeracaoNumaLinhaSo(t *testing.T) {
+	t.Parallel()
+
+	r := valida()
+	r.Total = 2
+	r.Gabarito.Respostas["2"] = "E"
+	dois := questao(2, true, "Segunda")
+	dois.Resposta = "E"
+	r.Questoes = append(r.Questoes, dois, dois, questao(7, true, "Sétima"))
+	if p := r.Pendencias(false); !contem(p, "Numeração repetida ou fora do total na etapa Questões: 2, 7.") {
+		t.Fatalf("pendências: %v", p)
+	}
+
+	r = valida()
+	r.Gabarito.Respostas["2"] = "A"
+	if p := r.Pendencias(false); !contem(p, "O gabarito tem 2 respostas e o caderno, 1 questões") {
+		t.Fatalf("gabarito maior que o caderno: %v", p)
+	}
+}
+
+func TestTotalPeloGabarito(t *testing.T) {
+	t.Parallel()
+
+	r := Rascunho{Gabarito: Gabarito{Respostas: map[string]string{"1": "A", "60": "", "x": "B"}}}
+	r.TotalPeloGabarito()
+	if r.Total != 60 || len(r.Alertas) != 1 {
+		t.Fatalf("total %d, alertas %v; quer 60, avisado", r.Total, r.Alertas)
+	}
+
+	// A capa manda; sem gabarito, nada a completar.
+	lida := Rascunho{Total: 50, Gabarito: r.Gabarito}
+	lida.TotalPeloGabarito()
+	vazio := Rascunho{}
+	vazio.TotalPeloGabarito()
+	if lida.Total != 50 || len(lida.Alertas) != 0 || vazio.Total != 0 || len(vazio.Alertas) != 0 {
+		t.Fatalf("lida %d %v, vazio %d %v", lida.Total, lida.Alertas, vazio.Total, vazio.Alertas)
+	}
+}
+
 // A questão excluída sai da conta, anulada ou não: a prova é publicada sem ela.
 func TestPendencias_Excluida(t *testing.T) {
 	t.Parallel()

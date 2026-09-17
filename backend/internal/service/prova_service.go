@@ -841,6 +841,7 @@ func (s *ProvaService) executarEtapa(ctx context.Context, i *prova.Importacao) (
 				return nil, err
 			}
 			i.Rascunho.Gabarito = g
+			i.Rascunho.TotalPeloGabarito()
 		}
 		if i.Etapa == prova.EtapaSoGabarito {
 			i.Rascunho.AplicarGabarito()

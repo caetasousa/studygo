@@ -382,8 +382,10 @@
 
 	/** Aonde levar o curador para resolver a pendência. */
 	function destinoDaPendencia(p: string): { rotulo: string; ir: () => void } | null {
+		// A pendência que diz a etapa manda: "fora do total" é das questões, não dos dados.
+		if (/etapa Dados/i.test(p)) return { rotulo: 'Abrir os dados', ir: () => (etapa = 'dados') };
 		// Falta questão: é na etapa Questões que se adiciona ou se exclui da prova.
-		if (/total esperado/i.test(p)) return { rotulo: 'Abrir as questões', ir: () => (etapa = 'questoes') };
+		if (/total esperado|etapa Questões/i.test(p)) return { rotulo: 'Abrir as questões', ir: () => (etapa = 'questoes') };
 		const numero = p.match(/quest(?:ão|ao)\s+(\d+)/i)?.[1];
 		if (numero) return { rotulo: `Abrir a questão ${numero}`, ir: () => abrirQuestao(Number(numero)) };
 		if (/texto de apoio/i.test(p)) return { rotulo: 'Abrir os textos', ir: () => (etapa = 'textos') };
