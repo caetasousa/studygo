@@ -18,10 +18,10 @@ func TestAvulsas_GrafiasDaMesmaMateriaViramUmNome(t *testing.T) {
 	t.Parallel()
 
 	qs := []QuestaoAvulsa{
-		{Numero: 1, Disciplina: "Noções Sobre Direitos das Pessoas com Deficiência"},
-		{Numero: 2, Disciplina: "Noções sobre Direitos das Pessoas com Deficiência"},
-		{Numero: 3, Disciplina: "Noções Sobre  Direitos das Pessoas com Deficiência "},
-		{Numero: 4, Disciplina: "Redes"},
+		{TemGabarito: true, Numero: 1, Disciplina: "Noções Sobre Direitos das Pessoas com Deficiência"},
+		{TemGabarito: true, Numero: 2, Disciplina: "Noções sobre Direitos das Pessoas com Deficiência"},
+		{TemGabarito: true, Numero: 3, Disciplina: "Noções Sobre  Direitos das Pessoas com Deficiência "},
+		{TemGabarito: true, Numero: 4, Disciplina: "Redes"},
 	}
 
 	got := materias(Avulsas(qs, FiltroDeAvulsas{}))
@@ -41,8 +41,8 @@ func TestAvulsas_EmpateFicaComAPrimeiraEmOrdemAlfabetica(t *testing.T) {
 	t.Parallel()
 
 	for _, qs := range [][]QuestaoAvulsa{
-		{{Disciplina: "Língua portuguesa"}, {Disciplina: "Língua Portuguesa"}},
-		{{Disciplina: "Língua Portuguesa"}, {Disciplina: "Língua portuguesa"}},
+		{{TemGabarito: true, Disciplina: "Língua portuguesa"}, {TemGabarito: true, Disciplina: "Língua Portuguesa"}},
+		{{TemGabarito: true, Disciplina: "Língua Portuguesa"}, {TemGabarito: true, Disciplina: "Língua portuguesa"}},
 	} {
 		if got := materias(Avulsas(qs, FiltroDeAvulsas{})); got[0] != "Língua Portuguesa" || got[1] != got[0] {
 			t.Fatalf("matérias = %q, quer as duas como Língua Portuguesa", got)
@@ -56,9 +56,9 @@ func TestAvulsas_NomeNaoMudaComOFiltro(t *testing.T) {
 	t.Parallel()
 
 	qs := []QuestaoAvulsa{
-		{Numero: 1, Ano: 2026, Disciplina: "Governança de TI"},
-		{Numero: 2, Ano: 2026, Disciplina: "Governança de TI"},
-		{Numero: 3, Ano: 2025, Disciplina: "governança de ti"},
+		{TemGabarito: true, Numero: 1, Ano: 2026, Disciplina: "Governança de TI"},
+		{TemGabarito: true, Numero: 2, Ano: 2026, Disciplina: "Governança de TI"},
+		{TemGabarito: true, Numero: 3, Ano: 2025, Disciplina: "governança de ti"},
 	}
 
 	got := Avulsas(qs, FiltroDeAvulsas{Ano: 2025})
@@ -73,8 +73,8 @@ func TestAvulsas_AssuntoSemEspacosAMais(t *testing.T) {
 	t.Parallel()
 
 	qs := []QuestaoAvulsa{
-		{Numero: 1, Disciplina: "Língua Portuguesa", Assunto: " Crase"},
-		{Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Concordância  nominal e verbal "},
+		{TemGabarito: true, Numero: 1, Disciplina: "Língua Portuguesa", Assunto: " Crase"},
+		{TemGabarito: true, Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Concordância  nominal e verbal "},
 	}
 
 	got := Avulsas(qs, FiltroDeAvulsas{})
@@ -87,11 +87,11 @@ func TestAvulsas_FiltraMateriasEAno(t *testing.T) {
 	t.Parallel()
 
 	qs := []QuestaoAvulsa{
-		{Numero: 1, Ano: 2026, Disciplina: "Redes"},
-		{Numero: 2, Ano: 2026, Disciplina: "Banco de Dados"},
-		{Numero: 3, Ano: 2025, Disciplina: "Redes"},
-		{Numero: 4, Ano: 2026, Disciplina: "Língua Portuguesa"},
-		{Numero: 5, Ano: 2026, Disciplina: ""},
+		{TemGabarito: true, Numero: 1, Ano: 2026, Disciplina: "Redes"},
+		{TemGabarito: true, Numero: 2, Ano: 2026, Disciplina: "Banco de Dados"},
+		{TemGabarito: true, Numero: 3, Ano: 2025, Disciplina: "Redes"},
+		{TemGabarito: true, Numero: 4, Ano: 2026, Disciplina: "Língua Portuguesa"},
+		{TemGabarito: true, Numero: 5, Ano: 2026, Disciplina: ""},
 	}
 	numeros := func(f FiltroDeAvulsas) []int {
 		var out []int
@@ -150,5 +150,23 @@ func TestGrupoDaMateria(t *testing.T) {
 		if got := GrupoDaMateria(materia); got != grupo {
 			t.Errorf("GrupoDaMateria(%q) = %q, quer %q", materia, got, grupo)
 		}
+	}
+}
+
+// Questão sem linha no gabarito não vai ao treino.
+func TestAvulsas_SemGabaritoFicaDeFora(t *testing.T) {
+	t.Parallel()
+
+	qs := []QuestaoAvulsa{
+		{Numero: 1, Disciplina: "Redes", TemGabarito: true, Resposta: "A"},
+		{Numero: 2, Disciplina: "Redes", TemGabarito: true},
+		{Numero: 3, Disciplina: "Redes"},
+	}
+
+	got := Avulsas(qs, FiltroDeAvulsas{})
+
+	// A 2 é anulada: tem gabarito, sem letra.
+	if len(got) != 2 || got[0].Numero != 1 || got[1].Numero != 2 {
+		t.Fatalf("avulsas = %+v", got)
 	}
 }

@@ -1159,6 +1159,43 @@ func TestParaPublicar_Excluida(t *testing.T) {
 	}
 }
 
+// A prova pode ser publicada antes de o gabarito sair, mas a questão sem
+// resposta não chega ao aluno: ele responderia sem ter como conferir.
+func TestSoComGabarito(t *testing.T) {
+	t.Parallel()
+
+	p := Publicacao{Conteudo: Rascunho{
+		Total:     4,
+		Questoes:  []Questao{questao(1, true, "com resposta"), questao(2, true, "anulada"), questao(3, true, "sem gabarito")},
+		Excluidas: []int{4},
+		Gabarito:  Gabarito{Respostas: map[string]string{"1": "C", "2": ""}},
+	}}
+
+	vista := p.SoComGabarito()
+
+	numeros := []int{}
+	for _, q := range vista.Conteudo.Questoes {
+		numeros = append(numeros, q.Numero)
+	}
+	// A anulada tem linha no gabarito: é questão da prova, sem letra certa.
+	if !slices.Equal(numeros, []int{1, 2}) {
+		t.Fatalf("questões = %v, quer a com resposta e a anulada", numeros)
+	}
+	if !slices.Equal(vista.Conteudo.Excluidas, []int{3, 4}) || vista.Conteudo.QuestoesNaProva() != 2 {
+		t.Fatalf("excluídas %v, %d na prova", vista.Conteudo.Excluidas, vista.Conteudo.QuestoesNaProva())
+	}
+	// O original não muda: a revisão do curador continua com as três.
+	if len(p.Conteudo.Questoes) != 3 {
+		t.Fatal("SoComGabarito mexeu na publicação original")
+	}
+
+	// Sem gabarito nenhum, nenhuma questão aparece.
+	sem := Publicacao{Conteudo: Rascunho{Total: 1, Questoes: []Questao{questao(1, true, "a")}}}
+	if vista := sem.SoComGabarito(); len(vista.Conteudo.Questoes) != 0 || vista.Conteudo.QuestoesNaProva() != 0 {
+		t.Fatalf("prova sem gabarito = %+v", vista.Conteudo)
+	}
+}
+
 func TestNomeDoCargo(t *testing.T) {
 	t.Parallel()
 

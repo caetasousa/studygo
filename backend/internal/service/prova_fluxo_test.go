@@ -734,10 +734,22 @@ type fakePublicacao struct {
 	*fakeProvas
 	// publicada é a importação que chegou ao repositório para publicar.
 	publicada prova.Importacao
+	// publicacao é a prova que o repositório devolve.
+	publicacao prova.Publicacao
 }
 
 func (f *fakePublicacao) Publicacao(context.Context, string) (prova.Publicacao, error) {
+	if f.publicacao.ID != "" {
+		return f.publicacao, nil
+	}
 	return prova.Publicacao{ID: "prova-1"}, nil
+}
+
+func (f *fakePublicacao) Catalogo(context.Context, port.FiltroCatalogo) ([]prova.Publicacao, error) {
+	if f.publicacao.ID == "" {
+		return nil, nil
+	}
+	return []prova.Publicacao{f.publicacao}, nil
 }
 
 func (f *fakePublicacao) ImportacaoDaPublicacao(context.Context, string) (prova.Importacao, error) {
@@ -770,6 +782,38 @@ func TestProvas_PublicarLevaSoAsProntas(t *testing.T) {
 	}
 	if p := repo.publicada.Rascunho; len(p.Questoes) != 1 || !slices.Equal(p.Excluidas, []int{2, 3}) {
 		t.Fatalf("ao repositório: %d questões, excluídas %v", len(p.Questoes), p.Excluidas)
+	}
+}
+
+// O aluno nunca vê questão sem resposta no gabarito, nem na prova nem na lista
+// do catálogo; a revisão do curador continua com todas.
+func TestProvas_QuestaoSemGabaritoNaoChegaAoAluno(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, _ := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	repo.publicacao = prova.Publicacao{ID: "prova-1", Conteudo: prova.Rascunho{
+		Total:    2,
+		Questoes: []prova.Questao{questaoExtraida(1, true), questaoExtraida(2, true)},
+		Gabarito: prova.Gabarito{Respostas: map[string]string{"1": "B"}},
+	}}
+
+	p, err := s.Publicacao(context.Background(), "prova-1", 0, "")
+	if err != nil {
+		t.Fatalf("Publicacao: %v", err)
+	}
+	if len(p.Conteudo.Questoes) != 1 || p.Conteudo.Questoes[0].Numero != 1 || p.Conteudo.QuestoesNaProva() != 1 {
+		t.Fatalf("prova do aluno = %+v", p.Conteudo)
+	}
+
+	lista, err := s.Catalogo(context.Background(), port.FiltroCatalogo{})
+	if err != nil || len(lista) != 1 || lista[0].Conteudo.QuestoesNaProva() != 1 {
+		t.Fatalf("catálogo = %+v (%v)", lista, err)
+	}
+	// A revisão do curador abre com as duas.
+	if i, err := s.Revisar(context.Background(), curador, "prova-1"); err != nil || len(i.Rascunho.Questoes) != 2 {
+		t.Fatalf("revisão = %+v (%v)", i.Rascunho.Questoes, err)
 	}
 }
 

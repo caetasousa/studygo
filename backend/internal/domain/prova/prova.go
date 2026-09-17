@@ -6,6 +6,7 @@ package prova
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -328,6 +329,37 @@ type Publicacao struct {
 	Revisao     int
 	Conteudo    Rascunho
 	PublicadoEm time.Time
+	// ComGabarito é quantas questões publicadas têm resposta no gabarito —
+	// contadas no banco, porque a lista do catálogo não carrega as questões.
+	ComGabarito int
+}
+
+// QuestoesParaOAluno é quantas questões a prova mostra: as que têm resposta no
+// gabarito. Vem do banco porque a lista do catálogo não carrega as questões.
+func (p Publicacao) QuestoesParaOAluno() int { return p.ComGabarito }
+
+// SoComGabarito é a prova como o aluno pode vê-la: sem as questões sem
+// resposta no gabarito. Responder sem ter como conferir não é treinar, e a
+// prova pode ser importada antes de o gabarito sair. As questões escondidas
+// entram nas excluídas, para a conta da prova bater com o que ela mostra; a
+// revisão do curador continua com todas (Repo.Publicacao).
+func (p Publicacao) SoComGabarito() Publicacao {
+	fora := map[int]bool{}
+	questoes := make([]Questao, 0, len(p.Conteudo.Questoes))
+	for _, q := range p.Conteudo.Questoes {
+		if _, ok := p.Conteudo.Gabarito.Respostas[strconv.Itoa(q.Numero)]; ok {
+			questoes = append(questoes, q)
+			continue
+		}
+		fora[q.Numero] = true
+	}
+	p.Conteudo.Questoes = questoes
+	for _, n := range p.Conteudo.Excluidas {
+		fora[n] = true
+	}
+	p.Conteudo.Excluidas = slices.Sorted(maps.Keys(fora))
+
+	return p
 }
 
 // Arquivos lista os recortes que o rascunho referencia.

@@ -149,13 +149,6 @@ func (s *ProvaService) ImportarPacote(ctx context.Context, usuario string, pct P
 	r := pct.Conteudo
 	r.AcertarApoios()
 	r.LimparBlocos()
-	// Já publicada lá: entra como veio, sem pedir de novo conferência nem
-	// gabarito — só a questão com defeito de integridade fica de fora.
-	criterios := prova.Criterios{}
-	if p := r.Pendencias(criterios); len(p) > 0 {
-		return prova.Publicacao{}, erroDeValidacao("a prova do pacote não tem questão que possa ir ao catálogo: " + p[0])
-	}
-	r, _ = r.ParaPublicar(criterios)
 	figuras := slices.Compact(slices.Sorted(slices.Values(r.Arquivos())))
 	for _, id := range figuras {
 		if _, err := uuid.Parse(id); err != nil || !parecePNG(pct.Figuras[id]) {
@@ -190,7 +183,6 @@ func (s *ProvaService) ImportarPacote(ctx context.Context, usuario string, pct P
 		}
 		// O pacote de uma prova publicada antes de o gabarito ter tabela própria
 		// vem sem as respostas, mas com o PDF: lido aqui, ela chega com gabarito.
-		// Sem leitura, entra como veio — "Abrir revisão" lê o PDF de novo.
 		if len(i.Rascunho.Gabarito.Respostas) == 0 {
 			if g, err := s.Processor.Gabarito(ctx, i.GabaritoArquivo, i.Rascunho.Caderno); err == nil {
 				i.Rascunho.Gabarito = g
@@ -198,6 +190,17 @@ func (s *ProvaService) ImportarPacote(ctx context.Context, usuario string, pct P
 			}
 		}
 	}
+
+	// Já publicada lá: entra sem pedir de novo a conferência. O gabarito, sim:
+	// questão sem resposta não vai ao catálogo em ambiente nenhum.
+	criterios := prova.Criterios{Gabarito: true}
+	if p := i.Rascunho.Pendencias(criterios); len(p) > 0 {
+		s.descartar(gravados)
+		return prova.Publicacao{}, erroDeValidacao(
+			"a prova do pacote não tem questão que possa ir ao catálogo: " + p[0],
+		)
+	}
+	i.Rascunho, _ = i.Rascunho.ParaPublicar(criterios)
 	for _, id := range figuras {
 		// A figura que já está aqui é a mesma (o id é o do conteúdo): outra
 		// prova pode usá-la, e sobrescrever ou descartar não é deste pacote.

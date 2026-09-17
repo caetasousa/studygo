@@ -784,6 +784,57 @@ func TestProvas_ExcluidaNaChaveAntiga(t *testing.T) {
 	}
 }
 
+// A prova publicada antes de o gabarito ter tabela própria tem questão sem
+// resposta: o banco conta quantas têm, e é o que o aluno vê.
+func TestProvas_PublicacaoContaAsQuestoesComGabarito(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "sem-gabarito"), 2); err != nil {
+		t.Fatal(err)
+	}
+	r := rascunhoPublicavel(uuid.NewString())
+	segunda := r.Questoes[0]
+	segunda.Numero, segunda.Blocos = 2, []prova.Bloco{{Tipo: "texto", Texto: "Segunda"}}
+	segunda.Resposta = "B"
+	r.Total, r.Questoes = 2, append(r.Questoes, segunda)
+	r.Questoes[0].Resposta = "C"
+	r.Gabarito = prova.Gabarito{Cargo: "E05", Caderno: "4", Respostas: map[string]string{"1": "C", "2": "B"}}
+	id, err := repo.Publicar(ctx, levarARevisao(t, repo, r), criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Como ficaram as provas publicadas antes da tabela: sem a linha da 2.
+	if _, err := pool.Exec(ctx, `DELETE FROM provas_gabarito_respostas WHERE prova_id = $1 AND numero = 2`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ComGabarito != 1 || len(p.Conteudo.Questoes) != 2 {
+		t.Fatalf("publicação: %d com gabarito, %d questões", p.ComGabarito, len(p.Conteudo.Questoes))
+	}
+	if vista := p.SoComGabarito(); len(vista.Conteudo.Questoes) != 1 || vista.Conteudo.Questoes[0].Numero != 1 {
+		t.Fatalf("prova do aluno = %+v", vista.Conteudo.Questoes)
+	}
+	catalogo, err := repo.Catalogo(ctx, port.FiltroCatalogo{Limite: 10})
+	if err != nil || len(catalogo) != 1 || catalogo[0].ComGabarito != 1 {
+		t.Fatalf("catálogo = %+v (%v)", catalogo, err)
+	}
+	avulsas, err := repo.QuestoesAvulsas(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(avulsas) != 2 || !avulsas[0].TemGabarito || avulsas[1].TemGabarito {
+		t.Fatalf("avulsas = %+v; quer a 1 com gabarito e a 2 sem", avulsas)
+	}
+}
+
 func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	t.Parallel()
 
@@ -827,10 +878,12 @@ func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []prova.QuestaoAvulsa{
-		{ProvaID: e05ID, Numero: 1, Disciplina: "Redes", Resposta: "C", Orgao: "TJCE", Ano: 2026, Cargo: "E05",
-			CargoNome: "Analista Judiciário – Infraestrutura de TI"},
-		{ProvaID: f06ID, Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Crase", Orgao: "TJCE", Ano: 2025, Cargo: "F06",
-			CargoNome: "Analista Judiciário – Sistemas"},
+		{ProvaID: e05ID, Numero: 1, Disciplina: "Redes", TemGabarito: true, Resposta: "C", Orgao: "TJCE", Ano: 2026,
+			Cargo: "E05", CargoNome: "Analista Judiciário – Infraestrutura de TI"},
+		// A F06 não tem gabarito: a questão só dela chega sem resposta, e o
+		// treino a descarta (prova.Avulsas).
+		{ProvaID: f06ID, Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Crase", Orgao: "TJCE", Ano: 2025,
+			Cargo: "F06", CargoNome: "Analista Judiciário – Sistemas"},
 	}
 	if !slices.Equal(avulsas, want) {
 		t.Fatalf("avulsas = %+v\nquer %+v", avulsas, want)

@@ -14,8 +14,11 @@ type QuestaoAvulsa struct {
 	Disciplina string
 	Assunto    string
 	// Grupo junta as matérias no treino: básicas, legislação ou específicas.
-	Grupo    string
-	Resposta string
+	Grupo string
+	// TemGabarito: a questão tem linha no gabarito da prova (a anulada tem,
+	// sem letra). Sem ela, a questão não vai ao treino.
+	TemGabarito bool
+	Resposta    string
 	// A identificação da prova de onde ela vem.
 	Orgao     string
 	Ano       int
@@ -37,7 +40,7 @@ func chaveDaMateria(nome string) string {
 }
 
 // Avulsas prepara as questões para o treino por matéria: descarta as que não
-// têm matéria, dá um nome só a cada matéria e aplica o filtro.
+// têm matéria nem gabarito, dá um nome só a cada matéria e aplica o filtro.
 //
 // O nome escolhido é a grafia mais usada no catálogo inteiro — antes do filtro,
 // para não mudar conforme o que se pediu. No empate fica a primeira em ordem
@@ -76,7 +79,10 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 	out := make([]QuestaoAvulsa, 0, len(qs))
 	for _, q := range qs {
 		k := chaveDaMateria(q.Disciplina)
-		if k == "" || (f.Ano != 0 && q.Ano != f.Ano) || (len(pedidas) > 0 && !slices.Contains(pedidas, k)) {
+		// Sem gabarito, a questão não é treinável: o aluno responderia sem ter
+		// como conferir.
+		if k == "" || !q.TemGabarito ||
+			(f.Ano != 0 && q.Ano != f.Ano) || (len(pedidas) > 0 && !slices.Contains(pedidas, k)) {
 			continue
 		}
 		q.Disciplina = nome[k]

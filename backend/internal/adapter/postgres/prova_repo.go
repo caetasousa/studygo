@@ -611,7 +611,11 @@ func (r *ProvaRepo) Publicar(ctx context.Context, i prova.Importacao, usuario st
 }
 
 const selecionarPublicacao = `SELECT p.id::text, p.revisao, pr.conteudo, p.publicado_em,
-	       coalesce(g.cargo, ''), coalesce(g.caderno, ''), coalesce(g.tipo, '')
+	       coalesce(g.cargo, ''), coalesce(g.caderno, ''), coalesce(g.tipo, ''),
+	       (SELECT count(*) FROM provas_questoes q
+	          JOIN provas_gabarito_respostas gr
+	            ON gr.prova_id = q.prova_id AND gr.revisao = q.revisao AND gr.numero = q.numero
+	         WHERE q.prova_id = p.id AND q.revisao = p.revisao)
 	  FROM provas p
 	  JOIN provas_revisoes pr ON pr.prova_id = p.id AND pr.revisao = p.revisao
 	  LEFT JOIN provas_gabaritos g ON g.prova_id = p.id AND g.revisao = p.revisao
@@ -623,7 +627,7 @@ func escanearPublicacao(row pgx.Row) (prova.Publicacao, error) {
 		conteudo             []byte
 		cargo, caderno, tipo string
 	)
-	err := row.Scan(&p.ID, &p.Revisao, &conteudo, &p.PublicadoEm, &cargo, &caderno, &tipo)
+	err := row.Scan(&p.ID, &p.Revisao, &conteudo, &p.PublicadoEm, &cargo, &caderno, &tipo, &p.ComGabarito)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return prova.Publicacao{}, prova.ErrNaoEncontrada
 	}
@@ -873,6 +877,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		     SELECT DISTINCT ON (q.conteudo_id)
 		            q.prova_id, q.numero, q.disciplina,
 		            coalesce(q.lugar->>'Assunto', '') AS assunto,
+		            g.resposta IS NOT NULL AS tem_gabarito,
 		            coalesce(g.resposta, '') AS resposta,
 		            coalesce(pr.conteudo->>'Orgao', '') AS orgao,
 		            coalesce((pr.conteudo->>'Ano')::int, 0) AS ano,
@@ -885,9 +890,11 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		       JOIN estreia e ON e.prova_id = p.id
 		       LEFT JOIN provas_gabarito_respostas g
 		              ON g.prova_id = q.prova_id AND g.revisao = q.revisao AND g.numero = q.numero
-		      ORDER BY q.conteudo_id, e.em, p.id, q.numero
+		      -- A ocorrência com gabarito vem antes: a mesma questão publicada
+		      -- sem ele noutra prova não some do treino.
+		      ORDER BY q.conteudo_id, (g.resposta IS NULL), e.em, p.id, q.numero
 		 )
-		 SELECT prova_id::text, numero, disciplina, assunto, resposta, orgao, ano, cargo, cargo_nome
+		 SELECT prova_id::text, numero, disciplina, assunto, tem_gabarito, resposta, orgao, ano, cargo, cargo_nome
 		   FROM uma_por_conteudo
 		  ORDER BY ano DESC, estreia, prova_id, numero`,
 	)
@@ -899,7 +906,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 	out := []prova.QuestaoAvulsa{}
 	for rows.Next() {
 		var q prova.QuestaoAvulsa
-		if err := rows.Scan(&q.ProvaID, &q.Numero, &q.Disciplina, &q.Assunto, &q.Resposta, &q.Orgao, &q.Ano, &q.Cargo, &q.CargoNome); err != nil {
+		if err := rows.Scan(&q.ProvaID, &q.Numero, &q.Disciplina, &q.Assunto, &q.TemGabarito, &q.Resposta, &q.Orgao, &q.Ano, &q.Cargo, &q.CargoNome); err != nil {
 			return nil, fmt.Errorf("lendo questão avulsa: %w", err)
 		}
 		out = append(out, q)

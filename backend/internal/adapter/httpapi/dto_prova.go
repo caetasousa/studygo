@@ -338,7 +338,7 @@ func provaResumoParaDTO(p prova.Publicacao) provaResumoDTO {
 
 	return provaResumoDTO{
 		ID: p.ID, Revisao: p.Revisao, Banca: c.Banca, Orgao: c.Orgao, Ano: c.Ano, Cargo: c.Cargo,
-		CargoNome: c.CargoNome, Caderno: c.Caderno, Total: c.QuestoesNaProva(), GabaritoTipo: c.Gabarito.Tipo,
+		CargoNome: c.CargoNome, Caderno: c.Caderno, Total: p.QuestoesParaOAluno(), GabaritoTipo: c.Gabarito.Tipo,
 		PublicadoEm: p.PublicadoEm,
 	}
 }

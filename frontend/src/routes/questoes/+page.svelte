@@ -411,8 +411,13 @@
 							<span class="orgao">{p.orgao}</span>
 							<span class="cargo" title={p.cargoNome}>{p.cargoNome || `Cargo ${p.cargo}`}</span>
 							<span class="meta">
-								{p.banca} · {p.cargo} · {p.total} questões
-								{#if p.gabaritoTipo === 'preliminar'}· <span class="preliminar">gabarito preliminar</span>{/if}
+								{p.banca} · {p.cargo} ·
+								{#if p.total === 0}
+									<span class="preliminar">sem gabarito</span>
+								{:else}
+									{p.total} questões
+									{#if p.gabaritoTipo === 'preliminar'}· <span class="preliminar">gabarito preliminar</span>{/if}
+								{/if}
 							</span>
 							<span class="andamento">
 								<span class="trilho" aria-hidden="true"><i style="width:{(100 * feito) / Math.max(1, p.total)}%"></i></span>

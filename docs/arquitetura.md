@@ -478,6 +478,16 @@ mas não com pendência de integridade, nem se já está no catálogo ou se o ca
 citam; o PDF ganha id novo. O prova.json é contrato (`testdata/prova_pacote.json`,
 `formatoDoPacote`).
 
+**Questão sem resposta no gabarito não chega ao aluno.** A prova pode ser
+importada e publicada antes de o gabarito sair — o que falta é só ele —, mas
+responder sem ter como conferir não é treinar: a publicação pela revisão e a
+pelo pacote só levam ao catálogo a questão com linha no gabarito (`Criterios`),
+e a leitura esconde o que ficou de fora — `Publicacao.SoComGabarito` na prova e
+no catálogo, `TemGabarito` no treino (`prova.Avulsas`). A anulada tem linha,
+sem letra, e continua na prova. O curador continua vendo tudo: a revisão abre
+da publicação inteira (`Repo.Publicacao`), e a prova sem gabarito fica na lista
+com "sem gabarito" no lugar da contagem.
+
 **Prova sem respostas, com o PDF do gabarito, lê o gabarito de novo.** As provas
 publicadas antes de o gabarito ter tabela própria (`cc242b2`) perderam as
 respostas — ficaram no JSON antigo, que ninguém lê —, e o pacote delas saiu sem

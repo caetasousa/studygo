@@ -51,6 +51,7 @@ func rascunhoLevado() prova.Rascunho {
 	return prova.Rascunho{
 		Banca: "FCC", Orgao: "TRT 18", Ano: 2023, Cargo: "L12", Caderno: "001", Total: 2,
 		Questoes: []prova.Questao{q1, q2},
+		Gabarito: prova.Gabarito{Cargo: "L12", Caderno: "1", Respostas: map[string]string{"1": "B", "2": "D"}},
 	}
 }
 
@@ -151,6 +152,7 @@ func TestProvas_ImportarPacoteSemRespostasLeOGabarito(t *testing.T) {
 	repo.publicada = prova.Publicacao{ID: "prova-nova"}
 	pct := pacoteLevado()
 	pct.Gabarito, pct.NomeGabarito = pdfMinimo, "trt18-gabarito.pdf"
+	pct.Conteudo.Gabarito = prova.Gabarito{}
 
 	if _, err := s.ImportarPacote(context.Background(), curador, pct); err != nil {
 		t.Fatalf("ImportarPacote: %v", err)
@@ -179,8 +181,11 @@ func TestProvas_ImportarPacoteRecusa(t *testing.T) {
 		mudar func(*PacoteDeProva, *fakeLevar)
 		quer  string
 	}{
-		"sem PDF":              {func(p *PacoteDeProva, _ *fakeLevar) { p.Documento = []byte("não é pdf") }, "PDF do caderno"},
-		"sem questão":          {func(p *PacoteDeProva, _ *fakeLevar) { p.Conteudo.Questoes = nil }, "não tem questão"},
+		"sem PDF":     {func(p *PacoteDeProva, _ *fakeLevar) { p.Documento = []byte("não é pdf") }, "PDF do caderno"},
+		"sem questão": {func(p *PacoteDeProva, _ *fakeLevar) { p.Conteudo.Questoes = nil }, "não tem questão"},
+		// Questão sem resposta não vai ao catálogo: sem gabarito no pacote e sem
+		// PDF para ler, a prova inteira é recusada.
+		"sem gabarito":         {func(p *PacoteDeProva, _ *fakeLevar) { p.Conteudo.Gabarito = prova.Gabarito{} }, "Sem gabarito"},
 		"sem a figura":         {func(p *PacoteDeProva, _ *fakeLevar) { delete(p.Figuras, figuraLevada) }, "falta no pacote a figura"},
 		"figura que não é png": {func(p *PacoteDeProva, _ *fakeLevar) { p.Figuras[figuraLevada] = []byte("gif") }, "falta no pacote a figura"},
 		"já no catálogo": {func(_ *PacoteDeProva, r *fakeLevar) {

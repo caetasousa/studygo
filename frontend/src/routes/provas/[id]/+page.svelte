@@ -427,6 +427,14 @@
 					</button>
 				</footer>
 			</article>
+		{:else if prova.questoes.length === 0}
+			<!-- Sem gabarito, a questão não aparece: responder sem poder conferir não é treinar. -->
+			<p class="callout warn">
+				<span>
+					Esta prova ainda está sem gabarito, e as questões só aparecem com ele. Quem cuida da curadoria
+					precisa enviar o gabarito na revisão da prova.
+				</span>
+			</p>
 		{:else}
 			<p class="dim">Nenhuma questão com esse filtro.</p>
 		{/if}

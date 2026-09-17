@@ -663,21 +663,34 @@ const PorPaginaCatalogo = 20
 func (s *ProvaService) Catalogo(ctx context.Context, f port.FiltroCatalogo) ([]prova.Publicacao, error) {
 	f.Offset = max(f.Offset, 0)
 	f.Limite = PorPaginaCatalogo
+	provas, err := s.Repo.Catalogo(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	// A prova sem gabarito fica na lista — é por ela que o curador a abre para
+	// corrigir —, mas contando só as questões que o aluno pode responder.
+	for i := range provas {
+		provas[i] = provas[i].SoComGabarito()
+	}
 
-	return s.Repo.Catalogo(ctx, f)
+	return provas, nil
 }
 
 // Publicacao devolve a revisão em vigor. Com número ou disciplina, só as
 // questões que casam — a busca é do banco, não de um filtro em memória.
 func (s *ProvaService) Publicacao(ctx context.Context, id string, numero int, disciplina string) (prova.Publicacao, error) {
 	p, err := s.Repo.Publicacao(ctx, id)
-	if err != nil || (numero == 0 && disciplina == "") {
+	if err != nil {
 		return p, err
 	}
+	if numero != 0 || disciplina != "" {
+		if p.Conteudo.Questoes, err = s.Repo.Questoes(ctx, id, numero, disciplina); err != nil {
+			return p, err
+		}
+	}
 
-	p.Conteudo.Questoes, err = s.Repo.Questoes(ctx, id, numero, disciplina)
-
-	return p, err
+	// Questão sem resposta no gabarito não chega ao aluno.
+	return p.SoComGabarito(), nil
 }
 
 // QuestoesAvulsas são as questões do catálogo para treinar fora da prova,
