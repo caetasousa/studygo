@@ -33,6 +33,8 @@ export interface Alternativa {
 export interface Questao {
 	numero: number;
 	disciplina: string;
+	/** O tema dentro da matéria, que o curador dá; a extração não preenche. */
+	assunto: string;
 	blocos: Bloco[];
 	alternativas: Alternativa[];
 	/** Ids dos materiais de apoio que a questão usa. */
@@ -168,6 +170,8 @@ export interface QuestaoAvulsa {
 	provaId: string;
 	numero: number;
 	disciplina: string;
+	/** O tema dentro da matéria; vazio quando a questão não foi classificada. */
+	assunto: string;
 	resposta: string;
 	orgao: string;
 	ano: number;

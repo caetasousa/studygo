@@ -358,6 +358,7 @@
 					{#if questao.disciplina}
 						<span class="materia" style={tagStyle(corDaMateria(questao.disciplina))}>{questao.disciplina}</span>
 					{/if}
+					{#if questao.assunto}<span class="assunto">{questao.assunto}</span>{/if}
 					<button type="button" class="link ver" onclick={() => (modo = 'resolver')}>ver a questão</button>
 				</h2>
 				{#key questao.numero}
@@ -394,6 +395,7 @@
 					{#if questao.disciplina}
 						<span class="materia" style={tagStyle(corDaMateria(questao.disciplina))}>{questao.disciplina}</span>
 					{/if}
+					{#if questao.assunto}<span class="assunto">{questao.assunto}</span>{/if}
 				</h2>
 
 				{#key questao.numero}
@@ -751,6 +753,11 @@
 		font-size: 12.5px;
 		font-weight: 500;
 		line-height: 1.7;
+	}
+	.assunto {
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--text-muted);
 	}
 	h2 .ver {
 		margin-left: auto;

@@ -11,12 +11,35 @@ export type SituacaoDoFiltro = 'todas' | 'abertas' | 'erradas';
 export interface FiltroDoTreino {
 	/** Vazio é todas as matérias. */
 	materias: string[];
+	/**
+	 * Os assuntos escolhidos, cada um com a sua matéria (chaveDoAssunto). Só
+	 * restringem a matéria deles: escolher Crase em Português não tira as
+	 * questões de Redes do treino.
+	 */
+	assuntos: string[];
 	/** Zero é qualquer ano. */
 	ano: number;
 	situacao: SituacaoDoFiltro;
 }
 
-export const SEM_FILTRO: FiltroDoTreino = { materias: [], ano: 0, situacao: 'todas' };
+export const SEM_FILTRO: FiltroDoTreino = { materias: [], assuntos: [], ano: 0, situacao: 'todas' };
+
+const SEPARADOR = ' › ';
+
+/** "Língua Portuguesa › Crase": o mesmo assunto pode existir em duas matérias. */
+export function chaveDoAssunto(materia: string, assunto: string): string {
+	return `${materia}${SEPARADOR}${assunto}`;
+}
+
+/** O nome do assunto, sem a matéria. */
+export function nomeDoAssunto(chave: string): string {
+	const i = chave.indexOf(SEPARADOR);
+	return i < 0 ? chave : chave.slice(i + SEPARADOR.length);
+}
+
+function doAssunto(chave: string, materia: string): boolean {
+	return chave.startsWith(materia + SEPARADOR);
+}
 
 /** As respostas guardadas de várias provas, pelo id da prova. */
 export type RespostasPorProva = Record<string, Respostas>;
@@ -34,6 +57,11 @@ export function respostaDaAvulsa(q: Ref, respostas: RespostasPorProva): Resposta
 
 export function situacaoDaAvulsa(q: QuestaoAvulsa, respostas: RespostasPorProva): Situacao {
 	return situacaoDaQuestao(q, respostaDaAvulsa(q, respostas));
+}
+
+function atendeAssuntos(q: QuestaoAvulsa, assuntos: string[]): boolean {
+	const daMateria = assuntos.filter((k) => doAssunto(k, q.disciplina));
+	return daMateria.length === 0 || daMateria.includes(chaveDoAssunto(q.disciplina, q.assunto));
 }
 
 function atende(s: Situacao, filtro: SituacaoDoFiltro): boolean {
@@ -58,6 +86,7 @@ export function filtrarTreino(
 	return qs.filter(
 		(q) =>
 			(menos === 'materias' || f.materias.length === 0 || f.materias.includes(q.disciplina)) &&
+			(menos === 'assuntos' || atendeAssuntos(q, f.assuntos)) &&
 			(menos === 'ano' || !f.ano || q.ano === f.ano) &&
 			(menos === 'situacao' || atende(situacaoDaAvulsa(q, respostas), f.situacao))
 	);
@@ -66,6 +95,8 @@ export function filtrarTreino(
 export interface OpcoesDoTreino {
 	/** Todas as matérias do catálogo, em ordem alfabética, com a contagem. */
 	materias: [string, number][];
+	/** Os assuntos de cada matéria escolhida, em ordem alfabética, com a contagem. */
+	assuntos: { materia: string; assuntos: [string, number][] }[];
 	/** Anos das provas, do mais recente, com a contagem. */
 	anos: [number, number][];
 	situacoes: Record<SituacaoDoFiltro, number>;
@@ -87,6 +118,16 @@ export function opcoesDoTreino(
 		qs.map((q) => q.disciplina),
 		filtrarTreino(qs, f, respostas, 'materias').map((q) => q.disciplina)
 	);
+	const semAssunto = filtrarTreino(qs, f, respostas, 'assuntos');
+	const assuntos = [...f.materias]
+		.sort((a, b) => a.localeCompare(b, 'pt-BR'))
+		.map((materia) => {
+			const deAssunto = (lista: QuestaoAvulsa[]) =>
+				lista.filter((q) => q.disciplina === materia && q.assunto).map((q) => q.assunto);
+			const contagem = contar(deAssunto(qs), deAssunto(semAssunto));
+			return { materia, assuntos: [...contagem].sort(([a], [b]) => a.localeCompare(b, 'pt-BR')) };
+		})
+		.filter((g) => g.assuntos.length > 0);
 	const anos = contar(
 		qs.map((q) => q.ano),
 		filtrarTreino(qs, f, respostas, 'ano').map((q) => q.ano)
@@ -101,20 +142,25 @@ export function opcoesDoTreino(
 
 	return {
 		materias: [...materias].sort(([a], [b]) => a.localeCompare(b, 'pt-BR')),
+		assuntos,
 		anos: [...anos].sort(([a], [b]) => b - a),
 		situacoes
 	};
 }
 
 /**
- * Tira do filtro salvo o que o catálogo não tem mais — matéria renomeada na
- * curadoria, ano de uma prova retirada. Sem isso, o filtro escolheria nada e
+ * Tira do filtro salvo o que o catálogo não tem mais — matéria ou assunto
+ * renomeado na curadoria, ano de uma prova retirada. Sem isso, o filtro escolheria nada e
  * não haveria chip para desmarcar.
  */
 export function ajustarAoCatalogo(f: FiltroDoTreino, qs: QuestaoAvulsa[]): FiltroDoTreino {
 	const materias = new Set(qs.map((q) => q.disciplina));
+	const assuntos = new Set(qs.map((q) => chaveDoAssunto(q.disciplina, q.assunto)));
+	const escolhidas = f.materias.filter((m) => materias.has(m));
 	return {
-		materias: f.materias.filter((m) => materias.has(m)),
+		materias: escolhidas,
+		// O assunto sem a matéria escolhida não teria chip para desmarcar.
+		assuntos: f.assuntos.filter((k) => assuntos.has(k) && escolhidas.some((m) => doAssunto(k, m))),
 		ano: qs.some((q) => q.ano === f.ano) ? f.ano : 0,
 		situacao: f.situacao
 	};
@@ -124,12 +170,17 @@ function situacaoValida(s: unknown): SituacaoDoFiltro {
 	return s === 'abertas' || s === 'erradas' ? s : 'todas';
 }
 
+function textos(v: unknown): string[] {
+	return Array.isArray(v) ? v.filter((m): m is string => typeof m === 'string') : [];
+}
+
 /** O filtro guardado no navegador. O que não se reconhece volta ao padrão. */
 export function lerFiltro(texto: string | null): FiltroDoTreino {
 	try {
 		const f = JSON.parse(texto ?? '{}') as Partial<Record<Criterio, unknown>>;
 		return {
-			materias: Array.isArray(f.materias) ? f.materias.filter((m): m is string => typeof m === 'string') : [],
+			materias: textos(f.materias),
+			assuntos: textos(f.assuntos),
 			ano: typeof f.ano === 'number' && Number.isInteger(f.ano) ? f.ano : 0,
 			situacao: situacaoValida(f.situacao)
 		};
@@ -142,6 +193,7 @@ export function lerFiltro(texto: string | null): FiltroDoTreino {
 export function enderecoDoTreino(f: FiltroDoTreino): string {
 	const q = new URLSearchParams();
 	for (const m of f.materias) q.append('disciplina', m);
+	for (const a of f.assuntos) q.append('assunto', a);
 	if (f.ano) q.set('ano', String(f.ano));
 	if (f.situacao !== 'todas') q.set('situacao', f.situacao);
 	const busca = q.toString();
@@ -151,6 +203,7 @@ export function enderecoDoTreino(f: FiltroDoTreino): string {
 export function filtroDoEndereco(p: URLSearchParams): FiltroDoTreino {
 	return {
 		materias: p.getAll('disciplina').filter(Boolean),
+		assuntos: p.getAll('assunto').filter(Boolean),
 		ano: Number(p.get('ano')) || 0,
 		situacao: situacaoValida(p.get('situacao'))
 	};

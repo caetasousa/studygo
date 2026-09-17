@@ -16,6 +16,7 @@ export function novaQuestao(numero: number, origem?: Origem): Questao {
 	return {
 		numero,
 		disciplina: '',
+		assunto: '',
 		blocos: [novoBloco()],
 		alternativas: LETRAS.map((letra) => ({ letra, blocos: [novoBloco()] })),
 		apoios: [],
@@ -490,6 +491,44 @@ export function escreverNumeros(numeros: number[]): string {
 		i = j;
 	}
 	return partes.join(', ');
+}
+
+type Classificada = Pick<Questao, 'disciplina' | 'assunto'>;
+
+/** O que faz duas grafias serem a mesma matéria, como no servidor. */
+function chaveDaMateria(nome: string): string {
+	return nome.trim().split(/\s+/).join(' ').toLowerCase();
+}
+
+/**
+ * Os nomes já usados — nesta prova e no catálogo publicado —, para a
+ * classificação sair igual em todas as provas: as matérias, e os assuntos da
+ * matéria que a questão tem. É o nome igual que junta as questões no treino.
+ */
+export function nomesJaUsados(
+	materia: string,
+	...listas: Classificada[][]
+): { materias: string[]; assuntos: string[] } {
+	const todas = listas.flat();
+	const chave = chaveDaMateria(materia);
+	// Duas grafias do mesmo nome sugerem uma só: a mais usada, como no treino.
+	const unicos = (nomes: string[]) => {
+		const usos = new Map<string, Map<string, number>>();
+		for (const n of nomes) {
+			const grafia = n.trim().split(/\s+/).join(' ');
+			if (!grafia) continue;
+			const k = grafia.toLowerCase();
+			const deK = usos.get(k) ?? new Map<string, number>();
+			usos.set(k, deK.set(grafia, (deK.get(grafia) ?? 0) + 1));
+		}
+		return [...usos.values()]
+			.map((grafias) => [...grafias].sort(([a, na], [b, nb]) => nb - na || (a < b ? -1 : 1))[0][0])
+			.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+	};
+	return {
+		materias: unicos(todas.map((q) => q.disciplina)),
+		assuntos: chave ? unicos(todas.filter((q) => chaveDaMateria(q.disciplina) === chave).map((q) => q.assunto)) : []
+	};
 }
 
 /**

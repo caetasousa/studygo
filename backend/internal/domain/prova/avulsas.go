@@ -12,6 +12,7 @@ type QuestaoAvulsa struct {
 	ProvaID    string
 	Numero     int
 	Disciplina string
+	Assunto    string
 	Resposta   string
 	// A identificação da prova de onde ela vem.
 	Orgao     string
@@ -77,6 +78,7 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 			continue
 		}
 		q.Disciplina = nome[k]
+		q.Assunto = strings.Join(strings.Fields(q.Assunto), " ")
 		out = append(out, q)
 	}
 

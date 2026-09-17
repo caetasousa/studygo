@@ -758,7 +758,7 @@ func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	f06 := rascunhoPublicavel(recorte)
 	f06.Cargo, f06.CargoNome, f06.Ano = "F06", "Analista Judiciário – Sistemas", 2025
 	propria := f06.Questoes[0]
-	propria.Numero, propria.Disciplina = 2, "Língua Portuguesa"
+	propria.Numero, propria.Disciplina, propria.Assunto = 2, "Língua Portuguesa", "Crase"
 	propria.Blocos = []prova.Bloco{{Tipo: "texto", Texto: "Só da F06"}}
 	f06.Questoes = append(f06.Questoes, propria)
 	i := levarARevisao(t, repo, f06)
@@ -777,7 +777,7 @@ func TestProvas_QuestoesAvulsasUmaVezPorConteudo(t *testing.T) {
 	want := []prova.QuestaoAvulsa{
 		{ProvaID: e05ID, Numero: 1, Disciplina: "Redes", Resposta: "C", Orgao: "TJCE", Ano: 2026, Cargo: "E05",
 			CargoNome: "Analista Judiciário – Infraestrutura de TI"},
-		{ProvaID: f06ID, Numero: 2, Disciplina: "Língua Portuguesa", Orgao: "TJCE", Ano: 2025, Cargo: "F06",
+		{ProvaID: f06ID, Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Crase", Orgao: "TJCE", Ano: 2025, Cargo: "F06",
 			CargoNome: "Analista Judiciário – Sistemas"},
 	}
 	if !slices.Equal(avulsas, want) {

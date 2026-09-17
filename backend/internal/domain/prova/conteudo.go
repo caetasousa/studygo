@@ -42,6 +42,7 @@ type FiguraNoPDF struct {
 type LugarDaQuestao struct {
 	Numero             int
 	Disciplina         string
+	Assunto            string
 	Apoios             []string
 	Origens            []Origem
 	Revisada, Completa bool
@@ -60,7 +61,7 @@ func (q Questao) Separar() (ConteudoDeQuestao, LugarDaQuestao) {
 	}
 
 	return c, LugarDaQuestao{
-		Numero: q.Numero, Disciplina: q.Disciplina, Apoios: q.Apoios, Origens: q.Origens,
+		Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Apoios: q.Apoios, Origens: q.Origens,
 		Revisada: q.Revisada, Completa: q.Completa, Figuras: figuras, IgualA: q.IgualA,
 	}
 }
@@ -70,7 +71,7 @@ func (q Questao) Separar() (ConteudoDeQuestao, LugarDaQuestao) {
 func JuntarQuestao(c ConteudoDeQuestao, l LugarDaQuestao) Questao {
 	k := 0
 	q := Questao{
-		Numero: l.Numero, Disciplina: l.Disciplina, Apoios: l.Apoios, Origens: l.Origens,
+		Numero: l.Numero, Disciplina: l.Disciplina, Assunto: l.Assunto, Apoios: l.Apoios, Origens: l.Origens,
 		Revisada: l.Revisada, Completa: l.Completa, IgualA: l.IgualA,
 		Blocos: comPosicao(c.Blocos, l.Figuras, &k),
 	}
@@ -271,6 +272,8 @@ func (r *Rascunho) Reaproveitar(irmas []Publicacao) {
 		_, lugar := q.Separar()
 		lugar.Completa, lugar.Revisada = true, true
 		lugar.Disciplina = cmp.Or(pub.Disciplina, lugar.Disciplina)
+		// O assunto também: a questão que cai de novo não é classificada outra vez.
+		lugar.Assunto = cmp.Or(pub.Assunto, lugar.Assunto)
 		lugar.IgualA = fmt.Sprintf("%s, questão %d", p.Conteudo.Rotulo(), pub.Numero)
 		// O recorte é o de lá, já conferido.
 		for k := range lugar.Figuras {

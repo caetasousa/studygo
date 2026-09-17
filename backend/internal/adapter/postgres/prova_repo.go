@@ -870,6 +870,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		 uma_por_conteudo AS (
 		     SELECT DISTINCT ON (q.conteudo_id)
 		            q.prova_id, q.numero, q.disciplina,
+		            coalesce(q.lugar->>'Assunto', '') AS assunto,
 		            coalesce(g.resposta, '') AS resposta,
 		            coalesce(pr.conteudo->>'Orgao', '') AS orgao,
 		            coalesce((pr.conteudo->>'Ano')::int, 0) AS ano,
@@ -884,7 +885,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 		              ON g.prova_id = q.prova_id AND g.revisao = q.revisao AND g.numero = q.numero
 		      ORDER BY q.conteudo_id, e.em, p.id, q.numero
 		 )
-		 SELECT prova_id::text, numero, disciplina, resposta, orgao, ano, cargo, cargo_nome
+		 SELECT prova_id::text, numero, disciplina, assunto, resposta, orgao, ano, cargo, cargo_nome
 		   FROM uma_por_conteudo
 		  ORDER BY ano DESC, estreia, prova_id, numero`,
 	)
@@ -896,7 +897,7 @@ func (r *ProvaRepo) QuestoesAvulsas(ctx context.Context) ([]prova.QuestaoAvulsa,
 	out := []prova.QuestaoAvulsa{}
 	for rows.Next() {
 		var q prova.QuestaoAvulsa
-		if err := rows.Scan(&q.ProvaID, &q.Numero, &q.Disciplina, &q.Resposta, &q.Orgao, &q.Ano, &q.Cargo, &q.CargoNome); err != nil {
+		if err := rows.Scan(&q.ProvaID, &q.Numero, &q.Disciplina, &q.Assunto, &q.Resposta, &q.Orgao, &q.Ano, &q.Cargo, &q.CargoNome); err != nil {
 			return nil, fmt.Errorf("lendo questão avulsa: %w", err)
 		}
 		out = append(out, q)

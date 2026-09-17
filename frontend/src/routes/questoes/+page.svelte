@@ -14,9 +14,11 @@
 	import { provasDoPacote } from '$lib/provas/pacote';
 	import {
 		ajustarAoCatalogo,
+		chaveDoAssunto,
 		enderecoDoTreino,
 		filtrarTreino,
 		lerFiltro,
+		nomeDoAssunto,
 		opcoesDoTreino,
 		type FiltroDoTreino,
 		type RespostasPorProva,
@@ -127,7 +129,17 @@
 	const deQuantasProvas = $derived(new Set(escolhidas.map((q) => q.provaId)).size);
 
 	function alternarMateria(m: string) {
-		filtro.materias = filtro.materias.includes(m) ? filtro.materias.filter((x) => x !== m) : [...filtro.materias, m];
+		if (filtro.materias.includes(m)) {
+			filtro.materias = filtro.materias.filter((x) => x !== m);
+			// Sem a matéria, os assuntos dela ficariam escolhidos sem chip para desmarcar.
+			filtro.assuntos = filtro.assuntos.filter((k) => !k.startsWith(chaveDoAssunto(m, '')));
+		} else {
+			filtro.materias = [...filtro.materias, m];
+		}
+	}
+
+	function alternarAssunto(k: string) {
+		filtro.assuntos = filtro.assuntos.includes(k) ? filtro.assuntos.filter((x) => x !== k) : [...filtro.assuntos, k];
 	}
 
 	/** "Língua Portuguesa e Redes" — o que o botão vai resolver, numa frase. */
@@ -140,6 +152,8 @@
 					? ms.join(' e ')
 					: `${ms.slice(0, 2).join(', ')} e mais ${ms.length - 2}`;
 		const partes = [materias];
+		const as = filtro.assuntos.map(nomeDoAssunto);
+		if (as.length) partes.push(as.length <= 2 ? as.join(' e ') : `${as.slice(0, 2).join(', ')} e mais ${as.length - 2}`);
 		if (filtro.ano) partes.push(`provas de ${filtro.ano}`);
 		if (filtro.situacao === 'abertas') partes.push('só as não resolvidas');
 		if (filtro.situacao === 'erradas') partes.push('só as que você errou');
@@ -418,10 +432,45 @@
 						</button>
 					{/each}
 					{#if filtro.materias.length}
-						<button type="button" class="limpar" onclick={() => (filtro.materias = [])}>Limpar</button>
+						<button
+							type="button"
+							class="limpar"
+							onclick={() => {
+								filtro.materias = [];
+								filtro.assuntos = [];
+							}}>Limpar</button
+						>
 					{/if}
 				</div>
 			</div>
+
+			<!-- Os assuntos aparecem com a matéria escolhida: sem ela, seriam centenas. -->
+			{#if opcoes.assuntos.length}
+				<div class="propriedade">
+					<span class="rotulo"><NavIcon name="questoes" size="sm" /> Assuntos</span>
+					<div class="valor assuntos">
+						{#each opcoes.assuntos as g (g.materia)}
+							<div class="grupo-assuntos">
+								{#if opcoes.assuntos.length > 1}<span class="de-materia">{g.materia}</span>{/if}
+								{#each g.assuntos as [a, n] (a)}
+									{@const k = chaveDoAssunto(g.materia, a)}
+									<button
+										type="button"
+										class="opcao"
+										aria-pressed={filtro.assuntos.includes(k)}
+										onclick={() => alternarAssunto(k)}
+									>
+										{a} <span class="n">{n}</span>
+									</button>
+								{/each}
+							</div>
+						{/each}
+						{#if filtro.assuntos.length}
+							<button type="button" class="limpar" onclick={() => (filtro.assuntos = [])}>Todos os assuntos</button>
+						{/if}
+					</div>
+				</div>
+			{/if}
 
 			{#if opcoes.anos.length > 1}
 				<div class="propriedade">
@@ -845,6 +894,23 @@
 		color: var(--text);
 		font-weight: 600;
 		background: var(--bg-hover);
+	}
+	.valor.assuntos {
+		display: grid;
+		justify-items: start;
+		gap: 8px;
+	}
+	.grupo-assuntos {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2px 4px;
+		align-items: center;
+	}
+	.de-materia {
+		width: 100%;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-faint);
 	}
 	.resumo {
 		display: flex;

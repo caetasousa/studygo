@@ -1,5 +1,6 @@
 {
   "ano": "number",
+  "assunto": "string",
   "cargo": "string",
   "cargoNome": "string",
   "disciplina": "string",

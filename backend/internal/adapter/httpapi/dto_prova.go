@@ -40,6 +40,7 @@ type alternativaDTO struct {
 type questaoDTO struct {
 	Numero       int              `json:"numero"`
 	Disciplina   string           `json:"disciplina"`
+	Assunto      string           `json:"assunto"`
 	Blocos       []blocoProvaDTO  `json:"blocos"`
 	Alternativas []alternativaDTO `json:"alternativas"`
 	Apoios       []string         `json:"apoios"`
@@ -164,6 +165,7 @@ type questaoAvulsaDTO struct {
 	ProvaID    string `json:"provaId"`
 	Numero     int    `json:"numero"`
 	Disciplina string `json:"disciplina"`
+	Assunto    string `json:"assunto"`
 	Resposta   string `json:"resposta"`
 	Orgao      string `json:"orgao"`
 	Ano        int    `json:"ano"`
@@ -243,7 +245,7 @@ func questaoParaDTO(q prova.Questao) questaoDTO {
 	}
 
 	return questaoDTO{
-		Numero: q.Numero, Disciplina: q.Disciplina, Blocos: blocosParaDTO(q.Blocos),
+		Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Blocos: blocosParaDTO(q.Blocos),
 		Alternativas: alternativas, Apoios: naoNula(q.Apoios), Origens: origensParaDTO(q.Origens),
 		Resposta: q.Resposta, Situacao: q.Situacao, Revisada: q.Revisada, Completa: q.Completa,
 		IgualA: q.IgualA,
@@ -328,7 +330,7 @@ func provaResumoParaDTO(p prova.Publicacao) provaResumoDTO {
 
 func questaoAvulsaParaDTO(q prova.QuestaoAvulsa) questaoAvulsaDTO {
 	return questaoAvulsaDTO{
-		ProvaID: q.ProvaID, Numero: q.Numero, Disciplina: q.Disciplina, Resposta: q.Resposta,
+		ProvaID: q.ProvaID, Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Resposta: q.Resposta,
 		Orgao: q.Orgao, Ano: q.Ano, Cargo: q.Cargo, CargoNome: q.CargoNome,
 	}
 }
@@ -385,7 +387,7 @@ func rascunhoDoDTO(d rascunhoDTO) prova.Rascunho {
 			origens = append(origens, origemDoDTO(o))
 		}
 		r.Questoes = append(r.Questoes, prova.Questao{
-			Numero: q.Numero, Disciplina: q.Disciplina, Blocos: blocosDoDTO(q.Blocos),
+			Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Blocos: blocosDoDTO(q.Blocos),
 			Alternativas: alternativas, Apoios: q.Apoios, Origens: origens,
 			Resposta: q.Resposta, Situacao: q.Situacao, Revisada: q.Revisada, Completa: q.Completa,
 			IgualA: q.IgualA,

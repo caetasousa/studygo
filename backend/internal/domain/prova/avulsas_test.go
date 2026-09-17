@@ -67,6 +67,22 @@ func TestAvulsas_NomeNaoMudaComOFiltro(t *testing.T) {
 	}
 }
 
+// O assunto vem digitado pelo curador; espaço a mais não pode separar duas
+// questões do mesmo assunto no filtro.
+func TestAvulsas_AssuntoSemEspacosAMais(t *testing.T) {
+	t.Parallel()
+
+	qs := []QuestaoAvulsa{
+		{Numero: 1, Disciplina: "Língua Portuguesa", Assunto: " Crase"},
+		{Numero: 2, Disciplina: "Língua Portuguesa", Assunto: "Concordância  nominal e verbal "},
+	}
+
+	got := Avulsas(qs, FiltroDeAvulsas{})
+	if got[0].Assunto != "Crase" || got[1].Assunto != "Concordância nominal e verbal" {
+		t.Fatalf("assuntos = %q, %q", got[0].Assunto, got[1].Assunto)
+	}
+}
+
 func TestAvulsas_FiltraMateriasEAno(t *testing.T) {
 	t.Parallel()
 

@@ -17,6 +17,7 @@ func TestSepararEJuntar_NaoPerdeNada(t *testing.T) {
 	q := comFiguraEm(questao(3, true, "Considere o gráfico."), 2, 100, 50, 300, 200)
 	q.Alternativas[1].Blocos = []Bloco{{Tipo: "imagem", Arquivo: "alt", Origem: &Origem{Pagina: 2, Retangulo: []float64{1, 2, 3, 4}}}}
 	q.Resposta, q.Situacao, q.Disciplina, q.Apoios = "C", "Gabarito sem alteração", "Estatística", []string{"t1"}
+	q.Assunto = "Medidas de dispersão"
 	q.Origens = []Origem{{Pagina: 2, Regiao: "1", Retangulo: []float64{0, 0, 500, 400}}}
 
 	c, l := q.Separar()
@@ -86,6 +87,7 @@ func TestReaproveitar_QuestaoIgualDeOutroCargo(t *testing.T) {
 	// só no espaço, e a figura noutra posição (outro PDF).
 	publicada := comFiguraEm(questao(3, true, "No texto, Sêneca caracteriza o presente como"), 1, 10, 20, 30, 40)
 	publicada.Blocos[1].Largura, publicada.Disciplina, publicada.Resposta = 40, "Língua Portuguesa", "C"
+	publicada.Assunto = "Tempos e modos verbais"
 	lida := comFiguraEm(questao(3, false, "No  texto, Sêneca caracteriza o presente como"), 2, 500, 600, 700, 800)
 	lida.Blocos[1].Arquivo, lida.Blocos[1].Revisado = "outro-recorte", false
 	lida.Resposta, lida.Disciplina, lida.Revisada = "C", "CONHECIMENTOS GERAIS", false
@@ -101,7 +103,7 @@ func TestReaproveitar_QuestaoIgualDeOutroCargo(t *testing.T) {
 		t.Fatalf("figura = %+v; quer o recorte publicado, já conferido, na posição deste PDF", f)
 	}
 	// Referência à já cadastrada: nada a conferir.
-	if q.Disciplina != "Língua Portuguesa" || q.Resposta != "C" || !q.Revisada {
+	if q.Disciplina != "Língua Portuguesa" || q.Assunto != "Tempos e modos verbais" || q.Resposta != "C" || !q.Revisada {
 		t.Fatalf("lugar = %+v", q)
 	}
 	if len(r.Alertas) != 0 {

@@ -11,12 +11,13 @@
 		comecoDoApoio,
 		definirResposta,
 		incompleta,
+		nomesJaUsados,
 		novoBloco,
 		problemasDaQuestao,
 		rotuloDoApoio,
 		vincularApoio
 	} from './revisao';
-	import type { Rascunho } from './types';
+	import type { QuestaoAvulsa, Rascunho } from './types';
 
 	let {
 		rascunho = $bindable(),
@@ -25,10 +26,13 @@
 		onremover,
 		onajustarFigura,
 		onabrirTexto,
-		onproxima
+		onproxima,
+		catalogo = []
 	}: {
 		rascunho: Rascunho;
 		indice: number;
+		/** As questões já publicadas, de onde vêm os nomes de matéria e assunto sugeridos. */
+		catalogo?: Pick<QuestaoAvulsa, 'disciplina' | 'assunto'>[];
 		/** Algo mudou. `desfazer` diz se a mudança derruba a conferência. */
 		onalterar: (desfazer: boolean) => void;
 		onremover: () => void;
@@ -49,8 +53,7 @@
 	const q = $derived(rascunho.questoes[indice]);
 	const faltaLetra = $derived(LETRAS.find((l) => !q.alternativas.some((a) => a.letra === l)));
 
-	/** As matérias já usadas na prova, para o nome sair igual. */
-	const materias = $derived([...new Set(rascunho.questoes.map((x) => x.disciplina).filter(Boolean))].sort());
+	const usados = $derived(nomesJaUsados(q.disciplina, rascunho.questoes, catalogo));
 
 	const figuras = $derived([
 		...figurasDoCampo(q.blocos, 'q', 'Enunciado'),
@@ -99,17 +102,45 @@
 {/snippet}
 
 <div class="questao">
-	<Campo
-		rotulo="Matéria"
-		ajuda="É por ela que o aluno filtra a prova. Ao digitar, aparecem as matérias já usadas nesta prova — use o mesmo nome para agrupar."
-	>
-		{#snippet children({ id, ajuda })}
-			<input {id} aria-describedby={ajuda} type="text" list="materias-da-prova" bind:value={q.disciplina} oninput={alterar} />
-			<datalist id="materias-da-prova">
-				{#each materias as m (m)}<option value={m}></option>{/each}
-			</datalist>
-		{/snippet}
-	</Campo>
+	<div class="classificacao">
+		<Campo
+			rotulo="Matéria"
+			ajuda="É por ela que o aluno filtra a prova. Ao digitar, aparecem as matérias já usadas — use o mesmo nome para agrupar."
+		>
+			{#snippet children({ id, ajuda })}
+				<input
+					{id}
+					aria-describedby={ajuda}
+					type="text"
+					list="materias-usadas"
+					bind:value={q.disciplina}
+					oninput={alterar}
+				/>
+				<datalist id="materias-usadas">
+					{#each usados.materias as m (m)}<option value={m}></option>{/each}
+				</datalist>
+			{/snippet}
+		</Campo>
+		<!-- Classificar não mexe no que a questão diz: não desfaz a conferência. -->
+		<Campo
+			rotulo="Assunto"
+			ajuda="O tema dentro da matéria, para o treino. Aparecem os assuntos que essa matéria já tem nas provas publicadas."
+		>
+			{#snippet children({ id, ajuda })}
+				<input
+					{id}
+					aria-describedby={ajuda}
+					type="text"
+					list="assuntos-usados"
+					bind:value={q.assunto}
+					oninput={() => onalterar(false)}
+				/>
+				<datalist id="assuntos-usados">
+					{#each usados.assuntos as a (a)}<option value={a}></option>{/each}
+				</datalist>
+			{/snippet}
+		</Campo>
+	</div>
 
 	{#each ligados as apoio (apoio.id)}
 		<TextoDeApoio {apoio}>
@@ -289,6 +320,11 @@
 		/* Sem o minmax, a linha mais longa de um bloco de código alarga a coluna
 		   e corta o texto na borda do cartão; assim, só o código rola. */
 		grid-template-columns: minmax(0, 1fr);
+		gap: 14px;
+	}
+	.classificacao {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 14px;
 	}
 	.rotulo {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	nomesJaUsados,
 	citaTexto,
 	incompleta,
 	problemasDaQuestao,
@@ -368,5 +369,25 @@ describe('trecho', () => {
 		// Em outra página, ou sem origem, a região inteira.
 		expect(trechoInicial(regioes[0], q, [q])).toEqual([0, 0, 600, 850]);
 		expect(trechoInicial(regioes[0], undefined)).toEqual([0, 0, 600, 850]);
+	});
+});
+
+describe('nomes já usados', () => {
+	it('matérias de tudo, assuntos só da matéria, qualquer grafia', () => {
+		const prova = [
+			{ disciplina: 'Língua Portuguesa', assunto: 'Crase' },
+			{ disciplina: 'Redes', assunto: 'DNS' }
+		];
+		const catalogo = [
+			{ disciplina: 'língua  portuguesa', assunto: 'Pontuação ' },
+			{ disciplina: 'Língua Portuguesa', assunto: 'crase' },
+			{ disciplina: 'Língua Portuguesa', assunto: 'Crase' },
+			{ disciplina: 'Língua Portuguesa', assunto: '' }
+		];
+		expect(nomesJaUsados(' Língua Portuguesa', prova, catalogo)).toEqual({
+			materias: ['Língua Portuguesa', 'Redes'],
+			assuntos: ['Crase', 'Pontuação']
+		});
+		expect(nomesJaUsados('', prova, catalogo).assuntos).toEqual([]);
 	});
 });

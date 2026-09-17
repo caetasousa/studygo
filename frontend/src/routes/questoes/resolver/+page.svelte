@@ -11,6 +11,7 @@
 		chaveDaAvulsa,
 		filtrarTreino,
 		filtroDoEndereco,
+		nomeDoAssunto,
 		respostaDaAvulsa,
 		type RespostasPorProva
 	} from '$lib/provas/treino';
@@ -66,6 +67,7 @@
 
 	const detalhes = $derived.by(() => {
 		const partes = [`${lista.length} ${lista.length === 1 ? 'questão' : 'questões'}`];
+		if (filtro.assuntos.length) partes.push(filtro.assuntos.map(nomeDoAssunto).join(', '));
 		if (filtro.ano) partes.push(`provas de ${filtro.ano}`);
 		if (filtro.situacao === 'abertas') partes.push('não resolvidas');
 		if (filtro.situacao === 'erradas') partes.push('as que você errou');
@@ -258,7 +260,7 @@
 										class="num {situacoes[i]}"
 										class:atual={i === atual}
 										aria-current={i === atual ? 'true' : undefined}
-										title="Questão {q.numero} · {q.disciplina}{anotacoes[q.provaId]?.[q.numero] ? ' · anotada' : ''}"
+										title="Questão {q.numero} · {q.disciplina}{q.assunto ? ` › ${q.assunto}` : ''}{anotacoes[q.provaId]?.[q.numero] ? ' · anotada' : ''}"
 										onclick={() => ir(i)}
 									>
 										{q.numero}
@@ -277,6 +279,7 @@
 			<h2>
 				Questão {item.numero}
 				<span class="materia" style={tagStyle(corDaMateria(item.disciplina))}>{item.disciplina}</span>
+				{#if item.assunto}<span class="assunto">{item.assunto}</span>{/if}
 			</h2>
 			<p class="origem">
 				<a href="/provas/{item.provaId}?q={item.numero}" title="Abrir a prova inteira nesta questão">
@@ -507,6 +510,11 @@
 		font-size: 12.5px;
 		font-weight: 500;
 		line-height: 1.7;
+	}
+	.assunto {
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--text-muted);
 	}
 	/* De onde a questão vem: discreto, e leva à prova inteira nela. */
 	.origem {

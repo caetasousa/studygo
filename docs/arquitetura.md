@@ -210,7 +210,7 @@ que herda os arquivos; a publicada fica no ar até a próxima.
 
 **Cada questão é guardada uma vez só.** A questão se divide no que ela é em
 qualquer prova — texto, alternativas, figuras (`ConteudoDeQuestao`) — e no
-lugar que ocupa numa prova — número, matéria, onde está no PDF
+lugar que ocupa numa prova — número, matéria, assunto, onde está no PDF
 (`LugarDaQuestao`). O conteúdo vai para `provas_questoes_conteudo`,
 identificado pela impressão (`Impressao`, que ignora espaços): a revisão nova
 que repete a anterior e o cargo que repete as Conhecimentos Gerais de outro
@@ -318,6 +318,14 @@ só, para a mesma matéria ter o mesmo nome na prova toda, e troca pela sugestã
 só a seção genérica — título que já é matéria ("Língua Portuguesa") manda. Na
 revisão, "Sugerir matérias" faz o mesmo sob demanda, sem gravar.
 
+**O assunto é do curador.** Dentro da matéria, o assunto ("Crase", "Redes
+TCP/IP e protocolos") é o que o treino filtra, e só junta questões se o nome
+for o mesmo em todas as provas — por isso a extração não o preenche. O editor
+sugere as matérias e os assuntos que o catálogo publicado já usa; a questão
+reaproveitada de outra prova traz o assunto de lá (`Reaproveitar`); e mudar a
+classificação não desfaz a conferência, porque não muda o que a questão diz.
+Mora no `lugar` (jsonb) — o filtro roda no navegador, não no SQL.
+
 **O curador edita texto, não blocos.** Cada campo (enunciado, alternativa,
 texto de apoio) é um texto só, com marcação curta: `**negrito**`, `*itálico*`,
 `__sublinhado__`, crases para `comando` no meio da frase, três crases em volta
@@ -387,7 +395,7 @@ entrega, com tabela própria.
 **O treino por matéria junta as questões de todas as provas.** A tela
 Questões tem duas entradas: a prova inteira (`/provas/{id}`) e as questões de
 uma ou mais matérias (`/questoes/resolver`). `GET /api/provas/questoes` lista as
-questões publicadas sem o conteúdo — prova, número, matéria, resposta — uma vez
+questões publicadas sem o conteúdo — prova, número, matéria, assunto, resposta — uma vez
 por conteúdo: a questão que caiu igual em dois cargos vem da prova que estreou
 primeiro no catálogo (a primeira revisão, para republicar não trocar a
 ocorrência e fazer a questão parecer nunca resolvida). Duas grafias da mesma
@@ -396,7 +404,9 @@ matéria ("Noções Sobre…" e "Noções sobre…") viram um nome só em
 SQL. O conteúdo vem da prova (`GET /api/provas/{id}`), carregada na vez da
 questão. O filtro de situação — não resolvidas, as que errou — é do navegador,
 porque as respostas também são; e o treino grava no mesmo lugar que a prova
-inteira: resolvida num, aparece resolvida no outro.
+inteira: resolvida num, aparece resolvida no outro. Com matéria escolhida,
+aparecem os assuntos dela; o assunto restringe só a própria matéria —
+Crase em Português não tira Redes do treino.
 
 **A anotação é do estudante, por questão.** Markdown (título, lista, tarefa,
 citação, código, link — só `http`, `https` e `mailto` viram link), salvo sozinho

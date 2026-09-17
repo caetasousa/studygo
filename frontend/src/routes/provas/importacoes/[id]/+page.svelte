@@ -41,7 +41,7 @@
 		eTrecho,
 		trechoInicial
 	} from '$lib/provas/revisao';
-	import type { EstadoImportacao, Importacao, Origem } from '$lib/provas/types';
+	import type { EstadoImportacao, Importacao, Origem, QuestaoAvulsa } from '$lib/provas/types';
 
 	const ROTULO: Record<EstadoImportacao, string> = {
 		na_fila: 'Na fila',
@@ -53,6 +53,8 @@
 	};
 
 	let imp = $state<Importacao | null>(null);
+	/** As questões publicadas: só para sugerir os nomes de matéria e assunto. */
+	let catalogo = $state<QuestaoAvulsa[]>([]);
 	let erro = $state('');
 	let aviso = $state('');
 	let conflito = $state(false);
@@ -464,6 +466,11 @@
 	}
 
 	onMount(() => {
+		// Sem o catálogo, o editor só deixa de sugerir: nada a avisar.
+		provasApi
+			.questoes()
+			.then((qs) => (catalogo = qs))
+			.catch(() => {});
 		void executar(async () => {
 			// Lida antes de carregar: receber() apaga a cópia.
 			const copia = lerRascunhoLocal(id);
@@ -1024,6 +1031,7 @@
 										onremover={removerQuestao}
 										onajustarFigura={ajustarFigura}
 										onabrirTexto={abrirTexto}
+										{catalogo}
 										onproxima={() => {
 											const i = proximaPendente(imp!.rascunho.questoes, indice);
 											irPara(i >= 0 ? i : Math.min(indice + 1, imp!.rascunho.questoes.length - 1));

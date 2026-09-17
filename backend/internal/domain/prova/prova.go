@@ -109,8 +109,12 @@ type Alternativa struct {
 }
 
 type Questao struct {
-	Numero       int
-	Disciplina   string
+	Numero     int
+	Disciplina string
+	// Assunto é o tema dentro da matéria, que o curador dá à questão. A
+	// extração não o preenche: é o que o treino filtra, e só serve se for o
+	// mesmo nome em todas as provas.
+	Assunto      string
 	Blocos       []Bloco
 	Alternativas []Alternativa
 	// Apoios lista os ids dos textos compartilhados que a questão usa.

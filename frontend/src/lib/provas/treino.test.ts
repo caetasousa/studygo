@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	ajustarAoCatalogo,
+	chaveDoAssunto,
 	enderecoDoTreino,
 	filtrarTreino,
 	filtroDoEndereco,
@@ -11,17 +12,26 @@ import {
 } from './treino';
 import type { QuestaoAvulsa } from './types';
 
-function avulsa(provaId: string, numero: number, disciplina: string, ano: number, resposta = 'C'): QuestaoAvulsa {
-	return { provaId, numero, disciplina, ano, resposta, orgao: 'TJCE', cargo: 'E05', cargoNome: '' };
+function avulsa(
+	provaId: string,
+	numero: number,
+	disciplina: string,
+	ano: number,
+	resposta = 'C',
+	assunto = ''
+): QuestaoAvulsa {
+	return { provaId, numero, disciplina, assunto, ano, resposta, orgao: 'TJCE', cargo: 'E05', cargoNome: '' };
 }
 
 const qs = [
-	avulsa('tjce', 1, 'Língua Portuguesa', 2026),
-	avulsa('tjce', 2, 'Língua Portuguesa', 2026),
+	avulsa('tjce', 1, 'Língua Portuguesa', 2026, 'C', 'Crase'),
+	avulsa('tjce', 2, 'Língua Portuguesa', 2026, 'C', 'Pontuação'),
 	avulsa('tjce', 3, 'Redes', 2026),
-	avulsa('trt', 1, 'Língua Portuguesa', 2025),
+	avulsa('trt', 1, 'Língua Portuguesa', 2025, 'C', 'Crase'),
 	avulsa('trt', 2, 'Banco de Dados', 2025, '')
 ];
+
+const CRASE = chaveDoAssunto('Língua Portuguesa', 'Crase');
 
 // tjce 1 certa, tjce 2 errada, trt 2 respondida sem gabarito, tjce 3 só marcada.
 const respostas: RespostasPorProva = {
@@ -43,9 +53,22 @@ describe('filtrarTreino', () => {
 	});
 
 	it('matérias, ano e situação se somam', () => {
-		const f = { materias: ['Língua Portuguesa'], ano: 2026, situacao: 'todas' as const };
+		const f = { materias: ['Língua Portuguesa'], assuntos: [], ano: 2026, situacao: 'todas' as const };
 		expect(chaves(filtrarTreino(qs, f, respostas))).toEqual(['tjce.1', 'tjce.2']);
 		expect(chaves(filtrarTreino(qs, { ...f, situacao: 'erradas' }, respostas))).toEqual(['tjce.2']);
+	});
+
+	it('o assunto restringe só a matéria dele', () => {
+		const f = { ...SEM_FILTRO, materias: ['Língua Portuguesa', 'Redes'], assuntos: [CRASE] };
+		expect(chaves(filtrarTreino(qs, f, respostas))).toEqual(['tjce.1', 'tjce.3', 'trt.1']);
+	});
+
+	it('assunto de mesmo nome noutra matéria não entra', () => {
+		const lista = [...qs, avulsa('trt', 3, 'Redação', 2025, 'C', 'Crase')];
+		const f = { ...SEM_FILTRO, materias: ['Língua Portuguesa', 'Redação'], assuntos: [CRASE] };
+		expect(chaves(filtrarTreino(lista, f, respostas))).toEqual(['tjce.1', 'trt.1', 'trt.3']);
+		const deRedacao = { ...f, assuntos: [chaveDoAssunto('Redação', 'Crase')] };
+		expect(chaves(filtrarTreino(lista, deRedacao, respostas))).toEqual(['tjce.1', 'tjce.2', 'trt.1', 'trt.3']);
 	});
 
 	it('não resolvida é a que não foi respondida, mesmo marcada', () => {
@@ -61,7 +84,11 @@ describe('filtrarTreino', () => {
 
 describe('opcoesDoTreino', () => {
 	it('cada grupo conta mantendo os outros critérios', () => {
-		const o = opcoesDoTreino(qs, { materias: ['Língua Portuguesa'], ano: 2025, situacao: 'todas' }, respostas);
+		const o = opcoesDoTreino(
+			qs,
+			{ materias: ['Língua Portuguesa'], assuntos: [], ano: 2025, situacao: 'todas' },
+			respostas
+		);
 		// As matérias contam no ano escolhido, e todas aparecem, mesmo com zero.
 		expect(o.materias).toEqual([
 			['Banco de Dados', 1],
@@ -74,6 +101,32 @@ describe('opcoesDoTreino', () => {
 			[2025, 1]
 		]);
 		expect(o.situacoes).toEqual({ todas: 1, abertas: 1, erradas: 0 });
+		// Os assuntos só da matéria escolhida, contados no ano escolhido.
+		expect(o.assuntos).toEqual([
+			{
+				materia: 'Língua Portuguesa',
+				assuntos: [
+					['Crase', 1],
+					['Pontuação', 0]
+				]
+			}
+		]);
+	});
+
+	it('escolher um assunto não zera os outros da matéria', () => {
+		const f = { ...SEM_FILTRO, materias: ['Língua Portuguesa', 'Redes'], assuntos: [CRASE] };
+		const o = opcoesDoTreino(qs, f, respostas);
+		expect(o.assuntos).toEqual([
+			{
+				materia: 'Língua Portuguesa',
+				assuntos: [
+					['Crase', 2],
+					['Pontuação', 1]
+				]
+			}
+		]);
+		// Com o assunto escolhido, a matéria conta só o que o treino teria.
+		expect(o.materias).toContainEqual(['Língua Portuguesa', 2]);
 	});
 
 	it('matérias em ordem alfabética do português', () => {
@@ -86,22 +139,35 @@ describe('filtro salvo', () => {
 	it('o que não se reconhece volta ao padrão', () => {
 		expect(lerFiltro(null)).toEqual(SEM_FILTRO);
 		expect(lerFiltro('{')).toEqual(SEM_FILTRO);
-		expect(lerFiltro('{"materias":["Redes",3],"ano":"2026","situacao":"x"}')).toEqual({
+		expect(lerFiltro('{"materias":["Redes",3],"assuntos":"Crase","ano":"2026","situacao":"x"}')).toEqual({
 			materias: ['Redes'],
+			assuntos: [],
 			ano: 0,
 			situacao: 'todas'
 		});
 	});
 
 	it('perde a matéria e o ano que o catálogo não tem mais', () => {
-		const f = { materias: ['Redes', 'Contabilidade'], ano: 2019, situacao: 'erradas' as const };
-		expect(ajustarAoCatalogo(f, qs)).toEqual({ materias: ['Redes'], ano: 0, situacao: 'erradas' });
+		const f = { materias: ['Redes', 'Contabilidade'], assuntos: [], ano: 2019, situacao: 'erradas' as const };
+		expect(ajustarAoCatalogo(f, qs)).toEqual({ materias: ['Redes'], assuntos: [], ano: 0, situacao: 'erradas' });
+	});
+
+	it('perde o assunto renomeado e o da matéria que saiu do filtro', () => {
+		const sumido = chaveDoAssunto('Língua Portuguesa', 'Acentuação');
+		const f = { ...SEM_FILTRO, materias: ['Língua Portuguesa'], assuntos: [CRASE, sumido] };
+		expect(ajustarAoCatalogo(f, qs).assuntos).toEqual([CRASE]);
+		expect(ajustarAoCatalogo({ ...f, materias: ['Redes'] }, qs).assuntos).toEqual([]);
 	});
 });
 
 describe('endereço do treino', () => {
 	it('ida e volta', () => {
-		const f = { materias: ['Língua Portuguesa', 'Redes & Cia'], ano: 2026, situacao: 'abertas' as const };
+		const f = {
+			materias: ['Língua Portuguesa', 'Redes & Cia'],
+			assuntos: [CRASE],
+			ano: 2026,
+			situacao: 'abertas' as const
+		};
 		const url = new URL(enderecoDoTreino(f), 'http://x');
 		expect(url.pathname).toBe('/questoes/resolver');
 		expect(filtroDoEndereco(url.searchParams)).toEqual(f);
