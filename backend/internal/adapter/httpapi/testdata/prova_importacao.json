@@ -17,7 +17,6 @@
       "string"
     ],
     "ano": "number",
-    "anuladasExcluidas": [],
     "apoios": [
       {
         "aviso": "string",
@@ -52,6 +51,7 @@
     "caderno": "string",
     "cargo": "string",
     "cargoNome": "string",
+    "excluidas": [],
     "extracoes": [
       {
         "modelo": "string",

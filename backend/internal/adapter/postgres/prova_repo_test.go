@@ -690,9 +690,9 @@ func TestProvas_GabaritoSeparadoDasQuestoes(t *testing.T) {
 	}
 }
 
-// A anulada excluída não vai para as questões, mas continua no gabarito e na
+// A excluída não vai para as questões, mas continua no gabarito e na
 // identificação: a revisão reaberta da publicada sabe que ela saiu.
-func TestProvas_AnuladaExcluidaSobreviveAPublicacao(t *testing.T) {
+func TestProvas_ExcluidaSobreviveAPublicacao(t *testing.T) {
 	t.Parallel()
 
 	pool := pgtest.Novo(t)
@@ -703,7 +703,7 @@ func TestProvas_AnuladaExcluidaSobreviveAPublicacao(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := rascunhoPublicavel(uuid.NewString())
-	r.Total, r.AnuladasExcluidas = 2, []int{2}
+	r.Total, r.Excluidas = 2, []int{2}
 	r.Questoes[0].Resposta = "D"
 	r.Gabarito = prova.Gabarito{
 		Cargo: "E05", Caderno: "4", Tipo: "definitivo",
@@ -721,14 +721,66 @@ func TestProvas_AnuladaExcluidaSobreviveAPublicacao(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := p.Conteudo; !slices.Equal(c.AnuladasExcluidas, []int{2}) || c.QuestoesNaProva() != 1 || len(c.Questoes) != 1 {
-		t.Fatalf("publicada: excluídas %v, %d na prova, %d questões", c.AnuladasExcluidas, c.QuestoesNaProva(), len(c.Questoes))
+	if c := p.Conteudo; !slices.Equal(c.Excluidas, []int{2}) || c.QuestoesNaProva() != 1 || len(c.Questoes) != 1 {
+		t.Fatalf("publicada: excluídas %v, %d na prova, %d questões", c.Excluidas, c.QuestoesNaProva(), len(c.Questoes))
 	}
 	if resposta, ok := p.Conteudo.Gabarito.Respostas["2"]; !ok || resposta != "" {
 		t.Fatalf("gabarito da publicada = %+v, quer a 2 anulada", p.Conteudo.Gabarito)
 	}
 	if pend := p.Conteudo.Pendencias(false); len(pend) > 0 {
 		t.Fatalf("a revisão reaberta nasceria com pendências: %v", pend)
+	}
+}
+
+// Rascunho e revisão gravados quando só a anulada saía da prova guardam a
+// chave AnuladasExcluidas. Lidos agora, a questão continua fora — senão
+// faltaria, e a revisão reaberta não publicaria.
+func TestProvas_ExcluidaNaChaveAntiga(t *testing.T) {
+	t.Parallel()
+
+	pool := pgtest.Novo(t)
+	ctx := t.Context()
+	repo := postgres.NewProvaRepo(pool)
+	criador := novoCurador(t, postgres.NewUsuarioRepo(pool))
+	if _, err := repo.Criar(ctx, novaImportacao(criador, "chave-antiga"), 2); err != nil {
+		t.Fatal(err)
+	}
+	r := rascunhoPublicavel(uuid.NewString())
+	r.Total, r.Excluidas = 2, []int{2}
+	i := levarARevisao(t, repo, r)
+	if _, err := pool.Exec(ctx,
+		`UPDATE provas_importacoes
+		    SET rascunho = jsonb_set(rascunho - 'Excluidas', '{AnuladasExcluidas}', rascunho->'Excluidas')
+		  WHERE id = $1`, i.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	i, err := repo.Obter(ctx, i.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(i.Rascunho.Excluidas, []int{2}) {
+		t.Fatalf("rascunho: excluídas %v, quer [2]", i.Rascunho.Excluidas)
+	}
+	id, err := repo.Publicar(ctx, i, criador)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx,
+		`UPDATE provas_revisoes
+		    SET conteudo = jsonb_set(conteudo - 'Excluidas', '{AnuladasExcluidas}', conteudo->'Excluidas')
+		  WHERE prova_id = $1`, id,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := repo.Publicacao(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Conteudo.Excluidas, []int{2}) || p.Conteudo.QuestoesNaProva() != 1 {
+		t.Fatalf("publicada: excluídas %v, %d na prova", p.Conteudo.Excluidas, p.Conteudo.QuestoesNaProva())
 	}
 }
 

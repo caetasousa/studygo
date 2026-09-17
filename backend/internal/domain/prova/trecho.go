@@ -139,6 +139,8 @@ func (r *Rascunho) AplicarTrecho(numero int, lido Rascunho) {
 	dela := func(q Questao) bool { return q.Numero == numero }
 	j := slices.IndexFunc(r.Questoes, dela)
 	if j < 0 {
+		// Ler de novo a excluída é querê-la de volta na prova.
+		r.Excluidas = slices.DeleteFunc(r.Excluidas, func(n int) bool { return n == numero })
 		chave := strconv.Itoa(numero)
 		r.Questoes = append(r.Questoes, Questao{
 			Numero: numero, Resposta: r.Gabarito.Respostas[chave], Situacao: r.Gabarito.Situacoes[chave],

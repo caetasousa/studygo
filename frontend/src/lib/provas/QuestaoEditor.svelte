@@ -35,6 +35,7 @@
 		catalogo?: Pick<QuestaoAvulsa, 'disciplina' | 'assunto'>[];
 		/** Algo mudou. `desfazer` diz se a mudança derruba a conferência. */
 		onalterar: (desfazer: boolean) => void;
+		/** Tira a questão da prova; a publicação segue sem ela. */
 		onremover: () => void;
 		/** Abre o recorte da figura (pelo destino) no painel do original. */
 		onajustarFigura: (destino: string) => void;
@@ -307,7 +308,7 @@
 							<input {id} aria-describedby={ajuda} type="text" bind:value={q.situacao} oninput={alterar} />
 						{/snippet}
 					</Campo>
-					<button class="btn danger" type="button" onclick={onremover}>Remover esta questão</button>
+					<button class="btn danger" type="button" onclick={onremover}>Excluir da prova</button>
 				</div>
 			</details>
 		</div>

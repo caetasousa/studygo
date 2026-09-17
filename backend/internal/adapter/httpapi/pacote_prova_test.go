@@ -45,7 +45,7 @@ func provaParaLevar(t *testing.T) service.ProvaParaLevar {
 	r.Questoes[0].Blocos[0].Arquivo = figuraDoPacote
 	r.Questoes[0].Alternativas[0].Blocos[0].Arquivo = figuraDoPacote
 	r.Apoios[0].Blocos[0].Arquivo = figuraDoPacote
-	r.AnuladasExcluidas = []int{7}
+	r.Excluidas = []int{7}
 
 	return service.ProvaParaLevar{
 		Conteudo:  r,

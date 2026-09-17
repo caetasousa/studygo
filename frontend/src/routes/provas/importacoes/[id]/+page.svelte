@@ -23,8 +23,9 @@
 		blocoDoDestino,
 		conferenciasQueCairam,
 		destinosDoRecorte,
-		devolverAnulada,
-		excluirAnulada,
+		devolverQuestao,
+		excluirNumero,
+		excluirQuestao,
 		incompleta,
 		novaQuestao,
 		numerosFaltando,
@@ -381,7 +382,7 @@
 
 	/** Aonde levar o curador para resolver a pendência. */
 	function destinoDaPendencia(p: string): { rotulo: string; ir: () => void } | null {
-		// Falta questão: é na etapa Questões que se adiciona ou se exclui a anulada.
+		// Falta questão: é na etapa Questões que se adiciona ou se exclui da prova.
 		if (/total esperado/i.test(p)) return { rotulo: 'Abrir as questões', ir: () => (etapa = 'questoes') };
 		const numero = p.match(/quest(?:ão|ao)\s+(\d+)/i)?.[1];
 		if (numero) return { rotulo: `Abrir a questão ${numero}`, ir: () => abrirQuestao(Number(numero)) };
@@ -401,30 +402,32 @@
 		alterar();
 	}
 
-	function removerQuestao() {
+	// A questão excluída sai da prova: não conta como questão que falta, não
+	// trava a publicação e não vai para o catálogo. Dá para devolver.
+	function excluirDaProva() {
 		if (!imp || !q) return;
-		// Tirar a anulada é excluí-la da prova; removida à parte, ela faltaria e travaria a publicação.
-		if (anulada(imp.rascunho, q.numero)) return excluirQuestaoAnulada();
-		if (!confirm(`Remover a questão ${q.numero} do rascunho?`)) return;
-		imp.rascunho.questoes = imp.rascunho.questoes.filter((_, k) => k !== indice);
-		irPara(Math.max(0, indice - 1));
-		alterar();
-	}
-
-	// A anulada pode ficar na prova, sem resposta certa, ou sair dela. Saindo,
-	// não conta como questão que falta nem vai para o catálogo.
-	function excluirQuestaoAnulada() {
-		if (!imp || !q) return;
-		if (!confirm(`Excluir da prova a questão ${q.numero}, anulada pela banca? Ela sai do rascunho e não vai para o catálogo.`))
+		const motivo = anulada(imp.rascunho, q.numero) ? ', anulada pela banca' : '';
+		if (
+			!confirm(
+				`Excluir da prova a questão ${q.numero}${motivo}? Ela sai do rascunho e a prova é publicada sem ela. Dá para devolver depois.`
+			)
+		)
 			return;
-		excluirAnulada(imp.rascunho, q.numero);
+		excluirQuestao(imp.rascunho, indice);
 		irPara(Math.max(0, indice - 1));
 		alterar();
 	}
 
-	function devolverQuestaoAnulada(numero: number) {
+	function publicarSemAFaltando() {
+		if (!imp || !faltando) return;
+		excluirNumero(imp.rascunho, Number(faltando));
+		faltando = '';
+		alterar();
+	}
+
+	function devolverAProva(numero: number) {
 		if (!imp) return;
-		devolverAnulada(imp.rascunho, numero);
+		devolverQuestao(imp.rascunho, numero);
 		aviso = `A questão ${numero} voltou para a prova e está entre as que faltam: adicione-a para transcrever.`;
 		alterar();
 	}
@@ -968,19 +971,26 @@
 								{#each faltam as n (n)}<option value={String(n)}>Questão {n}</option>{/each}
 							</select>
 							<button class="btn" type="button" disabled={!faltando} onclick={adicionarFaltando}>Adicionar</button>
+							<button
+								class="btn"
+								type="button"
+								disabled={!faltando}
+								title="A prova é publicada sem essa questão"
+								onclick={publicarSemAFaltando}>Publicar sem ela</button
+							>
 						</span>
 					{/if}
-					{#if imp.rascunho.anuladasExcluidas.length > 0}
+					{#if imp.rascunho.excluidas.length > 0}
 						<span class="faltam dim">
-							Anuladas fora da prova:
-							{#each imp.rascunho.anuladasExcluidas as n (n)}
+							Fora da prova:
+							{#each imp.rascunho.excluidas as n (n)}
 								<span>
 									{n}
 									<button
 										class="link"
 										type="button"
 										title="Devolver a questão {n} à prova"
-										onclick={() => devolverQuestaoAnulada(n)}>devolver</button
+										onclick={() => devolverAProva(n)}>devolver</button
 									>
 								</span>
 							{/each}
@@ -1017,7 +1027,7 @@
 								<p class="callout aviso-anulada">
 									<span>
 										<b>A banca anulou esta questão.</b> Ela pode ficar na prova, sem resposta certa, ou
-										<button class="link" type="button" onclick={excluirQuestaoAnulada}>sair da prova</button>.
+										<button class="link" type="button" onclick={excluirDaProva}>sair da prova</button>.
 									</span>
 								</p>
 							{/if}
@@ -1028,7 +1038,7 @@
 										bind:rascunho={imp.rascunho}
 										{indice}
 										onalterar={alterar}
-										onremover={removerQuestao}
+										onremover={excluirDaProva}
 										onajustarFigura={ajustarFigura}
 										onabrirTexto={abrirTexto}
 										{catalogo}

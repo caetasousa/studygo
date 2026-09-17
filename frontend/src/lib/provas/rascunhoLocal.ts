@@ -29,7 +29,15 @@ export function guardarEm(st: Armazenamento, id: string, copia: RascunhoLocal): 
 export function lerDe(st: Armazenamento, id: string): RascunhoLocal | null {
 	try {
 		const copia = JSON.parse(st.getItem(chaveDaRevisao(id)) ?? 'null') as RascunhoLocal | null;
-		return copia && Number.isInteger(copia.versao) && Array.isArray(copia.rascunho?.questoes) ? copia : null;
+		if (!copia || !Number.isInteger(copia.versao) || !Array.isArray(copia.rascunho?.questoes)) return null;
+		// A cópia guardada quando só a anulada saía da prova tem o nome antigo, que
+		// o servidor recusaria ao salvar.
+		const { anuladasExcluidas, ...rascunho } = copia.rascunho as Rascunho & { anuladasExcluidas?: unknown };
+		const excluidas = Array.isArray(rascunho.excluidas) ? rascunho.excluidas : anuladasExcluidas;
+		return {
+			versao: copia.versao,
+			rascunho: { ...rascunho, excluidas: Array.isArray(excluidas) ? excluidas.filter(Number.isInteger) : [] }
+		};
 	} catch {
 		return null;
 	}

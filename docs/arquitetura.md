@@ -376,10 +376,13 @@ desfaz a conferência dele (`InvalidarEdicoes`) — a tela avisa quais voltaram 
 conferência. Trocar o gabarito só desconfere a questão cuja letra mudou
 (`AplicarGabarito`). O que foi alterado e não salvo fica numa cópia no navegador
 (`rascunhoLocal.ts`), recuperada se o celular recarregar a aba; ela só vale
-sobre a mesma versão salva. A questão anulada pode sair da
-prova (`Rascunho.AnuladasExcluidas`): deixa de ser esperada enquanto o gabarito
-a anular, `Total` continua o da capa, e o catálogo conta só as que ficaram
-(`QuestoesNaProva`). `PROVAS_EXIGIR_CONFERENCIA=false`
+sobre a mesma versão salva. Qualquer questão pode sair da prova
+(`Rascunho.Excluidas`) — a anulada, a estragada, a que a extração não achou e
+não vale transcrever: deixa de ser esperada, `Total` continua o da capa, o
+gabarito fica inteiro e o catálogo conta só as que ficaram (`QuestoesNaProva`).
+Rascunho e revisão gravados antes guardam a chave antiga `AnuladasExcluidas`,
+que a leitura do repositório ainda entende; e marcar o trecho da excluída a
+devolve à prova. `PROVAS_EXIGIR_CONFERENCIA=false`
 tira a conferência das pendências — para testar o fluxo antes de haver quem
 revise —, mas a integridade continua bloqueando.
 

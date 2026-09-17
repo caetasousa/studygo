@@ -18,8 +18,9 @@ import {
 	numerosFaltando,
 	conferenciasQueCairam,
 	anulada,
-	excluirAnulada,
-	devolverAnulada,
+	excluirQuestao,
+	excluirNumero,
+	devolverQuestao,
 	proximaPendente,
 	escreverNumeros,
 	lerNumeros,
@@ -58,7 +59,7 @@ function rascunho(questoes: Questao[], total = questoes.length): Rascunho {
 		gabarito: { cargo: 'E05', caderno: '4', tipo: 'preliminar', respostas: {}, situacoes: {} },
 		alertas: [],
 		extracoes: [],
-		anuladasExcluidas: []
+		excluidas: []
 	};
 }
 
@@ -83,20 +84,37 @@ it('numerosFaltando aponta a questão que a extração perdeu', () => {
 	expect(numerosFaltando(rascunho([conferida(1), conferida(3)], 4))).toEqual([2, 4]);
 });
 
-it('a anulada excluída sai da prova sem virar questão que falta, e devolvida volta a faltar', () => {
+it('anulada identifica a questão sem letra no gabarito', () => {
 	const r = rascunho([conferida(1), conferida(2), conferida(3)], 3);
 	r.gabarito.respostas = { '1': 'A', '2': '', '3': 'C' };
 	expect([anulada(r, 1), anulada(r, 2), anulada(r, 9)]).toEqual([false, true, false]);
+});
 
-	excluirAnulada(r, 2);
-	excluirAnulada(r, 2);
+it('a questão excluída sai da prova sem virar questão que falta, e devolvida volta a faltar', () => {
+	const r = rascunho([conferida(1), conferida(2), conferida(3)], 3);
+
+	excluirQuestao(r, 1);
 	expect(r.questoes.map((q) => q.numero)).toEqual([1, 3]);
-	expect(r.anuladasExcluidas).toEqual([2]);
+	expect(r.excluidas).toEqual([2]);
 	expect(numerosFaltando(r)).toEqual([]);
 
-	devolverAnulada(r, 2);
-	expect(r.anuladasExcluidas).toEqual([]);
+	devolverQuestao(r, 2);
+	expect(r.excluidas).toEqual([]);
 	expect(numerosFaltando(r)).toEqual([2]);
+
+	// A que a extração não achou também pode ficar de fora.
+	excluirNumero(r, 2);
+	excluirNumero(r, 2);
+	expect(r.excluidas).toEqual([2]);
+});
+
+it('a leitura repetida ou fora da numeração só sai do rascunho', () => {
+	const r = rascunho([conferida(1), conferida(2), conferida(2), conferida(7)], 3);
+
+	excluirQuestao(r, 2);
+	excluirQuestao(r, 2);
+	expect(r.questoes.map((q) => q.numero)).toEqual([1, 2]);
+	expect(r.excluidas).toEqual([]);
 });
 
 it('conferenciasQueCairam aponta o que foi enviado conferido e voltou sem a marca', () => {

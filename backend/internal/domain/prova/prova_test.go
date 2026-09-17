@@ -903,8 +903,8 @@ func TestGabaritoEmLinhas(t *testing.T) {
 	}
 }
 
-// A anulada excluída sai da conta, mas só enquanto o gabarito a anular.
-func TestPendencias_AnuladaExcluida(t *testing.T) {
+// A questão excluída sai da conta, anulada ou não: a prova é publicada sem ela.
+func TestPendencias_Excluida(t *testing.T) {
 	t.Parallel()
 
 	semA2 := func() Rascunho {
@@ -921,31 +921,32 @@ func TestPendencias_AnuladaExcluida(t *testing.T) {
 	if p := r.Pendencias(true); !contem(p, "tem 2 questões e o total esperado é 3") {
 		t.Fatalf("anulada que só falta, sem exclusão: %v", p)
 	}
-	r.AnuladasExcluidas = []int{2}
+	r.Excluidas = []int{2}
 	if p := r.Pendencias(true); len(p) > 0 || r.QuestoesNaProva() != 2 {
 		t.Fatalf("anulada excluída: %v, %d na prova", p, r.QuestoesNaProva())
 	}
 
-	if p := semA2().Pendencias(true); !contem(p, "Falta a questão 2.") {
+	if p := semA2().Pendencias(true); !contem(p, "Falta a questão 2: transcreva ou exclua da prova.") {
 		t.Fatalf("a pendência de total não diz qual falta: %v", p)
 	}
 
+	// A que o gabarito não anula também sai: o curador decide.
 	r = semA2()
-	r.AnuladasExcluidas = []int{2}
+	r.Excluidas = []int{2}
 	r.Gabarito.Respostas["2"] = "C"
-	if p := r.Pendencias(true); !contem(p, "questão 2 foi excluída como anulada, mas o gabarito não a anula") {
-		t.Fatalf("gabarito trocado por um que dá a resposta: %v", p)
+	if p := r.Pendencias(true); len(p) > 0 {
+		t.Fatalf("excluída com resposta no gabarito: %v", p)
 	}
 
 	r = semA2()
-	r.AnuladasExcluidas = []int{3, 2}
-	if p := r.Pendencias(true); !contem(p, "questão 3 está no rascunho e entre as anuladas excluídas") {
+	r.Excluidas = []int{3, 2}
+	if p := r.Pendencias(true); !contem(p, "questão 3 está no rascunho e entre as excluídas") {
 		t.Fatalf("excluída e presente: %v", p)
 	}
 
 	r = semA2()
-	r.AnuladasExcluidas = []int{2, 2, 9}
-	if p := r.Pendencias(true); !contem(p, "anuladas excluídas: 2.") || !contem(p, "anuladas excluídas: 9.") {
+	r.Excluidas = []int{2, 2, 9}
+	if p := r.Pendencias(true); !contem(p, "entre as excluídas: 2.") || !contem(p, "entre as excluídas: 9.") {
 		t.Fatalf("repetida ou fora do total: %v", p)
 	}
 }
@@ -1220,6 +1221,20 @@ func TestAplicarTrecho_QuestaoQueFaltou(t *testing.T) {
 	}
 	if q := r.Questoes[1]; q.Resposta != "B" || q.Disciplina != "Português" {
 		t.Fatalf("questão 2 = %+v, quer resposta B e a matéria da 1", q)
+	}
+}
+
+// Marcar o trecho da questão excluída é querê-la de volta: sem isso, ela
+// estaria na prova e entre as excluídas, e a publicação travaria.
+func TestAplicarTrecho_ExcluidaVoltaAProva(t *testing.T) {
+	t.Parallel()
+
+	r := Rascunho{Questoes: []Questao{questao(1, true, "a")}, Excluidas: []int{2, 3}}
+
+	r.AplicarTrecho(2, Rascunho{Questoes: []Questao{questao(2, true, "a excluída")}})
+
+	if len(r.Questoes) != 2 || !slices.Equal(r.Excluidas, []int{3}) {
+		t.Fatalf("questões %d, excluídas %v; quer a 2 de volta e só a 3 excluída", len(r.Questoes), r.Excluidas)
 	}
 }
 

@@ -1,10 +1,12 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -71,7 +73,7 @@ func escanearImportacao(row pgx.Row) (prova.Importacao, error) {
 	if err := json.Unmarshal(regioes, &i.Regioes); err != nil {
 		return prova.Importacao{}, fmt.Errorf("decodificando regiões: %w", err)
 	}
-	if err := json.Unmarshal(rascunho, &i.Rascunho); err != nil {
+	if err := lerRascunho(rascunho, &i.Rascunho); err != nil {
 		return prova.Importacao{}, fmt.Errorf("decodificando rascunho: %w", err)
 	}
 
@@ -628,7 +630,7 @@ func escanearPublicacao(row pgx.Row) (prova.Publicacao, error) {
 	if err != nil {
 		return prova.Publicacao{}, fmt.Errorf("lendo prova publicada: %w", err)
 	}
-	if err := json.Unmarshal(conteudo, &p.Conteudo); err != nil {
+	if err := lerRascunho(conteudo, &p.Conteudo); err != nil {
 		return prova.Publicacao{}, fmt.Errorf("decodificando prova publicada: %w", err)
 	}
 	// O gabarito é o da tabela dele — as respostas vêm em completar.
@@ -1157,6 +1159,30 @@ func (r *ProvaRepo) ExcluirAnotacao(ctx context.Context, usuario, provaID string
 		usuario, provaID, numero,
 	); err != nil {
 		return fmt.Errorf("apagando anotação: %w", err)
+	}
+
+	return nil
+}
+
+// lerRascunho decodifica o rascunho gravado em jsonb. A exclusão nasceu só
+// para a anulada, na chave AnuladasExcluidas; o rascunho e a revisão gravados
+// antes continuam com ela, e sem esta leitura a questão excluída voltaria a
+// faltar e travaria a publicação.
+func lerRascunho(dados []byte, r *prova.Rascunho) error {
+	if err := json.Unmarshal(dados, r); err != nil {
+		return err
+	}
+	if !bytes.Contains(dados, []byte(`"AnuladasExcluidas"`)) {
+		return nil
+	}
+	var legado struct{ AnuladasExcluidas []int }
+	if err := json.Unmarshal(dados, &legado); err != nil {
+		return err
+	}
+	for _, n := range legado.AnuladasExcluidas {
+		if !slices.Contains(r.Excluidas, n) {
+			r.Excluidas = append(r.Excluidas, n)
+		}
 	}
 
 	return nil

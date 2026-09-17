@@ -214,10 +214,11 @@ type Rascunho struct {
 	Apoios                    []Apoio
 	Gabarito                  Gabarito
 	Alertas                   []string
-	// AnuladasExcluidas são os números das questões que a banca anulou e o
-	// curador tirou da prova. Total continua sendo o da capa: é a numeração do
-	// caderno, e a anulada excluída só deixa de ser esperada.
-	AnuladasExcluidas []int
+	// Excluidas são os números das questões que o curador tirou da prova — a
+	// anulada, a que a extração estragou e não vale transcrever. Total continua
+	// sendo o da capa: é a numeração do caderno, e a excluída só deixa de ser
+	// esperada.
+	Excluidas []int
 }
 
 // faltando diz quais números a pendência de total não achou — "O rascunho tem
@@ -227,7 +228,7 @@ func (r Rascunho) faltando() string {
 	for _, q := range r.Questoes {
 		presentes[q.Numero] = true
 	}
-	for _, n := range r.AnuladasExcluidas {
+	for _, n := range r.Excluidas {
 		presentes[n] = true
 	}
 	faltam := []string{}
@@ -240,15 +241,15 @@ func (r Rascunho) faltando() string {
 	case 0:
 		return ""
 	case 1:
-		return " Falta a questão " + faltam[0] + "."
+		return " Falta a questão " + faltam[0] + ": transcreva ou exclua da prova."
 	default:
-		return " Faltam as questões " + strings.Join(faltam, ", ") + "."
+		return " Faltam as questões " + strings.Join(faltam, ", ") + ": transcreva ou exclua da prova."
 	}
 }
 
 // QuestoesNaProva é quantas questões a prova publicada tem: o total da capa
-// sem as anuladas excluídas.
-func (r Rascunho) QuestoesNaProva() int { return r.Total - len(r.AnuladasExcluidas) }
+// sem as excluídas.
+func (r Rascunho) QuestoesNaProva() int { return r.Total - len(r.Excluidas) }
 
 type Importacao struct {
 	ID, Criador, Hash, Documento, GabaritoArquivo string
@@ -771,17 +772,12 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 			"O rascunho tem %d questões e o total esperado é %d.%s", len(r.Questoes), r.QuestoesNaProva(), r.faltando(),
 		))
 	}
-	// A exclusão vale enquanto o gabarito anular a questão: trocado por um que
-	// dá a resposta, ela volta a ser esperada.
+	// Excluir é decisão do curador, com ou sem anulação: a prova publicada só
+	// não tem aquele número. O gabarito continua inteiro.
 	excluidas := map[int]bool{}
-	for _, n := range r.AnuladasExcluidas {
-		resposta, noGabarito := r.Gabarito.Respostas[strconv.Itoa(n)]
+	for _, n := range r.Excluidas {
 		if excluidas[n] || n < 1 || n > r.Total {
-			out = append(out, fmt.Sprintf("Numeração inválida entre as anuladas excluídas: %d.", n))
-		} else if !noGabarito || resposta != "" {
-			out = append(out, fmt.Sprintf(
-				"A questão %d foi excluída como anulada, mas o gabarito não a anula; devolva-a à prova.", n,
-			))
+			out = append(out, fmt.Sprintf("Numeração inválida entre as excluídas: %d.", n))
 		}
 		excluidas[n] = true
 	}
@@ -834,7 +830,7 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 		numeros[q.Numero] = true
 		if excluidas[q.Numero] {
 			out = append(out, fmt.Sprintf(
-				"A questão %d está no rascunho e entre as anuladas excluídas; remova-a ou devolva-a à prova.", q.Numero,
+				"A questão %d está no rascunho e entre as excluídas; exclua-a de novo ou devolva-a à prova.", q.Numero,
 			))
 		}
 

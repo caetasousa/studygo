@@ -33,7 +33,7 @@ function rascunho(conferidas: boolean): Rascunho {
 		},
 		alertas: [],
 		extracoes: [],
-		anuladasExcluidas: []
+		excluidas: []
 	};
 }
 
@@ -44,6 +44,16 @@ it('guarda, lê e apaga a cópia da revisão pelo id', () => {
 	expect(lerDe(st, 'outra')).toBeNull();
 	apagarDe(st, 'imp-1');
 	expect(lerDe(st, 'imp-1')).toBeNull();
+});
+
+it('a cópia guardada com o nome antigo das excluídas é lida no nome novo', () => {
+	const st = memoria();
+	const { excluidas: _, ...antigo } = { ...rascunho(true), total: 2 };
+	st.dados.set('studygo.provas.revisao.imp-1', JSON.stringify({ versao: 3, rascunho: { ...antigo, anuladasExcluidas: [2] } }));
+	const lida = lerDe(st, 'imp-1')!.rascunho;
+	expect(lida.excluidas).toEqual([2]);
+	// O servidor recusa campo que não conhece: o antigo não pode ir no salvar.
+	expect('anuladasExcluidas' in lida).toBe(false);
 });
 
 it('cópia corrompida ou armazenamento que falha não quebram a tela', () => {
