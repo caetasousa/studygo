@@ -253,7 +253,7 @@ por vez, uma importação por vez no ambiente inteiro:
 |---|---|---|
 | preparar | divide cada página em regiões com sobreposição, sem renderizar a página inteira | não |
 | metadados | órgão, ano, cargo, caderno e total, lidos só da capa | sim |
-| gabarito | leitura determinística do texto — o gabarito de um tipo ou a relação do site da FCC com todos, de onde sai o tipo do caderno lido na capa; Gemini só se o PDF não tiver texto | às vezes |
+| gabarito | leitura determinística do texto — o gabarito de um tipo (número, letra e situação linha a linha, ou a tabela Questão/Alternativa sem situação), ou a relação do site da FCC com todos, de onde sai o tipo do caderno lido na capa; Gemini só se o PDF não tiver texto | às vezes |
 | uma por região | questões, textos de apoio e retângulos das figuras | sim |
 | consolidação | aplica o gabarito, ordena e classifica por matéria as questões de seção genérica | sim, só texto |
 

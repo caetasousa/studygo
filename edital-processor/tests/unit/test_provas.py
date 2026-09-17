@@ -162,6 +162,28 @@ def test_gabarito_definitivo_que_cita_o_preliminar(tmp_path: Path) -> None:
     assert g.tipo == "definitivo"
 
 
+def test_gabarito_em_tabela_questao_alternativa(tmp_path: Path) -> None:
+    """O da SCGE-PE: "Questão / Alternativa", número e letra linha a linha,
+    sem situação. Lido como o da FCC, a letra seguinte virava a situação e
+    ficava uma questão sim, outra não — e com o zero, que não é a questão 1."""
+    id = str(uuid.uuid4())
+    with pymupdf.open() as doc:
+        doc.new_page().insert_text(
+            (20, 30),
+            "Secretaria da Controladoria Geral do Estado - SCGE (PE)\n"
+            "CARGO: Gestor Governamental - Tecnologia da Informação\n"
+            "EXAME: CPU/PE - Janeiro/2026 | CADERNO: Tipo 004\n"
+            "Questão\nAlternativa\n01 \nE \n02 \nA \n03 \nX \n10 \nD ",
+        )
+        doc.save(arquivo(tmp_path, id, "pdf"))
+
+    g, _ = pipeline.ler_gabarito(tmp_path, id, "004")
+
+    assert g.respostas == {"1": "E", "2": "A", "3": "", "10": "D"}
+    assert g.situacoes == {}
+    assert g.caderno == "004" and g.cargo == "" and g.tipo == "nao_informado"
+
+
 def _relacao(root: Path) -> str:
     """A "Relação dos gabaritos" impressa do site da FCC, como a do TRT-18: um
     tipo embaixo do outro, as respostas em colunas lado a lado — e, no PDF,

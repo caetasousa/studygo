@@ -1173,6 +1173,35 @@ def _tipos_da_relacao(texto: str) -> dict[str, dict[str, str]]:
     return tipos
 
 
+_NUMERO_NO_GABARITO = re.compile(r"\d{1,3}")
+_LETRA_DA_RESPOSTA = re.compile(r"[A-E]|[X*]", re.IGNORECASE)
+
+
+def _respostas_linha_a_linha(texto: str) -> tuple[dict[str, str], dict[str, str]]:
+    """Número e letra, cada um numa linha, e a situação na seguinte quando o
+    documento a traz: o gabarito da FCC ("1 / E / Gabarito sem alteração") e o
+    de tabela Questão/Alternativa (o da SCGE-PE, "01 / E"). A linha seguinte só
+    é a situação se não for o número da próxima questão — sem isso, a tabela
+    lia uma questão sim, outra não. O número vai sem zeros: "01" é a 1."""
+    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
+    respostas: dict[str, str] = {}
+    situacoes: dict[str, str] = {}
+    i = 0
+    while i + 1 < len(linhas):
+        numero, letra = linhas[i], linhas[i + 1]
+        if not (_NUMERO_NO_GABARITO.fullmatch(numero) and _LETRA_DA_RESPOSTA.fullmatch(letra)):
+            i += 1
+            continue
+        numero, letra = str(int(numero)), letra.upper()
+        # X e * marcam questão anulada: fica sem letra, com a situação dita.
+        respostas[numero] = letra if letra in "ABCDE" else ""
+        i += 2
+        if i < len(linhas) and not _NUMERO_NO_GABARITO.fullmatch(linhas[i]):
+            situacoes[numero] = linhas[i]
+            i += 1
+    return respostas, situacoes
+
+
 def ler_gabarito(root: Path, documento: str, caderno_da_prova: str = "") -> tuple[Gabarito, str]:
     """Leitura determinística do gabarito da FCC, que vem com texto nativo:
     número, letra e situação, uma por linha; ou a relação com todos os tipos,
@@ -1185,7 +1214,8 @@ def ler_gabarito(root: Path, documento: str, caderno_da_prova: str = "") -> tupl
     # ficava vazio e as onze questões de resposta C, sem resposta.
     # A relação escreve "Cargo ou opção L12 - TÉCNICO JUD…".
     cargo = re.search(r"Cargo(?::|\s+ou\s+op\S*)\s*([A-Z0-9]{2,3})\b", text, re.IGNORECASE)
-    caderno = re.search(r"Tipo de Gabarito:\s*(\d+)", text)
+    # "Tipo de Gabarito: 4" na FCC; "CADERNO: Tipo 004" na tabela da SCGE-PE.
+    caderno = re.search(r"(?:Tipo de Gabarito:|CADERNO:\s*Tipo)\s*(\d+)", text, re.IGNORECASE)
     # DEFINITIVO primeiro: o definitivo costuma citar o preliminar que substitui.
     maiusculo = text.upper()
     tipo = (
@@ -1200,11 +1230,7 @@ def ler_gabarito(root: Path, documento: str, caderno_da_prova: str = "") -> tupl
         caderno=caderno[1] if caderno else "",
         tipo=tipo,
     )
-    for m in re.finditer(r"(?:^|\n)(\d+)\s*\n([A-E]|[X*])\s*\n([^\n]+)", text, re.IGNORECASE):
-        # X e * marcam questão anulada: fica sem letra, com a situação dita.
-        letra = m[2].upper()
-        result.respostas[m[1]] = letra if letra in "ABCDE" else ""
-        result.situacoes[m[1]] = m[3].strip()
+    result.respostas, result.situacoes = _respostas_linha_a_linha(text)
     if result.respostas:
         return result, text
 
@@ -1247,4 +1273,8 @@ async def gabarito(
             settings,
         )
     )
-    return Gabarito.model_validate(raw)
+    lido = Gabarito.model_validate(raw)
+    # A tabela escreve "01": a questão é a 1, que é como o backend a procura.
+    lido.respostas = {_sem_zeros(k) or k: v for k, v in lido.respostas.items()}
+    lido.situacoes = {_sem_zeros(k) or k: v for k, v in lido.situacoes.items()}
+    return lido
