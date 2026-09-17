@@ -418,6 +418,48 @@ func TestMesclar_DuasLeiturasCompletas(t *testing.T) {
 	}
 }
 
+// A região recusada devolve a questão pelo OCR; a vizinha, que a leu pela IA,
+// vence em qualquer ordem — e o pedaço da IA não troca a questão inteira do
+// OCR, nem se soma a ela.
+func TestMesclar_LeituraDaIAVenceADoOCR(t *testing.T) {
+	t.Parallel()
+
+	doOCR := questao(7, true, "texto do OCR")
+	doOCR.LidaPorOCR = true
+	daIA := questao(7, true, "texto da IA")
+
+	for nome, ordem := range map[string][2]Questao{"OCR antes": {doOCR, daIA}, "IA antes": {daIA, doOCR}} {
+		r := Rascunho{Questoes: []Questao{ordem[0]}}
+		r.Mesclar(Rascunho{Questoes: []Questao{ordem[1]}})
+		if q := r.Questoes[0]; q.LidaPorOCR || q.Blocos[0].Texto != "texto da IA" || len(r.Alertas) != 0 {
+			t.Errorf("%s: questão = %+v, alertas %v", nome, q, r.Alertas)
+		}
+	}
+
+	pedaco := questao(7, false, "pedaço da IA")
+	pedaco.Alternativas = pedaco.Alternativas[:2]
+	r := Rascunho{Questoes: []Questao{doOCR}}
+	r.Mesclar(Rascunho{Questoes: []Questao{pedaco}})
+	if q := r.Questoes[0]; !q.LidaPorOCR || len(q.Alternativas) != 5 || len(q.Blocos) != 1 {
+		t.Fatalf("pedaço da IA sobre o OCR inteiro: %+v", q)
+	}
+}
+
+// Questão do OCR não é dada como conferida: só o curador, olhando o original.
+func TestConfirmarSemProblema_NaoConfereAQuestaoDoOCR(t *testing.T) {
+	t.Parallel()
+
+	q := questao(1, true, "Enunciado")
+	q.Revisada, q.LidaPorOCR, q.Resposta = false, true, "E"
+	r := Rascunho{Questoes: []Questao{q}, Gabarito: Gabarito{Respostas: map[string]string{"1": "E"}}}
+
+	r.ConfirmarSemProblema()
+
+	if r.Questoes[0].Revisada {
+		t.Fatal("questão do OCR conferida sem o curador")
+	}
+}
+
 func TestMesclar_LigaApoioAsQuestoesDeOutraRegiao(t *testing.T) {
 	t.Parallel()
 
@@ -749,6 +791,34 @@ func TestAplicarReleitura_SoCompletaOQueFaltava(t *testing.T) {
 	}
 	if len(r.Apoios) != 0 {
 		t.Fatalf("texto de apoio da releitura entrou: %+v", r.Apoios)
+	}
+}
+
+// A questão que veio do OCR é relida sozinha pela IA, mesmo inteira; e a
+// releitura da IA toma o lugar dela, mas a que voltou do OCR de novo não troca
+// a leitura que já existe.
+func TestReleituras_QuestaoDoOCRERelida(t *testing.T) {
+	t.Parallel()
+
+	regioes := []Origem{{Pagina: 1, Regiao: "5", Retangulo: []float64{0, 0, 595, 842}}}
+	doOCR := questao(1, true, "do OCR")
+	doOCR.LidaPorOCR = true
+	doOCR.Origens = []Origem{{Pagina: 1, Regiao: "5", Retangulo: []float64{0, 100, 595, 300}}}
+	r := Rascunho{Total: 1, Questoes: []Questao{doOCR}}
+
+	if got := r.Releituras(regioes); len(got) != 1 || got[0].Regiao != "q1" {
+		t.Fatalf("releituras = %+v, quer a da questão 1", got)
+	}
+
+	outraDoOCR := questao(1, true, "OCR de novo")
+	outraDoOCR.LidaPorOCR = true
+	r.AplicarReleitura(Rascunho{Questoes: []Questao{outraDoOCR}})
+	if r.Questoes[0].Blocos[0].Texto != "do OCR" {
+		t.Fatalf("releitura do OCR trocou a leitura: %+v", r.Questoes[0])
+	}
+	r.AplicarReleitura(Rascunho{Questoes: []Questao{questao(1, true, "da IA")}})
+	if q := r.Questoes[0]; q.LidaPorOCR || q.Blocos[0].Texto != "da IA" {
+		t.Fatalf("releitura da IA não entrou: %+v", q)
 	}
 }
 
@@ -1327,6 +1397,21 @@ func TestAplicarTrecho_TrocaAQuestao(t *testing.T) {
 // Sem o número dentro do trecho, o modelo pode chutar outro: a única questão
 // lida é a pedida. Questão que faltou entra na ordem, com a resposta do
 // gabarito e a matéria da anterior.
+// Relida pelo trecho que o curador marcou, a questão é a leitura da IA.
+func TestAplicarTrecho_TiraAMarcaDoOCR(t *testing.T) {
+	t.Parallel()
+
+	doOCR := questao(4, true, "do OCR")
+	doOCR.LidaPorOCR = true
+	r := Rascunho{Questoes: []Questao{doOCR}}
+
+	r.AplicarTrecho(4, Rascunho{Questoes: []Questao{questao(4, true, "da IA")}})
+
+	if q := r.Questoes[0]; q.LidaPorOCR || q.Blocos[0].Texto != "da IA" {
+		t.Fatalf("questão = %+v", q)
+	}
+}
+
 func TestAplicarTrecho_QuestaoQueFaltou(t *testing.T) {
 	t.Parallel()
 

@@ -409,3 +409,12 @@ describe('nomes já usados', () => {
 		expect(nomesJaUsados('', prova, catalogo).assuntos).toEqual([]);
 	});
 });
+
+describe('questão do OCR', () => {
+	it('é problema até o curador conferir', () => {
+		const q = { ...novaQuestao(4), lidaPorOcr: true };
+		const r = { questoes: [q], apoios: [], gabarito: { respostas: {} } } as unknown as Rascunho;
+		expect(problemasDaQuestao(q, r).some((p) => p.startsWith('Veio do OCR'))).toBe(true);
+		expect(problemasDaQuestao({ ...q, revisada: true }, r).some((p) => p.startsWith('Veio do OCR'))).toBe(false);
+	});
+});

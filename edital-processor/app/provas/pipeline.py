@@ -18,6 +18,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.config import Settings
 from app.core.errors import InvalidPDF, OCRUnavailable, ProviderRefused, RenderLimitExceeded
 from app.provas.documentos import ajustar_figura, arquivo, original, recortar, regioes, render
+from app.provas.questoes_do_texto import questoes_das_linhas
 from app.provas.schemas import (
     Alternativa,
     Apoio,
@@ -388,7 +389,7 @@ async def extrair(
         except ProviderRefused:
             if not recuperar:
                 raise
-            return await _regiao_por_ocr(root, documento, png, origem, provider, settings)
+            return await _regiao_por_ocr(root, documento, png, origem, provider, settings, questao)
 
     lida = RegiaoLida.model_validate(raw)
     resultado = Rascunho(
@@ -1039,12 +1040,17 @@ async def _regiao_por_ocr(
     origem: Origem,
     provider: LLMProvider,
     settings: Settings,
+    questao: int = 0,
 ) -> Rascunho:
     """Último recurso: o Gemini recusou até a estrutura — quase sempre por causa
     de um texto de apoio, obra publicada que ele não reproduz, e as questões
     citam trechos dela. O OCR transcreve os textos, e as questões são lidas de
-    novo sem eles: só as faixas fora dos textos (faixas_de_questoes). Faixa
-    recusada de novo fica de fora, e o curador monta a questão pelo original."""
+    novo sem eles: só as faixas fora dos textos (faixas_de_questoes).
+
+    A questão que a IA não leu nem assim sai do próprio OCR, pelo desenho dela
+    (questoes_das_linhas), marcada como lida por OCR. Antes, a região inteira
+    virava um texto de apoio e as questões dela faltavam. Com `questao`, é a
+    releitura dela: só ela interessa, e a leitura sem número é ela."""
     aviso = f"A IA se recusou a ler a região {origem.regiao}"
     try:
         texto, linhas = await run_in_threadpool(ocr_image_com_linhas, png, settings)
@@ -1068,10 +1074,48 @@ async def _regiao_por_ocr(
         lidas.alertas += parte.alertas
     recuperadas = _faixas([q.numero for q in lidas.questoes])
 
+    do_ocr = questoes_das_linhas(linhas)
+    if questao and len(do_ocr) == 1 and not do_ocr[0].numero:
+        do_ocr[0].numero = questao
+    lidas_pela_ia = {q.numero for q in lidas.questoes}
+    sem_numero = sum(1 for q in do_ocr if not q.numero)
+    do_ocr = [
+        q
+        for q in do_ocr
+        if q.numero and q.numero not in lidas_pela_ia and (not questao or q.numero == questao)
+    ]
+    lidas.questoes += [
+        Questao(
+            numero=q.numero,
+            blocos=[Bloco(texto=q.enunciado)] if q.enunciado else [],
+            alternativas=[
+                Alternativa(letra=letra, blocos=[Bloco(texto=corpo)])
+                for letra, corpo in q.alternativas
+            ],
+            origens=[_faixa_da_regiao(origem, q.topo, q.pe)],
+            completa=q.completa,
+            lida_por_ocr=True,
+        )
+        for q in do_ocr
+    ]
+
     # Com aviso, cada texto sai separado e já ligado às questões que ele cita;
-    # sem aviso, a região inteira fica como material, para não perder nada.
+    # sem aviso e sem questão achada, a região inteira fica como material, para
+    # não perder nada.
     textos = textos_do_ocr(texto) if texto.strip() else []
-    if textos and recuperadas:
+    if do_ocr:
+        aviso += (
+            f": as questões {_faixas([q.numero for q in do_ocr])} vieram do OCR, sem a IA — "
+            "confira número, enunciado e alternativas com o original"
+        )
+        if recuperadas:
+            aviso += f"; as questões {recuperadas} foram lidas à parte, sem o texto de apoio"
+        if textos:
+            aviso += "; os textos de apoio vieram por OCR"
+        if sem_numero:
+            aviso += f"; {sem_numero} sem número ficaram de fora — confira se falta alguma"
+        aviso += "."
+    elif textos and recuperadas:
         aviso += (
             f" por causa do texto de apoio: as questões {recuperadas} foram lidas à parte, "
             "sem o texto, e o texto veio por OCR — confira com o original."
@@ -1100,7 +1144,7 @@ async def _regiao_por_ocr(
             )
             for k, (frase, corpo, questoes) in enumerate(textos)
         ]
-    elif texto.strip():
+    elif texto.strip() and not lidas.questoes:
         resultado.apoios = [
             Apoio(id=f"r{origem.regiao}-ocr", blocos=[Bloco(texto=texto)], origens=[origem])
         ]

@@ -128,6 +128,10 @@ type Questao struct {
 	// IgualA diz de onde a questão foi reaproveitada ("TJCE 2026 · E05, questão
 	// 3"): o conteúdo é o já publicado lá.
 	IgualA string
+	// LidaPorOCR: a IA recusou a região e a questão saiu do OCR. Qualquer
+	// leitura da IA passa na frente, ela ganha releitura, e nunca é dada como
+	// conferida sem o curador.
+	LidaPorOCR bool
 }
 
 // Apoio é o texto ou figura compartilhado por várias questões.
@@ -506,6 +510,20 @@ func (r *Rascunho) Mesclar(n Rascunho) {
 		// somar a segunda mostraria a mesma questão duas vezes.
 		atual := &r.Questoes[j]
 		switch {
+		// Uma leitura da IA e uma do OCR: vence a da IA, se trouxe ao menos as
+		// mesmas alternativas; senão, a que tem mais. Pedaços das duas não se
+		// somam — o OCR já traz a questão toda, e juntar repetiria alternativas.
+		case atual.LidaPorOCR != q.LidaPorOCR:
+			ia, ocr := *atual, q
+			if atual.LidaPorOCR {
+				ia, ocr = q, *atual
+			}
+			melhor := ocr
+			if !vazia(ia) && len(ia.Alternativas) >= len(ocr.Alternativas) {
+				melhor = ia
+			}
+			melhor.Apoios = unir(atual.Apoios, q.Apoios)
+			*atual = melhor
 		// Inteira vence a que não é: o pedaço cortado e também a entrada que o
 		// modelo marca como completa sem trazer alternativa nenhuma.
 		case inteira(q) && !inteira(*atual), !atual.Completa && q.Completa, vazia(*atual):
@@ -710,7 +728,7 @@ func temFigura(q Questao) bool {
 }
 
 func (r Rascunho) semProblema(q Questao, apoios map[string]bool) bool {
-	if !inteira(q) || semConteudo(q.Blocos) {
+	if !inteira(q) || semConteudo(q.Blocos) || q.LidaPorOCR {
 		return false
 	}
 	letras := map[string]bool{}

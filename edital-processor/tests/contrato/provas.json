@@ -161,7 +161,8 @@
         "Resposta": "",
         "Situacao": "",
         "Revisada": false,
-        "Completa": true
+        "Completa": true,
+        "LidaPorOcr": true
       }
     ],
     "Apoios": [

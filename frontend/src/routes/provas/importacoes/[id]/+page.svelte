@@ -1006,6 +1006,13 @@
 							<span>Questão {q?.numero ?? '—'} de {imp.rascunho.questoes.length}</span>
 							{#if q?.revisada}<span class="dim">conferida</span>{/if}
 							{#if q && temFigura(q)}<span class="pill tem-figura">com figura</span>{/if}
+							{#if q?.lidaPorOcr}
+								<span
+									class="pill tem-figura"
+									title="A IA recusou a região desta questão, e ela veio do OCR. Confira o número, o enunciado e as alternativas com o original — ou marque o trecho e leia de novo."
+									>veio do OCR</span
+								>
+							{/if}
 							{#if q?.igualA}
 								<span
 									class="pill reaproveitada"

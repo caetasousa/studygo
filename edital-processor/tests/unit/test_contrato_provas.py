@@ -61,6 +61,7 @@ def _exemplo() -> dict[str, object]:
         situacao="",
         revisada=False,
         completa=True,
+        lida_por_ocr=True,
     )
     apoio = Apoio(
         id="r6-t1",

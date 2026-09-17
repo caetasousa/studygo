@@ -312,6 +312,20 @@ texto —, o OCR transcreve os textos, e as linhas dele dizem onde cada um vai
 do aviso à fonte: as faixas de fora, onde estão as questões, são lidas de novo
 sem o texto (`faixas_de_questoes`).
 
+**Questão que a IA não lê sai do OCR, não vira texto de apoio.** Antes, a
+região recusada sem aviso de texto virava um texto de apoio com o OCR inteiro,
+e as questões dela faltavam. O desenho da questão da FCC — enunciado e "(A)" a
+"(E)", cada alternativa começando a linha — separa as questões nas linhas do
+OCR (`questoes_do_texto.questoes_das_linhas`), com as trocas típicas da letra
+("(AJ", "(Cj", "(4)") e o número à margem, lido ou deduzido das vizinhas. A
+questão vem marcada `LidaPorOCR`: qualquer leitura da IA da mesma questão — a
+região vizinha, a releitura, o trecho marcado — passa na frente
+(`Mesclar`, `AplicarReleitura`); ela ganha releitura sozinha mesmo inteira, e
+nunca é dada como conferida sem o curador. Numa bateria com os doze cadernos
+locais e a IA recusando todas as 226 regiões, 92,6% das 739 questões voltaram
+com o número certo (antes, nenhuma, e 224 textos de apoio de questões); 25
+voltaram com número trocado, por isso a conferência.
+
 **A matéria é da questão, não da seção.** O caderno põe quarenta questões sob
 "Conhecimentos Específicos"; a consolidação manda o resumo de todas numa chamada
 só, para a mesma matéria ter o mesmo nome na prova toda, e troca pela sugestão

@@ -148,7 +148,8 @@ func (r *Rascunho) AplicarTrecho(numero int, lido Rascunho) {
 		j = len(r.Questoes) - 1
 	}
 	q := &r.Questoes[j]
-	q.Revisada, q.IgualA = false, ""
+	// O trecho marcado pelo curador é lido pela IA: a questão deixa de ser a do OCR.
+	q.Revisada, q.IgualA, q.LidaPorOCR = false, "", false
 	if q.Disciplina == "" {
 		q.Disciplina = lida.Disciplina
 	}

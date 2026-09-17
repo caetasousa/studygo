@@ -88,6 +88,7 @@
       "completa": "bool",
       "disciplina": "string",
       "igualA": "string",
+      "lidaPorOcr": "bool",
       "numero": "number",
       "origens": [
         {

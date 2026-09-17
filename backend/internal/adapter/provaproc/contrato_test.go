@@ -76,7 +76,7 @@ func TestContrato_RegiaoExtraida(t *testing.T) {
 	}
 
 	q := r.Questoes[0]
-	if q.Numero != 24 || q.Disciplina == "" || !q.Completa || len(q.Alternativas) != 5 ||
+	if q.Numero != 24 || q.Disciplina == "" || !q.Completa || !q.LidaPorOCR || len(q.Alternativas) != 5 ||
 		len(q.Apoios) != 1 || len(q.Origens) != 1 {
 		t.Fatalf("questão = %+v", q)
 	}

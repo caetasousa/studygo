@@ -46,6 +46,8 @@ export interface Questao {
 	completa: boolean;
 	/** De qual prova publicada o conteúdo foi reaproveitado ("TJCE 2026 · E05, questão 3"). */
 	igualA: string;
+	/** A IA recusou a região, e a questão veio do OCR: conferir número, texto e alternativas. */
+	lidaPorOcr: boolean;
 }
 
 export interface Apoio {

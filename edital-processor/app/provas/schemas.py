@@ -133,6 +133,9 @@ class Questao(Modelo):
     situacao: str = ""
     revisada: bool = False
     completa: bool = True
+    # A IA recusou a região e a questão saiu do OCR: qualquer leitura da IA
+    # passa na frente, e o backend a relê sozinha.
+    lida_por_ocr: bool = False
 
 
 class Apoio(Modelo):

@@ -25,7 +25,8 @@ export function novaQuestao(numero: number, origem?: Origem): Questao {
 		situacao: '',
 		revisada: false,
 		completa: false,
-		igualA: ''
+		igualA: '',
+		lidaPorOcr: false
 	};
 }
 
@@ -95,6 +96,9 @@ export function problemasDaQuestao(q: Questao, r: Rascunho): string[] {
 		out.push(`A resposta (${q.resposta || 'nenhuma'}) difere do gabarito (${oficial || 'anulada'}).`);
 	if (citaTexto(q) && !q.apoios.some((id) => r.apoios.some((a) => a.id === id)))
 		out.push('Cita um texto, mas nenhum texto de apoio está ligado a ela.');
+	// Conferida, o curador já olhou o original: sai da lista de problemas.
+	if (q.lidaPorOcr && !q.revisada)
+		out.push('Veio do OCR, porque a IA recusou a região: confira número, enunciado e alternativas com o original.');
 	return out;
 }
 

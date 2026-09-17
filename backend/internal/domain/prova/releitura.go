@@ -150,7 +150,8 @@ func (r Rascunho) Releituras(regioes []Origem) []Origem {
 
 	for n := 1; n <= ultima; n++ {
 		q, lida := lidas[n]
-		if (lida && inteira(q)) || (!lida && r.Total > 0 && n > r.Total) {
+		// A que veio do OCR também: sozinha, a IA costuma lê-la.
+		if (lida && inteira(q) && !q.LidaPorOCR) || (!lida && r.Total > 0 && n > r.Total) {
 			continue
 		}
 		var (
@@ -256,10 +257,16 @@ func (r *Rascunho) AplicarReleitura(n Rascunho) {
 			continue
 		}
 		atual := &r.Questoes[j]
-		if atual.Completa && len(atual.Alternativas) == 5 {
+		// A leitura da IA toma o lugar da do OCR se trouxe ao menos o mesmo.
+		if atual.LidaPorOCR && !q.LidaPorOCR && len(q.Alternativas) >= len(atual.Alternativas) {
+			*atual = q
 			continue
 		}
-		if (q.Completa && !atual.Completa) || len(q.Alternativas) > len(atual.Alternativas) {
+		if inteira(*atual) {
+			continue
+		}
+		// A releitura que veio do OCR só vale se trouxe mais alternativas.
+		if len(q.Alternativas) > len(atual.Alternativas) || (!q.LidaPorOCR && q.Completa && !atual.Completa) {
 			*atual = q
 		}
 	}

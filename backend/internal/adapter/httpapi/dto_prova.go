@@ -51,6 +51,8 @@ type questaoDTO struct {
 	Completa     bool             `json:"completa"`
 	// IgualA: de qual prova publicada o conteúdo foi reaproveitado.
 	IgualA string `json:"igualA"`
+	// LidaPorOcr: a IA recusou a região, e a questão veio do OCR.
+	LidaPorOcr bool `json:"lidaPorOcr"`
 }
 
 type apoioDTO struct {
@@ -260,7 +262,7 @@ func questaoParaDTO(q prova.Questao) questaoDTO {
 		Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Blocos: blocosParaDTO(q.Blocos),
 		Alternativas: alternativas, Apoios: naoNula(q.Apoios), Origens: origensParaDTO(q.Origens),
 		Resposta: q.Resposta, Situacao: q.Situacao, Revisada: q.Revisada, Completa: q.Completa,
-		IgualA: q.IgualA,
+		IgualA: q.IgualA, LidaPorOcr: q.LidaPorOCR,
 	}
 }
 
@@ -404,7 +406,7 @@ func rascunhoDoDTO(d rascunhoDTO) prova.Rascunho {
 			Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Blocos: blocosDoDTO(q.Blocos),
 			Alternativas: alternativas, Apoios: q.Apoios, Origens: origens,
 			Resposta: q.Resposta, Situacao: q.Situacao, Revisada: q.Revisada, Completa: q.Completa,
-			IgualA: q.IgualA,
+			IgualA: q.IgualA, LidaPorOCR: q.LidaPorOcr,
 		})
 	}
 	for _, a := range d.Apoios {

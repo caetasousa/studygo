@@ -977,8 +977,12 @@ async def test_faixa_recusada_de_novo_fica_para_o_curador(
     result = await pipeline.extrair(tmp_path, id, origin, provider, Settings(provas_dir=tmp_path))
 
     assert len(provider.pedidos) == 4  # região inteira duas vezes, a faixa duas
-    assert result.questoes == [] and result.apoios[0].id == "r1-ocr1"
-    assert "Confira no original se alguma questão dela ficou faltando" in result.alertas[0]
+    # A questão 1 que a faixa não trouxe sai do OCR, com o (A) que ele leu, e
+    # fica incompleta para a releitura; o texto continua o de apoio.
+    q = result.questoes[0]
+    assert (q.numero, q.lida_por_ocr, q.completa) == (1, True, False)
+    assert [a.letra for a in q.alternativas] == ["A"] and result.apoios[0].id == "r1-ocr1"
+    assert "as questões 1 vieram do OCR" in result.alertas[0]
 
 
 async def test_apoio_guarda_o_aviso_e_a_area_no_original(tmp_path: Path) -> None:
@@ -1138,3 +1142,72 @@ async def test_releitura_le_so_a_questao(tmp_path: Path, monkeypatch: pytest.Mon
     )
 
     assert result.questoes[0].origens == [so_a_questao]
+
+
+# A página que a IA recusou inteira, sem texto de apoio: antes, o OCR virava um
+# texto de apoio e as três questões faltavam.
+PAGINA_RECUSADA = _linhas(
+    (0.02, "Caderno de Prova 'E05', Tipo 004"),
+    (0.05, "27. Um órgão usa uma solução de segurança. Uma implicação é"),
+    (0.09, "(A) centralizar."),
+    (0.12, "(B) isolar."),
+    (0.15, "(C) duplicar."),
+    (0.18, "(D) remover."),
+    (0.21, "(E) auditar."),
+    (0.30, "28. Considere a política de cópias. Ela deve"),
+    (0.34, "(A) ser diária."),
+    (0.37, "(B) ser semanal."),
+    (0.40, "(C) ser mensal."),
+    (0.43, "(D) ser anual."),
+    (0.46, "(E) ser dispensada."),
+)
+
+
+async def test_recusa_dupla_sem_texto_de_apoio_tira_as_questoes_do_ocr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pipeline, "ocr_image_com_linhas", lambda png, s: ("OCR", PAGINA_RECUSADA))
+    id = pdf(tmp_path)
+    origem = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="5")
+    recusa = ProviderRefused("RECITATION")
+
+    result = await pipeline.extrair(
+        tmp_path, id, origem, FakeProvider(recusa, recusa), Settings(provas_dir=tmp_path)
+    )
+
+    assert [(q.numero, q.completa, q.lida_por_ocr) for q in result.questoes] == [
+        (27, True, True),
+        (28, True, True),
+    ]
+    assert result.questoes[1].alternativas[4].blocos[0].texto == "ser dispensada."
+    # A área de cada questão é a dela na região, não a página inteira.
+    y0, y1 = result.questoes[0].origens[0].retangulo[1::2]
+    assert 30 < y0 < 60 and 160 < y1 < 200
+    # O OCR era das questões: não vira texto de apoio.
+    assert result.apoios == []
+    assert "as questões 27-28 vieram do OCR" in result.alertas[0]
+
+
+async def test_releitura_recusada_fica_com_a_questao_do_ocr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A releitura da questão 28 é a região só dela: o número na caixa da margem
+    não sai no OCR, e a leitura sem número é a pedida."""
+    so_a_28 = [linha for linha in PAGINA_RECUSADA if linha.topo >= 0.30]
+    so_a_28[0] = LinhaOCR("Considere a política de cópias. Ela deve", 0.30, 0.32)
+    monkeypatch.setattr(pipeline, "ocr_image_com_linhas", lambda png, s: ("OCR", so_a_28))
+    monkeypatch.setattr(pipeline, "localizar_questao", lambda root, doc, origem, n, s: origem)
+    id = pdf(tmp_path)
+    origem = Origem(pagina=1, retangulo=[0, 0, 595, 800], regiao="q28")
+    recusa = ProviderRefused("RECITATION")
+
+    result = await pipeline.extrair(
+        tmp_path,
+        id,
+        origem,
+        FakeProvider(recusa, recusa),
+        Settings(provas_dir=tmp_path),
+        questao=28,
+    )
+
+    assert [(q.numero, q.completa, q.lida_por_ocr) for q in result.questoes] == [(28, True, True)]
