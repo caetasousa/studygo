@@ -376,8 +376,7 @@
 			await publicar();
 			return;
 		}
-		const n = imp.pendencias.length;
-		erro = `Não publicado: ${n === 1 ? 'sobrou 1 pendência' : `sobraram ${n} pendências`}. Veja a lista na etapa Publicar.`;
+		erro = `Não publicado: ${imp.pendencias[0]}`;
 	}
 
 	/** Aonde levar o curador para resolver a pendência. */
@@ -1222,6 +1221,13 @@
 							prova traz ela de volta para corrigir; publicar de novo substitui a versão no ar.
 						</p>
 						<ul class="resumo">
+							<li>
+								<b>{imp.publicaveis}</b>
+								{imp.publicaveis === 1 ? 'questão vai' : 'questões vão'} ao catálogo{#if imp.deFora.length > 0}; <b
+										>{imp.deFora.length}</b
+									>
+									{imp.deFora.length === 1 ? 'fica' : 'ficam'} de fora{/if}
+							</li>
 							<li><b>{conferidas} de {imp.rascunho.questoes.length}</b> questões conferidas</li>
 						{#if reaproveitadas > 0}
 							<li>
@@ -1248,15 +1254,14 @@
 						{#if alterado}
 							<p class="callout warn">
 								<span>
-									Há alterações não salvas: as pendências abaixo são as da última versão salva. “Salvar e
-									publicar” grava o que você mudou, confere de novo e publica se não sobrar nada.
+									Há alterações não salvas: o que vai e o que fica de fora abaixo é da última versão salva.
+									“Salvar e publicar” grava o que você mudou, confere de novo e publica as prontas.
 								</span>
 							</p>
 						{/if}
 
-						<h3>Pendências ({imp.pendencias.length})</h3>
-						<p class="ajuda">O que impede publicar. Resolva cada uma na etapa em que ela está e salve.</p>
 						{#if imp.pendencias.length > 0}
+							<h3>O que impede publicar</h3>
 							<ul class="pendencias">
 								{#each imp.pendencias as p, i (i)}
 									{@const destino = destinoDaPendencia(p)}
@@ -1267,7 +1272,45 @@
 								{/each}
 							</ul>
 						{:else}
-							<p class="pronta">Nenhuma pendência: a prova pode ser publicada.</p>
+							<p class="pronta">
+								Pronta: {imp.publicaveis === 1 ? 'a questão pronta vai' : `as ${imp.publicaveis} questões prontas vão`} ao
+								catálogo.
+							</p>
+						{/if}
+
+						<!-- De fora não trava: vão as prontas, e a revisão reaberta deixa corrigir e publicar de novo. -->
+						{#if imp.deFora.length > 0}
+							<h3>Ficam de fora ({imp.deFora.length})</h3>
+							<p class="ajuda">
+								Não impedem publicar: essas não vão ao catálogo agora. Corrija quando quiser e publique de novo.
+							</p>
+							<ul class="pendencias">
+								{#each imp.deFora as f (f.numero)}
+									{@const noRascunho = imp.rascunho.questoes.some((q) => q.numero === f.numero)}
+									<li>
+										Questão {f.numero}: {f.motivo}.
+										{#if noRascunho}
+											<button type="button" class="ir" onclick={() => abrirQuestao(f.numero)}>Abrir a questão</button>
+										{:else}
+											<button type="button" class="ir" onclick={() => (etapa = 'questoes')}>Abrir as questões</button>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if imp.avisos.length > 0}
+							<h3>Avisos ({imp.avisos.length})</h3>
+							<p class="ajuda">Não impedem publicar: vale conferir antes.</p>
+							<ul class="pendencias">
+								{#each imp.avisos as a, i (i)}
+									{@const destino = destinoDaPendencia(a)}
+									<li>
+										{a}
+										{#if destino}<button type="button" class="ir" onclick={destino.ir}>{destino.rotulo}</button>{/if}
+									</li>
+								{/each}
+							</ul>
 						{/if}
 						{#if cargoDiverge}{@render cargoDoGabarito()}{/if}
 
@@ -1284,7 +1327,9 @@
 								disabled={ocupado || (!alterado && imp.pendencias.length > 0)}
 								onclick={() => executar(salvarEPublicar)}
 							>
-								{alterado ? 'Salvar e publicar' : 'Publicar no catálogo'}
+								{alterado
+									? 'Salvar e publicar'
+									: `Publicar ${imp.publicaveis} ${imp.publicaveis === 1 ? 'questão' : 'questões'} no catálogo`}
 							</button>
 						</div>
 					</div>

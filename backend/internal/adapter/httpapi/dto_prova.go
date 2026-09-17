@@ -112,12 +112,22 @@ type importacaoProvaDTO struct {
 	NomeGabarito  string      `json:"nomeGabarito"`
 	Regioes       []origemDTO `json:"regioes"`
 	Rascunho      rascunhoDTO `json:"rascunho"`
-	Pendencias    []string    `json:"pendencias"`
-	// ConferenciaObrigatoria diz se a falta de conferência entra nas
-	// pendências neste ambiente (PROVAS_EXIGIR_CONFERENCIA).
+	// Pendencias impedem publicar; Avisos, não. Publicaveis são as questões
+	// que vão ao catálogo, e DeFora, as que ficam, com o motivo.
+	Pendencias  []string    `json:"pendencias"`
+	Avisos      []string    `json:"avisos"`
+	Publicaveis int         `json:"publicaveis"`
+	DeFora      []deForaDTO `json:"deFora"`
+	// ConferenciaObrigatoria diz se a questão não conferida fica de fora da
+	// publicação neste ambiente (PROVAS_EXIGIR_CONFERENCIA).
 	ConferenciaObrigatoria bool      `json:"conferenciaObrigatoria"`
 	CriadoEm               time.Time `json:"criadoEm"`
 	AtualizadoEm           time.Time `json:"atualizadoEm"`
+}
+
+type deForaDTO struct {
+	Numero int    `json:"numero"`
+	Motivo string `json:"motivo"`
 }
 
 type importacaoResumoDTO struct {
@@ -303,6 +313,7 @@ func importacaoProvaParaDTO(i service.ImportacaoDeProva) importacaoProvaDTO {
 		Erro: i.Erro, ProvaID: i.ProvaID, NomeDocumento: i.NomeDocumento, NomeGabarito: i.NomeGabarito,
 		Regioes:  origensParaDTO(i.Regioes),
 		Rascunho: rascunhoParaDTO(i.Rascunho), Pendencias: naoNula(i.Pendencias),
+		Avisos: naoNula(i.Avisos), Publicaveis: i.Publicaveis, DeFora: deForaParaDTO(i.DeFora),
 		ConferenciaObrigatoria: i.ConferenciaObrigatoria,
 		CriadoEm:               i.CriadoEm, AtualizadoEm: i.AtualizadoEm,
 	}
@@ -436,4 +447,13 @@ type anotacaoDeQuestaoRequest struct {
 
 func anotacaoDeQuestaoParaDTO(a prova.Anotacao) anotacaoDeQuestaoDTO {
 	return anotacaoDeQuestaoDTO{Numero: a.Numero, Texto: a.Texto, AtualizadaEm: a.AtualizadaEm}
+}
+
+func deForaParaDTO(fora []prova.DeFora) []deForaDTO {
+	out := make([]deForaDTO, 0, len(fora))
+	for _, f := range fora {
+		out = append(out, deForaDTO{Numero: f.Numero, Motivo: f.Motivo})
+	}
+
+	return out
 }

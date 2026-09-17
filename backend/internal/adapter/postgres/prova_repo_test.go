@@ -709,7 +709,7 @@ func TestProvas_ExcluidaSobreviveAPublicacao(t *testing.T) {
 		Cargo: "E05", Caderno: "4", Tipo: "definitivo",
 		Respostas: map[string]string{"1": "D", "2": ""}, Situacoes: map[string]string{"2": "Anulada"},
 	}
-	if p := r.Pendencias(false); len(p) > 0 {
+	if p := r.Pendencias(prova.Criterios{}); len(p) > 0 {
 		t.Fatalf("rascunho do teste com pendências: %v", p)
 	}
 	id, err := repo.Publicar(ctx, levarARevisao(t, repo, r), criador)
@@ -727,7 +727,7 @@ func TestProvas_ExcluidaSobreviveAPublicacao(t *testing.T) {
 	if resposta, ok := p.Conteudo.Gabarito.Respostas["2"]; !ok || resposta != "" {
 		t.Fatalf("gabarito da publicada = %+v, quer a 2 anulada", p.Conteudo.Gabarito)
 	}
-	if pend := p.Conteudo.Pendencias(false); len(pend) > 0 {
+	if pend := p.Conteudo.Pendencias(prova.Criterios{}); len(pend) > 0 {
 		t.Fatalf("a revisão reaberta nasceria com pendências: %v", pend)
 	}
 }

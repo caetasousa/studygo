@@ -74,12 +74,18 @@ func GabaritoDasLinhas(cargo, caderno, tipo string, linhas []RespostaDoGabarito)
 // situação não conta: é o texto da banca ao lado da letra, e o definitivo a
 // escreve em todas ("Gabarito sem alteração") onde o preliminar não escrevia; a
 // anulação muda a letra, e essa conta.
+//
+// Ganhar a resposta que não tinha também não desconfere: o curador conferiu o
+// texto, e a letra vem do documento oficial. O gabarito lido errado da SCGE-PE
+// deixava metade das questões sem resposta; o certo, enviado depois,
+// desconferiria as que ele confirmou.
 func (r *Rascunho) AplicarGabarito() {
 	for j := range r.Questoes {
 		q := &r.Questoes[j]
 		chave := strconv.Itoa(q.Numero)
 		if resposta := r.Gabarito.Respostas[chave]; q.Resposta != resposta {
-			q.Resposta, q.Revisada = resposta, false
+			q.Revisada = q.Revisada && q.Resposta == ""
+			q.Resposta = resposta
 		}
 		q.Situacao = r.Gabarito.Situacoes[chave]
 	}

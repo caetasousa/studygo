@@ -6,7 +6,6 @@ package prova
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -219,32 +218,6 @@ type Rascunho struct {
 	// sendo o da capa: é a numeração do caderno, e a excluída só deixa de ser
 	// esperada.
 	Excluidas []int
-}
-
-// faltando diz quais números a pendência de total não achou — "O rascunho tem
-// 59 questões" não dizia qual procurar.
-func (r Rascunho) faltando() string {
-	presentes := map[int]bool{}
-	for _, q := range r.Questoes {
-		presentes[q.Numero] = true
-	}
-	for _, n := range r.Excluidas {
-		presentes[n] = true
-	}
-	faltam := []string{}
-	for n := 1; n <= r.Total; n++ {
-		if !presentes[n] {
-			faltam = append(faltam, strconv.Itoa(n))
-		}
-	}
-	switch len(faltam) {
-	case 0:
-		return ""
-	case 1:
-		return " Falta a questão " + faltam[0] + ": transcreva ou exclua da prova."
-	default:
-		return " Faltam as questões " + strings.Join(faltam, ", ") + ": transcreva ou exclua da prova."
-	}
 }
 
 // QuestoesNaProva é quantas questões a prova publicada tem: o total da capa
@@ -777,38 +750,190 @@ func semConteudo(bs []Bloco) bool {
 	return !slices.ContainsFunc(bs, func(b Bloco) bool { return b.Tipo == "imagem" || strings.TrimSpace(b.Texto) != "" })
 }
 
-// Pendencias lista o que impede a publicação. Vazia, o rascunho pode ir para
-// o catálogo.
+// Criterios dizem o que a questão precisa, além da integridade, para ir ao
+// catálogo.
+type Criterios struct {
+	// Conferencia: só a questão conferida pelo curador, com os recortes e os
+	// textos que usa conferidos. Produção pede; o ambiente de teste, não.
+	Conferencia bool
+	// Gabarito: só a questão com linha no gabarito — a anulada tem, sem letra.
+	// A prova de pacote já foi publicada noutro ambiente e entra como veio.
+	Gabarito bool
+}
+
+// DeFora é a questão que não vai ao catálogo nesta publicação, e por quê.
+type DeFora struct {
+	Numero int
+	Motivo string
+}
+
+// ParaPublicar separa o que vai ao catálogo. A questão que não atende fica de
+// fora sem travar as outras — 56 conferidas publicam, mesmo com 4 por
+// transcrever —, e o número dela entra nas excluídas da revisão publicada: a
+// revisão reaberta sabe o que ficou de fora e deixa devolver.
 //
-// exigirConferencia decide se a falta da conferência do curador — na questão,
-// no material de apoio e no recorte — bloqueia. Sem ela, só a integridade
-// conta: numeração, alternativas, figura recortada, gabarito do mesmo caderno.
+// A que o curador excluiu não é listada: foi decisão dele.
+func (r Rascunho) ParaPublicar(c Criterios) (Rascunho, []DeFora) {
+	g := gabaritoValido(r.Gabarito)
+	excluida := map[int]bool{}
+	for _, n := range r.Excluidas {
+		excluida[n] = true
+	}
+	vezes := map[int]int{}
+	for _, q := range r.Questoes {
+		vezes[q.Numero]++
+	}
+	apoios := map[string]Apoio{}
+	for _, a := range r.Apoios {
+		apoios[a.ID] = a
+	}
+
+	pub := r
+	pub.Gabarito, pub.Questoes, pub.Apoios, pub.Excluidas = g, nil, nil, nil
+	fora := []DeFora{}
+	presentes, publicadas := map[int]bool{}, map[int]bool{}
+	for _, q := range r.Questoes {
+		presentes[q.Numero] = true
+		if excluida[q.Numero] {
+			continue
+		}
+		if motivo := r.motivoDeFora(q, c, g, vezes[q.Numero], apoios); motivo != "" {
+			fora = append(fora, DeFora{Numero: q.Numero, Motivo: motivo})
+			continue
+		}
+		// A resposta que vale é a do gabarito, a que o banco grava.
+		chave := strconv.Itoa(q.Numero)
+		q.Resposta, q.Situacao = g.Respostas[chave], g.Situacoes[chave]
+		pub.Questoes = append(pub.Questoes, q)
+		publicadas[q.Numero] = true
+	}
+
+	// Sem o total da capa, o maior número conhecido: sem ele, a prova
+	// publicada não saberia quantas questões tem.
+	if pub.Total <= 0 {
+		for _, q := range pub.Questoes {
+			pub.Total = max(pub.Total, q.Numero)
+		}
+		for chave := range g.Respostas {
+			n, _ := strconv.Atoi(chave)
+			pub.Total = max(pub.Total, n)
+		}
+	}
+	for n := 1; n <= pub.Total; n++ {
+		if !presentes[n] && !excluida[n] {
+			fora = append(fora, DeFora{Numero: n, Motivo: "não está no rascunho"})
+		}
+		if !publicadas[n] {
+			pub.Excluidas = append(pub.Excluidas, n)
+		}
+	}
+	for _, a := range r.Apoios {
+		a.Questoes = slices.DeleteFunc(slices.Clone(a.Questoes), func(n int) bool { return !publicadas[n] })
+		if len(a.Questoes) > 0 {
+			pub.Apoios = append(pub.Apoios, a)
+		}
+	}
+	slices.SortStableFunc(fora, func(a, b DeFora) int { return a.Numero - b.Numero })
+
+	return pub, fora
+}
+
+// motivoDeFora diz por que a questão não vai ao catálogo; vazio, ela vai.
+func (r Rascunho) motivoDeFora(q Questao, c Criterios, g Gabarito, vezes int, apoios map[string]Apoio) string {
+	if q.Numero < 1 || (r.Total > 0 && q.Numero > r.Total) {
+		return fmt.Sprintf("o número está fora da numeração do caderno (1 a %d)", r.Total)
+	}
+	if vezes > 1 {
+		return "o número está repetido no rascunho"
+	}
+	if c.Conferencia && !q.Revisada {
+		return "não foi conferida"
+	}
+	if _, ok := g.Respostas[strconv.Itoa(q.Numero)]; c.Gabarito && !ok {
+		return "não tem resposta no gabarito"
+	}
+	if !q.Completa || semConteudo(q.Blocos) || len(q.Alternativas) != 5 {
+		return "está incompleta"
+	}
+	letras := map[string]bool{}
+	for _, a := range q.Alternativas {
+		if len(a.Letra) != 1 || !strings.Contains("ABCDE", a.Letra) || letras[a.Letra] || len(a.Blocos) == 0 {
+			return "as alternativas estão inválidas"
+		}
+		letras[a.Letra] = true
+		if p := problemaDosBlocos(a.Blocos, c.Conferencia); p != "" {
+			return "a alternativa " + a.Letra + " " + p
+		}
+	}
+	if p := problemaDosBlocos(q.Blocos, c.Conferencia); p != "" {
+		return "o enunciado " + p
+	}
+	for _, id := range q.Apoios {
+		a, ok := apoios[id]
+		switch {
+		case !ok:
+			return "usa um texto de apoio que não existe mais"
+		case c.Conferencia && !a.Revisado:
+			return "usa o " + a.rotulo() + ", que não foi conferido"
+		case problemaDosBlocos(a.Blocos, c.Conferencia) != "":
+			return "o " + a.rotulo() + " " + problemaDosBlocos(a.Blocos, c.Conferencia)
+		}
+	}
+
+	return ""
+}
+
+// gabaritoValido é o gabarito que o banco aceita: número sem zero à esquerda
+// (o "01" do gabarito em tabela é a questão 1) e letra de A a E, ou vazia na
+// anulada. A linha inválida sai, e a questão dela fica sem resposta.
+func gabaritoValido(g Gabarito) Gabarito {
+	if len(g.Respostas) == 0 {
+		return g
+	}
+	respostas, situacoes := map[string]string{}, map[string]string{}
+	for chave, letra := range g.Respostas {
+		n, err := strconv.Atoi(strings.TrimSpace(chave))
+		if err != nil || n < 1 || !slices.Contains(letrasDoGabarito, letra) {
+			continue
+		}
+		respostas[strconv.Itoa(n)] = letra
+		if s, ok := g.Situacoes[chave]; ok {
+			situacoes[strconv.Itoa(n)] = s
+		}
+	}
+	g.Respostas, g.Situacoes = respostas, situacoes
+
+	return g
+}
+
+// Pendencias é o que impede publicar: não sobrar questão que possa ir ao
+// catálogo. O que falta numa questão só a deixa de fora (ParaPublicar), e o
+// que falta na identificação é aviso (Avisos).
+func (r Rascunho) Pendencias(c Criterios) []string {
+	pub, _ := r.ParaPublicar(c)
+	switch {
+	case len(pub.Questoes) > 0:
+		return []string{}
+	case len(r.Questoes) == 0:
+		return []string{"O rascunho não tem questões."}
+	case c.Gabarito && len(pub.Gabarito.Respostas) == 0:
+		return []string{"Sem gabarito, nenhuma questão tem resposta: envie o gabarito na etapa Dados."}
+	default:
+		return []string{"Nenhuma questão pode ir ao catálogo: veja em \"Ficam de fora\" o motivo de cada uma."}
+	}
+}
+
+// Avisos é o que vale conferir antes de publicar, sem impedir: a identificação
+// que a capa não deu e o gabarito que não parece ser o desta prova.
 //
 // O caderno do gabarito é comparado pelos dígitos (ver normalizarCaderno).
-func (r Rascunho) Pendencias(exigirConferencia bool) []string {
+func (r Rascunho) Avisos() []string {
 	out := []string{}
 	if falta := r.identificacaoQueFalta(); len(falta) > 0 {
 		out = append(out, "Confira na etapa Dados: "+strings.Join(falta, ", ")+".")
 	}
-	// Sem total, cada questão estaria fora da numeração: a pendência é uma só,
-	// e diz onde se resolve.
-	semTotal := r.Total <= 0
-	if semTotal {
+	if r.Total <= 0 {
 		out = append(out, "A capa não disse quantas questões a prova tem: preencha o Total de questões na etapa Dados.")
-	} else if len(r.Questoes) != r.QuestoesNaProva() {
-		out = append(out, fmt.Sprintf(
-			"O rascunho tem %d questões e o total esperado é %d.%s", len(r.Questoes), r.QuestoesNaProva(), r.faltando(),
-		))
-	}
-	foraDaNumeracao := func(n int) bool { return n < 1 || (!semTotal && n > r.Total) }
-	// Excluir é decisão do curador, com ou sem anulação: a prova publicada só
-	// não tem aquele número. O gabarito continua inteiro.
-	excluidas := map[int]bool{}
-	for _, n := range r.Excluidas {
-		if excluidas[n] || foraDaNumeracao(n) {
-			out = append(out, fmt.Sprintf("Numeração inválida entre as excluídas: %d.", n))
-		}
-		excluidas[n] = true
 	}
 	if g := r.Gabarito.Cargo; g != "" && !mesmoCargo(r.Cargo, g) {
 		// A mensagem diz o que conferir: o código está na capa, em "Caderno de
@@ -822,90 +947,13 @@ func (r Rascunho) Pendencias(exigirConferencia bool) []string {
 				"use esse código na etapa Dados; se não, o gabarito é de outro cargo.", g, prova, g,
 		))
 	}
-	if r.Gabarito.Caderno != "" && normalizarCaderno(r.Gabarito.Caderno) != normalizarCaderno(r.Caderno) {
-		out = append(out, "O tipo de gabarito não corresponde ao caderno da prova.")
+	if r.Gabarito.Caderno != "" && r.Caderno != "" && normalizarCaderno(r.Gabarito.Caderno) != normalizarCaderno(r.Caderno) {
+		out = append(out, "O tipo de gabarito não corresponde ao caderno da prova: confira na etapa Dados.")
 	}
-	if len(r.Gabarito.Respostas) > 0 && (r.Gabarito.Cargo == "" || r.Gabarito.Caderno == "") {
-		out = append(out,
-			"O gabarito veio sem o código do cargo ou o tipo do caderno: preencha Cargo no gabarito e Caderno no gabarito na etapa Dados.")
-	}
-	if n := len(r.Gabarito.Respostas); n > 0 && !semTotal && n != r.Total {
+	if n := len(r.Gabarito.Respostas); n > 0 && r.Total > 0 && n != r.Total {
 		out = append(out, fmt.Sprintf(
 			"O gabarito tem %d respostas e o caderno, %d questões: confira o Total de questões na etapa Dados ou troque o gabarito.",
 			n, r.Total,
-		))
-	}
-	for _, chave := range slices.Sorted(maps.Keys(r.Gabarito.Respostas)) {
-		letra := r.Gabarito.Respostas[chave]
-		if n, err := strconv.Atoi(chave); err != nil || n < 1 || !slices.Contains(letrasDoGabarito, letra) {
-			out = append(out, fmt.Sprintf("O gabarito tem resposta inválida: %q na questão %q.", letra, chave))
-		}
-	}
-
-	apoios := map[string]bool{}
-	for _, a := range r.Apoios {
-		apoios[a.ID] = true
-		local := a.rotulo()
-		// Texto que nenhuma questão usa não aparece para o aluno: ou falta
-		// ligar, ou é lixo da extração.
-		if len(a.Questoes) == 0 {
-			out = append(out, "Ligue às questões ou remova o "+local+".")
-		} else if exigirConferencia && !a.Revisado {
-			out = append(out, "Confira o "+local+".")
-		}
-		out = append(out, pendenciasDosBlocos(a.Blocos, local, exigirConferencia)...)
-	}
-
-	numeros := map[int]bool{}
-	invalidas := []string{}
-	for _, q := range r.Questoes {
-		local := fmt.Sprintf("questão %d", q.Numero)
-		if numeros[q.Numero] || foraDaNumeracao(q.Numero) {
-			invalidas = append(invalidas, strconv.Itoa(q.Numero))
-		}
-		numeros[q.Numero] = true
-		if excluidas[q.Numero] {
-			out = append(out, fmt.Sprintf(
-				"A questão %d está no rascunho e entre as excluídas; exclua-a de novo ou devolva-a à prova.", q.Numero,
-			))
-		}
-
-		if !q.Completa || len(q.Blocos) == 0 || len(q.Alternativas) != 5 {
-			out = append(out, fmt.Sprintf("A %s está incompleta.", local))
-		}
-		if exigirConferencia && !q.Revisada {
-			out = append(out, fmt.Sprintf("A %s não foi conferida.", local))
-		}
-
-		letras := map[string]bool{}
-		for _, a := range q.Alternativas {
-			if len(a.Letra) != 1 || !strings.Contains("ABCDE", a.Letra) || letras[a.Letra] || len(a.Blocos) == 0 {
-				out = append(out, fmt.Sprintf("Alternativas inválidas na %s.", local))
-			}
-			letras[a.Letra] = true
-			out = append(out, pendenciasDosBlocos(a.Blocos, local, exigirConferencia)...)
-		}
-		for _, id := range q.Apoios {
-			if !apoios[id] {
-				out = append(out, fmt.Sprintf("A %s aponta um texto de apoio que não existe mais (%s); ligue de novo na etapa Textos de apoio.", local, id))
-			}
-		}
-		if q.Resposta != "" && !letras[q.Resposta] {
-			out = append(out, fmt.Sprintf("Resposta inválida na %s.", local))
-		}
-		if len(r.Gabarito.Respostas) > 0 {
-			oficial, ok := r.Gabarito.Respostas[strconv.Itoa(q.Numero)]
-			if !ok || q.Resposta != oficial {
-				out = append(out, fmt.Sprintf(
-					"A resposta da %s difere do gabarito; corrija a transcrição oficial.", local,
-				))
-			}
-		}
-		out = append(out, pendenciasDosBlocos(q.Blocos, local, exigirConferencia)...)
-	}
-	if len(invalidas) > 0 {
-		out = append(out, fmt.Sprintf(
-			"Numeração repetida ou fora do total na etapa Questões: %s.", strings.Join(invalidas, ", "),
 		))
 	}
 
@@ -975,32 +1023,33 @@ func limparBlocos(bs []Bloco) []Bloco {
 	return out
 }
 
-func pendenciasDosBlocos(bs []Bloco, local string, exigirConferencia bool) []string {
-	out := []string{}
+// problemaDosBlocos diz o que impede os blocos de chegar ao aluno; vazio, nada.
+func problemaDosBlocos(bs []Bloco, exigirConferencia bool) string {
 	for _, b := range bs {
 		switch b.Tipo {
 		case "texto", "codigo":
 			// Espaço entre dois trechos formatados é texto: separa as palavras.
 			if b.Texto == "" || (b.Tipo == "codigo" && strings.TrimSpace(b.Texto) == "") {
-				out = append(out, "Bloco de texto vazio na "+local+".")
+				return "tem bloco de texto vazio"
 			}
 		case "imagem":
 			// Sem posição no PDF desta prova é a figura reaproveitada de outra:
 			// o recorte existe, e é o que o aluno vê.
 			if b.Arquivo == "" {
-				out = append(out, "Imagem sem recorte na "+local+".")
-			} else if exigirConferencia && !b.Revisado {
-				out = append(out, "Recorte não conferido na "+local+".")
+				return "tem figura sem recorte"
+			}
+			if exigirConferencia && !b.Revisado {
+				return "tem recorte não conferido"
 			}
 			if b.Largura < 0 || b.Largura > 100 {
-				out = append(out, "Tamanho de figura fora de 0 a 100% na "+local+".")
+				return "tem figura com tamanho fora de 0 a 100%"
 			}
 		default:
-			out = append(out, "Tipo de bloco inválido na "+local+".")
+			return "tem bloco de tipo inválido"
 		}
 	}
 
-	return out
+	return ""
 }
 
 // InvalidarEdicoes desfaz a conferência de tudo o que mudou nesta gravação.

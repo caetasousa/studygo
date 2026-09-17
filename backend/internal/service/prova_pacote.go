@@ -149,11 +149,13 @@ func (s *ProvaService) ImportarPacote(ctx context.Context, usuario string, pct P
 	r := pct.Conteudo
 	r.AcertarApoios()
 	r.LimparBlocos()
-	if p := r.Pendencias(false); len(p) > 0 {
-		return prova.Publicacao{}, erroDeValidacao(fmt.Sprintf(
-			"a prova do pacote tem %d pendências; a primeira: %s", len(p), p[0],
-		))
+	// Já publicada lá: entra como veio, sem pedir de novo conferência nem
+	// gabarito — só a questão com defeito de integridade fica de fora.
+	criterios := prova.Criterios{}
+	if p := r.Pendencias(criterios); len(p) > 0 {
+		return prova.Publicacao{}, erroDeValidacao("a prova do pacote não tem questão que possa ir ao catálogo: " + p[0])
 	}
+	r, _ = r.ParaPublicar(criterios)
 	figuras := slices.Compact(slices.Sorted(slices.Values(r.Arquivos())))
 	for _, id := range figuras {
 		if _, err := uuid.Parse(id); err != nil || !parecePNG(pct.Figuras[id]) {

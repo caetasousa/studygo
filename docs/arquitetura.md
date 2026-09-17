@@ -374,13 +374,20 @@ figura inteira; conferido o último, a questão fica conferida
 (`ConfirmarPelosRecortes`). A revisão as destaca — filtro "Com figura", ponto
 no mapa, aviso na questão.
 
-**Nada vai ao catálogo sem conferência.** `Rascunho.Pendencias` bloqueia a
-publicação enquanto houver questão não conferida ou incompleta, figura sem
-recorte, número fora da sequência, ou gabarito de outro cargo ou caderno. A
-resposta de uma questão só vem do gabarito oficial, nunca da IA, e editar algo
-desfaz a conferência dele (`InvalidarEdicoes`) — a tela avisa quais voltaram a pedir
-conferência. Trocar o gabarito só desconfere a questão cuja letra mudou
-(`AplicarGabarito`). O que foi alterado e não salvo fica numa cópia no navegador
+**Vai ao catálogo o que está pronto; o resto fica de fora sem travar.**
+`Rascunho.ParaPublicar` escolhe as questões conferidas (quando o ambiente
+exige) e com linha no gabarito, inteiras, com as figuras recortadas e os textos
+que usam conferidos. A que não atende fica de fora com o motivo (`DeFora`) — 56
+conferidas publicam mesmo com 4 por transcrever — e o número dela entra nas
+excluídas da revisão publicada, que reaberta deixa corrigir e publicar de novo.
+`Pendencias` só impede publicar quando não sobra nenhuma; identificação que a
+capa não deu e gabarito de outro cargo ou caderno são `Avisos`. O gabarito que
+o banco recusa (letra fora de A–E, número com zero à esquerda) é acertado ou
+descartado linha a linha. A resposta de uma questão só vem do gabarito
+oficial, nunca da IA, e editar algo desfaz a conferência dele
+(`InvalidarEdicoes`) — a tela avisa quais voltaram a pedir conferência. Trocar
+o gabarito só desconfere a questão cuja letra mudou; a que ganha a resposta que
+não tinha continua conferida (`AplicarGabarito`). O que foi alterado e não salvo fica numa cópia no navegador
 (`rascunhoLocal.ts`), recuperada se o celular recarregar a aba; ela só vale
 sobre a mesma versão salva. Qualquer questão pode sair da prova
 (`Rascunho.Excluidas`) — a anulada, a estragada, a que a extração não achou e
@@ -389,8 +396,9 @@ gabarito fica inteiro e o catálogo conta só as que ficaram (`QuestoesNaProva`)
 Rascunho e revisão gravados antes guardam a chave antiga `AnuladasExcluidas`,
 que a leitura do repositório ainda entende; e marcar o trecho da excluída a
 devolve à prova. `PROVAS_EXIGIR_CONFERENCIA=false`
-tira a conferência das pendências — para testar o fluxo antes de haver quem
-revise —, mas a integridade continua bloqueando.
+publica também a questão não conferida — para testar o fluxo antes de haver
+quem revise —, mas a integridade continua valendo. A prova de pacote entra sem
+pedir conferência nem gabarito: já foi publicada noutro ambiente.
 
 **Resolver não grava nada.** A prova publicada abre uma questão por vez: o
 nome da prova com as matérias em etiquetas que filtram, uma barra presa com a

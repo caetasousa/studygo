@@ -1,6 +1,7 @@
 package prova
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"slices"
@@ -40,34 +41,178 @@ func contem(pendencias []string, trecho string) bool {
 	return strings.Contains(strings.Join(pendencias, "\n"), trecho)
 }
 
+var publicar = Criterios{Conferencia: true, Gabarito: true}
+
+func motivos(fora []DeFora) string {
+	var sb strings.Builder
+	for _, f := range fora {
+		fmt.Fprintf(&sb, "%d: %s\n", f.Numero, f.Motivo)
+	}
+
+	return sb.String()
+}
+
 func TestPendencias_RascunhoValidoPublica(t *testing.T) {
 	t.Parallel()
 
-	if p := valida().Pendencias(true); len(p) > 0 {
-		t.Fatalf("rascunho válido com pendências: %v", p)
+	r := valida()
+	pub, fora := r.ParaPublicar(publicar)
+	if p := r.Pendencias(publicar); len(p) > 0 || len(pub.Questoes) != 1 || len(fora) > 0 || len(r.Avisos()) > 0 {
+		t.Fatalf("rascunho válido: pendências %v, %d publicáveis, de fora %v, avisos %v", p, len(pub.Questoes), fora, r.Avisos())
 	}
 }
 
-// O gabarito cita só o código; a prova pode tê-lo junto do nome.
-func TestPendencias_CodigoDoCargoJuntoDoNome(t *testing.T) {
+// O caso do MPEAL: 56 questões conferidas e quatro que a extração não achou.
+// As prontas vão ao catálogo; as outras ficam de fora, sem travar nada, e
+// entram nas excluídas da revisão publicada.
+func TestParaPublicar_PublicaAsProntasEDeixaAsOutrasDeFora(t *testing.T) {
 	t.Parallel()
 
-	for _, cargo := range []string{"e05", "E05 - Analista Judiciário", "Analista Judiciário (E05)"} {
-		r := valida()
-		r.Cargo = cargo
-		if p := r.Pendencias(true); len(p) > 0 {
-			t.Errorf("cargo %q: %v", cargo, p)
-		}
-	}
 	r := valida()
-	r.Cargo = "E050"
-	if p := r.Pendencias(true); len(p) != 1 {
-		t.Errorf("E050 não é E05, e passou: %v", p)
+	r.Total = 4
+	dois, tres := questao(2, true, "Segunda"), questao(3, true, "Terceira")
+	tres.Revisada = false
+	r.Questoes = append(r.Questoes, dois, tres)
+	r.Gabarito.Respostas = map[string]string{"1": "E", "2": "B", "3": "C", "4": "D"}
+	r.Apoios = []Apoio{
+		{ID: "t1", Blocos: []Bloco{{Tipo: "texto", Texto: "A vida"}}, Questoes: []int{2, 3}, Revisado: true},
+		{ID: "t2", Blocos: []Bloco{{Tipo: "texto", Texto: "Só da 3"}}, Questoes: []int{3}, Revisado: true},
+	}
+	r.AcertarApoios()
+
+	pub, fora := r.ParaPublicar(publicar)
+
+	if p := r.Pendencias(publicar); len(p) > 0 {
+		t.Fatalf("pendências = %v; quer publicar as prontas", p)
+	}
+	numeros := []int{}
+	for _, q := range pub.Questoes {
+		numeros = append(numeros, q.Numero)
+	}
+	if !slices.Equal(numeros, []int{1, 2}) || pub.Questoes[1].Resposta != "B" {
+		t.Fatalf("publicadas = %v (resposta da 2: %q)", numeros, pub.Questoes[1].Resposta)
+	}
+	if got := motivos(fora); got != "3: não foi conferida\n4: não está no rascunho\n" {
+		t.Fatalf("de fora:\n%s", got)
+	}
+	if !slices.Equal(pub.Excluidas, []int{3, 4}) || pub.QuestoesNaProva() != 2 {
+		t.Fatalf("excluídas %v, %d na prova", pub.Excluidas, pub.QuestoesNaProva())
+	}
+	if len(pub.Apoios) != 1 || !slices.Equal(pub.Apoios[0].Questoes, []int{2}) {
+		t.Fatalf("textos publicados = %+v; quer só o t1, da 2", pub.Apoios)
+	}
+	// O rascunho não muda: a revisão continua com a 3 para conferir.
+	if len(r.Questoes) != 3 || len(r.Apoios[0].Questoes) != 2 {
+		t.Fatal("ParaPublicar mexeu no rascunho")
 	}
 }
 
-// Cada caso é algo que o plano exige que bloqueie a publicação.
-func TestPendencias_BloqueiamPublicacao(t *testing.T) {
+// Cada caso deixa a única questão de fora, com o motivo dito.
+func TestParaPublicar_Motivos(t *testing.T) {
+	t.Parallel()
+
+	casos := []struct {
+		nome   string
+		mudar  func(*Rascunho)
+		motivo string
+	}{
+		{"não conferida", func(r *Rascunho) { r.Questoes[0].Revisada = false }, "não foi conferida"},
+		{"sem resposta no gabarito", func(r *Rascunho) { r.Gabarito.Respostas = map[string]string{"2": "A"} },
+			"não tem resposta no gabarito"},
+		{"letra que o banco recusa", func(r *Rascunho) { r.Gabarito.Respostas["1"] = "F" }, "não tem resposta no gabarito"},
+		{"alternativa faltando", func(r *Rascunho) {
+			r.Questoes[0].Alternativas = r.Questoes[0].Alternativas[:4]
+		}, "está incompleta"},
+		{"fragmento não confirmado", func(r *Rascunho) { r.Questoes[0].Completa = false }, "está incompleta"},
+		{"imagem sem recorte", func(r *Rascunho) {
+			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos, Bloco{Tipo: "imagem"})
+		}, "o enunciado tem figura sem recorte"},
+		{"recorte não conferido", func(r *Rascunho) {
+			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
+				Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}})
+		}, "o enunciado tem recorte não conferido"},
+		{"figura maior que a coluna", func(r *Rascunho) {
+			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
+				Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}, Revisado: true, Largura: 140})
+		}, "tamanho fora de 0 a 100%"},
+		{"apoio inexistente", func(r *Rascunho) { r.Questoes[0].Apoios = []string{"t1"} }, "não existe mais"},
+		{"texto não conferido", func(r *Rascunho) {
+			r.Apoios = []Apoio{{ID: "t1", Blocos: []Bloco{{Tipo: "texto", Texto: "A vida"}}, Questoes: []int{1}}}
+			r.Questoes[0].Apoios = []string{"t1"}
+		}, "usa o texto de apoio das questões 1, que não foi conferido"},
+		{"número fora do caderno", func(r *Rascunho) { r.Questoes[0].Numero = 7 }, "fora da numeração do caderno (1 a 1)"},
+		{"número repetido", func(r *Rascunho) { r.Questoes = append(r.Questoes, r.Questoes[0]) }, "repetido"},
+	}
+
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			t.Parallel()
+
+			r := valida()
+			c.mudar(&r)
+			pub, fora := r.ParaPublicar(publicar)
+			if len(pub.Questoes) != 0 || !strings.Contains(motivos(fora), c.motivo) {
+				t.Fatalf("%d publicadas, de fora:\n%squer o motivo %q", len(pub.Questoes), motivos(fora), c.motivo)
+			}
+			if p := r.Pendencias(publicar); len(p) != 1 {
+				t.Fatalf("sem nenhuma publicável, a pendência é uma: %v", p)
+			}
+		})
+	}
+}
+
+func TestPendencias_SemQuestaoOuSemGabarito(t *testing.T) {
+	t.Parallel()
+
+	if p := (Rascunho{}).Pendencias(publicar); !contem(p, "não tem questões") {
+		t.Fatalf("rascunho vazio: %v", p)
+	}
+	r := valida()
+	r.Gabarito = Gabarito{}
+	if p := r.Pendencias(publicar); !contem(p, "Sem gabarito, nenhuma questão tem resposta") {
+		t.Fatalf("sem gabarito: %v", p)
+	}
+	// A prova de pacote não pede gabarito.
+	if p := r.Pendencias(Criterios{}); len(p) > 0 {
+		t.Fatalf("pacote sem gabarito: %v", p)
+	}
+}
+
+// Sem a exigência de conferência, a questão não conferida vai, mas a figura
+// sem recorte continua de fora.
+func TestParaPublicar_SemExigirConferencia(t *testing.T) {
+	t.Parallel()
+
+	semConferir := Criterios{Gabarito: true}
+	r := valida()
+	r.Questoes[0].Revisada = false
+	r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
+		Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}})
+	if pub, fora := r.ParaPublicar(semConferir); len(pub.Questoes) != 1 {
+		t.Fatalf("conferência deixou de fora sem ser exigida: %v", fora)
+	}
+
+	r.Questoes[0].Blocos = append(r.Questoes[0].Blocos, Bloco{Tipo: "imagem"})
+	if _, fora := r.ParaPublicar(semConferir); !strings.Contains(motivos(fora), "figura sem recorte") {
+		t.Fatalf("figura sem recorte publicou: %v", fora)
+	}
+}
+
+// O gabarito em tabela escreve "01": é a questão 1.
+func TestParaPublicar_GabaritoComZeroAEsquerda(t *testing.T) {
+	t.Parallel()
+
+	r := valida()
+	r.Gabarito.Respostas = map[string]string{"01": "E"}
+	r.Gabarito.Situacoes = map[string]string{"01": "Gabarito sem alteração"}
+	pub, fora := r.ParaPublicar(publicar)
+	if len(pub.Questoes) != 1 || pub.Gabarito.Respostas["1"] != "E" || pub.Gabarito.Situacoes["1"] == "" {
+		t.Fatalf("publicadas %d, gabarito %+v, de fora %v", len(pub.Questoes), pub.Gabarito, fora)
+	}
+}
+
+// O que não impede publicar, mas vale conferir.
+func TestAvisos(t *testing.T) {
 	t.Parallel()
 
 	casos := []struct {
@@ -79,41 +224,14 @@ func TestPendencias_BloqueiamPublicacao(t *testing.T) {
 		{"caderno com prefixo é outro", func(r *Rascunho) { r.Caderno = "TIPO-003" }, "tipo de gabarito"},
 		{"cargo do gabarito é outro", func(r *Rascunho) { r.Gabarito.Cargo = "E04" },
 			`O gabarito é do cargo E04 e a prova está com o cargo "E05"`},
-		// A leitura da capa às vezes traz o nome no lugar do código: a pendência
+		// A leitura da capa às vezes traz o nome no lugar do código: o aviso
 		// diz onde achar o código.
 		{"nome no lugar do código", func(r *Rascunho) { r.Cargo = "Analista Judiciário – Sistemas da Informação" },
 			`Se a capa diz "Caderno de Prova 'E05'", use esse código na etapa Dados`},
 		{"prova sem código", func(r *Rascunho) { r.Cargo = "" }, "a prova está sem o código do cargo"},
-		{"questão ausente", func(r *Rascunho) { r.Total = 2 }, "tem 1 questões e o total esperado é 2"},
-		{"alternativa faltando", func(r *Rascunho) {
-			r.Questoes[0].Alternativas = r.Questoes[0].Alternativas[:4]
-		}, "questão 1 está incompleta"},
-		{"fragmento não confirmado", func(r *Rascunho) { r.Questoes[0].Completa = false }, "incompleta"},
-		{"questão não conferida", func(r *Rascunho) { r.Questoes[0].Revisada = false }, "não foi conferida"},
-		{"imagem sem recorte", func(r *Rascunho) {
-			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos, Bloco{Tipo: "imagem"})
-		}, "Imagem sem recorte na questão 1"},
-		{"recorte não conferido", func(r *Rascunho) {
-			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
-				Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}})
-		}, "Recorte não conferido"},
-		{"resposta difere do gabarito", func(r *Rascunho) { r.Questoes[0].Resposta = "A" }, "difere do gabarito"},
-		{"apoio inexistente", func(r *Rascunho) { r.Questoes[0].Apoios = []string{"t1"} }, "não existe mais (t1)"},
-		// Texto que nenhuma questão usa não aparece para o aluno: falta ligar,
-		// ou é lixo da extração.
-		{"texto sem questões", func(r *Rascunho) {
-			r.Apoios = append(r.Apoios, Apoio{ID: "r0-ocr", Blocos: []Bloco{{Tipo: "texto", Texto: "capa"}}})
-		}, "Ligue às questões ou remova o texto de apoio r0-ocr"},
-		{"texto não conferido", func(r *Rascunho) {
-			r.Apoios = append(r.Apoios, Apoio{
-				ID: "t1", Blocos: []Bloco{{Tipo: "texto", Texto: "A vida"}}, Questoes: []int{3, 1, 2, 5},
-			})
-		}, "Confira o texto de apoio das questões 1-3, 5"},
 		{"banca de outra", func(r *Rascunho) { r.Banca = "Cebraspe" }, "banca FCC"},
-		{"figura maior que a coluna", func(r *Rascunho) {
-			r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
-				Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}, Revisado: true, Largura: 140})
-		}, "Tamanho de figura"},
+		{"gabarito maior que o caderno", func(r *Rascunho) { r.Gabarito.Respostas["2"] = "A" },
+			"O gabarito tem 2 respostas e o caderno, 1 questões"},
 	}
 
 	for _, c := range casos {
@@ -122,41 +240,43 @@ func TestPendencias_BloqueiamPublicacao(t *testing.T) {
 
 			r := valida()
 			c.mudar(&r)
-			if p := r.Pendencias(true); !contem(p, c.trecho) {
-				t.Fatalf("pendências %v não mencionam %q", p, c.trecho)
+			if a := r.Avisos(); !contem(a, c.trecho) {
+				t.Fatalf("avisos %v não mencionam %q", a, c.trecho)
+			}
+			if p := r.Pendencias(publicar); len(p) > 0 {
+				t.Fatalf("aviso virou pendência: %v", p)
 			}
 		})
 	}
 }
 
-// Sem a exigência de conferência, só a integridade bloqueia: marcar a
-// questão deixa de ser pré-requisito, mas figura sem recorte continua sendo.
-func TestPendencias_SemExigirConferencia(t *testing.T) {
+// O gabarito cita só o código; a prova pode tê-lo junto do nome.
+func TestAvisos_CodigoDoCargoJuntoDoNome(t *testing.T) {
 	t.Parallel()
 
-	r := valida()
-	r.Questoes[0].Revisada = false
-	r.Questoes[0].Blocos = append(r.Questoes[0].Blocos,
-		Bloco{Tipo: "imagem", Arquivo: "x", Origem: &Origem{Pagina: 1}})
-	if p := r.Pendencias(false); len(p) > 0 {
-		t.Fatalf("conferência bloqueou sem ser exigida: %v", p)
+	for _, cargo := range []string{"e05", "E05 - Analista Judiciário", "Analista Judiciário (E05)"} {
+		r := valida()
+		r.Cargo = cargo
+		if a := r.Avisos(); len(a) > 0 {
+			t.Errorf("cargo %q: %v", cargo, a)
+		}
 	}
-
-	r.Questoes[0].Blocos = append(r.Questoes[0].Blocos, Bloco{Tipo: "imagem"})
-	if p := r.Pendencias(false); !contem(p, "Imagem sem recorte") {
-		t.Fatalf("figura sem recorte publicou: %v", p)
+	r := valida()
+	r.Cargo = "E050"
+	if a := r.Avisos(); len(a) != 1 {
+		t.Errorf("E050 não é E05, e passou: %v", a)
 	}
 }
 
 // A capa escreve o caderno de um jeito e o gabarito de outro.
-func TestPendencias_CadernoPorDigitos(t *testing.T) {
+func TestAvisos_CadernoPorDigitos(t *testing.T) {
 	t.Parallel()
 
 	for _, caderno := range []string{"004", "TIPO-004", "Tipo 4"} {
 		r := valida()
 		r.Caderno = caderno
-		if p := r.Pendencias(true); len(p) > 0 {
-			t.Errorf("caderno %q contra gabarito 4: %v", caderno, p)
+		if a := r.Avisos(); len(a) > 0 {
+			t.Errorf("caderno %q contra gabarito 4: %v", caderno, a)
 		}
 	}
 }
@@ -319,21 +439,23 @@ func TestAplicarGabarito_RespostaSoDoOficial(t *testing.T) {
 	t.Parallel()
 
 	r := Rascunho{
-		Questoes: []Questao{questao(1, true, "a"), questao(2, true, "b")},
+		Questoes: []Questao{questao(1, true, "a"), questao(2, true, "b"), questao(3, true, "c")},
 		Gabarito: Gabarito{
-			Respostas: map[string]string{"1": "C"},
+			Respostas: map[string]string{"1": "C", "3": "D"},
 			Situacoes: map[string]string{"1": "Gabarito sem alteração"},
 		},
 	}
 	r.Questoes[1].Resposta = "A" // inventada: não está no gabarito
+	r.Questoes[2].Resposta = "B"
 
 	r.AplicarGabarito()
 
-	if r.Questoes[0].Resposta != "C" || r.Questoes[1].Resposta != "" {
-		t.Fatalf("respostas = %q, %q", r.Questoes[0].Resposta, r.Questoes[1].Resposta)
+	if r.Questoes[0].Resposta != "C" || r.Questoes[1].Resposta != "" || r.Questoes[2].Resposta != "D" {
+		t.Fatalf("respostas = %q, %q, %q", r.Questoes[0].Resposta, r.Questoes[1].Resposta, r.Questoes[2].Resposta)
 	}
-	if r.Questoes[0].Revisada {
-		t.Fatal("resposta mudou e a conferência continuou valendo")
+	// A letra que mudou pede conferência; a que chegou onde não havia, não.
+	if !r.Questoes[0].Revisada || r.Questoes[1].Revisada || r.Questoes[2].Revisada {
+		t.Fatalf("conferidas = %v, %v, %v; quer só a 1", r.Questoes[0].Revisada, r.Questoes[1].Revisada, r.Questoes[2].Revisada)
 	}
 }
 
@@ -701,8 +823,8 @@ func TestAplicarReleitura_QuestaoFicaComOTextoDoRascunho(t *testing.T) {
 	if got := r.Questoes[0].Apoios; len(got) != 1 || got[0] != "r0-t1" {
 		t.Fatalf("textos da questão 4 = %v, quer só r0-t1", got)
 	}
-	if p := r.Pendencias(false); contem(p, "não existe mais") {
-		t.Fatalf("pendência de texto que não existe: %v", p)
+	if _, fora := r.ParaPublicar(Criterios{}); strings.Contains(motivos(fora), "não existe mais") {
+		t.Fatalf("de fora por texto que não existe: %v", fora)
 	}
 }
 
@@ -814,8 +936,8 @@ func TestLimparBlocos(t *testing.T) {
 	if got := r.Questoes[1].Blocos; len(got) != 2 || got[0].Texto != "Considere:" || got[1].Tipo != "imagem" {
 		t.Fatalf("enunciado da 55 = %+v; quer só o texto e a figura", got)
 	}
-	if p := r.Pendencias(false); contem(p, "vazio") {
-		t.Fatalf("pendência de bloco vazio depois de limpar: %v", p)
+	if _, fora := r.ParaPublicar(Criterios{}); strings.Contains(motivos(fora), "vazio") {
+		t.Fatalf("de fora por bloco vazio depois de limpar: %v", fora)
 	}
 }
 
@@ -904,42 +1026,28 @@ func TestGabaritoEmLinhas(t *testing.T) {
 }
 
 // A capa não lida deixava total 0, e cada questão virava uma "Numeração
-// inválida": 59 pendências escondiam as três que diziam o que preencher.
-func TestPendencias_CapaNaoLida(t *testing.T) {
+// inválida": agora é aviso, e a prova publica com o total do que se conhece.
+func TestAvisos_CapaNaoLida(t *testing.T) {
 	t.Parallel()
 
 	r := valida()
 	r.Ano, r.Cargo, r.Total = 0, "", 0
 	r.Questoes = append(r.Questoes, questao(2, true, "Segunda"), questao(3, true, "Terceira"))
-	r.Gabarito = Gabarito{Tipo: "preliminar", Respostas: map[string]string{"1": "E", "2": "", "3": ""}}
+	r.Gabarito = Gabarito{Tipo: "preliminar", Respostas: map[string]string{"1": "E", "2": "", "3": "", "4": "A"}}
 
 	quer := []string{
 		"Confira na etapa Dados: ano, código do cargo.",
 		"A capa não disse quantas questões a prova tem: preencha o Total de questões na etapa Dados.",
-		"O gabarito veio sem o código do cargo ou o tipo do caderno: preencha Cargo no gabarito e Caderno no gabarito na etapa Dados.",
 	}
-	if p := r.Pendencias(false); !slices.Equal(p, quer) {
-		t.Fatalf("pendências:\n%s\nquer:\n%s", strings.Join(p, "\n"), strings.Join(quer, "\n"))
+	if a := r.Avisos(); !slices.Equal(a, quer) {
+		t.Fatalf("avisos:\n%s\nquer:\n%s", strings.Join(a, "\n"), strings.Join(quer, "\n"))
 	}
-}
-
-func TestPendencias_NumeracaoNumaLinhaSo(t *testing.T) {
-	t.Parallel()
-
-	r := valida()
-	r.Total = 2
-	r.Gabarito.Respostas["2"] = "E"
-	dois := questao(2, true, "Segunda")
-	dois.Resposta = "E"
-	r.Questoes = append(r.Questoes, dois, dois, questao(7, true, "Sétima"))
-	if p := r.Pendencias(false); !contem(p, "Numeração repetida ou fora do total na etapa Questões: 2, 7.") {
-		t.Fatalf("pendências: %v", p)
+	pub, fora := r.ParaPublicar(publicar)
+	if p := r.Pendencias(publicar); len(p) > 0 || len(pub.Questoes) != 3 || pub.Total != 4 {
+		t.Fatalf("pendências %v, %d publicadas, total %d; quer 3 de 4", p, len(pub.Questoes), pub.Total)
 	}
-
-	r = valida()
-	r.Gabarito.Respostas["2"] = "A"
-	if p := r.Pendencias(false); !contem(p, "O gabarito tem 2 respostas e o caderno, 1 questões") {
-		t.Fatalf("gabarito maior que o caderno: %v", p)
+	if got := motivos(fora); got != "4: não está no rascunho\n" {
+		t.Fatalf("de fora:\n%s", got)
 	}
 }
 
@@ -962,66 +1070,22 @@ func TestTotalPeloGabarito(t *testing.T) {
 	}
 }
 
-// A questão excluída sai da conta, anulada ou não: a prova é publicada sem ela.
-func TestPendencias_Excluida(t *testing.T) {
-	t.Parallel()
-
-	semA2 := func() Rascunho {
-		r := valida()
-		r.Total = 3
-		q3 := questao(3, true, "Terceira")
-		q3.Resposta = "A"
-		r.Questoes = append(r.Questoes, q3)
-		r.Gabarito.Respostas = map[string]string{"1": "E", "2": "", "3": "A"}
-		return r
-	}
-
-	r := semA2()
-	if p := r.Pendencias(true); !contem(p, "tem 2 questões e o total esperado é 3") {
-		t.Fatalf("anulada que só falta, sem exclusão: %v", p)
-	}
-	r.Excluidas = []int{2}
-	if p := r.Pendencias(true); len(p) > 0 || r.QuestoesNaProva() != 2 {
-		t.Fatalf("anulada excluída: %v, %d na prova", p, r.QuestoesNaProva())
-	}
-
-	if p := semA2().Pendencias(true); !contem(p, "Falta a questão 2: transcreva ou exclua da prova.") {
-		t.Fatalf("a pendência de total não diz qual falta: %v", p)
-	}
-
-	// A que o gabarito não anula também sai: o curador decide.
-	r = semA2()
-	r.Excluidas = []int{2}
-	r.Gabarito.Respostas["2"] = "C"
-	if p := r.Pendencias(true); len(p) > 0 {
-		t.Fatalf("excluída com resposta no gabarito: %v", p)
-	}
-
-	r = semA2()
-	r.Excluidas = []int{3, 2}
-	if p := r.Pendencias(true); !contem(p, "questão 3 está no rascunho e entre as excluídas") {
-		t.Fatalf("excluída e presente: %v", p)
-	}
-
-	r = semA2()
-	r.Excluidas = []int{2, 2, 9}
-	if p := r.Pendencias(true); !contem(p, "entre as excluídas: 2.") || !contem(p, "entre as excluídas: 9.") {
-		t.Fatalf("repetida ou fora do total: %v", p)
-	}
-}
-
-// O banco só aceita A a E, ou vazia na anulada: a pendência pega antes.
-func TestPendencias_GabaritoComRespostaInvalida(t *testing.T) {
+// A excluída não vai ao catálogo nem é listada de fora: foi decisão do
+// curador, anulada ou não.
+func TestParaPublicar_Excluida(t *testing.T) {
 	t.Parallel()
 
 	r := valida()
-	r.Gabarito.Respostas["x"] = "B"
-	r.Gabarito.Respostas["1"] = "F"
+	r.Total = 3
+	tres := questao(3, true, "Terceira")
+	r.Questoes = append(r.Questoes, questao(2, true, "Segunda"), tres)
+	r.Gabarito.Respostas = map[string]string{"1": "E", "2": "C", "3": "A"}
+	r.Excluidas = []int{2, 2, 9}
 
-	p := r.Pendencias(false)
+	pub, fora := r.ParaPublicar(publicar)
 
-	if !contem(p, `"F" na questão "1"`) || !contem(p, `"B" na questão "x"`) {
-		t.Fatalf("pendências = %v", p)
+	if len(pub.Questoes) != 2 || len(fora) != 0 || !slices.Equal(pub.Excluidas, []int{2}) || pub.QuestoesNaProva() != 2 {
+		t.Fatalf("%d publicadas, de fora %v, excluídas %v", len(pub.Questoes), fora, pub.Excluidas)
 	}
 }
 

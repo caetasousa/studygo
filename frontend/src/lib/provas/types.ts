@@ -120,8 +120,15 @@ export interface Importacao {
 	nomeGabarito: string;
 	regioes: Origem[];
 	rascunho: Rascunho;
+	/** O que impede publicar: não sobrar questão que possa ir ao catálogo. */
 	pendencias: string[];
-	/** Se a conferência do curador entra nas pendências neste ambiente. */
+	/** O que vale conferir antes de publicar, sem impedir. */
+	avisos: string[];
+	/** Quantas questões vão ao catálogo se publicar agora. */
+	publicaveis: number;
+	/** As questões que ficam de fora da publicação, com o motivo. */
+	deFora: { numero: number; motivo: string }[];
+	/** Se a questão não conferida fica de fora neste ambiente. */
 	conferenciaObrigatoria: boolean;
 	criadoEm: string;
 	atualizadoEm: string;

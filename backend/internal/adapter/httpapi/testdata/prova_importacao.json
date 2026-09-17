@@ -1,7 +1,9 @@
 {
   "atualizadoEm": "string",
+  "avisos": [],
   "conferenciaObrigatoria": "bool",
   "criadoEm": "string",
+  "deFora": [],
   "erro": "string",
   "estado": "string",
   "etapa": "number",
@@ -12,6 +14,7 @@
     "string"
   ],
   "provaId": "string",
+  "publicaveis": "number",
   "rascunho": {
     "alertas": [
       "string"

@@ -41,19 +41,29 @@ type ProvaService struct {
 	MaxProcessamento time.Duration
 	// MaxEtapa limita cada chamada ao processador.
 	MaxEtapa time.Duration
-	// ExigirConferencia faz a conferência do curador bloquear a publicação.
-	// Desligada, só a integridade do rascunho bloqueia — é para testar o fluxo
-	// antes de haver quem revise; produção fica com ela ligada.
+	// ExigirConferencia deixa de fora da publicação a questão que o curador
+	// não conferiu. Desligada, é para testar o fluxo antes de haver quem
+	// revise; produção fica com ela ligada.
 	ExigirConferencia bool
 }
 
-// ImportacaoDeProva é a importação como a curadoria a vê, com o que falta para
-// publicar já calculado.
+// ImportacaoDeProva é a importação como a curadoria a vê, com o que vai e o
+// que fica de fora da publicação já calculados.
 type ImportacaoDeProva struct {
 	prova.Importacao
-	TotalEtapas            int
-	Pendencias             []string
+	TotalEtapas int
+	// Pendencias impedem publicar; Avisos, não. Publicaveis são as questões
+	// que vão ao catálogo, e DeFora, as que ficam, com o motivo.
+	Pendencias, Avisos     []string
+	Publicaveis            int
+	DeFora                 []prova.DeFora
 	ConferenciaObrigatoria bool
+}
+
+// criterios da publicação pela revisão: conferida, se o ambiente pede, e com
+// resposta no gabarito.
+func (s *ProvaService) criterios() prova.Criterios {
+	return prova.Criterios{Conferencia: s.ExigirConferencia, Gabarito: true}
 }
 
 func (s *ProvaService) montar(i prova.Importacao) ImportacaoDeProva {
@@ -63,10 +73,15 @@ func (s *ProvaService) montar(i prova.Importacao) ImportacaoDeProva {
 	i.Rascunho.AcertarApoios()
 	i.Rascunho.LimparBlocos()
 
+	pub, fora := i.Rascunho.ParaPublicar(s.criterios())
+
 	return ImportacaoDeProva{
 		Importacao:             i,
 		TotalEtapas:            prova.TotalEtapas(len(i.Regioes)),
-		Pendencias:             i.Rascunho.Pendencias(s.ExigirConferencia),
+		Pendencias:             i.Rascunho.Pendencias(s.criterios()),
+		Avisos:                 i.Rascunho.Avisos(),
+		Publicaveis:            len(pub.Questoes),
+		DeFora:                 fora,
 		ConferenciaObrigatoria: s.ExigirConferencia,
 	}
 }
@@ -252,9 +267,12 @@ func (s *ProvaService) Publicar(ctx context.Context, usuario, id string, versao 
 	i.Rascunho.AcertarApoios()
 	i.Rascunho.LimparBlocos()
 	i.Rascunho.DimensionarFiguras()
-	if p := i.Rascunho.Pendencias(s.ExigirConferencia); len(p) > 0 {
-		return "", erroDeValidacao(fmt.Sprintf("ainda há %d pendências; a primeira: %s", len(p), p[0]))
+	if p := i.Rascunho.Pendencias(s.criterios()); len(p) > 0 {
+		return "", erroDeValidacao(p[0])
 	}
+	// Vai ao catálogo só o que está pronto; o resto fica nas excluídas da
+	// revisão publicada.
+	i.Rascunho, _ = i.Rascunho.ParaPublicar(s.criterios())
 	// A capa sem código deixa a importação passar da conferência da capa; o
 	// curador preenche o cargo, e é aqui que a repetida para.
 	p, repetida, err := s.noCatalogo(ctx, i)

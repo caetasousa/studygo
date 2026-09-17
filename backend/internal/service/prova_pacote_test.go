@@ -150,7 +150,7 @@ func TestProvas_ImportarPacoteRecusa(t *testing.T) {
 		quer  string
 	}{
 		"sem PDF":              {func(p *PacoteDeProva, _ *fakeLevar) { p.Documento = []byte("não é pdf") }, "PDF do caderno"},
-		"com pendência":        {func(p *PacoteDeProva, _ *fakeLevar) { p.Conteudo.Total = 3 }, "pendências"},
+		"sem questão":          {func(p *PacoteDeProva, _ *fakeLevar) { p.Conteudo.Questoes = nil }, "não tem questão"},
 		"sem a figura":         {func(p *PacoteDeProva, _ *fakeLevar) { delete(p.Figuras, figuraLevada) }, "falta no pacote a figura"},
 		"figura que não é png": {func(p *PacoteDeProva, _ *fakeLevar) { p.Figuras[figuraLevada] = []byte("gif") }, "falta no pacote a figura"},
 		"já no catálogo": {func(_ *PacoteDeProva, r *fakeLevar) {

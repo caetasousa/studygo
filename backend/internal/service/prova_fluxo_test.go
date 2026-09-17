@@ -547,13 +547,17 @@ func TestProvas_CapaSemTotalFicaComOTotalDoGabarito(t *testing.T) {
 	if r.Total != 2 || !slices.ContainsFunc(r.Alertas, func(a string) bool { return strings.Contains(a, "o total ficou 2") }) {
 		t.Fatalf("total = %d, alertas %v; quer o total do gabarito, avisado", r.Total, r.Alertas)
 	}
-	// Sobra o que a capa não disse, nomeado, e o código que o gabarito sugere.
+	// O que a capa não disse vira aviso, nomeado, com o código que o gabarito
+	// sugere; nada impede publicar.
 	quer := []string{
 		"Confira na etapa Dados: ano, código do cargo.",
 		`O gabarito é do cargo E05 e a prova está sem o código do cargo. Se a capa diz "Caderno de Prova 'E05'", ` +
 			"use esse código na etapa Dados; se não, o gabarito é de outro cargo.",
 	}
-	if p := r.Pendencias(false); !slices.Equal(p, quer) {
+	if a := r.Avisos(); !slices.Equal(a, quer) {
+		t.Fatalf("avisos = %q", a)
+	}
+	if p := r.Pendencias(prova.Criterios{Gabarito: true}); len(p) > 0 {
 		t.Fatalf("pendências = %q", p)
 	}
 }
@@ -698,7 +702,7 @@ func TestProvas_PublicarComPendenciaRecusa(t *testing.T) {
 }
 
 // Com a conferência desligada, um rascunho íntegro publica sem nenhuma questão
-// marcada — e sem gabarito, que nunca foi obrigatório.
+// marcada; o gabarito continua pedido.
 func TestProvas_PublicarSemConferenciaQuandoDesligada(t *testing.T) {
 	t.Parallel()
 
@@ -708,7 +712,8 @@ func TestProvas_PublicarSemConferenciaQuandoDesligada(t *testing.T) {
 	s.ExigirConferencia = false
 	volume.nomes["doc.pdf"] = true
 	r := prova.Rascunho{Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 1,
-		Questoes: []prova.Questao{questaoExtraida(1, true)}}
+		Questoes: []prova.Questao{questaoExtraida(1, true)},
+		Gabarito: prova.Gabarito{Cargo: "E05", Caderno: "4", Respostas: map[string]string{"1": "A"}}}
 	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
 
 	id, err := s.Publicar(context.Background(), curador, "i", 1)
@@ -725,7 +730,11 @@ func TestProvas_PublicarSemConferenciaQuandoDesligada(t *testing.T) {
 }
 
 // fakePublicacao registra a publicação sem reproduzir o banco.
-type fakePublicacao struct{ *fakeProvas }
+type fakePublicacao struct {
+	*fakeProvas
+	// publicada é a importação que chegou ao repositório para publicar.
+	publicada prova.Importacao
+}
 
 func (f *fakePublicacao) Publicacao(context.Context, string) (prova.Publicacao, error) {
 	return prova.Publicacao{ID: "prova-1"}, nil
@@ -733,6 +742,35 @@ func (f *fakePublicacao) Publicacao(context.Context, string) (prova.Publicacao, 
 
 func (f *fakePublicacao) ImportacaoDaPublicacao(context.Context, string) (prova.Importacao, error) {
 	return f.importacoes["base"], nil
+}
+
+// 56 conferidas e 4 por fazer: publica as prontas, e só elas chegam ao
+// repositório; as outras ficam nas excluídas da revisão.
+func TestProvas_PublicarLevaSoAsProntas(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, volume := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	s.ExigirConferencia = true
+	volume.nomes["doc.pdf"] = true
+	conferida, pendente := questaoExtraida(1, true), questaoExtraida(2, true)
+	conferida.Revisada = true
+	r := prova.Rascunho{Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 3,
+		Questoes: []prova.Questao{conferida, pendente},
+		Gabarito: prova.Gabarito{Cargo: "E05", Caderno: "4", Respostas: map[string]string{"1": "A", "2": "B", "3": "C"}}}
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
+
+	vista, err := s.Obter(context.Background(), curador, "i")
+	if err != nil || vista.Publicaveis != 1 || len(vista.DeFora) != 2 || len(vista.Pendencias) != 0 {
+		t.Fatalf("revisão: %d publicáveis, de fora %v, pendências %v (%v)", vista.Publicaveis, vista.DeFora, vista.Pendencias, err)
+	}
+	if _, err := s.Publicar(context.Background(), curador, "i", 1); err != nil {
+		t.Fatalf("Publicar: %v", err)
+	}
+	if p := repo.publicada.Rascunho; len(p.Questoes) != 1 || !slices.Equal(p.Excluidas, []int{2, 3}) {
+		t.Fatalf("ao repositório: %d questões, excluídas %v", len(p.Questoes), p.Excluidas)
+	}
 }
 
 // Extrair de novo parte do mesmo PDF e do mesmo gabarito, do zero, e vira
@@ -761,7 +799,8 @@ func TestProvas_ReextrairAbreRevisaoDaMesmaProva(t *testing.T) {
 	}
 }
 
-func (f *fakePublicacao) Publicar(context.Context, prova.Importacao, string) (string, error) {
+func (f *fakePublicacao) Publicar(_ context.Context, i prova.Importacao, _ string) (string, error) {
+	f.publicada = i
 	return "prova-1", nil
 }
 
@@ -1211,7 +1250,8 @@ func TestProvas_PublicarRecusaProvaQueJaEstaNoCatalogo(t *testing.T) {
 		Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", CargoNome: "Analista",
 	}}}
 	r := prova.Rascunho{Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 1,
-		Questoes: []prova.Questao{questaoExtraida(1, true)}}
+		Questoes: []prova.Questao{questaoExtraida(1, true)},
+		Gabarito: prova.Gabarito{Cargo: "E05", Caderno: "4", Respostas: map[string]string{"1": "A"}}}
 	repo.importacoes["i"] = prova.Importacao{ID: "i", Documento: "doc", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
 
 	_, err := s.Publicar(context.Background(), curador, "i", 1)
