@@ -92,9 +92,25 @@ export function filtrarTreino(
 	);
 }
 
+/** Os grupos de matéria, na ordem da tela. O que o servidor não souber agrupar fica nas específicas. */
+export const GRUPOS = [
+	['basicas', 'Básicas'],
+	['legislacao', 'Legislação'],
+	['especificas', 'Específicas de TI']
+] as const;
+
+export interface GrupoDeMaterias {
+	grupo: string;
+	rotulo: string;
+	/** As matérias do grupo, em ordem alfabética, com a contagem. */
+	materias: [string, number][];
+}
+
 export interface OpcoesDoTreino {
 	/** Todas as matérias do catálogo, em ordem alfabética, com a contagem. */
 	materias: [string, number][];
+	/** As mesmas matérias, por grupo; grupo sem matéria não aparece. */
+	grupos: GrupoDeMaterias[];
 	/** Os assuntos de cada matéria escolhida, em ordem alfabética, com a contagem. */
 	assuntos: { materia: string; assuntos: [string, number][] }[];
 	/** Anos das provas, do mais recente, com a contagem. */
@@ -140,8 +156,21 @@ export function opcoesDoTreino(
 		if (s === 'errada') situacoes.erradas++;
 	}
 
+	const emOrdem = [...materias].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
+	const grupoDe = new Map(qs.map((q) => [q.disciplina, q.grupo]));
+	const conhecido = (g: string | undefined) => GRUPOS.some(([id]) => id === g);
+	const grupos = GRUPOS.map(([grupo, rotulo]) => ({
+		grupo,
+		rotulo,
+		materias: emOrdem.filter(([m]) => {
+			const g = grupoDe.get(m);
+			return conhecido(g) ? g === grupo : grupo === 'especificas';
+		})
+	})).filter((g) => g.materias.length > 0);
+
 	return {
-		materias: [...materias].sort(([a], [b]) => a.localeCompare(b, 'pt-BR')),
+		materias: emOrdem,
+		grupos,
 		assuntos,
 		anos: [...anos].sort(([a], [b]) => b - a),
 		situacoes

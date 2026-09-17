@@ -421,7 +421,11 @@ matéria ("Noções Sobre…" e "Noções sobre…") viram um nome só em
 SQL. O conteúdo vem da prova (`GET /api/provas/{id}`), carregada na vez da
 questão. O filtro de situação — não resolvidas, as que errou — é do navegador,
 porque as respostas também são; e o treino grava no mesmo lugar que a prova
-inteira: resolvida num, aparece resolvida no outro. Com matéria escolhida,
+inteira: resolvida num, aparece resolvida no outro. As matérias aparecem em
+três grupos — básicas (português, matemática e noções de informática, como
+Word e Excel), legislação e específicas de TI —, e o nome do grupo marca todas as dele. A matéria é texto livre, então o
+grupo sai do nome (`prova.GrupoDaMateria`); o que não é básica nem legislação é
+específica. Com matéria escolhida,
 aparecem os assuntos dela; o assunto restringe só a própria matéria —
 Crase em Português não tira Redes do treino.
 

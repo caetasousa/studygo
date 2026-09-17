@@ -122,3 +122,33 @@ func TestAvulsas_FiltraMateriasEAno(t *testing.T) {
 		}
 	}
 }
+
+func TestGrupoDaMateria(t *testing.T) {
+	t.Parallel()
+
+	for materia, grupo := range map[string]string{
+		"Língua Portuguesa":                          GrupoBasicas,
+		"Matemática e Raciocínio Lógico":             GrupoBasicas,
+		"Raciocínio Lógico-Matemático":               GrupoBasicas,
+		"Legislação Institucional":                   GrupoLegislacao,
+		"Legislação Aplicada à TI":                   GrupoLegislacao,
+		"Noções de Direito Administrativo":           GrupoLegislacao,
+		"Direitos das Pessoas com Deficiência":       GrupoLegislacao,
+		"Direitos Humanos":                           GrupoLegislacao,
+		"Administração Pública":                      GrupoLegislacao,
+		"Sustentabilidade":                           GrupoLegislacao,
+		"Sistemas Operacionais, Redes e Nuvem":       GrupoEspecificas,
+		"Engenharia de Software":                     GrupoEspecificas,
+		"Inteligência Artificial e Ciência de Dados": GrupoEspecificas,
+		"Governança de TI":                           GrupoEspecificas,
+		"Noções de Informática":                      GrupoBasicas,
+		"Informática Básica":                         GrupoBasicas,
+		"Pacote Office (Word e Excel)":               GrupoBasicas,
+		"Informática":                                GrupoEspecificas,
+		"Lógica de Programação":                      GrupoEspecificas,
+	} {
+		if got := GrupoDaMateria(materia); got != grupo {
+			t.Errorf("GrupoDaMateria(%q) = %q, quer %q", materia, got, grupo)
+		}
+	}
+}

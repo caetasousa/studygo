@@ -20,7 +20,8 @@ function avulsa(
 	resposta = 'C',
 	assunto = ''
 ): QuestaoAvulsa {
-	return { provaId, numero, disciplina, assunto, ano, resposta, orgao: 'TJCE', cargo: 'E05', cargoNome: '' };
+	const grupo = disciplina === 'Língua Portuguesa' ? 'basicas' : 'especificas';
+	return { provaId, numero, disciplina, assunto, grupo, ano, resposta, orgao: 'TJCE', cargo: 'E05', cargoNome: '' };
 }
 
 const qs = [
@@ -127,6 +128,21 @@ describe('opcoesDoTreino', () => {
 		]);
 		// Com o assunto escolhido, a matéria conta só o que o treino teria.
 		expect(o.materias).toContainEqual(['Língua Portuguesa', 2]);
+	});
+
+	it('agrupa as matérias na ordem básicas, legislação e específicas', () => {
+		const lista = [
+			...qs,
+			{ ...avulsa('trt', 3, 'Direito Administrativo', 2025), grupo: 'legislacao' },
+			{ ...avulsa('trt', 4, 'Matéria nova', 2025), grupo: '' }
+		];
+		const o = opcoesDoTreino(lista, SEM_FILTRO, respostas);
+		expect(o.grupos.map((g) => [g.rotulo, g.materias.map(([m]) => m)])).toEqual([
+			['Básicas', ['Língua Portuguesa']],
+			['Legislação', ['Direito Administrativo']],
+			// Grupo que o servidor não deu cai nas específicas.
+			['Específicas de TI', ['Banco de Dados', 'Matéria nova', 'Redes']]
+		]);
 	});
 
 	it('matérias em ordem alfabética do português', () => {

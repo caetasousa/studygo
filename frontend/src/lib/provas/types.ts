@@ -179,6 +179,8 @@ export interface QuestaoAvulsa {
 	disciplina: string;
 	/** O tema dentro da matéria; vazio quando a questão não foi classificada. */
 	assunto: string;
+	/** O grupo da matéria no treino, que o servidor dá pelo nome. */
+	grupo: string;
 	resposta: string;
 	orgao: string;
 	ano: number;

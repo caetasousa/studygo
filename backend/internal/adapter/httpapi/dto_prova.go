@@ -176,11 +176,13 @@ type questaoAvulsaDTO struct {
 	Numero     int    `json:"numero"`
 	Disciplina string `json:"disciplina"`
 	Assunto    string `json:"assunto"`
-	Resposta   string `json:"resposta"`
-	Orgao      string `json:"orgao"`
-	Ano        int    `json:"ano"`
-	Cargo      string `json:"cargo"`
-	CargoNome  string `json:"cargoNome"`
+	// Grupo: "basicas", "legislacao" ou "especificas".
+	Grupo     string `json:"grupo"`
+	Resposta  string `json:"resposta"`
+	Orgao     string `json:"orgao"`
+	Ano       int    `json:"ano"`
+	Cargo     string `json:"cargo"`
+	CargoNome string `json:"cargoNome"`
 }
 
 // provaRenomeRequest corrige o título da prova publicada.
@@ -341,8 +343,9 @@ func provaResumoParaDTO(p prova.Publicacao) provaResumoDTO {
 
 func questaoAvulsaParaDTO(q prova.QuestaoAvulsa) questaoAvulsaDTO {
 	return questaoAvulsaDTO{
-		ProvaID: q.ProvaID, Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Resposta: q.Resposta,
-		Orgao: q.Orgao, Ano: q.Ano, Cargo: q.Cargo, CargoNome: q.CargoNome,
+		ProvaID: q.ProvaID, Numero: q.Numero, Disciplina: q.Disciplina, Assunto: q.Assunto, Grupo: q.Grupo,
+		Resposta: q.Resposta,
+		Orgao:    q.Orgao, Ano: q.Ano, Cargo: q.Cargo, CargoNome: q.CargoNome,
 	}
 }
 

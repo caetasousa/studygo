@@ -4,6 +4,7 @@
   "cargo": "string",
   "cargoNome": "string",
   "disciplina": "string",
+  "grupo": "string",
   "numero": "number",
   "orgao": "string",
   "provaId": "string",

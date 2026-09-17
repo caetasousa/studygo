@@ -13,7 +13,9 @@ type QuestaoAvulsa struct {
 	Numero     int
 	Disciplina string
 	Assunto    string
-	Resposta   string
+	// Grupo junta as matérias no treino: básicas, legislação ou específicas.
+	Grupo    string
+	Resposta string
 	// A identificação da prova de onde ela vem.
 	Orgao     string
 	Ano       int
@@ -79,8 +81,56 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 		}
 		q.Disciplina = nome[k]
 		q.Assunto = strings.Join(strings.Fields(q.Assunto), " ")
+		q.Grupo = GrupoDaMateria(q.Disciplina)
 		out = append(out, q)
 	}
 
 	return out
+}
+
+// Os grupos de matéria do treino, na ordem em que aparecem.
+const (
+	GrupoBasicas     = "basicas"
+	GrupoLegislacao  = "legislacao"
+	GrupoEspecificas = "especificas"
+)
+
+var (
+	semAcento = strings.NewReplacer(
+		"á", "a", "à", "a", "â", "a", "ã", "a", "é", "e", "ê", "e", "í", "i",
+		"ó", "o", "ô", "o", "õ", "o", "ú", "u", "ç", "c",
+	)
+	// Português, matemática e a informática do dia a dia, com os nomes que as
+	// bancas dão: "Língua Portuguesa", "Raciocínio Lógico-Matemático",
+	// "Noções de Informática" (Word, Excel). "Lógica" e "informática" sozinhas
+	// não: são também a de programação e a de um cargo de TI.
+	basicas = []string{
+		"portugues", "lingua", "redacao", "matematica", "raciocinio",
+		"nocoes de informatica", "informatica basica", "office", "word", "excel", "planilha",
+	}
+	// Lei, regimento e norma de conduta — "Noções de Direito Administrativo",
+	// "Direitos das Pessoas com Deficiência", "Administração Pública",
+	// "Sustentabilidade" (as resoluções do CNJ), "Legislação Aplicada à TI".
+	legislacao = []string{
+		"legisla", "direito", "regimento", "estatuto", "etica", "constitui",
+		"administracao publica", "sustentabilidade",
+	}
+)
+
+// GrupoDaMateria diz em que grupo a matéria entra no treino. A matéria da
+// questão é texto livre — da extração ou do curador —, então o grupo sai do
+// nome: o que não é básica nem legislação é específica de TI.
+func GrupoDaMateria(nome string) string {
+	n := semAcento.Replace(strings.ToLower(nome))
+	contem := func(partes []string) bool {
+		return slices.ContainsFunc(partes, func(p string) bool { return strings.Contains(n, p) })
+	}
+	switch {
+	case contem(basicas):
+		return GrupoBasicas
+	case contem(legislacao):
+		return GrupoLegislacao
+	default:
+		return GrupoEspecificas
+	}
 }

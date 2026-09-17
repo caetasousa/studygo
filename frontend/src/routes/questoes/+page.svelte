@@ -21,6 +21,7 @@
 		nomeDoAssunto,
 		opcoesDoTreino,
 		type FiltroDoTreino,
+		type GrupoDeMaterias,
 		type RespostasPorProva,
 		type SituacaoDoFiltro
 	} from '$lib/provas/treino';
@@ -138,13 +139,34 @@
 		}
 	}
 
+	/** O grupo inteiro de uma vez: marca as que faltam, ou desmarca todas se já estavam. */
+	function alternarGrupo(g: GrupoDeMaterias) {
+		const doGrupo = g.materias.map(([m]) => m);
+		if (doGrupo.every((m) => filtro.materias.includes(m))) {
+			filtro.materias = filtro.materias.filter((m) => !doGrupo.includes(m));
+			filtro.assuntos = filtro.assuntos.filter((k) => !doGrupo.some((m) => k.startsWith(chaveDoAssunto(m, ''))));
+		} else {
+			filtro.materias = [...filtro.materias, ...doGrupo.filter((m) => !filtro.materias.includes(m))];
+		}
+	}
+
 	function alternarAssunto(k: string) {
 		filtro.assuntos = filtro.assuntos.includes(k) ? filtro.assuntos.filter((x) => x !== k) : [...filtro.assuntos, k];
 	}
 
 	/** "Língua Portuguesa e Redes" — o que o botão vai resolver, numa frase. */
 	const descricao = $derived.by(() => {
-		const ms = filtro.materias;
+		// O grupo marcado inteiro vira o nome dele: "Básicas", não as duas matérias.
+		const restantes = new Set(filtro.materias);
+		const ms: string[] = [];
+		for (const g of opcoes.grupos) {
+			const doGrupo = g.materias.map(([m]) => m);
+			if (doGrupo.length > 1 && doGrupo.every((m) => restantes.has(m))) {
+				ms.push(g.rotulo);
+				doGrupo.forEach((m) => restantes.delete(m));
+			}
+		}
+		ms.push(...filtro.materias.filter((m) => restantes.has(m)));
 		const materias =
 			ms.length === 0
 				? 'Todas as matérias'
@@ -417,19 +439,35 @@
 		<div class="propriedades">
 			<div class="propriedade">
 				<span class="rotulo"><NavIcon name="conteudo" size="sm" /> Matérias</span>
-				<div class="valor" class:escolhendo={filtro.materias.length > 0}>
-					{#each opcoes.materias as [m, n] (m)}
-						{@const marcada = filtro.materias.includes(m)}
-						<button
-							type="button"
-							class="etiqueta"
-							style={tagStyle(corDaMateria(m))}
-							aria-pressed={marcada}
-							onclick={() => alternarMateria(m)}
-						>
-							{#if marcada}<span class="check" aria-hidden="true">✓</span>{/if}{m}
-							<span class="n">{n}</span>
-						</button>
+				<div class="valor grupos" class:escolhendo={filtro.materias.length > 0}>
+					{#each opcoes.grupos as g (g.grupo)}
+						{@const inteiro = g.materias.every(([m]) => filtro.materias.includes(m))}
+						<div class="grupo-materias">
+							<span class="linha-grupo">
+								<button
+									type="button"
+									class="de-grupo"
+									aria-pressed={inteiro}
+									title={inteiro ? `Desmarcar as matérias de ${g.rotulo}` : `Marcar todas as matérias de ${g.rotulo}`}
+									onclick={() => alternarGrupo(g)}
+								>
+									{#if inteiro}<span class="check" aria-hidden="true">✓</span>{/if}{g.rotulo}
+								</button>
+							</span>
+							{#each g.materias as [m, n] (m)}
+								{@const marcada = filtro.materias.includes(m)}
+								<button
+									type="button"
+									class="etiqueta"
+									style={tagStyle(corDaMateria(m))}
+									aria-pressed={marcada}
+									onclick={() => alternarMateria(m)}
+								>
+									{#if marcada}<span class="check" aria-hidden="true">✓</span>{/if}{m}
+									<span class="n">{n}</span>
+								</button>
+							{/each}
+						</div>
 					{/each}
 					{#if filtro.materias.length}
 						<button
@@ -894,6 +932,40 @@
 		color: var(--text);
 		font-weight: 600;
 		background: var(--bg-hover);
+	}
+	.valor.grupos {
+		display: grid;
+		justify-items: start;
+		gap: 10px;
+	}
+	.grupo-materias {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		align-items: center;
+	}
+	/* O nome do grupo em cima das etiquetas; clicar marca o grupo inteiro. */
+	.linha-grupo {
+		width: 100%;
+	}
+	.de-grupo {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		padding: 0;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		text-align: left;
+		color: var(--text-faint);
+		background: none;
+		border: 0;
+		cursor: pointer;
+	}
+	.de-grupo:hover,
+	.de-grupo[aria-pressed='true'] {
+		color: var(--text);
 	}
 	.valor.assuntos {
 		display: grid;
