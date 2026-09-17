@@ -188,6 +188,15 @@ func (s *ProvaService) ImportarPacote(ctx context.Context, usuario string, pct P
 			s.descartar(gravados)
 			return prova.Publicacao{}, err
 		}
+		// O pacote de uma prova publicada antes de o gabarito ter tabela própria
+		// vem sem as respostas, mas com o PDF: lido aqui, ela chega com gabarito.
+		// Sem leitura, entra como veio — "Abrir revisão" lê o PDF de novo.
+		if len(i.Rascunho.Gabarito.Respostas) == 0 {
+			if g, err := s.Processor.Gabarito(ctx, i.GabaritoArquivo, i.Rascunho.Caderno); err == nil {
+				i.Rascunho.Gabarito = g
+				i.Rascunho.AplicarGabarito()
+			}
+		}
 	}
 	for _, id := range figuras {
 		// A figura que já está aqui é a mesma (o id é o do conteúdo): outra

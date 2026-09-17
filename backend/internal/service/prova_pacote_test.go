@@ -142,6 +142,36 @@ func TestProvas_ImportarPacotePublica(t *testing.T) {
 	}
 }
 
+// O pacote exportado de uma prova publicada antes da tabela de gabaritos vem
+// sem as respostas, mas com o PDF do gabarito: a importação o lê.
+func TestProvas_ImportarPacoteSemRespostasLeOGabarito(t *testing.T) {
+	t.Parallel()
+
+	s, repo, _ := novoLevar(t)
+	repo.publicada = prova.Publicacao{ID: "prova-nova"}
+	pct := pacoteLevado()
+	pct.Gabarito, pct.NomeGabarito = pdfMinimo, "trt18-gabarito.pdf"
+
+	if _, err := s.ImportarPacote(context.Background(), curador, pct); err != nil {
+		t.Fatalf("ImportarPacote: %v", err)
+	}
+	r := repo.publicadas[0].Rascunho
+	if len(r.Gabarito.Respostas) != 2 || r.Questoes[0].Resposta != "B" || r.Questoes[1].Resposta != "D" {
+		t.Fatalf("gabarito = %+v, respostas %q %q", r.Gabarito, r.Questoes[0].Resposta, r.Questoes[1].Resposta)
+	}
+
+	// Com as respostas no pacote, o PDF não é lido de novo.
+	s, repo, _ = novoLevar(t)
+	repo.publicada = prova.Publicacao{ID: "prova-nova"}
+	pct.Conteudo.Gabarito = prova.Gabarito{Cargo: "L12", Caderno: "1", Respostas: map[string]string{"1": "A", "2": "C"}}
+	if _, err := s.ImportarPacote(context.Background(), curador, pct); err != nil {
+		t.Fatalf("ImportarPacote: %v", err)
+	}
+	if g := repo.publicadas[0].Rascunho.Gabarito; g.Respostas["1"] != "A" {
+		t.Fatalf("gabarito do pacote trocado pela leitura: %+v", g)
+	}
+}
+
 func TestProvas_ImportarPacoteRecusa(t *testing.T) {
 	t.Parallel()
 

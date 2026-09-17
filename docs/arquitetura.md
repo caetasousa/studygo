@@ -478,6 +478,14 @@ mas não com pendência de integridade, nem se já está no catálogo ou se o ca
 citam; o PDF ganha id novo. O prova.json é contrato (`testdata/prova_pacote.json`,
 `formatoDoPacote`).
 
+**Prova sem respostas, com o PDF do gabarito, lê o gabarito de novo.** As provas
+publicadas antes de o gabarito ter tabela própria (`cc242b2`) perderam as
+respostas — ficaram no JSON antigo, que ninguém lê —, e o pacote delas saiu sem
+gabarito. O PDF continuou guardado, e o leitor determinístico o lê inteiro. Por
+isso a importação do pacote sem respostas lê o PDF que veio junto, e "Abrir
+revisão" de uma prova publicada sem respostas já nasce com o gabarito na fila
+(`EtapaSoGabarito`): quando volta, é publicar.
+
 **A prova importada duas vezes sai pela curadoria.** "Excluir prova" apaga de vez
 a prova e tudo o que veio dela — revisões, questões, textos, gabarito, anotações e
 as importações que a publicaram ou revisam (`ProvaRepo.ExcluirProva`, numa

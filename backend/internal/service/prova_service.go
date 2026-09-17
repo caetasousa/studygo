@@ -570,6 +570,16 @@ func (s *ProvaService) Revisar(ctx context.Context, usuario, provaID string) (Im
 	if err != nil {
 		return ImportacaoDeProva{}, err
 	}
+	// A prova publicada antes de o gabarito ter tabela própria ficou sem as
+	// respostas, mas com o PDF dele: a revisão já nasce lendo-o de novo, e é só
+	// publicar quando voltar.
+	if len(p.Conteudo.Gabarito.Respostas) == 0 && base.GabaritoArquivo != "" {
+		criada.Etapa, criada.Estado = prova.EtapaSoGabarito, prova.EstadoNaFila
+		if err := s.Repo.Salvar(ctx, criada, criada.Versao); err != nil {
+			return ImportacaoDeProva{}, err
+		}
+		return s.Obter(ctx, usuario, criada.ID)
+	}
 
 	return s.montar(criada), nil
 }

@@ -773,6 +773,28 @@ func TestProvas_PublicarLevaSoAsProntas(t *testing.T) {
 	}
 }
 
+// A prova publicada antes da tabela de gabaritos não tem as respostas, mas tem
+// o PDF: "Abrir revisão" já põe o gabarito para ler.
+func TestProvas_RevisarProvaSemRespostasLeOGabarito(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakePublicacao{fakeProvas: novoFakeProvas()}
+	s, _ := novoProvaServiceDeTeste(repo.fakeProvas, extratorDeDuasRegioes())
+	s.Repo = repo
+	repo.importacoes["base"] = prova.Importacao{
+		ID: "base", Documento: "doc", GabaritoArquivo: "gab", Estado: prova.EstadoPublicada,
+		Regioes: []prova.Origem{{Pagina: 1, Regiao: "0"}},
+	}
+
+	i, err := s.Revisar(context.Background(), curador, "prova-1")
+	if err != nil {
+		t.Fatalf("Revisar: %v", err)
+	}
+	if i.Estado != prova.EstadoNaFila || i.Etapa != prova.EtapaSoGabarito || i.GabaritoArquivo != "gab" {
+		t.Fatalf("revisão = %s, etapa %d, gabarito %q; quer o gabarito na fila", i.Estado, i.Etapa, i.GabaritoArquivo)
+	}
+}
+
 // Extrair de novo parte do mesmo PDF e do mesmo gabarito, do zero, e vira
 // revisão da mesma prova — não uma prova nova no catálogo.
 func TestProvas_ReextrairAbreRevisaoDaMesmaProva(t *testing.T) {
