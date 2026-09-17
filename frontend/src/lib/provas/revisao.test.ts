@@ -418,3 +418,23 @@ describe('questão do OCR', () => {
 		expect(problemasDaQuestao({ ...q, revisada: true }, r).some((p) => p.startsWith('Veio do OCR'))).toBe(false);
 	});
 });
+
+describe('palpites da revisão', () => {
+	it('somem quando o curador confere a questão', () => {
+		const base = novaQuestao(4);
+		const q = {
+			...base,
+			completa: true,
+			blocos: [{ ...novoBloco(), texto: 'De acordo com o texto, é correto afirmar:' }],
+			alternativas: base.alternativas.map((a) => ({ ...a, blocos: [{ ...novoBloco(), texto: a.letra }] }))
+		};
+		const r = { questoes: [q], apoios: [], gabarito: { respostas: {} } } as unknown as Rascunho;
+		expect(problemasDaQuestao(q, r)).toEqual(['Cita um texto, mas nenhum texto de apoio está ligado a ela.']);
+
+		const conferida = { ...q, revisada: true };
+		expect(problemasDaQuestao(conferida, r)).toEqual([]);
+		// O que impede publicar continua: alternativa que falta não some ao conferir.
+		const incompleta = { ...conferida, alternativas: conferida.alternativas.slice(0, 4) };
+		expect(problemasDaQuestao(incompleta, r)).toEqual(['Tem 4 de 5 alternativas; faltam E.']);
+	});
+});

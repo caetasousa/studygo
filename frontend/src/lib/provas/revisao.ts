@@ -94,11 +94,14 @@ export function problemasDaQuestao(q: Questao, r: Rascunho): string[] {
 	const oficial = r.gabarito.respostas[String(q.numero)];
 	if (Object.keys(r.gabarito.respostas).length > 0 && oficial !== undefined && q.resposta !== oficial)
 		out.push(`A resposta (${q.resposta || 'nenhuma'}) difere do gabarito (${oficial || 'anulada'}).`);
-	if (citaTexto(q) && !q.apoios.some((id) => r.apoios.some((a) => a.id === id)))
-		out.push('Cita um texto, mas nenhum texto de apoio está ligado a ela.');
-	// Conferida, o curador já olhou o original: sai da lista de problemas.
-	if (q.lidaPorOcr && !q.revisada)
-		out.push('Veio do OCR, porque a IA recusou a região: confira número, enunciado e alternativas com o original.');
+	// Conferida, o curador já olhou: o que é palpite sai da lista, e a questão
+	// deixa de ficar laranja no mapa. O que impede publicar continua aparecendo.
+	if (!q.revisada) {
+		if (citaTexto(q) && !q.apoios.some((id) => r.apoios.some((a) => a.id === id)))
+			out.push('Cita um texto, mas nenhum texto de apoio está ligado a ela.');
+		if (q.lidaPorOcr)
+			out.push('Veio do OCR, porque a IA recusou a região: confira número, enunciado e alternativas com o original.');
+	}
 	return out;
 }
 
