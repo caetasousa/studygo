@@ -147,5 +147,13 @@ export const provasApi = {
 		corpo.set('gabarito', gabarito);
 		corpo.set('versao', String(versao));
 		return request<Importacao>(`${imp}/${id}/gabarito`, { method: 'POST', body: corpo });
+	},
+
+	/** A folha de alterações da banca: muda só as questões que ela cita. */
+	aplicarAlteracoes: (id: string, versao: number, alteracoes: File) => {
+		const corpo = new FormData();
+		corpo.set('alteracoes', alteracoes);
+		corpo.set('versao', String(versao));
+		return request<Importacao>(`${imp}/${id}/alteracoes`, { method: 'POST', body: corpo });
 	}
 };

@@ -50,6 +50,10 @@ type pedido struct {
 	Apoio bool `json:"apoio,omitempty"`
 	// Caderno é o da prova, para o gabarito que traz vários tipos.
 	Caderno string `json:"caderno,omitempty"`
+	// Cargo e Alteracoes pedem a folha de alterações de gabarito da banca, que
+	// traz vários cargos e só as questões que mudaram.
+	Cargo      string `json:"cargo,omitempty"`
+	Alteracoes bool   `json:"alteracoes,omitempty"`
 }
 
 type wireErro struct {
@@ -136,6 +140,17 @@ func (c *Client) Extrair(ctx context.Context, documento string, regiao prova.Ori
 func (c *Client) Gabarito(ctx context.Context, arquivo, caderno string) (prova.Gabarito, error) {
 	var g prova.Gabarito
 	err := c.chamar(ctx, "gabarito", pedido{Documento: arquivo, Caderno: caderno}, &g)
+
+	return g, err
+}
+
+// AlteracoesDeGabarito lê a folha de alterações da banca: só as questões do
+// cargo e do tipo desta prova que mudaram de letra ou foram atribuídas a todos.
+func (c *Client) AlteracoesDeGabarito(ctx context.Context, arquivo, cargo, caderno string) (prova.Gabarito, error) {
+	var g prova.Gabarito
+	err := c.chamar(ctx, "gabarito", pedido{
+		Documento: arquivo, Cargo: cargo, Caderno: caderno, Alteracoes: true,
+	}, &g)
 
 	return g, err
 }

@@ -28,6 +28,10 @@ class PedidoDocumento(BaseModel):
 class PedidoGabarito(PedidoDocumento):
     # O caderno da prova: a relação da FCC traz todos os tipos num arquivo.
     caderno: str = ""
+    # O cargo da prova e, com ele, a folha de alterações de gabarito: ela traz
+    # vários cargos, e só as questões que mudaram.
+    cargo: str = ""
+    alteracoes: bool = False
 
 
 class PedidoRegiao(BaseModel):
@@ -107,6 +111,11 @@ async def gabarito(
     settings: Settings = Depends(get_settings),
     provider: LLMProvider = Depends(get_provider),
 ) -> object:
+    if body.alteracoes:
+        alteradas = await run_in_threadpool(
+            pipeline.ler_alteracoes, settings.provas_dir, body.documento, body.cargo, body.caderno
+        )
+        return alteradas.model_dump(by_alias=True)
     result = await pipeline.gabarito(
         settings.provas_dir, body.documento, body.caderno, provider, settings
     )

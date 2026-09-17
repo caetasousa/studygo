@@ -478,6 +478,18 @@ mas não com pendência de integridade, nem se já está no catálogo ou se o ca
 citam; o PDF ganha id novo. O prova.json é contrato (`testdata/prova_pacote.json`,
 `formatoDoPacote`).
 
+**A folha de alterações muda só o que ela cita.** Depois dos recursos, a FCC
+publica a "Alteração de gabarito e Atribuição de questões": por cargo e por
+tipo de caderno, as questões que trocaram de resposta e as atribuídas a todos —
+anuladas, ponto de quem quer que seja. Trocar o arquivo do gabarito por essa
+folha apagaria as respostas que não mudaram, então ela tem caminho próprio
+(`POST /api/provas/importacoes/{id}/alteracoes` → `AplicarAlteracoesDeGabarito`
+→ `Rascunho.AplicarAlteracoes`): a leitura é determinística, do texto do PDF
+(`ler_alteracoes`), pega só o trecho do cargo e do tipo desta prova, e o
+gabarito passa a definitivo. A questão que mudou de letra volta a pedir
+conferência; o aviso diz quais foram. Folha de outro cargo é recusada, em vez
+de mudar nada.
+
 **Questão sem resposta no gabarito não chega ao aluno.** A prova pode ser
 importada e publicada antes de o gabarito sair — o que falta é só ele —, mas
 responder sem ter como conferir não é treinar: a publicação pela revisão e a
@@ -646,7 +658,7 @@ POST      /api/provas/{id}/{revisar,reextrair,excluir}                     ← c
 PATCH|DELETE /api/provas/{id}                     ← título; tirar do catálogo
 GET|POST  /api/provas/pacotes                   ← levar a outro ambiente (.zip; uma prova por envio)
 GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
-POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,materias}
+POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,alteracoes,materias}
 GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante
 ```
 

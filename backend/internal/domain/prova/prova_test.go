@@ -1196,6 +1196,46 @@ func TestSoComGabarito(t *testing.T) {
 	}
 }
 
+// A folha da banca muda só o que cita: o resto do gabarito preliminar fica.
+func TestAplicarAlteracoes(t *testing.T) {
+	t.Parallel()
+
+	r := valida()
+	r.Total = 3
+	dois, tres := questao(2, true, "Segunda"), questao(3, true, "Terceira")
+	dois.Resposta, tres.Resposta = "A", "B"
+	r.Questoes = append(r.Questoes, dois, tres)
+	r.Gabarito = Gabarito{
+		Cargo: "E05", Caderno: "4", Tipo: "preliminar",
+		Respostas: map[string]string{"1": "E", "2": "A", "3": "B"},
+		Situacoes: map[string]string{"1": "Gabarito sem alteração"},
+	}
+
+	alteradas, atribuidas := r.AplicarAlteracoes(Gabarito{
+		Respostas: map[string]string{"2": "C", "3": "", "9": "X"},
+		Situacoes: map[string]string{"2": "Gabarito alterado", "3": "Questão atribuída a todos"},
+	})
+
+	if !slices.Equal(alteradas, []int{2}) || !slices.Equal(atribuidas, []int{3}) {
+		t.Fatalf("alteradas %v, atribuídas %v", alteradas, atribuidas)
+	}
+	// A 1 não é citada e fica como estava; a letra inválida não entra.
+	if g := r.Gabarito; g.Respostas["1"] != "E" || g.Respostas["2"] != "C" || g.Respostas["3"] != "" ||
+		g.Respostas["9"] != "" || g.Tipo != "definitivo" {
+		t.Fatalf("gabarito = %+v", g)
+	}
+	if r.Questoes[1].Resposta != "C" || r.Questoes[2].Resposta != "" {
+		t.Fatalf("respostas das questões = %q, %q", r.Questoes[1].Resposta, r.Questoes[2].Resposta)
+	}
+	// Quem mudou de letra volta a pedir conferência; a 1 continua conferida.
+	if !r.Questoes[0].Revisada || r.Questoes[1].Revisada || r.Questoes[2].Revisada {
+		t.Fatalf("conferidas = %v", []bool{r.Questoes[0].Revisada, r.Questoes[1].Revisada, r.Questoes[2].Revisada})
+	}
+	if p := r.Pendencias(publicar); len(p) > 0 {
+		t.Fatalf("pendências = %v", p)
+	}
+}
+
 func TestNomeDoCargo(t *testing.T) {
 	t.Parallel()
 

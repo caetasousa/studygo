@@ -153,6 +153,8 @@ func NewRouter(
 		protegida("POST "+imp+"/{id}/cadastradas", h.Prova.ProcurarCadastradas)
 		limitada("POST "+imp+"/{id}/recortar", limites.Curadoria, h.Prova.Recortar)
 		limitada("POST "+imp+"/{id}/gabarito", limites.Edital, h.Prova.AtualizarGabarito)
+		// A folha de alterações é lida do texto, sem IA: o teto é o da curadoria.
+		limitada("POST "+imp+"/{id}/alteracoes", limites.Curadoria, h.Prova.AplicarAlteracoes)
 		limitada("POST "+imp+"/{id}/materias", limites.Edital, h.Prova.SugerirMaterias)
 	}
 

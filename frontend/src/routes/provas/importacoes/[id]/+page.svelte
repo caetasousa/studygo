@@ -73,6 +73,7 @@
 	let zoom = $state(100);
 	let faltando = $state('');
 	let novoGabarito = $state<HTMLInputElement | null>(null);
+	let alteracoesDeGabarito = $state<HTMLInputElement | null>(null);
 	// O trecho relido: em que faixa do caderno ele é marcado, e para qual
 	// questão voltar quando a leitura terminar — a fila devolve a tela ao começo.
 	let trechoIdx = $state(0);
@@ -469,6 +470,17 @@
 		receber(await provasApi.atualizarGabarito(imp.id, imp.versao, arquivo));
 	}
 
+	// A folha de alterações muda só as questões que cita; o aviso do servidor
+	// diz quais foram.
+	async function importarAlteracoes() {
+		const arquivo = alteracoesDeGabarito?.files?.[0];
+		if (!imp || !arquivo) return;
+		const antes = imp.rascunho.alertas.length;
+		receber(await provasApi.aplicarAlteracoes(imp.id, imp.versao, arquivo));
+		if (alteracoesDeGabarito) alteracoesDeGabarito.value = '';
+		aviso = imp.rascunho.alertas[antes] ?? 'As alterações foram aplicadas ao gabarito.';
+	}
+
 	onMount(() => {
 		// Sem o catálogo, o editor só deixa de sugerir: nada a avisar.
 		provasApi
@@ -807,6 +819,30 @@
 										onclick={() => executar(trocarGabarito)}
 									>
 										Ler o gabarito novo
+									</button>
+								</div>
+							{/snippet}
+						</Campo>
+						<Campo
+							rotulo="Importar alterações de gabarito"
+							ajuda="A folha da banca com as questões que mudaram de resposta e as atribuídas a todos (anuladas). Só as questões dela mudam; o resto do gabarito fica, e o gabarito passa a definitivo. Salve a revisão antes."
+						>
+							{#snippet children({ id, ajuda })}
+								<div class="gabarito-novo">
+									<input
+										{id}
+										aria-describedby={ajuda}
+										type="file"
+										accept="application/pdf"
+										bind:this={alteracoesDeGabarito}
+									/>
+									<button
+										class="btn"
+										type="button"
+										disabled={ocupado || alterado}
+										onclick={() => executar(importarAlteracoes)}
+									>
+										Aplicar as alterações
 									</button>
 								</div>
 							{/snippet}

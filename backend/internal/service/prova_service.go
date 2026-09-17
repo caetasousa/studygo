@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -536,6 +537,70 @@ func (s *ProvaService) AtualizarGabarito(ctx context.Context, usuario, id string
 	}
 
 	return s.Obter(ctx, usuario, id)
+}
+
+// AplicarAlteracoesDeGabarito lê a folha de alterações da banca — "Alteração
+// de gabarito e Atribuição de questões" — e muda só as questões dela. O
+// gabarito preliminar inteiro continua valendo: trocar o arquivo do gabarito
+// por essa folha apagaria as respostas que não mudaram.
+func (s *ProvaService) AplicarAlteracoesDeGabarito(
+	ctx context.Context, usuario, id string, versao int, pdf []byte, nome string,
+) (ImportacaoDeProva, error) {
+	i, err := s.carregar(ctx, usuario, id)
+	if err != nil {
+		return ImportacaoDeProva{}, err
+	}
+	if i.Estado != prova.EstadoEmRevisao || i.Versao != versao {
+		return ImportacaoDeProva{}, prova.ErrConflito
+	}
+	if !parecePDF(pdf) {
+		return ImportacaoDeProva{}, erroDeValidacao("as alterações de gabarito precisam ser um PDF")
+	}
+
+	arquivo := uuid.NewString()
+	if err := s.Arquivos.Guardar(arquivo, pdf); err != nil {
+		return ImportacaoDeProva{}, err
+	}
+	if err := s.Repo.RegistrarArquivo(ctx, id, arquivo, "pdf"); err != nil {
+		s.descartar([]string{arquivo + ".pdf"})
+		return ImportacaoDeProva{}, err
+	}
+	lidas, err := s.Processor.AlteracoesDeGabarito(ctx, arquivo, i.Rascunho.Cargo, i.Rascunho.Caderno)
+	if err != nil {
+		s.descartar([]string{arquivo + ".pdf"})
+		return ImportacaoDeProva{}, err
+	}
+
+	alteradas, atribuidas := i.Rascunho.AplicarAlteracoes(lidas)
+	if len(alteradas) == 0 && len(atribuidas) == 0 {
+		s.descartar([]string{arquivo + ".pdf"})
+		return ImportacaoDeProva{}, erroDeValidacao(fmt.Sprintf(
+			"o documento não traz alteração para o cargo %q, tipo %q desta prova; confira se é a folha certa",
+			i.Rascunho.Cargo, i.Rascunho.Caderno,
+		))
+	}
+	i.Rascunho.Alertas = append(i.Rascunho.Alertas, avisoDasAlteracoes(nome, alteradas, atribuidas))
+	if err := s.Repo.Salvar(ctx, i, versao); err != nil {
+		return ImportacaoDeProva{}, err
+	}
+
+	return s.Obter(ctx, usuario, id)
+}
+
+// avisoDasAlteracoes diz o que a folha mudou, para o curador conferir cada uma.
+func avisoDasAlteracoes(nome string, alteradas, atribuidas []int) string {
+	partes := []string{}
+	if len(alteradas) > 0 {
+		partes = append(partes, fmt.Sprintf("trocou a resposta da(s) questão(ões) %s", prova.Faixas(alteradas)))
+	}
+	if len(atribuidas) > 0 {
+		partes = append(partes, fmt.Sprintf("atribuiu a todos a(s) questão(ões) %s", prova.Faixas(atribuidas)))
+	}
+
+	return fmt.Sprintf(
+		"O documento de alterações %s%s. O gabarito virou definitivo; confira as questões com o original.",
+		cmp.Or(prova.NomeDoArquivo(nome), "enviado"), " "+strings.Join(partes, " e "),
+	)
 }
 
 // Revisar abre um rascunho novo a partir da revisão publicada. A publicada

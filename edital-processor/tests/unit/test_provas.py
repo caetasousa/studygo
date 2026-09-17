@@ -1211,3 +1211,45 @@ async def test_releitura_recusada_fica_com_a_questao_do_ocr(
     )
 
     assert [(q.numero, q.completa, q.lida_por_ocr) for q in result.questoes] == [(28, True, True)]
+
+
+def _alteracoes(root: Path) -> str:
+    """A folha "Alteração de gabarito e Atribuição de questões" da FCC: um
+    trecho por cargo, as alterações com a letra nova e as atribuições sem
+    letra — questão anulada, ponto de todos."""
+    id = str(uuid.uuid4())
+    with pymupdf.open() as doc:
+        doc.new_page().insert_text(
+            (20, 30),
+            "TRIBUNAL REGIONAL DO TRABALHO\nAlteração de gabarito e Atribuição de questões\n"
+            "H08 - TÉC JUD - ÁREA ADM\nAlterações\nConhec. Gerais\n"
+            "Questão 17 tipo 1 A\nQuestão 16 tipo 3 B\n-----------------------\n"
+            "Atribuições\nConhec. Específicos\nQuestão 29 tipo 1\nQuestão 30 tipo 3\n"
+            "-----------------------\n",
+        )
+        doc.new_page().insert_text(
+            (20, 30),
+            "I09 - TÉC JUD - APOIO ESP\nAtribuições\nConhec. Gerais\nQuestão 40 tipo 1\n",
+        )
+        doc.save(arquivo(root, id, "pdf"))
+    return id
+
+
+def test_alteracoes_de_gabarito_do_cargo_e_do_tipo(tmp_path: Path) -> None:
+    id = _alteracoes(tmp_path)
+
+    g = pipeline.ler_alteracoes(tmp_path, id, "H08", "001")
+
+    assert g.respostas == {"17": "A", "29": ""}
+    assert g.situacoes == {"17": "Gabarito alterado", "29": "Questão atribuída a todos"}
+    assert (g.cargo, g.caderno, g.tipo) == ("H08", "1", "definitivo")
+
+    # Outro tipo do mesmo cargo tem outra numeração.
+    outro = pipeline.ler_alteracoes(tmp_path, id, "H08", "TIPO-003")
+    assert outro.respostas == {"16": "B", "30": ""}
+
+    # O cargo que a folha não cita não muda nada.
+    assert pipeline.ler_alteracoes(tmp_path, id, "E05", "001").respostas == {}
+
+    # E cada cargo fica com o que é dele.
+    assert pipeline.ler_alteracoes(tmp_path, id, "I09", "001").respostas == {"40": ""}

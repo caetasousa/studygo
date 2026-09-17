@@ -157,11 +157,12 @@ func (a Apoio) rotulo() string {
 		return "texto de apoio " + a.ID + ", que não está ligado a nenhuma questão"
 	}
 
-	return "texto de apoio das questões " + faixas(a.Questoes)
+	return "texto de apoio das questões " + Faixas(a.Questoes)
 }
 
-// faixas escreve [1..10, 12] como "1-10, 12".
-func faixas(numeros []int) string {
+// Faixas escreve [1..10, 12] como "1-10, 12" — é assim que a tela e os avisos
+// falam de um punhado de questões.
+func Faixas(numeros []int) string {
 	ns := slices.Sorted(slices.Values(numeros))
 	var partes []string
 	for i := 0; i < len(ns); i++ {

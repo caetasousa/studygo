@@ -192,6 +192,10 @@ type fakeExtrator struct {
 	cadernoDoGabarito string
 	// capa, quando dada, é o que a leitura da capa devolve.
 	capa *prova.Metadados
+	// alteracoes é a folha de alterações de gabarito lida, e o cargo e o
+	// caderno com que ela foi pedida.
+	alteracoes                               prova.Gabarito
+	cargoDasAlteracoes, cadernoDasAlteracoes string
 }
 
 func (e *fakeExtrator) Preparar(context.Context, string) ([]prova.Origem, error) {
@@ -216,6 +220,11 @@ func (e *fakeExtrator) Extrair(_ context.Context, _ string, o prova.Origem) (pro
 func (e *fakeExtrator) Gabarito(_ context.Context, _, caderno string) (prova.Gabarito, error) {
 	e.cadernoDoGabarito = caderno
 	return e.gabarito, e.err
+}
+
+func (e *fakeExtrator) AlteracoesDeGabarito(_ context.Context, _, cargo, caderno string) (prova.Gabarito, error) {
+	e.cargoDasAlteracoes, e.cadernoDasAlteracoes = cargo, caderno
+	return e.alteracoes, e.err
 }
 
 func (e *fakeExtrator) Classificar(_ context.Context, qs []prova.ResumoDeQuestao) (map[int]string, error) {
@@ -814,6 +823,61 @@ func TestProvas_QuestaoSemGabaritoNaoChegaAoAluno(t *testing.T) {
 	// A revisão do curador abre com as duas.
 	if i, err := s.Revisar(context.Background(), curador, "prova-1"); err != nil || len(i.Rascunho.Questoes) != 2 {
 		t.Fatalf("revisão = %+v (%v)", i.Rascunho.Questoes, err)
+	}
+}
+
+// A folha de alterações muda o gabarito da prova sem trocar o arquivo dele:
+// trocar apagaria as respostas que não mudaram.
+func TestProvas_AplicarAlteracoesDeGabarito(t *testing.T) {
+	t.Parallel()
+
+	repo := novoFakeProvas()
+	extrator := extratorDeDuasRegioes()
+	extrator.alteracoes = prova.Gabarito{
+		Respostas: map[string]string{"2": ""},
+		Situacoes: map[string]string{"2": "Questão atribuída a todos"},
+	}
+	s, volume := novoProvaServiceDeTeste(repo, extrator)
+	r := prova.Rascunho{
+		Banca: "FCC", Orgao: "TJCE", Ano: 2026, Cargo: "E05", Caderno: "004", Total: 2,
+		Questoes: []prova.Questao{questaoExtraida(1, true), questaoExtraida(2, true)},
+		Gabarito: prova.Gabarito{Cargo: "E05", Caderno: "4", Tipo: "preliminar",
+			Respostas: map[string]string{"1": "B", "2": "D"}},
+	}
+	r.AplicarGabarito()
+	repo.importacoes["i"] = prova.Importacao{ID: "i", Estado: prova.EstadoEmRevisao, Versao: 1, Rascunho: r}
+
+	i, err := s.AplicarAlteracoesDeGabarito(context.Background(), curador, "i", 1, pdfMinimo, "alteracoes.pdf")
+	if err != nil {
+		t.Fatalf("AplicarAlteracoesDeGabarito: %v", err)
+	}
+	if extrator.cargoDasAlteracoes != "E05" || extrator.cadernoDasAlteracoes != "004" {
+		t.Fatalf("pedido = cargo %q, caderno %q", extrator.cargoDasAlteracoes, extrator.cadernoDasAlteracoes)
+	}
+	g := i.Rascunho.Gabarito
+	if g.Respostas["1"] != "B" || g.Respostas["2"] != "" || g.Tipo != "definitivo" {
+		t.Fatalf("gabarito = %+v", g)
+	}
+	if i.Rascunho.Questoes[1].Resposta != "" || len(i.Rascunho.Alertas) != 1 {
+		t.Fatalf("questão 2 = %+v, alertas %v", i.Rascunho.Questoes[1], i.Rascunho.Alertas)
+	}
+	if !strings.Contains(i.Rascunho.Alertas[0], "atribuiu a todos a(s) questão(ões) 2") {
+		t.Fatalf("aviso = %q", i.Rascunho.Alertas[0])
+	}
+	if len(volume.nomes) != 1 {
+		t.Fatalf("volume = %v; quer a folha guardada", volume.nomes)
+	}
+
+	// Folha de outro cargo: nada muda, e o arquivo não fica no volume.
+	extrator.alteracoes = prova.Gabarito{}
+	atual := repo.importacoes["i"]
+	_, err = s.AplicarAlteracoesDeGabarito(context.Background(), curador, "i", atual.Versao, pdfMinimo, "outra.pdf")
+	var v ErrValidacao
+	if !errors.As(err, &v) || !strings.Contains(v.Msg, "não traz alteração para o cargo") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(volume.nomes) != 1 {
+		t.Fatalf("volume = %v; a folha recusada ficou", volume.nomes)
 	}
 }
 

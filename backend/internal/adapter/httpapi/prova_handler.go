@@ -618,6 +618,48 @@ func (h *ProvaHandler) SugerirMaterias(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, out)
 }
 
+// AplicarAlteracoes recebe multipart com "alteracoes" e "versao": a folha de
+// alterações da banca muda só as questões que ela cita.
+func (h *ProvaHandler) AplicarAlteracoes(w http.ResponseWriter, r *http.Request) {
+	usuario, ok := h.usuario(w, r)
+	if !ok {
+		return
+	}
+	id, ok := h.idDaRota(w, r)
+	if !ok {
+		return
+	}
+	if !h.provas.Curador(usuario) {
+		writeError(w, r, h.logger, prova.ErrAcesso)
+		return
+	}
+
+	if err := h.lerMultipart(w, r, 1); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
+
+	pdf, nome, err := h.lerArquivo(r, "alteracoes")
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	versao, err := strconv.Atoi(r.FormValue("versao"))
+	if pdf == nil || err != nil {
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+		return
+	}
+
+	i, err := h.provas.AplicarAlteracoesDeGabarito(r.Context(), usuario, id, versao, pdf, nome)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, importacaoProvaParaDTO(i))
+}
+
 // AtualizarGabarito recebe multipart com "gabarito" e "versao".
 func (h *ProvaHandler) AtualizarGabarito(w http.ResponseWriter, r *http.Request) {
 	usuario, ok := h.usuario(w, r)

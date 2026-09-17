@@ -114,6 +114,9 @@ type ProvaProcessor interface {
 	// site da FCC imprime traz todos os tipos num arquivo, e é por ele que o
 	// processador escolhe qual ler.
 	Gabarito(ctx context.Context, arquivo, caderno string) (prova.Gabarito, error)
+	// AlteracoesDeGabarito lê a folha de alterações da banca: só o que mudou
+	// no gabarito deste cargo e tipo de caderno.
+	AlteracoesDeGabarito(ctx context.Context, arquivo, cargo, caderno string) (prova.Gabarito, error)
 	// Classificar sugere a matéria de cada questão, pelo número. Só lê texto:
 	// não recebe o PDF.
 	Classificar(ctx context.Context, questoes []prova.ResumoDeQuestao) (map[int]string, error)

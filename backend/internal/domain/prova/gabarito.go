@@ -90,3 +90,41 @@ func (r *Rascunho) AplicarGabarito() {
 		q.Situacao = r.Gabarito.Situacoes[chave]
 	}
 }
+
+// AplicarAlteracoes junta ao gabarito o que a folha de alterações da banca
+// mudou: a questão que trocou de letra e a atribuída a todos, que fica sem
+// letra como qualquer anulada. O resto do gabarito continua como está — a
+// folha só traz o que mudou —, e o gabarito passa a ser o definitivo.
+//
+// Devolve os números que mudaram de letra e os atribuídos a todos, em ordem.
+func (r *Rascunho) AplicarAlteracoes(a Gabarito) (alteradas, atribuidas []int) {
+	if r.Gabarito.Respostas == nil {
+		r.Gabarito.Respostas = map[string]string{}
+	}
+	if r.Gabarito.Situacoes == nil {
+		r.Gabarito.Situacoes = map[string]string{}
+	}
+	for _, chave := range slices.Sorted(maps.Keys(a.Respostas)) {
+		n, err := strconv.Atoi(chave)
+		if err != nil || n < 1 {
+			continue
+		}
+		letra := a.Respostas[chave]
+		if !slices.Contains(letrasDoGabarito, letra) {
+			continue
+		}
+		r.Gabarito.Respostas[chave] = letra
+		r.Gabarito.Situacoes[chave] = a.Situacoes[chave]
+		if letra == "" {
+			atribuidas = append(atribuidas, n)
+		} else {
+			alteradas = append(alteradas, n)
+		}
+	}
+	if len(alteradas) > 0 || len(atribuidas) > 0 {
+		r.Gabarito.Tipo = "definitivo"
+		r.AplicarGabarito()
+	}
+
+	return alteradas, atribuidas
+}

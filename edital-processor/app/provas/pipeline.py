@@ -1288,6 +1288,53 @@ def ler_gabarito(root: Path, documento: str, caderno_da_prova: str = "") -> tupl
     return result, text
 
 
+# A folha de alterações da FCC: por cargo e tipo de caderno, as questões que
+# mudaram de letra ("Questão 17 tipo 1 A") e as atribuídas a todos, que valem
+# ponto para quem quer que seja — anuladas, sem letra ("Questão 59 tipo 1").
+_CARGO_DA_ALTERACAO = re.compile(r"^\s*([A-Z]?\d{2,3})\s*-\s*\S", re.MULTILINE)
+_QUESTAO_ALTERADA = re.compile(
+    r"Quest(?:ão|ao)\s+(\d{1,3})\s+tipo\s+(\d{1,3})\s*([A-E])?\s*$", re.IGNORECASE | re.MULTILINE
+)
+_ATRIBUICAO = re.compile(r"atribui", re.IGNORECASE)
+SITUACAO_ALTERADA = "Gabarito alterado"
+SITUACAO_ATRIBUIDA = "Questão atribuída a todos"
+
+
+def ler_alteracoes(root: Path, documento: str, cargo: str, caderno: str) -> Gabarito:
+    """As alterações do cargo e do tipo pedidos, do documento de alterações de
+    gabarito da FCC. Só o que mudou: a questão sem letra foi atribuída a todos
+    e fica anulada. Sem texto no PDF, nada — o documento é gerado em texto, e
+    adivinhar alteração de gabarito seria pior do que não ler."""
+    with pymupdf.open(original(root, documento)) as doc:
+        texto = "\n".join(str(p.get_text()) for p in doc)
+
+    tipo = _sem_zeros(caderno)
+    procurado = _codigo(cargo) or cargo.strip().upper()
+    result = Gabarito(cargo=procurado, caderno=tipo, tipo="definitivo")
+    # Cada cargo abre um trecho; sem cargo nenhum citado, o documento é de um só.
+    cargos = list(_CARGO_DA_ALTERACAO.finditer(texto))
+    trechos: list[tuple[str, str]] = []
+    for k, m in enumerate(cargos):
+        fim = cargos[k + 1].start() if k + 1 < len(cargos) else len(texto)
+        trechos.append((m[1].upper(), texto[m.end() : fim]))
+    if not trechos:
+        trechos = [(procurado, texto)]
+    for codigo, trecho in trechos:
+        if procurado and codigo != procurado:
+            continue
+        for alteracao in _QUESTAO_ALTERADA.finditer(trecho):
+            if _sem_zeros(alteracao[2]) != tipo:
+                continue
+            numero, letra = str(int(alteracao[1])), (alteracao[3] or "").upper()
+            # O título da seção acima diz se é alteração ou atribuição.
+            ate = trecho.rfind("\n", 0, alteracao.start())
+            secao = trecho[:ate]
+            atribuida = not letra or _ATRIBUICAO.search(secao[secao.rfind("---") :])
+            result.respostas[numero] = "" if atribuida else letra
+            result.situacoes[numero] = SITUACAO_ATRIBUIDA if atribuida else SITUACAO_ALTERADA
+    return result
+
+
 async def gabarito(
     root: Path, documento: str, caderno: str, provider: LLMProvider, settings: Settings
 ) -> Gabarito:

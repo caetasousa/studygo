@@ -43,3 +43,25 @@ func TestClient_ExtrairDizOQueLer(t *testing.T) {
 		}
 	}
 }
+
+// A folha de alterações traz vários cargos e todos os tipos: o pedido diz qual
+// é o desta prova.
+func TestClient_AlteracoesDizemOCargoEOTipo(t *testing.T) {
+	t.Parallel()
+
+	var pedido map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&pedido)
+		_, _ = w.Write([]byte(`{"Respostas":{"17":"A"},"Situacoes":{"17":"Gabarito alterado"}}`))
+	}))
+	defer srv.Close()
+
+	g, err := provaproc.New(srv.URL, "token").AlteracoesDeGabarito(context.Background(), "arq", "H08", "001")
+
+	if err != nil || g.Respostas["17"] != "A" || g.Situacoes["17"] != "Gabarito alterado" {
+		t.Fatalf("alterações = %+v (%v)", g, err)
+	}
+	if pedido["cargo"] != "H08" || pedido["caderno"] != "001" || pedido["alteracoes"] != true {
+		t.Fatalf("pedido = %v", pedido)
+	}
+}

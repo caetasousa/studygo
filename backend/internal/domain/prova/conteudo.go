@@ -299,7 +299,7 @@ func (r *Rascunho) Reaproveitar(irmas []Publicacao) {
 		if !ok {
 			continue
 		}
-		faixa := faixas(a.Questoes)
+		faixa := Faixas(a.Questoes)
 		conteudo, _ := pub.Separar()
 		_, lugar := a.Separar()
 		lugar.IgualA = p.Conteudo.Rotulo()
