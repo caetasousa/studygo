@@ -538,7 +538,7 @@
 										aria-pressed={filtro.assuntos.includes(k)}
 										onclick={() => alternarAssunto(k)}
 									>
-										{a} <span class="n">{n}</span>
+										{a || 'Sem assunto classificado'} <span class="n">{n}</span>
 									</button>
 								{/each}
 							</div>

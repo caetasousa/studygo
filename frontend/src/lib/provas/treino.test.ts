@@ -124,7 +124,8 @@ describe('opcoesDoTreino', () => {
 					['Crase', 2],
 					['Pontuação', 1]
 				]
-			}
+			},
+			{ materia: 'Redes', assuntos: [['', 1]] }
 		]);
 		// Com o assunto escolhido, a matéria conta só o que o treino teria.
 		expect(o.materias).toContainEqual(['Língua Portuguesa', 2]);
@@ -194,5 +195,21 @@ describe('endereço do treino', () => {
 	it('sem filtro, sem busca', () => {
 		expect(enderecoDoTreino(SEM_FILTRO)).toBe('/questoes/resolver');
 		expect(filtroDoEndereco(new URLSearchParams())).toEqual(SEM_FILTRO);
+	});
+});
+
+describe('questões sem assunto', () => {
+	it('inclui todas as 50 questões nos assuntos e permite treinar as não classificadas', () => {
+		const lista = Array.from({ length: 50 }, (_, i) =>
+			avulsa('a', i + 1, 'Raciocínio Lógico', 2026, 'C', i < 30 ? 'Proposições' : '')
+		);
+		const f = { ...SEM_FILTRO, materias: ['Raciocínio Lógico'] };
+		const o = opcoesDoTreino(lista, f, {});
+		expect(o.materias).toEqual([['Raciocínio Lógico', 50]]);
+		expect(o.assuntos[0].assuntos.reduce((total, [, n]) => total + n, 0)).toBe(50);
+		const filtro = { ...f, assuntos: [chaveDoAssunto('Raciocínio Lógico', '')] };
+		expect(filtrarTreino(lista, filtro, {})).toHaveLength(20);
+		expect(ajustarAoCatalogo(filtro, lista)).toEqual(filtro);
+		expect(filtroDoEndereco(new URL(enderecoDoTreino(filtro), 'http://x').searchParams)).toEqual(filtro);
 	});
 });

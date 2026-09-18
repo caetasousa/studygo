@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // QuestaoAvulsa é uma questão do catálogo vista fora da prova dela: o bastante
@@ -63,7 +65,12 @@ func chaveDaMateria(nome string) string {
 	}
 	slices.Sort(palavras)
 
-	return strings.Join(slices.Compact(palavras), " ")
+	chave := strings.Join(slices.Compact(palavras), " ")
+	// As bancas usam estes dois nomes para a mesma matéria do treino.
+	if chave == "logic raciocini" {
+		return "logic matematic raciocini"
+	}
+	return chave
 }
 
 // radical tira o plural e a vogal final, que muda com o gênero: "lógico" e
@@ -93,7 +100,7 @@ func radical(palavra string) string {
 // NomeDaMateria é o nome como se escreve: sem espaço a mais e com as letras
 // que o HTML da página da banca deixou escapar ("Governan&ccedil;a de TI").
 func NomeDaMateria(nome string) string {
-	return strings.Join(strings.Fields(html.UnescapeString(nome)), " ")
+	return strings.Join(strings.Fields(norm.NFC.String(html.UnescapeString(nome))), " ")
 }
 
 // Avulsas prepara as questões para o treino por matéria: descarta as que não
@@ -143,7 +150,7 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 			continue
 		}
 		q.Disciplina = nome[k]
-		q.Assunto = strings.Join(strings.Fields(q.Assunto), " ")
+		q.Assunto = NomeDaMateria(q.Assunto)
 		q.Grupo = GrupoDaMateria(q.Disciplina)
 		out = append(out, q)
 	}

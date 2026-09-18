@@ -70,7 +70,7 @@ func TestAvulsas_MesmaMateriaEscritaDeOutroJeito(t *testing.T) {
 	t.Parallel()
 
 	juntas := [][]string{
-		{"Matemática e Raciocínio Lógico", "Raciocínio Lógico-Matemático", "Raciocínio lógico matemático"},
+		{"Matemática e Raciocínio Lógico", "Raciocínio Lógico-Matemático", "Raciocínio lógico matemático", "Raciocínio Lógico", "Racioci\u0301nio Lo\u0301gico"},
 		{"Direito Administrativo", "Noções de Direito Administrativo", "Noções de Direitos Administrativos"},
 		{"Direitos das Pessoas com Deficiência", "Noções sobre Direitos das Pessoas com Deficiência"},
 		{"Segurança da Informação", "Seguran&ccedil;a da Informa&ccedil&atilde;o", "Seguranca da Informacao"},
@@ -91,6 +91,8 @@ func TestAvulsas_MesmaMateriaEscritaDeOutroJeito(t *testing.T) {
 		{"Desenvolvimento de Software", "Desenvolvimento de Sistemas"},
 		{"Legislação", "Legislação Institucional"},
 		{"Segurança da Informação", "Segurança do Trabalho"},
+		{"Matemática", "Raciocínio Lógico"},
+		{"Lógica de Programação", "Raciocínio Lógico"},
 		{"Administração Pública", "Administração Financeira e Orçamentária"},
 	}
 	for _, par := range separadas {

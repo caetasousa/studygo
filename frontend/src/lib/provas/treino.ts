@@ -34,7 +34,7 @@ export function chaveDoAssunto(materia: string, assunto: string): string {
 /** O nome do assunto, sem a matéria. */
 export function nomeDoAssunto(chave: string): string {
 	const i = chave.indexOf(SEPARADOR);
-	return i < 0 ? chave : chave.slice(i + SEPARADOR.length);
+	return (i < 0 ? chave : chave.slice(i + SEPARADOR.length)) || 'Sem assunto classificado';
 }
 
 function doAssunto(chave: string, materia: string): boolean {
@@ -145,7 +145,7 @@ export function opcoesDoTreino(
 		.sort((a, b) => a.localeCompare(b, 'pt-BR'))
 		.map((materia) => {
 			const deAssunto = (lista: QuestaoAvulsa[]) =>
-				lista.filter((q) => q.disciplina === materia && q.assunto).map((q) => q.assunto);
+				lista.filter((q) => q.disciplina === materia).map((q) => q.assunto);
 			const contagem = contar(deAssunto(qs), deAssunto(semAssunto));
 			return { materia, assuntos: [...contagem].sort(([a], [b]) => a.localeCompare(b, 'pt-BR')) };
 		})
