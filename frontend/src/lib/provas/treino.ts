@@ -92,16 +92,22 @@ export function filtrarTreino(
 	);
 }
 
-/** Os grupos de matéria, na ordem da tela. O que o servidor não souber agrupar fica nas específicas. */
+/**
+ * Os grupos de matéria, na ordem da tela, com o que cada um é numa linha. O
+ * que o servidor não souber agrupar fica nas específicas.
+ */
 export const GRUPOS = [
-	['basicas', 'Básicas'],
-	['legislacao', 'Legislação'],
-	['especificas', 'Específicas de TI']
+	['basicas', 'Básicas', 'Português, matemática e informática'],
+	['legislacao', 'Legislação e administração pública', 'Cai em concurso de qualquer órgão'],
+	['orgao', 'Do órgão', 'Regimento, ética e leis do estado: só deste concurso'],
+	['especificas', 'Específicas de TI', 'Inclui as leis e normas de TI']
 ] as const;
 
 export interface GrupoDeMaterias {
 	grupo: string;
 	rotulo: string;
+	/** O que o grupo junta, numa linha, para o cartão dele. */
+	explicacao: string;
 	/** As matérias do grupo, em ordem alfabética, com a contagem. */
 	materias: [string, number][];
 }
@@ -159,9 +165,10 @@ export function opcoesDoTreino(
 	const emOrdem = [...materias].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
 	const grupoDe = new Map(qs.map((q) => [q.disciplina, q.grupo]));
 	const conhecido = (g: string | undefined) => GRUPOS.some(([id]) => id === g);
-	const grupos = GRUPOS.map(([grupo, rotulo]) => ({
+	const grupos = GRUPOS.map(([grupo, rotulo, explicacao]) => ({
 		grupo,
 		rotulo,
+		explicacao,
 		materias: emOrdem.filter(([m]) => {
 			const g = grupoDe.get(m);
 			return conhecido(g) ? g === grupo : grupo === 'especificas';

@@ -1,8 +1,10 @@
 package prova
 
 import (
+	"html"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // QuestaoAvulsa é uma questão do catálogo vista fora da prova dela: o bastante
@@ -32,11 +34,66 @@ type FiltroDeAvulsas struct {
 	Ano      int
 }
 
-// chaveDaMateria é o que faz duas grafias serem a mesma matéria: a extração
-// e o curador escrevem "Noções Sobre Direitos…" numa prova e "Noções sobre
-// Direitos…" noutra, e quem filtra procura uma matéria só.
+// As palavras que não distinguem uma matéria de outra: cada banca põe as suas
+// ("Noções de Direito Administrativo" é Direito Administrativo).
+var palavrasVazias = map[string]bool{
+	"a": true, "as": true, "o": true, "os": true, "e": true, "de": true, "da": true,
+	"do": true, "das": true, "dos": true, "em": true, "no": true, "na": true,
+	"sobre": true, "nocao": true, "nocoes": true, "conhecimento": true,
+	"conhecimentos": true, "geral": true, "gerais": true, "basico": true,
+	"basicos": true, "aplicado": true, "aplicada": true,
+}
+
+// chaveDaMateria é o que faz duas grafias serem a mesma matéria. A extração e
+// o curador escrevem "Noções Sobre Direitos…" numa prova, "Direitos…" noutra e
+// "Seguran&ccedil;a da Informa&ccedil&atilde;o" numa terceira; "Matemática e
+// Raciocínio Lógico" e "Raciocínio Lógico-Matemático" são a mesma matéria com
+// as palavras noutra ordem. A chave é o conjunto das palavras que importam,
+// sem acento, sem plural e sem o fim que muda com o gênero.
 func chaveDaMateria(nome string) string {
-	return strings.ToLower(strings.Join(strings.Fields(nome), " "))
+	palavras := []string{}
+	for _, palavra := range strings.FieldsFunc(
+		semAcento.Replace(strings.ToLower(NomeDaMateria(nome))),
+		func(c rune) bool { return !unicode.IsLetter(c) && !unicode.IsDigit(c) },
+	) {
+		if palavrasVazias[palavra] {
+			continue
+		}
+		palavras = append(palavras, radical(palavra))
+	}
+	slices.Sort(palavras)
+
+	return strings.Join(slices.Compact(palavras), " ")
+}
+
+// radical tira o plural e a vogal final, que muda com o gênero: "lógico" e
+// "lógica", "sistemas operacionais" e "sistema operacional", "informações" e
+// "informação" são a mesma palavra para achar a matéria.
+func radical(palavra string) string {
+	r := palavra
+	switch {
+	case strings.HasSuffix(r, "ais"): // operacionais → operacional
+		r = strings.TrimSuffix(r, "ais") + "al"
+	case strings.HasSuffix(r, "eis"):
+		r = strings.TrimSuffix(r, "eis") + "el"
+	case strings.HasSuffix(r, "ois"):
+		r = strings.TrimSuffix(r, "ois") + "ol"
+	case strings.HasSuffix(r, "oes"), strings.HasSuffix(r, "aes"):
+		r = r[:len(r)-3] + "ao" // informações → informação
+	case strings.HasSuffix(r, "s"):
+		r = strings.TrimSuffix(r, "s")
+	}
+	if len(r) > 3 && strings.ContainsRune("aeo", rune(r[len(r)-1])) {
+		r = r[:len(r)-1]
+	}
+
+	return r
+}
+
+// NomeDaMateria é o nome como se escreve: sem espaço a mais e com as letras
+// que o HTML da página da banca deixou escapar ("Governan&ccedil;a de TI").
+func NomeDaMateria(nome string) string {
+	return strings.Join(strings.Fields(html.UnescapeString(nome)), " ")
 }
 
 // Avulsas prepara as questões para o treino por matéria: descarta as que não
@@ -55,7 +112,7 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 		if usos[k] == nil {
 			usos[k] = map[string]int{}
 		}
-		usos[k][strings.Join(strings.Fields(q.Disciplina), " ")]++
+		usos[k][NomeDaMateria(q.Disciplina)]++
 	}
 
 	nome := make(map[string]string, len(usos))
@@ -94,10 +151,13 @@ func Avulsas(qs []QuestaoAvulsa, f FiltroDeAvulsas) []QuestaoAvulsa {
 	return out
 }
 
-// Os grupos de matéria do treino, na ordem em que aparecem.
+// Os grupos de matéria do treino, na ordem em que aparecem. A separação é
+// prática, não acadêmica: o que serve para qualquer concurso, o que só serve
+// para aquele órgão e o que é do cargo de TI.
 const (
 	GrupoBasicas     = "basicas"
 	GrupoLegislacao  = "legislacao"
+	GrupoOrgao       = "orgao"
 	GrupoEspecificas = "especificas"
 )
 
@@ -114,18 +174,32 @@ var (
 		"portugues", "lingua", "redacao", "matematica", "raciocinio",
 		"nocoes de informatica", "informatica basica", "office", "word", "excel", "planilha",
 	}
-	// Lei, regimento e norma de conduta — "Noções de Direito Administrativo",
-	// "Direitos das Pessoas com Deficiência", "Administração Pública",
-	// "Sustentabilidade" (as resoluções do CNJ), "Legislação Aplicada à TI".
+	// Só vale para aquele concurso: o regimento do tribunal, o estatuto dos
+	// servidores do estado, o código de ética da casa, as resoluções do CNJ e
+	// do CSJT, e o que a banca cobra sobre o estado.
+	doOrgao = []string{
+		"regimento", "etica", "estatuto", "institucional", "organizacao judiciaria",
+		"resolu", "lei organica", "estadual", "do estado", "geografia e historia",
+	}
+	// Lei e administração pública que caem em concurso de qualquer órgão.
 	legislacao = []string{
-		"legisla", "direito", "regimento", "estatuto", "etica", "constitui",
-		"administracao publica", "sustentabilidade",
+		"legisla", "direito", "constitui", "administracao publica", "administracao financeira",
+		"orcament", "auditoria", "controle interno", "regulacao", "sustentabilidade",
+		"direitos humanos", "deficiencia",
+	}
+	// A lei que é do cargo de TI, e não do concurso: LGPD, Marco Civil,
+	// contratações de TIC. Vem antes das outras, por citar "legislação" —
+	// "Legislação Aplicada à TI" é matéria de específicas.
+	deTI = []string{
+		" ti", " tic", "tecnologia da informacao", "lgpd", "marco civil",
+		"dados pessoais", "governo digital",
 	}
 )
 
 // GrupoDaMateria diz em que grupo a matéria entra no treino. A matéria da
 // questão é texto livre — da extração ou do curador —, então o grupo sai do
-// nome: o que não é básica nem legislação é específica de TI.
+// nome: o que não é básica, nem do órgão, nem legislação geral é específica
+// de TI.
 func GrupoDaMateria(nome string) string {
 	n := semAcento.Replace(strings.ToLower(nome))
 	contem := func(partes []string) bool {
@@ -134,6 +208,10 @@ func GrupoDaMateria(nome string) string {
 	switch {
 	case contem(basicas):
 		return GrupoBasicas
+	case contem(deTI):
+		return GrupoEspecificas
+	case contem(doOrgao):
+		return GrupoOrgao
 	case contem(legislacao):
 		return GrupoLegislacao
 	default:

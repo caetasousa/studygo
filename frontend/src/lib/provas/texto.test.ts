@@ -14,6 +14,14 @@ describe('separador', () => {
 		expect(separador('em outra VLAN.', 'Os itens I, II e III são')).toBe('\n');
 	});
 
+	// O título do texto de apoio não termina em ponto, mas é linha própria.
+	it('título em negrito não fica colado no texto', () => {
+		expect(separador('Uma vela para Dario', 'Dario vem apressado', true)).toBe('\n');
+		// Destaque no meio da frase continua na mesma linha.
+		expect(separador('não lhes sobra', 'tempo para examinar', true)).toBe('');
+		expect(separador('o termo', 'Sublinhado', false)).toBe('');
+	});
+
 	it('quebra ou espaço já presentes não dobram', () => {
 		expect(separador('.\n', 'Em relação')).toBe('');
 		expect(separador('.', '\nEm relação')).toBe('');

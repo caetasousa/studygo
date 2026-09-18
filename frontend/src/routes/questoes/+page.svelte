@@ -126,6 +126,10 @@
 	// --- por matéria --------------------------------------------------------
 
 	const opcoes = $derived(opcoesDoTreino(avulsas, filtro, respostas));
+	// Qual grupo está aberto na lista de matérias: "todos" mostra a lista inteira.
+	let grupoAberto = $state('todos');
+	const grupoDaVez = $derived(opcoes.grupos.find((g) => g.grupo === grupoAberto));
+	const materiasDaVez = $derived(grupoDaVez ? grupoDaVez.materias : opcoes.materias);
 	const escolhidas = $derived(filtrarTreino(avulsas, filtro, respostas));
 	const deQuantasProvas = $derived(new Set(escolhidas.map((q) => q.provaId)).size);
 
@@ -444,36 +448,57 @@
 		<div class="propriedades">
 			<div class="propriedade">
 				<span class="rotulo"><NavIcon name="conteudo" size="sm" /> Matérias</span>
-				<div class="valor grupos" class:escolhendo={filtro.materias.length > 0}>
-					{#each opcoes.grupos as g (g.grupo)}
-						{@const inteiro = g.materias.every(([m]) => filtro.materias.includes(m))}
-						<div class="grupo-materias">
-							<span class="linha-grupo">
-								<button
-									type="button"
-									class="de-grupo"
-									aria-pressed={inteiro}
-									title={inteiro ? `Desmarcar as matérias de ${g.rotulo}` : `Marcar todas as matérias de ${g.rotulo}`}
-									onclick={() => alternarGrupo(g)}
-								>
-									{#if inteiro}<span class="check" aria-hidden="true">✓</span>{/if}{g.rotulo}
-								</button>
-							</span>
-							{#each g.materias as [m, n] (m)}
-								{@const marcada = filtro.materias.includes(m)}
-								<button
-									type="button"
-									class="etiqueta"
-									style={tagStyle(corDaMateria(m))}
-									aria-pressed={marcada}
-									onclick={() => alternarMateria(m)}
-								>
-									{#if marcada}<span class="check" aria-hidden="true">✓</span>{/if}{m}
+				<div class="valor materias">
+					<!-- Primeiro o grupo, depois as matérias dele: uma decisão por vez. -->
+					<div class="abas-grupo" role="tablist" aria-label="Grupos de matéria">
+						<button
+							type="button"
+							role="tab"
+							aria-selected={grupoAberto === 'todos'}
+							onclick={() => (grupoAberto = 'todos')}
+						>
+							Todas <span class="n">{opcoes.materias.reduce((t, [, n]) => t + n, 0)}</span>
+						</button>
+						{#each opcoes.grupos as g (g.grupo)}
+							{@const soma = g.materias.reduce((t, [, n]) => t + n, 0)}
+							{@const escolhidas = g.materias.filter(([m]) => filtro.materias.includes(m)).length}
+							<button
+								type="button"
+								role="tab"
+								aria-selected={grupoAberto === g.grupo}
+								onclick={() => (grupoAberto = g.grupo)}
+							>
+								{g.rotulo}
+								<span class="n">{soma}</span>
+								{#if escolhidas > 0}<span class="marcadas">{escolhidas} ✓</span>{/if}
+							</button>
+						{/each}
+					</div>
+					{#if grupoDaVez}
+						<p class="explicacao">
+							{grupoDaVez.explicacao}
+							<button type="button" class="ir" onclick={() => alternarGrupo(grupoDaVez!)}>
+								{grupoDaVez.materias.every(([m]) => filtro.materias.includes(m))
+									? 'Desmarcar todas'
+									: 'Marcar todas'}
+							</button>
+						</p>
+					{/if}
+					<ul class="lista-materias">
+						{#each materiasDaVez as [m, n] (m)}
+							{@const marcada = filtro.materias.includes(m)}
+							<li>
+								<button type="button" aria-pressed={marcada} onclick={() => alternarMateria(m)}>
+									<span class="caixa" aria-hidden="true">{marcada ? '✓' : ''}</span>
+									<span class="cor" aria-hidden="true" style={tagStyle(corDaMateria(m))}></span>
+									<span class="nome">{m}</span>
 									<span class="n">{n}</span>
 								</button>
-							{/each}
-						</div>
-					{/each}
+							</li>
+						{:else}
+							<li class="dim">Nenhuma matéria neste grupo.</li>
+						{/each}
+					</ul>
 					{#if filtro.materias.length}
 						<button
 							type="button"
@@ -481,13 +506,23 @@
 							onclick={() => {
 								filtro.materias = [];
 								filtro.assuntos = [];
-							}}>Limpar</button
+							}}>Limpar as {filtro.materias.length} escolhidas</button
 						>
 					{/if}
 				</div>
 			</div>
 
-			<!-- Os assuntos aparecem com a matéria escolhida: sem ela, seriam centenas. -->
+			<!-- Os assuntos aparecem com a matéria escolhida: sem ela, seriam centenas.
+			     Sem assunto classificado, a linha diz isso em vez de sumir. -->
+			{#if filtro.materias.length > 0 && opcoes.assuntos.length === 0}
+				<div class="propriedade">
+					<span class="rotulo"><NavIcon name="questoes" size="sm" /> Assuntos</span>
+					<p class="explicacao sem-assunto">
+						{filtro.materias.length === 1 ? 'Esta matéria ainda não tem' : 'Estas matérias ainda não têm'} assuntos
+						classificados; o treino leva a matéria inteira.
+					</p>
+				</div>
+			{/if}
 			{#if opcoes.assuntos.length}
 				<div class="propriedade">
 					<span class="rotulo"><NavIcon name="questoes" size="sm" /> Assuntos</span>
@@ -871,38 +906,124 @@
 		min-height: 34px;
 		padding: 4px 0;
 	}
-	/* A etiqueta colorida do Notion: cada matéria com a sua cor, a mesma da prova. */
-	.etiqueta {
+	/* Escolher matéria é uma lista: caixa, cor, nome e quantas questões. */
+	.valor.materias {
+		display: grid;
+		gap: 8px;
+		width: 100%;
+	}
+	.abas-grupo {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+	.abas-grupo button {
 		display: inline-flex;
 		align-items: baseline;
 		gap: 5px;
-		max-width: 100%;
-		padding: 2px 8px;
+		padding: 5px 10px;
 		font: inherit;
 		font-size: 13.5px;
-		line-height: 1.5;
-		text-align: left;
-		border: 0;
-		border-radius: 4px;
+		color: var(--text-muted);
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 999px;
 		cursor: pointer;
-		transition: opacity 0.1s;
 	}
-	.etiqueta .n {
-		color: inherit;
-		opacity: 0.65;
+	.abas-grupo button:hover {
+		background: var(--bg-hover);
 	}
-	.etiqueta[aria-pressed='true'] {
-		box-shadow: inset 0 0 0 1.5px currentColor;
+	.abas-grupo button[aria-selected='true'] {
+		color: var(--text);
 		font-weight: 600;
+		background: var(--bg-soft);
+		border-color: var(--border);
 	}
-	.escolhendo .etiqueta:not([aria-pressed='true']) {
-		opacity: 0.5;
+	.marcadas {
+		font-size: 11.5px;
+		color: var(--accent);
 	}
-	.etiqueta:hover {
-		opacity: 1 !important;
+	.explicacao {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: baseline;
+		margin: 0;
+		font-size: 12.5px;
+		color: var(--text-faint);
 	}
-	.check {
-		font-size: 12px;
+	.lista-materias {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 2px 12px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.lista-materias button {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		width: 100%;
+		padding: 7px 8px;
+		font: inherit;
+		font-size: 14px;
+		text-align: left;
+		color: var(--text);
+		background: none;
+		border: 0;
+		border-radius: 7px;
+		cursor: pointer;
+	}
+	.lista-materias button:hover {
+		background: var(--bg-hover);
+	}
+	.lista-materias button[aria-pressed='true'] {
+		background: var(--accent-soft);
+	}
+	.caixa {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 17px;
+		height: 17px;
+		font-size: 11px;
+		color: var(--accent);
+		border: 1.5px solid var(--border-strong);
+		border-radius: 4px;
+	}
+	.lista-materias button[aria-pressed='true'] .caixa {
+		border-color: var(--accent);
+	}
+	.cor {
+		flex: none;
+		width: 9px;
+		height: 9px;
+		border-radius: 3px;
+	}
+	.nome {
+		flex: 1;
+		min-width: 0;
+	}
+	.lista-materias .n {
+		flex: none;
+		font-variant-numeric: tabular-nums;
+	}
+	.sem-assunto {
+		align-self: center;
+	}
+	/* "Marcar todas" é um link ao lado da frase do grupo, não um botão. */
+	.explicacao button {
+		padding: 0;
+		font: inherit;
+		font-size: 12.5px;
+		color: var(--accent);
+		background: none;
+		border: 0;
+		cursor: pointer;
+	}
+	.explicacao button:hover {
+		text-decoration: underline;
 	}
 	.limpar {
 		padding: 2px 6px;
@@ -938,39 +1059,29 @@
 		font-weight: 600;
 		background: var(--bg-hover);
 	}
+	/* Um cartão por grupo: o nome do grupo marca ou desmarca o grupo inteiro. */
 	.valor.grupos {
 		display: grid;
-		justify-items: start;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		align-items: start;
 		gap: 10px;
+		width: 100%;
 	}
 	.grupo-materias {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-		align-items: center;
+		align-content: start;
+		padding: 10px 12px 12px;
+		background: var(--bg-soft);
+		border: 1px solid var(--border);
+		border-radius: 10px;
 	}
-	/* O nome do grupo em cima das etiquetas; clicar marca o grupo inteiro. */
-	.linha-grupo {
+	.cabeca-grupo {
+		display: grid;
+		gap: 2px;
 		width: 100%;
-	}
-	.de-grupo {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 5px;
-		padding: 0;
-		font: inherit;
-		font-size: 12px;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		text-align: left;
-		color: var(--text-faint);
-		background: none;
-		border: 0;
-		cursor: pointer;
-	}
-	.de-grupo:hover,
-	.de-grupo[aria-pressed='true'] {
-		color: var(--text);
+		margin-bottom: 2px;
 	}
 	.valor.assuntos {
 		display: grid;

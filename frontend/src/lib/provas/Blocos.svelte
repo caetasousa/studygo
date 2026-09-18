@@ -59,7 +59,9 @@
 		<BlocoDeCodigo texto={peca.texto} linguagem={peca.linguagem} copiavel={interativo} />
 	{:else}
 		<p>
-			{#each peca.blocos as t, j (j)}{j > 0 ? separador(peca.blocos[j - 1].texto, t.texto) : ''}<span
+			{#each peca.blocos as t, j (j)}{j > 0
+					? separador(peca.blocos[j - 1].texto, t.texto, peca.blocos[j - 1].formato !== t.formato)
+					: ''}<span
 					class:negrito={t.formato === 'negrito'}
 					class:italico={t.formato === 'italico'}
 					class:sublinhado={t.formato === 'sublinhado'}

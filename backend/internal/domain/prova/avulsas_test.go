@@ -36,6 +36,74 @@ func TestAvulsas_GrafiasDaMesmaMateriaViramUmNome(t *testing.T) {
 	}
 }
 
+// A mesma matéria escrita com acento, sem acento e com o HTML da página da
+// banca é uma matéria só no treino.
+func TestAvulsas_AcentoEHtmlNaoSeparamAMateria(t *testing.T) {
+	t.Parallel()
+
+	qs := []QuestaoAvulsa{
+		{TemGabarito: true, Numero: 1, Disciplina: "Segurança da Informação"},
+		{TemGabarito: true, Numero: 2, Disciplina: "Seguran&ccedil;a da Informa&ccedil&atilde;o"},
+		{TemGabarito: true, Numero: 3, Disciplina: "Seguranca da Informacao"},
+		{TemGabarito: true, Numero: 4, Disciplina: "Governan&ccedil;a de TI"},
+	}
+
+	got := materias(Avulsas(qs, FiltroDeAvulsas{}))
+
+	quer := []string{
+		"Segurança da Informação", "Segurança da Informação", "Segurança da Informação",
+		"Governança de TI",
+	}
+	if !slices.Equal(got, quer) {
+		t.Fatalf("matérias = %q, quer %q", got, quer)
+	}
+	// E o filtro acha as três pela grafia que o aluno escolher.
+	if n := len(Avulsas(qs, FiltroDeAvulsas{Materias: []string{"Seguranca da Informacao"}})); n != 3 {
+		t.Fatalf("filtro por matéria sem acento trouxe %d", n)
+	}
+}
+
+// As mesmas palavras noutra ordem, com plural, com "Noções de" na frente ou
+// com o HTML da banca são uma matéria só — e nomes diferentes continuam
+// diferentes.
+func TestAvulsas_MesmaMateriaEscritaDeOutroJeito(t *testing.T) {
+	t.Parallel()
+
+	juntas := [][]string{
+		{"Matemática e Raciocínio Lógico", "Raciocínio Lógico-Matemático", "Raciocínio lógico matemático"},
+		{"Direito Administrativo", "Noções de Direito Administrativo", "Noções de Direitos Administrativos"},
+		{"Direitos das Pessoas com Deficiência", "Noções sobre Direitos das Pessoas com Deficiência"},
+		{"Segurança da Informação", "Seguran&ccedil;a da Informa&ccedil&atilde;o", "Seguranca da Informacao"},
+		{"Sistemas Operacionais", "Sistema operacional"},
+	}
+	for _, nomes := range juntas {
+		qs := make([]QuestaoAvulsa, 0, len(nomes))
+		for i, nome := range nomes {
+			qs = append(qs, QuestaoAvulsa{TemGabarito: true, Numero: i + 1, Disciplina: nome})
+		}
+		got := materias(Avulsas(qs, FiltroDeAvulsas{}))
+		if len(slices.Compact(slices.Clone(got))) != 1 {
+			t.Errorf("%q viraram %q, quer uma matéria só", nomes, got)
+		}
+	}
+
+	separadas := [][2]string{
+		{"Desenvolvimento de Software", "Desenvolvimento de Sistemas"},
+		{"Legislação", "Legislação Institucional"},
+		{"Segurança da Informação", "Segurança do Trabalho"},
+		{"Administração Pública", "Administração Financeira e Orçamentária"},
+	}
+	for _, par := range separadas {
+		qs := []QuestaoAvulsa{
+			{TemGabarito: true, Numero: 1, Disciplina: par[0]},
+			{TemGabarito: true, Numero: 2, Disciplina: par[1]},
+		}
+		if got := materias(Avulsas(qs, FiltroDeAvulsas{})); got[0] == got[1] {
+			t.Errorf("%q e %q viraram a mesma matéria (%q)", par[0], par[1], got[0])
+		}
+	}
+}
+
 // Sem uma grafia mais usada, o nome não pode depender da ordem das questões.
 func TestAvulsas_EmpateFicaComAPrimeiraEmOrdemAlfabetica(t *testing.T) {
 	t.Parallel()
@@ -127,23 +195,35 @@ func TestGrupoDaMateria(t *testing.T) {
 	t.Parallel()
 
 	for materia, grupo := range map[string]string{
-		"Língua Portuguesa":                          GrupoBasicas,
-		"Matemática e Raciocínio Lógico":             GrupoBasicas,
-		"Raciocínio Lógico-Matemático":               GrupoBasicas,
-		"Legislação Institucional":                   GrupoLegislacao,
-		"Legislação Aplicada à TI":                   GrupoLegislacao,
-		"Noções de Direito Administrativo":           GrupoLegislacao,
-		"Direitos das Pessoas com Deficiência":       GrupoLegislacao,
-		"Direitos Humanos":                           GrupoLegislacao,
-		"Administração Pública":                      GrupoLegislacao,
-		"Sustentabilidade":                           GrupoLegislacao,
+		"Língua Portuguesa":                       GrupoBasicas,
+		"Matemática e Raciocínio Lógico":          GrupoBasicas,
+		"Raciocínio Lógico-Matemático":            GrupoBasicas,
+		"Noções de Informática":                   GrupoBasicas,
+		"Informática Básica":                      GrupoBasicas,
+		"Pacote Office (Word e Excel)":            GrupoBasicas,
+		"Direito Administrativo":                  GrupoLegislacao,
+		"Noções de Direito Constitucional":        GrupoLegislacao,
+		"Direitos das Pessoas com Deficiência":    GrupoLegislacao,
+		"Direitos Humanos":                        GrupoLegislacao,
+		"Administração Pública":                   GrupoLegislacao,
+		"Administração Financeira e Orçamentária": GrupoLegislacao,
+		"Auditoria e Controle Interno":            GrupoLegislacao,
+		"Sustentabilidade":                        GrupoLegislacao,
+		// Só valem para o concurso daquele órgão.
+		"Regimento Interno e Organização do Órgão": GrupoOrgao,
+		"Código de Ética do Órgão":                 GrupoOrgao,
+		"Estatuto dos Servidores do Estado":        GrupoOrgao,
+		"Resoluções do CNJ e do CSJT":              GrupoOrgao,
+		"Legislação Institucional":                 GrupoOrgao,
+		"Geografia e História de Roraima":          GrupoOrgao,
+		// A lei do cargo de TI é específica, não legislação do concurso.
+		"Legislação e Normas de TI":                  GrupoEspecificas,
+		"Legislação Aplicada à TI":                   GrupoEspecificas,
+		"Proteção de Dados Pessoais (LGPD)":          GrupoEspecificas,
 		"Sistemas Operacionais, Redes e Nuvem":       GrupoEspecificas,
 		"Engenharia de Software":                     GrupoEspecificas,
 		"Inteligência Artificial e Ciência de Dados": GrupoEspecificas,
 		"Governança de TI":                           GrupoEspecificas,
-		"Noções de Informática":                      GrupoBasicas,
-		"Informática Básica":                         GrupoBasicas,
-		"Pacote Office (Word e Excel)":               GrupoBasicas,
 		"Informática":                                GrupoEspecificas,
 		"Lógica de Programação":                      GrupoEspecificas,
 	} {

@@ -61,9 +61,25 @@
 	.apoio[open] .seta {
 		transform: rotate(90deg);
 	}
-	/* O texto inteiro, sem barra de rolagem: é para ler, como no caderno. */
+	/* O texto inteiro, sem barra de rolagem: é para ler, como no caderno. A
+	   coluna estreita e a linha alta são para ler de corrido, não para caber. */
 	.corpo {
 		padding: 6px 0 4px 22px;
+		max-width: 64ch;
+		font-size: 15.5px;
+		line-height: 1.75;
+	}
+	.corpo :global(p) {
+		margin-bottom: 14px;
+		line-height: inherit;
+		text-align: justify;
+		hyphens: auto;
+	}
+	/* O título do texto: a primeira linha, em negrito, respira antes do corpo. */
+	.corpo :global(p:first-child .negrito:first-child) {
+		display: inline-block;
+		margin-bottom: 4px;
+		font-size: 1.05em;
 	}
 	.acoes {
 		display: flex;

@@ -10,10 +10,15 @@ const COMECO_DE_PARAGRAFO = /^[\p{Lu}\d("“'—–-]/u;
  * O que vai entre dois blocos de texto seguidos: quebra de linha quando o
  * anterior fecha a frase e o próximo começa outra; nada quando é a mesma frase
  * continuando, ou quando o próprio texto já traz o espaço ou a quebra.
+ *
+ * O título do texto de apoio ("Uma vela para Dario") não termina em ponto, mas
+ * é linha própria: a mudança de destaque — negrito do título para o texto
+ * normal — também quebra. Sem isso, o título saía colado no primeiro parágrafo.
  */
-export function separador(anterior: string, proximo: string): string {
+export function separador(anterior: string, proximo: string, mudouODestaque = false): string {
 	if (/\s$/.test(anterior) || /^\s/.test(proximo)) return '';
-	return FIM_DE_FRASE.test(anterior) && COMECO_DE_PARAGRAFO.test(proximo) ? '\n' : '';
+	if (!COMECO_DE_PARAGRAFO.test(proximo)) return '';
+	return FIM_DE_FRASE.test(anterior) || mudouODestaque ? '\n' : '';
 }
 
 // Markdown de código, como no Notion: crases marcam `código em linha`, e três

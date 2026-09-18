@@ -130,16 +130,18 @@ describe('opcoesDoTreino', () => {
 		expect(o.materias).toContainEqual(['Língua Portuguesa', 2]);
 	});
 
-	it('agrupa as matérias na ordem básicas, legislação e específicas', () => {
+	it('agrupa as matérias na ordem dos grupos', () => {
 		const lista = [
 			...qs,
 			{ ...avulsa('trt', 3, 'Direito Administrativo', 2025), grupo: 'legislacao' },
+			{ ...avulsa('trt', 5, 'Regimento Interno', 2025), grupo: 'orgao' },
 			{ ...avulsa('trt', 4, 'Matéria nova', 2025), grupo: '' }
 		];
 		const o = opcoesDoTreino(lista, SEM_FILTRO, respostas);
 		expect(o.grupos.map((g) => [g.rotulo, g.materias.map(([m]) => m)])).toEqual([
 			['Básicas', ['Língua Portuguesa']],
-			['Legislação', ['Direito Administrativo']],
+			['Legislação e administração pública', ['Direito Administrativo']],
+			['Do órgão', ['Regimento Interno']],
 			// Grupo que o servidor não deu cai nas específicas.
 			['Específicas de TI', ['Banco de Dados', 'Matéria nova', 'Redes']]
 		]);
