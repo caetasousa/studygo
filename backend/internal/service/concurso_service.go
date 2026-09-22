@@ -105,14 +105,6 @@ func (s *ConcursoService) Detalhe(
 	return detalheDe(c), nil
 }
 
-func (s *ConcursoService) PorSlug(
-	ctx context.Context,
-	usuarioID uuid.UUID,
-	slug string,
-) (concurso.Concurso, error) {
-	return s.doDono(ctx, usuarioID, slug)
-}
-
 // tentativasDeSlug é quantas vezes um sufixo novo é sorteado antes de desistir.
 //
 // O slug é o nome normalizado mais dois bytes aleatórios, e o UNIQUE é do banco

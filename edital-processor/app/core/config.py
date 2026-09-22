@@ -69,9 +69,6 @@ class Settings(BaseSettings):
     # model many times mostly stalls, so keep this small and move on.
     gemini_max_attempts: int = 2
 
-    # --- confidence ----------------------------------------------------------
-    min_confidence: float = 0.0
-
     # --- temporary artifacts -----------------------------------------------
     work_dir: Path = Path("/var/lib/edital-processor/work")
     artifact_ttl_seconds: int = 3600

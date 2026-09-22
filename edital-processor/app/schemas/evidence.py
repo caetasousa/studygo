@@ -1,9 +1,10 @@
 """Evidence and confidence (spec §11).
 
 Every critical fact points back to where it came from: a stable field path, the
-physical PDF page, how it was read, and a confidence the formula in
-``app.services.confidence`` computes — never a number the model reports about
-itself.
+physical PDF page, how it was read, and a confidence — never a number the
+model reports about itself. Today it is a flat 0.75 when the snippet is found
+on the page and absent otherwise (``extract_llm._evidence``); a scored formula
+was written once and never wired, so it was removed.
 """
 
 from __future__ import annotations

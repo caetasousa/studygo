@@ -540,15 +540,6 @@ export interface Caderno {
 	diasFracos: DiaFraco[];
 }
 
-export interface AnotacaoInput {
-	data?: string | null;
-	disciplina?: string | null;
-	tema?: string;
-	texto: string;
-	url?: string;
-	resolvido: boolean;
-}
-
 export interface CasamentoTEC {
 	assunto: string;
 	disciplina: string;

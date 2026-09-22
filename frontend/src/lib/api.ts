@@ -1,6 +1,5 @@
 import { auth } from '$lib/stores/auth.svelte';
 import type {
-	AnotacaoInput,
 	Caderno,
 	AnaliseResposta,
 	ConcursoDetalhe,
@@ -275,18 +274,6 @@ export const api = {
 	estatisticas: (slug: string) => request<Estatisticas>(`${planoBase(slug)}/estatisticas`),
 
 	caderno: (slug: string) => request<Caderno>(`${planoBase(slug)}/caderno`),
-
-	criarAnotacao: (slug: string, input: AnotacaoInput) =>
-		request<Caderno>(`${planoBase(slug)}/anotacoes`, { method: 'POST', body: JSON.stringify(input) }),
-
-	atualizarAnotacao: (slug: string, id: string, input: AnotacaoInput) =>
-		request<Caderno>(`${planoBase(slug)}/anotacoes/${id}`, {
-			method: 'PATCH',
-			body: JSON.stringify(input)
-		}),
-
-	removerAnotacao: (slug: string, id: string) =>
-		request<Caderno>(`${planoBase(slug)}/anotacoes/${id}`, { method: 'DELETE' }),
 
 	dossie: (slug: string, disciplina: string) =>
 		request<Dossie>(`${planoBase(slug)}/dossie?disciplina=${encodeURIComponent(disciplina)}`),

@@ -26,7 +26,7 @@ nothing until the user confirms.
 | Gemini adapter (§3, §16) | ✅ model fallback chain, retry/backoff, timeout, structured output (Gemini schema dialect), typed errors; ported from the Go adapter |
 | LLM extraction steps | ✅ `analisar` (banca + cargos), `estrutura`, `conteudo`; maps raw JSON → §8 schema; **never invents question counts** |
 | Evidence (§11) | ✅ JSON Pointer field, physical page, snippet, method, confidence set only when the snippet is found on the page |
-| Confidence (§11) | ✅ computed from source quality + snippet validity + rule agreement + arithmetic + page conflict — never model-reported |
+| Confidence (§11) | ⚠️ flat 0.75 when the snippet is found on its page, absent otherwise — never model-reported. The scored formula (source quality, rule agreement, arithmetic, page conflict) was never wired and was removed |
 | Cross-validation (§12) | ✅ duplicate cargo codes, missing date/disciplines, questions-not-broken-down (blocker), sum mismatch, unmappable group (blocker), weight scope, invalid evidence page, ISO dates |
 | Temporary artifacts (§5) | ✅ UUID, `ownerRef` binding, TTL, atomic write, no client paths, sweep |
 | Typed errors (§6) | ✅ full set, stable codes, `transient` flag, request-id |

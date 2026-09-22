@@ -3,7 +3,6 @@ import { api } from '$lib/api';
 import { concursoStore } from '$lib/stores/concurso.svelte';
 import { chave, esquecerPorPrefixo, lerMigrando } from '$lib/storageKey';
 import type {
-	AnotacaoInput,
 	Atividade,
 	Caderno,
 	ConfigInput,
@@ -290,10 +289,6 @@ class PlanoStore {
 
 	estatisticas = (): Promise<Estatisticas> => api.estatisticas(this.slug);
 	caderno = (): Promise<Caderno> => api.caderno(this.slug);
-	criarAnotacao = (input: AnotacaoInput): Promise<Caderno> => api.criarAnotacao(this.slug, input);
-	atualizarAnotacao = (id: string, input: AnotacaoInput): Promise<Caderno> =>
-		api.atualizarAnotacao(this.slug, id, input);
-	removerAnotacao = (id: string): Promise<Caderno> => api.removerAnotacao(this.slug, id);
 	dossie = (disciplina: string) => api.dossie(this.slug, disciplina);
 	exportarCsv = (): Promise<string> => api.exportarCsv(this.slug);
 
