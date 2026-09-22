@@ -382,6 +382,18 @@
 					{banca ? `Banca: ${banca}. ` : ''}Um edital costuma ter vários cargos — o plano é montado só
 					para o que você escolher.
 				</p>
+				{#if cargos.length === 0}
+					<!-- A leitura voltou sem cargo nenhum: sem a IA, ou num texto em que ela
+					     não achou a lista de cargos. Parar numa lista vazia e muda deixava o
+					     usuário sem saber o que fazer; o cadastro manual resolve os dois. -->
+					<div class="callout warn" style="margin-bottom:12px">
+						<span class="em"><NavIcon name="alerta" /></span>
+						<div>
+							Não encontrei nenhum cargo neste edital. Confira se o texto colado inclui a
+							lista de cargos, ou cadastre o concurso manualmente.
+						</div>
+					</div>
+				{/if}
 				{#each cargos as c (c.codigo + c.nome)}
 					<label class="cargo-opt" class:sel={cargoSel === c.nome}>
 						<input type="radio" name="cargo" value={c.nome} bind:group={cargoSel} />
@@ -397,9 +409,13 @@
 				{/each}
 				<div style="display:flex;gap:10px;margin-top:16px">
 					<button class="btn" onclick={() => (etapa = 'edital')}>← voltar</button>
-					<button class="btn primary" disabled={!cargoSel} onclick={buscarEstrutura}>
-						Continuar →
-					</button>
+					{#if cargos.length === 0}
+						<button class="btn primary" onclick={() => (etapa = 'manual')}>Cadastrar manualmente</button>
+					{:else}
+						<button class="btn primary" disabled={!cargoSel} onclick={buscarEstrutura}>
+							Continuar →
+						</button>
+					{/if}
 				</div>
 			</div>
 		</div>
