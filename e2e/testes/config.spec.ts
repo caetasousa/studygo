@@ -166,4 +166,73 @@ test.describe('configurações e dados', () => {
 			await expect(dossie).toContainText(trecho);
 		}
 	});
+
+	test('[D7] compactar fecha o vão e mantém a ordem manual', async ({ page, api }) => {
+		const slug = await api.concurso('Compactar E2E');
+		const porDia = async () => {
+			const plano = await api.plano(slug);
+			const futuros = plano.dias.slice(plano.hojeIndex + 1, plano.hojeIndex + 3);
+			const movidas = plano.dias.flatMap((d: { itens: { movida: boolean }[] }) => d.itens).filter((i: { movida: boolean }) => i.movida);
+			return { amanha: futuros[0].itens.length, depois: futuros[1].itens.length, movidas: movidas.length };
+		};
+
+		// Descer a última matéria de amanhã para o dia seguinte abre um vão amanhã.
+		await page.goto('/cronograma');
+		await expect(page.getByRole('heading', { name: 'Semana 01' })).toBeVisible();
+		const amanha = page
+			.locator('main')
+			.getByRole('list')
+			.filter({ has: page.getByRole('button', { name: /^Registrar estudo de / }) })
+			.nth(1);
+		const ultima = (await materiasDoDia(page, amanha)).at(-1)!;
+		await amanha.getByRole('button', { name: `Descer ${ultima} uma posição` }).click();
+		await expect.poll(porDia).toEqual({ amanha: 1, depois: 3, movidas: 1 });
+
+		await abrirConfig(page);
+		await page.getByRole('button', { name: '⇡ Compactar o cronograma' }).click();
+		await expect.poll(porDia).toEqual({ amanha: 2, depois: 2, movidas: 1 });
+		await expect(page.getByText('Nenhuma troca manual ainda.')).toBeHidden();
+	});
+
+	test('[D8] reorganizar a partir de hoje refaz o que vem depois e guarda o estudado', async ({ page, api }) => {
+		const slug = await api.concurso('Reorganizar E2E');
+		await abrirHoje(page);
+		const [estudada] = await materiasDoDia(page);
+		await registrar(page, estudada, { minutos: 60, questoes: 10, acertos: 7, concluir: true });
+
+		await page.goto('/cronograma');
+		await expect(page.getByRole('heading', { name: 'Semana 01' })).toBeVisible();
+		const amanha = page
+			.locator('main')
+			.getByRole('list')
+			.filter({ has: page.getByRole('button', { name: /^Registrar estudo de / }) })
+			.nth(1);
+		const [a] = await materiasDoDia(page, amanha);
+		await amanha.getByRole('button', { name: `Descer ${a} uma posição` }).click();
+		// Descer a primeira é uma troca: as duas matérias ficam marcadas.
+		const movidas = async () =>
+			(await api.plano(slug)).dias.flatMap((d: { itens: { movida: boolean }[] }) => d.itens).filter((i: { movida: boolean }) => i.movida).length;
+		await expect.poll(movidas).toBeGreaterThan(0);
+		const trocadas = await movidas();
+		const antes = await api.plano(slug);
+
+		await abrirConfig(page);
+		await expect(page.getByLabel('Reorganizar a partir de')).toHaveValue(antes.dias[antes.hojeIndex].data);
+		await page.getByRole('button', { name: '⇅ Reorganizar dali em diante' }).click();
+		const confirmacao = page.getByRole('alertdialog', { name: 'Refazer o cronograma?' });
+		await confirmacao.getByRole('button', { name: 'Cancelar' }).click();
+		expect(await movidas(), 'cancelar reorganizou mesmo assim').toBe(trocadas);
+
+		await page.getByRole('button', { name: '⇅ Reorganizar dali em diante' }).click();
+		await confirmacao.getByRole('button', { name: 'Reorganizar' }).click();
+		await expect(page.getByText('Nenhuma troca manual ainda.')).toBeVisible();
+
+		const depois = await api.plano(slug);
+		expect(await movidas(), 'a troca manual sobreviveu à reorganização').toBe(0);
+		expect(depois.props.horasTotal, 'reorganizar mexeu no que já foi estudado').toBe(antes.props.horasTotal);
+		const hoje = depois.dias[depois.hojeIndex].itens.map((i: { disciplina: string; concluido: boolean }) => [i.disciplina, i.concluido]);
+		const codigo = antes.dias[antes.hojeIndex].itens.find((i: { concluido: boolean }) => i.concluido).disciplina;
+		expect(hoje, 'a matéria estudada hoje saiu do lugar').toContainEqual([codigo, true]);
+		expect(depois.dias[depois.hojeIndex + 1].itens).toHaveLength(2);
+	});
 });

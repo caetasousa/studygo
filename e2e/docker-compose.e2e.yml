@@ -1,0 +1,10 @@
+# Por cima do docker-compose.yml da raiz, só no stack de E2E.
+#
+# Troca o edital-processor pelo dublê de e2e/duble-processador: o assistente do
+# edital fica testável de ponta a ponta sem Gemini. Todo o resto são as imagens
+# de produção.
+services:
+  edital-processor:
+    build: ./e2e/duble-processador
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]

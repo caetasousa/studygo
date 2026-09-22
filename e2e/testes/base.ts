@@ -116,6 +116,13 @@ export class Api {
 	plano(slug: string) {
 		return this.chamar('GET', `/api/concursos/${slug}/plano`);
 	}
+
+	/** O concurso como foi gravado: dados.disciplinas traz questões e temas. */
+	async unicoConcurso() {
+		const { concursos } = await this.chamar('GET', '/api/concursos');
+		expect(concursos).toHaveLength(1);
+		return this.chamar('GET', `/api/concursos/${concursos[0].slug}`);
+	}
 }
 
 export const test = base.extend<{ conta: Conta; api: Api }>({

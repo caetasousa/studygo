@@ -177,4 +177,36 @@ test.describe('estudo do dia', () => {
 		const indice = await nomes.evaluateAll((els, nome) => els.findIndex((e) => (e as HTMLInputElement).value === nome), a);
 		await expect(page.getByLabel('Caderno de erros — link').nth(indice)).toHaveValue(url);
 	});
+
+	test('[C11] a revisão do dia abre com o que há para revisar e fica gravada', async ({ page, api }) => {
+		await api.concurso('Revisão E2E', [
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] },
+			{ nome: 'Direito Constitucional', bloco: 'esp', questoes: 15, temas: ['Direitos fundamentais', 'Controle de constitucionalidade'] }
+		]);
+		await abrirHoje(page);
+		for (const m of await materiasDoDia(page)) await registrar(page, m, { minutos: 60, questoes: 10, acertos: 5, concluir: true });
+
+		await abrirCronograma(page);
+		const botao = page.getByRole('button', { name: /^Registrar revisão de / }).first();
+		const materia = (await botao.getAttribute('aria-label'))!.replace('Registrar revisão de ', '');
+		await botao.click();
+
+		// A revisão puxa o que foi mal: o assunto estudado hoje com 50%.
+		const dialogo = page.getByRole('dialog', { name: `Registrar revisão — ${materia}` });
+		await expect(dialogo.getByRole('heading', { name: 'Volte a estes assuntos, sem consultar antes' })).toBeVisible();
+		await expect(dialogo.getByRole('listitem').first()).toContainText('50%');
+
+		const nota = 'Revisei e ainda confundo os conceitos';
+		await dialogo.getByLabel('O que ainda precisa de atenção').fill(nota);
+		await dialogo.getByLabel('Questões').fill('8');
+		await dialogo.getByLabel('Acertos').fill('6');
+		await dialogo.getByRole('button', { name: 'Salvar' }).click();
+		await expect(dialogo).toBeHidden();
+
+		await page.reload();
+		await page.getByRole('button', { name: `Registrar revisão de ${materia}` }).first().click();
+		await expect(dialogo.getByLabel('O que ainda precisa de atenção')).toHaveValue(nota);
+		await expect(dialogo.getByLabel('Questões')).toHaveValue('8');
+		await expect(dialogo.getByLabel('Acertos')).toHaveValue('6');
+	});
 });

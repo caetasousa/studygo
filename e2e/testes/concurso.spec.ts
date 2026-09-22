@@ -181,12 +181,11 @@ test.describe('concurso', () => {
 		await expect(page.locator('main').getByText('Excluir E2E')).toBeHidden();
 	});
 
-	test('[B9] sem a IA, a análise do edital avisa e o cadastro manual continua', async ({ page, conta }) => {
+	test('[B9] a análise do edital sem cargo avisa e oferece o cadastro manual', async ({ page, conta }) => {
 		void conta;
 		await page.goto('/concursos/novo');
-		await page.getByLabel('…ou cole o texto do edital').fill(
-			'TRIBUNAL REGIONAL. EDITAL 01/2026. Cargo A01 Analista Judiciário. Língua Portuguesa 20 questões.'
-		);
+		// O dublê do processador devolve zero cargos para este texto.
+		await page.getByLabel('…ou cole o texto do edital').fill('TRIBUNAL REGIONAL. EDITAL 01/2026, sem a lista de cargos.');
 		await page.getByRole('button', { name: 'Analisar edital →' }).click();
 
 		// Sem a IA (ou quando ela não acha cargo nenhum no texto), a análise volta
@@ -196,5 +195,52 @@ test.describe('concurso', () => {
 		await expect(main.getByText(/nenhum cargo|não (encontr|ach)/i).first()).toBeVisible({ timeout: 30_000 });
 		await main.getByRole('button', { name: 'Cadastrar manualmente' }).click();
 		await expect(page.getByLabel('Nome *')).toBeVisible();
+	});
+
+	test('[B10] o assistente do edital leva ao plano o que a leitura trouxe', async ({ page, api }) => {
+		await page.goto('/concursos/novo');
+		await page.getByLabel('…ou cole o texto do edital').fill('TRIBUNAL REGIONAL DO TRABALHO. EDITAL 01/2026. Cargos A01 e B02.');
+		await page.getByRole('button', { name: 'Analisar edital →' }).click();
+
+		// O segundo cargo, de propósito: a estrutura do dublê muda com o cargo, e
+		// é isso que mostra que o assistente pediu a do cargo escolhido.
+		await page.getByRole('radio', { name: /^B02 — Técnico Judiciário/ }).check();
+		await page.getByRole('button', { name: 'Continuar →' }).click();
+
+		const main = page.locator('main');
+		await expect(page.getByRole('heading', { name: 'Conhecimentos gerais' })).toBeVisible();
+		await expect(main.getByRole('textbox').nth(1)).toHaveValue('Matemática');
+		await expect(main.getByText('Soma informada: 40 / 40 do grupo')).toBeVisible();
+		await page.getByRole('button', { name: 'Próximo: específicas →' }).click();
+
+		await expect(page.getByRole('heading', { name: 'Conhecimentos específicos do cargo' })).toBeVisible();
+		await expect(main.getByRole('textbox').first()).toHaveValue('Direito Administrativo');
+		await page.getByRole('button', { name: 'Buscar conteúdo programático →' }).click();
+
+		// A revisão chega preenchida com o que foi lido; nada aqui é digitado.
+		await expect(page.getByLabel('Nome *')).toHaveValue('TRT E2E — Técnico Judiciário');
+		await expect(page.getByLabel('Data da prova *')).toHaveValue(dataEmDias(75));
+		await expect(page.getByLabel('Tópicos — um por linha').nth(2)).toHaveValue(/Atos administrativos\s+Licitações/);
+		await page.getByRole('button', { name: 'Criar concurso' }).click();
+		await expect(page.getByRole('heading', { name: 'Hoje', level: 1 })).toBeVisible();
+
+		// O plano nasceu do que a leitura trouxe: disciplinas, tópicos e datas.
+		await page.goto('/conteudo');
+		for (const tema of ['Crase', 'Porcentagem', 'Atos administrativos', 'Gestão de documentos']) {
+			await expect(page.locator('main').getByText(tema).first()).toBeVisible();
+		}
+		await page.goto('/datas');
+		for (const marco of ['Inscrições', 'Pagamento da taxa']) {
+			await expect(page.locator('main').getByText(marco).first()).toBeVisible();
+		}
+		const { dados } = await api.unicoConcurso();
+		const gravadas = dados.disciplinas.map((d: { nome: string; bloco: string; questoes: number }) => [d.nome, d.bloco, d.questoes]);
+		expect(gravadas).toEqual([
+			['Língua Portuguesa', 'ger', 25],
+			['Matemática', 'ger', 15],
+			['Direito Administrativo', 'esp', 20],
+			['Arquivologia', 'esp', 10]
+		]);
+		expect(dados.prova).toBe(dataEmDias(75));
 	});
 });

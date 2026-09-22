@@ -33,7 +33,8 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | B6 | as datas do edital não aparecem, ou "cumprido" não fica gravado | lembrete de inscrição perdido |
 | B7 | dois concursos se misturam, ou trocar de plano não troca a tela | o registro de um aparece no outro |
 | B8 | excluir o concurso não pede confirmação, ou cancelar exclui mesmo assim | perda de dados por um clique |
-| B9 | sem a IA, a análise do edital trava ou esconde o caminho manual | usuário sem como cadastrar |
+| B9 | a análise do edital sem nenhum cargo trava ou esconde o caminho manual | usuário sem como cadastrar |
+| B10 | o assistente do edital perde pelo caminho o que foi lido — cargo, disciplinas, tópicos ou datas | o usuário revisa uma coisa e o plano nasce outra |
 
 ## C. Estudo do dia
 
@@ -49,6 +50,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C8 | o balanceamento não reflete as horas lançadas | painel de "onde estou devendo" mentindo |
 | C9 | matéria abaixo de 70% não entra no caderno de erros, ou uma boa entra | erros sem revisão, ou revisão do que já se sabe |
 | C10 | o link do caderno de erros colado no registro não vale para a matéria toda | link some no dia seguinte |
+| C11 | a revisão do dia não abre com o que há para revisar, ou o resultado dela não fica gravado | o bloco de revisão vira enfeite |
 
 ## D. Configurações e dados
 
@@ -60,6 +62,20 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | D4 | limpar registros não pede confirmação, ou não zera o progresso | perda por engano, ou botão sem efeito |
 | D5 | restaurar a ordem automática não desfaz a troca manual | ordem manual presa para sempre |
 | D6 | o dossiê do NotebookLM sai sem a ementa e as leis cadastradas | fonte inútil para colar |
+| D7 | compactar não fecha o vão deixado no cronograma, ou desfaz a ordem manual | dias vazios no meio e conteúdo espremido no fim |
+| D8 | reorganizar a partir de uma data mexe no que já foi estudado, ou não refaz o que vem depois | histórico reescrito, ou plano velho |
+
+## Fora da suíte, de propósito
+
+- **A importação de desempenho do TEC** (o CSV do TEC no caderno de erros)
+  não é coberta: decisão de 22/09/2026. O parser dele tem teste em
+  `backend/internal/domain/tec`.
+- **O Gemini de verdade.** No stack de E2E o `edital-processor` é trocado por
+  um dublê (`e2e/duble-processador/`) que devolve sempre a mesma leitura: o
+  assistente é testado inteiro, sem custo, sem rede e sem resposta diferente a
+  cada execução. Quem testa o processador de verdade — PDF, OCR e o contrato
+  com a IA — é a suíte dele (`make check-processor`), e o contrato entre os
+  dois lados tem teste no Go (`adapter/editalproc`).
 
 ## Perguntas em aberto
 
@@ -72,6 +88,12 @@ decisão de produto antes de virarem teste.
   leem a nota do DIA, que só existe nos dias sem matéria (simulado, revisão
   geral). Num dia normal, o que o estudante escreve em "Observação" fica
   gravado (C3) e não chega a nenhum dos dois.
+- **O mesmo vale para a nota da revisão do dia.** O diálogo diz "Vira uma
+  anotação no caderno de erros desta disciplina", e o backend de fato grava
+  uma anotação — mas a tela do caderno não mostra anotações desde e6d9a91
+  (01/09, de propósito: "o NotebookLM cobre o resto"), e a anotação nasce sem
+  disciplina, então também não entra no dossiê da matéria. Ela fica gravada
+  (C11) e só volta ao reabrir a revisão.
 - **Mudar os blocos por dia refaz o cronograma de amanhã em diante, mas o dia
   de hoje já estudado fica só com a matéria concluída — e ela passa a aparecer
   como um bloco do tamanho do dia inteiro.** Com uma matéria de 60 min
@@ -79,3 +101,11 @@ decisão de produto antes de virarem teste.
   180 min, e a outra matéria que estava agendada sai do dia. O estudo
   registrado continua certo (1,0 h); o que muda é o que a tela diz que o dia
   tinha. Visto em 21/09/2026 durante o D2.
+- **O mesmo tópico aparece várias vezes seguidas no mesmo dia.** Com uma
+  disciplina de um tópico só e 4 a 6 blocos por dia, 39 de 40 dias mostram,
+  por exemplo, "Crimes contra a pessoa" repetido em sequência (medido em
+  22/09/2026, pela API do stack de E2E). Era o que `plano.MesclarItensIguais`
+  (0863109) corrigia, juntando os blocos iguais; a chamada saiu na
+  materialização do cronograma (4b4fe6b) e a função ficou sem uso. Voltar a
+  juntar muda a saída do motor — protegida pelo golden test — e o modelo: hoje
+  cada bloco é uma atividade com registro próprio.
