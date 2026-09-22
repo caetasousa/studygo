@@ -5,10 +5,7 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // Config holds every value the process reads from the environment. It is loaded
@@ -35,29 +32,6 @@ type Config struct {
 	// servidor é qual publicação ele está servindo.
 	Versao string
 	Deploy string
-
-	Provas Provas
-}
-
-// Provas configura o catálogo de provas. Sem curadores, ninguém importa nem
-// publica, e o worker nem liga a fila — só a consulta funciona.
-type Provas struct {
-	// Dir é o volume durável compartilhado com o processador.
-	Dir       string
-	Curadores map[string]bool
-	// TodosCuradores faz de qualquer conta curadora (PROVAS_CURADORES=*). É
-	// atalho do ambiente local, onde recriar o banco muda o UUID das contas e
-	// esvaziaria a lista em silêncio.
-	TodosCuradores bool
-	// MaxPDF é o teto de cada arquivo. O nginx precisa aceitar o dobro, porque
-	// a importação leva prova e gabarito juntos.
-	MaxPDF       int64
-	MaxPendentes int
-	// MaxChamadas e MaxProcessamento são os tetos de custo de uma importação.
-	MaxChamadas      int
-	MaxProcessamento time.Duration
-	// ExigirConferencia faz a conferência do curador bloquear a publicação.
-	ExigirConferencia bool
 }
 
 // Argon2Params configures the argon2id password hasher. Defaults follow the
@@ -122,55 +96,7 @@ func Load() (Config, error) {
 		)
 	}
 
-	provas, err := carregarProvas(cfg.Versao)
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.Provas = provas
-
 	return cfg, nil
-}
-
-func carregarProvas(versao string) (Provas, error) {
-	p := Provas{
-		Dir:               getEnv("PROVAS_DIR", "/var/lib/provas"),
-		Curadores:         map[string]bool{},
-		MaxPDF:            int64(getEnvInt("PROVAS_MAX_UPLOAD_MIB", 25)) << 20,
-		MaxPendentes:      getEnvInt("PROVAS_MAX_PENDENTES", 2),
-		MaxChamadas:       getEnvInt("PROVAS_MAX_CHAMADAS", 180),
-		MaxProcessamento:  time.Duration(getEnvInt("PROVAS_MAX_MINUTOS", 20)) * time.Minute,
-		ExigirConferencia: getEnvBool("PROVAS_EXIGIR_CONFERENCIA", true),
-	}
-
-	// UUID inválido derruba a partida: uma lista com erro de digitação que
-	// subisse em silêncio tiraria a curadoria de alguém sem aviso.
-	for _, bruto := range strings.Split(os.Getenv("PROVAS_CURADORES"), ",") {
-		bruto = strings.TrimSpace(bruto)
-		if bruto == "" {
-			continue
-		}
-		// No ar, "*" deixaria qualquer conta aberta importar PDF, gastando
-		// Gemini, e publicar no catálogo. O deploy sempre preenche APP_VERSAO,
-		// então a partida recusa, e a pipeline para no smoke test de staging.
-		if bruto == "*" {
-			if versao != "dev" {
-				return Provas{}, fmt.Errorf("PROVAS_CURADORES=* só vale no ambiente local; no deploy, liste os UUIDs")
-			}
-			p.TodosCuradores = true
-			continue
-		}
-		id, err := uuid.Parse(bruto)
-		if err != nil {
-			return Provas{}, fmt.Errorf("PROVAS_CURADORES contém um UUID inválido: %q", bruto)
-		}
-		p.Curadores[id.String()] = true
-	}
-
-	if p.MaxPDF <= 0 || p.MaxPendentes <= 0 || p.MaxChamadas <= 0 || p.MaxProcessamento <= 0 {
-		return Provas{}, fmt.Errorf("os limites de provas (PROVAS_MAX_*) precisam ser positivos")
-	}
-
-	return p, nil
 }
 
 // tamanhoMinimoSegredo é o piso do JWT_SECRET, em caracteres.

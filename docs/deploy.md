@@ -118,9 +118,8 @@ publicar) está em [fluxo-de-trabalho.md](fluxo-de-trabalho.md).
 
 `deploy.yml` roda as migrations no boot do backend (advisory-lock, então o
 worker pode subir junto sem corrida) e é seguro repetir. Antes de subir as
-imagens, ele copia o banco e o volume de provas para `<app_dir>/backups` e
-guarda as 5 últimas cópias — a restauração está em
-[ci-cd.md](ci-cd.md#cópia-do-banco-antes-de-cada-deploy).
+imagens, ele copia o banco para `<app_dir>/backups` e guarda as 5 últimas
+cópias — a restauração está em [ci-cd.md](ci-cd.md#cópia-do-banco-antes-de-cada-deploy).
 
 ---
 
@@ -171,7 +170,7 @@ que o CSV não leva é a conta em si (cadastre de novo).
 | | Onde | Arquivo | Contém |
 |---|---|---|---|
 | 🗒️ | Inventário | `ansible/inventory/<ambiente>/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
-| 🔐 | Segredos | `ansible/inventory/<ambiente>/group_vars/app/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token`, `provas_curadores` |
+| 🔐 | Segredos | `ansible/inventory/<ambiente>/group_vars/app/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token` |
 | 📄 | Não-secreto | `ansible/inventory/<ambiente>/group_vars/app/main.yml` (versionado) | `app_domain`, portas, nome do banco |
 
 `<ambiente>` é `staging` ou `production`: cada um tem inventário e segredos
@@ -185,15 +184,6 @@ próprios, e nenhum comando escolhe um deles por omissão.
 > **Nunca** rode `ssh-keygen` sobrescrevendo `~/.ssh/annygo_deploy`. O root SSH
 > está desativado; se a chave for perdida, a recuperação é só pelo console web do
 > provedor.
-
-ℹ️ `provas_curadores` são os UUIDs das contas que importam e publicam provas,
-separados por vírgula. Vazio, a curadoria fica desligada e o catálogo só
-consulta. Fica no `secrets.yml` e não no `main.yml` porque o repositório é
-público. Para ligar, pegue o id da conta e rode o deploy de novo pela pipeline:
-
-```bash
-docker compose exec postgres psql -U annygo annygo -c "select id, email from usuarios"
-```
 
 ℹ️ O `docker-compose.yml` da raiz é só para desenvolvimento local. Em produção o
 Ansible gera o seu a partir de `ansible/templates/docker-compose.prod.yml.j2`.

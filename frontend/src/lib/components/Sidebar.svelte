@@ -9,7 +9,6 @@
 	import IconButton from './IconButton.svelte';
 	import PlanoPicker from './PlanoPicker.svelte';
 	import type { NavIconName } from './NavIcon.svelte';
-	import { esquecerRascunhosLocais } from '$lib/provas/rascunhoLocal';
 
 	let {
 		open = $bindable(false),
@@ -30,8 +29,7 @@
 			itens: [
 				{ href: '/', icon: 'hoje', label: 'Hoje' },
 				{ href: '/cronograma', icon: 'cronograma', label: 'Cronograma' },
-				{ href: '/caderno', icon: 'caderno', label: 'Caderno de erros' },
-				{ href: '/questoes', icon: 'questoes', label: 'Questões' }
+				{ href: '/caderno', icon: 'caderno', label: 'Caderno de erros' }
 			]
 		},
 		{
@@ -64,8 +62,6 @@
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
 		if (href === '/concursos') return page.url.pathname === '/concursos';
-		// A prova aberta e a curadoria moram em /provas, mas são parte de Questões.
-		if (href === '/questoes') return ['/questoes', '/provas'].some((p) => page.url.pathname.startsWith(p));
 		return page.url.pathname.startsWith(href);
 	}
 
@@ -146,7 +142,6 @@
 				onclick={() => {
 					concursoStore.limpar();
 					planoStore.limpar();
-					esquecerRascunhosLocais();
 					auth.logout();
 				}}>Sair</button
 			>

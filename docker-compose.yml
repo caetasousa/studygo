@@ -16,13 +16,8 @@ services:
       DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
-      PROVAS_CURADORES: "${PROVAS_CURADORES:-}"
-      PROVAS_EXIGIR_CONFERENCIA: "${PROVAS_EXIGIR_CONFERENCIA:-true}"
-      PROVAS_DIR: "/var/lib/provas"
       EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
       EDITAL_PROCESSOR_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
-    volumes:
-      - provas_data:/var/lib/provas
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,7 +32,6 @@ services:
       EP_GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
     volumes:
       - edital_work:/var/lib/edital-processor/work
-      - provas_data:/var/lib/provas
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
       interval: 15s
@@ -48,14 +42,9 @@ services:
   worker:
     build: ./backend
     entrypoint: ["/worker"]
-    volumes:
-      - provas_data:/var/lib/provas
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
-      PROVAS_CURADORES: "${PROVAS_CURADORES:-}"
-      EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
-      EDITAL_PROCESSOR_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
       # Sem LEMBRETE_INTERVALO o worker roda na virada do dia. Aqui ele fica
       # curto de propósito: esperar a meia-noite para ver o worker agir
       # inviabiliza o desenvolvimento.
@@ -83,6 +72,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  provas_data:
   postgres_data:
   edital_work:

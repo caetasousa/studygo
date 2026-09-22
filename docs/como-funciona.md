@@ -20,13 +20,6 @@ o sistema acompanha o progresso.
 Também dá para enviar o PDF do edital e deixar o sistema extrair as matérias
 sozinho, em vez de digitar tudo à mão.
 
-E há um catálogo de **provas anteriores**, o mesmo para todo mundo. Algumas
-contas escolhidas — os **curadores** — enviam o PDF de uma prova e o gabarito;
-o sistema lê as questões e recorta as figuras do próprio PDF; o curador confere
-tudo ao lado do original e só então publica. Na aba **Questões**, quem estuda
-resolve uma prova inteira, como no dia, ou treina uma matéria com as questões de
-todas as provas — só as que ainda não fez, ou só as que errou.
-
 ---
 
 ## As quatro peças
@@ -40,11 +33,11 @@ Pense num restaurante:
 | **frontend** | o salão | a tela que você vê e clica |
 | **backend** | a cozinha | onde as decisões acontecem |
 | **PostgreSQL** | a despensa | onde tudo fica guardado |
-| **edital-processor** | um especialista contratado | lê o PDF do edital (ou da prova) e devolve o conteúdo |
+| **edital-processor** | um especialista contratado | lê o PDF do edital e devolve as matérias |
 
 Existe ainda o **worker**: um ajudante que roda sozinho de tempos em tempos para
-enviar lembretes e para ler as provas enviadas, um pedaço por vez. Ninguém pede
-nada a ele; ele acorda, faz o trabalho e volta a dormir.
+enviar lembretes. Ninguém pede nada a ele; ele acorda, faz o trabalho e volta a
+dormir.
 
 ```
 Você → tela (frontend) → cozinha (backend) → despensa (PostgreSQL)
@@ -177,10 +170,6 @@ homologação antes de mexer no que as pessoas usam.
 | **digest** | a "impressão digital" de uma versão do sistema |
 | **rollback** | voltar para a versão anterior |
 | **migration** | uma mudança na estrutura do banco de dados |
-| **prova** | uma prova anterior publicada no catálogo, com questões e gabarito |
-| **importação** | uma prova sendo lida e revisada, antes de ir para o catálogo |
-| **curador** | conta que pode importar e publicar provas |
-| **recorte** | uma figura da prova, cortada do PDF original |
 
 ---
 

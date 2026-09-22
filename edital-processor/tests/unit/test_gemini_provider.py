@@ -17,7 +17,6 @@ from app.core.config import Settings
 from app.core.errors import (
     InvalidProviderResponse,
     ProviderRateLimited,
-    ProviderRefused,
     ProviderTimeout,
     ProviderUnavailable,
 )
@@ -184,37 +183,6 @@ async def test_timeout_moves_to_next_model_then_raises(provider: Any) -> None:
     assert tried == ["m1", "m2", "m3"]
 
 
-async def test_uma_tentativa_passa_ao_proximo_modelo_na_sobrecarga(provider: Any) -> None:
-    """As provas pedem uma tentativa só, mas um 503 volta em segundos: cair no
-    próximo modelo resolve na hora o que a fila levaria minutos repetindo."""
-
-    async def sobrecarregado(model: str, contents: str, config: Any) -> Any:
-        if model in {"m1", "m2"}:
-            raise _FakeServerError(503)
-        return types.SimpleNamespace(text="{}")
-
-    tried, gp = provider(sobrecarregado)
-    pedido = _request().model_copy(update={"single_attempt": True})
-
-    assert await gp.extract_structured(pedido) == {}
-    assert tried == ["m1", "m2", "m3"]
-
-
-async def test_uma_tentativa_para_no_primeiro_timeout(provider: Any) -> None:
-    """Com o teto longo das provas, esperar outro modelo passaria do prazo do
-    cliente Go; quem repete é a fila."""
-
-    async def lento(model: str, contents: str, config: Any) -> Any:
-        await asyncio.sleep(5)
-
-    tried, gp = provider(lento)
-    pedido = _request().model_copy(update={"single_attempt": True})
-
-    with pytest.raises(ProviderTimeout):
-        await gp.extract_structured(pedido)
-    assert tried == ["m1"]
-
-
 async def test_empty_response_is_invalid(provider: Any) -> None:
     async def empty(model: str, contents: str, config: Any) -> Any:
         return types.SimpleNamespace(text="")
@@ -222,39 +190,6 @@ async def test_empty_response_is_invalid(provider: Any) -> None:
     _, gp = provider(empty)
     with pytest.raises(InvalidProviderResponse):
         await gp.extract_structured(_request())
-
-
-async def test_empty_response_is_not_a_refusal(provider: Any) -> None:
-    """Resposta vazia sem motivo de recusa continua sendo só resposta inválida:
-    o edital não pode passar a ver um erro novo."""
-
-    async def empty(model: str, contents: str, config: Any) -> Any:
-        return types.SimpleNamespace(
-            text="", candidates=[types.SimpleNamespace(finish_reason=None)]
-        )
-
-    _, gp = provider(empty)
-    with pytest.raises(InvalidProviderResponse) as exc:
-        await gp.extract_structured(_request())
-    assert not isinstance(exc.value, ProviderRefused)
-
-
-async def test_recitation_is_a_refusal_and_is_not_retried(provider: Any) -> None:
-    """O Gemini não reproduz obra publicada, e com temperatura zero repetir dá
-    a mesma recusa. O erro tem classe própria para as provas tentarem outro
-    caminho, mas o mesmo código dos editais."""
-    recitation = types.SimpleNamespace(name="RECITATION")
-
-    async def refused(model: str, contents: str, config: Any) -> Any:
-        return types.SimpleNamespace(
-            text=None, candidates=[types.SimpleNamespace(finish_reason=recitation)]
-        )
-
-    tried, gp = provider(refused)
-    with pytest.raises(ProviderRefused) as exc:
-        await gp.extract_structured(_request())
-    assert exc.value.code == InvalidProviderResponse.code
-    assert tried == ["m1"]
 
 
 async def test_non_object_json_is_invalid(provider: Any) -> None:

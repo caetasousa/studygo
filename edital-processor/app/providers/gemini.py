@@ -19,7 +19,6 @@ from app.core.config import Settings
 from app.core.errors import (
     InvalidProviderResponse,
     ProviderRateLimited,
-    ProviderRefused,
     ProviderTimeout,
     ProviderUnavailable,
 )
@@ -27,13 +26,6 @@ from app.core.logging import get_logger
 from app.providers.base import StructuredRequest
 
 _log = get_logger("gemini")
-
-# Motivos de parada em que o modelo escolheu não responder. RECITATION é o que
-# aparece nas provas: o texto de apoio é trecho de livro, e o Gemini se recusa a
-# reproduzir obra publicada.
-_REFUSAL_REASONS = frozenset(
-    {"RECITATION", "SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY"}
-)
 
 # Prepended to every call. The JSON mode does not enforce these.
 PREAMBLE = (
@@ -73,58 +65,32 @@ class GeminiProvider:
         from google.genai.errors import APIError, ClientError, ServerError
 
         client = self._get_client()
-        contents: Any = "\n\n".join([request.system, *request.chunks])
-        if request.images:
-            contents = [
-                contents,
-                *[gt.Part.from_bytes(data=i.data, mime_type=i.mime) for i in request.images],
-            ]
+        contents = "\n\n".join([request.system, *request.chunks])
         config = gt.GenerateContentConfig(
-            system_instruction=request.instruction or PREAMBLE,
+            system_instruction=PREAMBLE,
             response_mime_type="application/json",
-            response_schema=None if request.instruction else request.response_schema,
-            response_json_schema=request.response_schema if request.instruction else None,
+            response_schema=request.response_schema,
             temperature=0.0,
         )
 
         last_error: Exception | None = None
         deadline = asyncio.get_running_loop().time() + self._settings.gemini_total_budget_seconds
-        timeout = request.timeout_seconds or self._settings.gemini_timeout_seconds
-        attempts = 1 if request.single_attempt else self._settings.gemini_max_attempts
         for model in self._models:
-            # Uma tentativa só: o timeout encerra a cadeia, porque com o teto
-            # longo das provas o próximo modelo passaria do prazo do cliente.
-            if request.single_attempt and isinstance(last_error, TimeoutError):
-                break
             if asyncio.get_running_loop().time() >= deadline:
                 _log.warning("gemini budget exhausted", extra={"stage": "llm"})
                 break
-            for attempt in range(1, attempts + 1):
+            for attempt in range(1, self._settings.gemini_max_attempts + 1):
                 try:
                     response = await asyncio.wait_for(
                         client.aio.models.generate_content(
                             model=model, contents=contents, config=config
                         ),
                         timeout=min(
-                            timeout, max(1.0, deadline - asyncio.get_running_loop().time())
+                            self._settings.gemini_timeout_seconds,
+                            max(1.0, deadline - asyncio.get_running_loop().time()),
                         ),
                     )
-                    _log.info(
-                        "gemini concluído",
-                        extra={
-                            "model": model,
-                            "usage": str(getattr(response, "usage_metadata", None)),
-                            "stage": "llm",
-                        },
-                    )
-                    self._check_refusal(response)
-                    data = self._parse(response.text)
-                    if request.instruction:
-                        usage = getattr(response, "usage_metadata", None)
-                        data["_modelo"] = model
-                        data["_entrada"] = getattr(usage, "prompt_token_count", 0) or 0
-                        data["_saida"] = getattr(usage, "candidates_token_count", 0) or 0
-                    return data
+                    return self._parse(response.text)
                 except TimeoutError as exc:
                     last_error = exc
                     _log.warning(
@@ -172,19 +138,6 @@ class GeminiProvider:
         if attempt >= self._settings.gemini_max_attempts:
             return
         await asyncio.sleep(2.0 ** (attempt - 1))  # 1s, 2s, 4s, ...
-
-    @staticmethod
-    def _check_refusal(response: Any) -> None:
-        """Resposta vazia porque o modelo recusou não é "resposta vazia": com
-        temperatura zero, repetir dá a mesma recusa. Quem chama precisa saber
-        o motivo para tentar outro caminho."""
-        if getattr(response, "text", None):
-            return
-        for candidate in getattr(response, "candidates", None) or []:
-            reason = getattr(candidate, "finish_reason", None)
-            name = getattr(reason, "name", str(reason or ""))
-            if name in _REFUSAL_REASONS:
-                raise ProviderRefused(f"gemini recusou a resposta: {name}")
 
     @staticmethod
     def _parse(text: str | None) -> dict[str, object]:

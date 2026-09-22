@@ -14,15 +14,11 @@ import (
 
 	"studygo/internal/adapter/notifier"
 	"studygo/internal/adapter/postgres"
-	"studygo/internal/adapter/provafiles"
-	"studygo/internal/adapter/provaproc"
 	"studygo/internal/platform/config"
 	"studygo/internal/platform/db"
 	"studygo/internal/port"
 	"studygo/internal/service"
 	"studygo/migrations"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -56,10 +52,6 @@ func run(logger *slog.Logger) error {
 			return err
 		}
 	}
-
-	// A fila de provas tem laço próprio: uma extração de minutos não pode
-	// atrasar o replanejamento da virada do dia, nem o contrário.
-	go novoProvaService(cfg, pool).Rodar(ctx, logger)
 
 	planos := postgres.NewPlanoRepo(pool)
 	cronogramas := postgres.NewCronogramaRepo(pool)
@@ -203,22 +195,5 @@ func limparSessoes(
 
 	if apagados > 0 {
 		logger.InfoContext(ctx, "sessões expiradas removidas", slog.Int64("tokens", apagados))
-	}
-}
-
-// novoProvaService monta o catálogo de provas como o servidor monta; aqui ele
-// só é usado para rodar a fila de importações.
-func novoProvaService(cfg config.Config, pool *pgxpool.Pool) *service.ProvaService {
-	return &service.ProvaService{
-		Repo:              postgres.NewProvaRepo(pool),
-		Processor:         provaproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken),
-		Arquivos:          provafiles.Store{Root: cfg.Provas.Dir},
-		Curadores:         cfg.Provas.Curadores,
-		TodosCuradores:    cfg.Provas.TodosCuradores,
-		MaxPendentes:      cfg.Provas.MaxPendentes,
-		MaxChamadas:       cfg.Provas.MaxChamadas,
-		MaxProcessamento:  cfg.Provas.MaxProcessamento,
-		MaxEtapa:          4 * time.Minute,
-		ExigirConferencia: cfg.Provas.ExigirConferencia,
 	}
 }

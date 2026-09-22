@@ -31,9 +31,9 @@ def require_service_token(
     """FastAPI dependency: reject a call without the shared service token.
 
     Sem token configurado, recusa também. Antes ficava aberto, para facilitar
-    o teste local — mas um serviço que fala com o Gemini e escreve no volume
-    das provas não pode acabar sem porteiro porque faltou uma variável de
-    ambiente. Quem testa passa o token que vai usar (tests/unit/test_api.py).
+    o teste local — mas um serviço que recebe PDFs e fala com o Gemini não
+    pode acabar sem porteiro porque faltou uma variável de ambiente. Quem
+    testa passa o token que vai usar (tests/unit/test_api.py).
     """
     expected = settings.service_token
 

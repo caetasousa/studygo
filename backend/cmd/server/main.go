@@ -13,8 +13,6 @@ import (
 	"studygo/internal/adapter/editalproc"
 	"studygo/internal/adapter/httpapi"
 	"studygo/internal/adapter/postgres"
-	"studygo/internal/adapter/provafiles"
-	"studygo/internal/adapter/provaproc"
 	"studygo/internal/platform/config"
 	"studygo/internal/platform/db"
 	"studygo/internal/platform/httpserver"
@@ -22,8 +20,6 @@ import (
 	"studygo/internal/port"
 	"studygo/internal/service"
 	"studygo/migrations"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -86,8 +82,6 @@ func run(logger *slog.Logger) error {
 		Relogio:    clock,
 	}
 
-	provaService := novoProvaService(cfg, pool)
-
 	handlers := httpapi.Handlers{
 		Health: httpapi.NewHealthHandler(
 			service.NewHealthService(pool, db.NovoSchema(pool), cfg.Versao, cfg.Deploy), logger,
@@ -107,9 +101,7 @@ func run(logger *slog.Logger) error {
 			service.NewImportacaoTECService(deps),
 			logger,
 		),
-		Prova: httpapi.NewProvaHandler(provaService, cfg.Provas.MaxPDF, logger),
 	}
-	handlers.Auth.CuradorProvas = provaService.Curador
 
 	router := httpapi.NewRouter(handlers, tokens, authService, httpapi.LimitesPadrao(logger), logger)
 
@@ -148,21 +140,4 @@ func run(logger *slog.Logger) error {
 	}
 
 	return nil
-}
-
-// novoProvaService monta o catálogo de provas. O worker monta o mesmo, porque é
-// ele quem roda a fila; o servidor só atende a curadoria e a consulta.
-func novoProvaService(cfg config.Config, pool *pgxpool.Pool) *service.ProvaService {
-	return &service.ProvaService{
-		Repo:              postgres.NewProvaRepo(pool),
-		Processor:         provaproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken),
-		Arquivos:          provafiles.Store{Root: cfg.Provas.Dir},
-		Curadores:         cfg.Provas.Curadores,
-		TodosCuradores:    cfg.Provas.TodosCuradores,
-		MaxPendentes:      cfg.Provas.MaxPendentes,
-		MaxChamadas:       cfg.Provas.MaxChamadas,
-		MaxProcessamento:  cfg.Provas.MaxProcessamento,
-		MaxEtapa:          4 * time.Minute,
-		ExigirConferencia: cfg.Provas.ExigirConferencia,
-	}
 }

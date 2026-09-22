@@ -127,13 +127,6 @@ class InvalidProviderResponse(ProcessorError):
     transient = False
 
 
-class ProviderRefused(InvalidProviderResponse):
-    """O modelo se recusou a responder — recitação de obra publicada, filtro de
-    segurança. Mesmo código e status da resposta inválida, para o contrato dos
-    editais não mudar; o pipeline de provas o distingue pela classe e tenta
-    outro caminho, porque prova de concurso cita livro o tempo todo."""
-
-
 # --- auth --------------------------------------------------------------------
 
 

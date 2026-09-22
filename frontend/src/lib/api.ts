@@ -50,7 +50,7 @@ function mensagemHTTP(status: number): string {
  * minutos e depois recebe 401 para sempre. Foi o que aconteceu com o download
  * do CSV, que baixava `{"erro":"não autenticado"}` como se fosse a planilha.
  */
-export async function fetchAutenticado(
+async function fetchAutenticado(
 	path: string,
 	init: RequestInit = {},
 	retry = true
@@ -73,36 +73,26 @@ export async function fetchAutenticado(
 /** Uma resposta que não é JSON — hoje, o CSV do plano. */
 async function requestTexto(path: string): Promise<string> {
 	const res = await fetchAutenticado(path);
-	if (!res.ok) throw await erroDaResposta(res);
+
+	if (!res.ok) {
+		if (res.status === 401) auth.clear();
+
+		// O corpo de erro é JSON mesmo quando a rota devolve texto.
+		const texto = await res.text();
+		let erro: string | undefined;
+		try {
+			erro = (JSON.parse(texto) as { erro?: string })?.erro;
+		} catch {
+			erro = undefined;
+		}
+
+		throw new ApiError(res.status, erro ?? mensagemHTTP(res.status));
+	}
 
 	return res.text();
 }
 
-/** Um arquivo para baixar, com o nome que o servidor deu a ele. */
-export async function requestArquivo(path: string): Promise<{ blob: Blob; nome: string }> {
-	const res = await fetchAutenticado(path);
-	if (!res.ok) throw await erroDaResposta(res);
-	const nome = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'arquivo';
-
-	return { blob: await res.blob(), nome };
-}
-
-async function erroDaResposta(res: Response): Promise<ApiError> {
-	if (res.status === 401) auth.clear();
-
-	// O corpo de erro é JSON mesmo quando a rota devolve texto ou arquivo.
-	const texto = await res.text();
-	let erro: string | undefined;
-	try {
-		erro = (JSON.parse(texto) as { erro?: string })?.erro;
-	} catch {
-		erro = undefined;
-	}
-
-	return new ApiError(res.status, erro ?? mensagemHTTP(res.status));
-}
-
-export async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
 	const res = await fetchAutenticado(path, init, retry);
 
 	if (res.status === 204) return undefined as T;

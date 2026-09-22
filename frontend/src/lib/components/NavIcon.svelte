@@ -14,7 +14,6 @@
 		| 'lua'
 		| 'menu'
 		| 'prova'
-		| 'questoes'
 		| 'faltam'
 		| 'horas'
 		| 'acerto'
@@ -126,11 +125,6 @@
 		<rect x="4" y="5" width="16" height="15" rx="2.5" />
 		<path d="M4 10h16M9 3.5v3M15 3.5v3" />
 		<path d="M9.5 14.5l1.8 1.8 3.2-3.4" />
-	{:else if name === 'questoes'}
-		<!-- answer sheet: one option ticked, the others still to go -->
-		<rect x="4.5" y="3.5" width="15" height="17" rx="2.5" />
-		<path d="m8 9 1.6 1.6L12.5 7.6" />
-		<path d="M8 14h8M8 17h5" />
 	{:else if name === 'faltam'}
 		<circle cx="12" cy="12" r="8" />
 		<path d="M12 7.5V12l3 1.8" />

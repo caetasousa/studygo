@@ -23,12 +23,11 @@
     # uma versão com CVE conhecido.
     server_tokens off;
 
-    # O default do nginx (1m) é bem menor do que a aplicação de fato aceita. O
-    # maior corpo é a importação de prova: caderno e gabarito juntos, até 25 MiB
-    # cada (PROVAS_MAX_UPLOAD_MIB), mais o enquadramento do multipart. O backend
-    # recusa o que passar disso; a borda precisa deixar chegar até lá, e o nginx
-    # do container do frontend (frontend/nginx.conf) usa o mesmo número.
-    client_max_body_size 52m;
+    # O default do nginx (1m) é bem menor do que a aplicação de fato aceita: o
+    # upload do edital tem limite próprio adiante na cadeia (os 20 MiB do
+    # backend, ver maxEditalPDF, mais a folga do multipart), então a borda
+    # precisa permitir pelo menos isso — senão recusa antes de o app ver.
+    client_max_body_size 24m;
 
     # O default do nginx (60s) é bem menor do que a importação de edital
     # legitimamente leva: OCR mais as chamadas do Gemini, numa VPS com menos
@@ -61,9 +60,7 @@
     #    vale a mais estrita: script embutido injetado não executa.
     #  - style-src 'unsafe-inline': o CSS que o SvelteKit embute.
     #  - fonts.googleapis.com / fonts.gstatic.com: as fontes do app.html.
-    #  - img-src blob:: as figuras das provas exigem o token, então chegam por
-    #    fetch e são mostradas por URL de blob.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
 {% endmacro %}
 {% macro proxy_para_frontend() %}
         proxy_pass http://127.0.0.1:{{ frontend_port }};

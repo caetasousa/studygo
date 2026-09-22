@@ -55,9 +55,9 @@ No backend:
 Regras que valem sem exceção:
 
 - O domínio não conhece HTTP, JSON, SQL nem framework algum.
-- **Tag JSON só em adapter.** O contrato da API vive em `adapter/httpapi`; os
-  clientes dos serviços internos (`adapter/editalproc`, `adapter/provaproc`)
-  carregam as tags do contrato deles. `domain/` e `service/` não têm nenhuma:
+- **Tag JSON só em adapter.** O contrato da API vive em `adapter/httpapi`; o
+  cliente do serviço interno (`adapter/editalproc`) carrega as tags do
+  contrato dele. `domain/` e `service/` não têm nenhuma:
   os casos de uso devolvem tipos sem tag (`service.PlanoMontado` e companhia)
   e o adapter os traduz em DTO.
 - **Todo SQL vive em `adapter/postgres`.** Nenhuma consulta em service ou handler.
@@ -99,6 +99,9 @@ rollback automático pelos `.down.sql`.
   (`TestMigrations_NaoContemLogicaDeNegocio`).
 - Trate migrations que podem ter sido aplicadas como imutáveis; corrija com uma
   migration nova.
+- A numeração continua em **000008**. As 000004–000007 (catálogo de provas,
+  hoje no provasGo) saíram do bundle mas estão registradas em staging e em
+  bancos locais: reusar um desses números faz a migration nova ser pulada.
 - Rollback de código não reverte schema. Migration destrutiva (`DROP TABLE`,
   `DROP COLUMN`, `RENAME`, `ALTER COLUMN ... TYPE`, `SET NOT NULL`, `TRUNCATE`)
   só entra numa publicação posterior à que parou de usar o que ela remove, e

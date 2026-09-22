@@ -47,11 +47,7 @@
 
 	const publicRoutes = ['/login', '/registro'];
 	const isPublic = $derived(publicRoutes.includes(page.url.pathname));
-	// Telas que não dependem de um concurso ativo: o cadastro de concursos e as
-	// questões das provas, que são as mesmas para todo mundo.
-	const foraDoPlano = $derived(
-		['/concursos', '/provas', '/questoes'].some((p) => page.url.pathname.startsWith(p))
-	);
+	const isConcursoAdmin = $derived(page.url.pathname.startsWith('/concursos'));
 
 	$effect(() => {
 		// Enquanto a renovação de boot não responde não se sabe nada: redirecionar
@@ -77,7 +73,7 @@
 			auth.isAuthenticated &&
 			concursoStore.carregado &&
 			concursoStore.lista.length === 0 &&
-			!foraDoPlano
+			!isConcursoAdmin
 		) {
 			goto('/concursos/novo');
 		}
@@ -140,7 +136,7 @@
 					</button>
 				</div>
 			{/if}
-			{#if planoStore.erro && !foraDoPlano}
+			{#if planoStore.erro && !isConcursoAdmin}
 				<div class="form-error" style="margin-bottom:16px">{planoStore.erro}</div>
 			{/if}
 			{@render children()}

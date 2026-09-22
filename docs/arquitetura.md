@@ -25,10 +25,8 @@ flowchart LR
     N --> F["🧡 Frontend<br/>SPA"]
     F -- "/api" --> B["🐹 Backend Go<br/>hexágono único"]
     B --> P[("🐘 PostgreSQL")]
-    B -. edital, recorte .-> E["🐍 edital-processor"]
+    B -. edital .-> E["🐍 edital-processor"]
     W["🔔 worker"] --> P
-    W -. fila de provas .-> E
-    B & W & E --- V[("📚 provas_data")]
 ```
 
 Um hexágono só no backend, sem bounded contexts. Os domínios do produto —
@@ -44,9 +42,7 @@ lidos juntos; separá-los criaria fronteiras que só custariam tradução.
 | 🚀 | `cmd/` | composição e inicialização |
 | 🔌 | `adapter/httpapi/` | HTTP, auth, DTOs (tags JSON), mappers, redação das mensagens |
 | 🐘 | `adapter/postgres/` | repositories e SQL |
-| 🐍 | `adapter/editalproc/` | cliente do edital-processor (editais) |
-| 📚 | `adapter/provaproc/` | cliente das rotas de provas do edital-processor |
-| 🗃️ | `adapter/provafiles/` | PDFs das provas no volume `provas_data` |
+| 🐍 | `adapter/editalproc/` | cliente do edital-processor |
 | 🔐 | `adapter/crypto/` | argon2id, JWT |
 | 🔔 | `adapter/notifier/` | entrega de lembretes |
 | ⚙️ | `service/` | casos de uso |
@@ -141,6 +137,13 @@ usuarios ──┬── refresh_tokens
 
 </details>
 
+O catálogo de provas saiu para o projeto provasGo em 21/09/2026, e as
+migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
+junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
+ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
+sumiu, e o código não as lê. Por isso **a próxima migration é a 000008**: uma
+000004 nova seria dada como aplicada nesses bancos e nunca rodaria.
+
 Regras que o schema carrega:
 
 - **Identidade por id, nunca por valor.** `atividades.disciplina_id` e
@@ -184,378 +187,15 @@ banco, e o JWT usa relógio próprio: nenhum dos dois passa por aqui.
 
 ---
 
-## 📚 Catálogo de provas
-
-Um catálogo **compartilhado**, fora dos concursos de cada usuário: provas
-anteriores da FCC (múltipla escolha), com as questões transcritas, as figuras
-recortadas do PDF original e o gabarito oficial. Quem publica são os curadores
-— uma lista de UUIDs em `PROVAS_CURADORES`, sem sistema de papéis (no
-ambiente local, `*` libera qualquer conta); todo mundo autenticado consulta.
-
-```
-provas_importacoes ──┬── provas_etapas                (resultado e duração de cada etapa)
-      │              └── provas_importacao_arquivos ──► provas_arquivos
-      └──► provas ──┬── provas_revisoes ──┬── provas_questoes ──► provas_questoes_conteudo
-                    │                     ├── provas_apoios ───► provas_apoios_conteudo
-                    │                     └── provas_gabaritos ── provas_gabarito_respostas
-                    └── provas_anotacoes  (a nota de cada estudante, por questão)
-```
-
-**Importação é trabalho de curadoria; publicação é o que o catálogo mostra.** A
-importação guarda o rascunho revisável (jsonb, com os nomes dos campos de
-`prova.Rascunho`); publicar abre uma revisão imutável da prova e grava uma
-linha por questão, que é o que garante número único e o que a busca por
-disciplina filtra. Uma revisão nova de prova já publicada é outra importação,
-que herda os arquivos; a publicada fica no ar até a próxima.
-
-**Cada questão é guardada uma vez só.** A questão se divide no que ela é em
-qualquer prova — texto, alternativas, figuras (`ConteudoDeQuestao`) — e no
-lugar que ocupa numa prova — número, matéria, assunto, onde está no PDF
-(`LugarDaQuestao`). O conteúdo vai para `provas_questoes_conteudo`,
-identificado pela impressão (`Impressao`, que ignora espaços): a revisão nova
-que repete a anterior e o cargo que repete as Conhecimentos Gerais de outro
-apontam para a mesma linha. O texto de apoio segue o mesmo caminho. A revisão
-guarda só a identificação; publicada, a importação fica com a identificação, e
-o resultado bruto das etapas sai.
-
-**O gabarito é uma entidade à parte da questão.** A questão é o que o caderno
-diz; a resposta é o que o gabarito diz — outro documento da banca. Publicado,
-o gabarito vai para `provas_gabaritos` (cargo, tipo do caderno, preliminar ou
-definitivo) e `provas_gabarito_respostas` (uma linha por número, com a letra —
-vazia na anulada, e o banco só aceita A a E — e a situação); nem a questão
-publicada nem a revisão guardam a resposta, e a leitura a traz do gabarito.
-Um gabarito por revisão, sem histórico: o que muda entra numa revisão nova. No
-rascunho da importação, que o curador edita, a resposta ainda anda junto de
-cada questão, e a publicação exige que as duas batam. As provas publicadas em
-staging antes da 000007 guardavam a resposta na questão e ficam sem ela: abrir
-revisão, trocar o gabarito e publicar de novo.
-
-**O mesmo concurso aproveita o que já foi publicado.** Na consolidação — e no
-botão "Procurar questões já cadastradas" da revisão —, cada questão é comparada
-com as das provas publicadas da mesma banca, ano e órgão (`MesmoOrgao`: "TRF 1"
-é "TRF1"). É a mesma questão quando cada alternativa, na mesma letra, bate por
-letras (o OCR troca "Sêneca" por "Sâneca") e o enunciado de uma contém o da
-outra; com cinco alternativas de texto quase idênticas, o enunciado pode ter
-perdido um trecho na leitura. A leitura que perdeu alternativas também é a
-mesma, com o mesmo número, quando o enunciado bate e cada alternativa lida bate
-na mesma letra (`mesmaQuestaoIncompleta`) — sem nenhuma lida, não: é a ordem
-delas que diz se a resposta do gabarito desta prova vale para o conteúdo de lá.
-Com outro número, só a quase idêntica. A questão
-igual vira referência à já cadastrada (`Rascunho.Reaproveitar`): o conteúdo é o
-de lá, que o curador revisou, a resposta é a do gabarito desta prova, ela entra
-conferida e não aparece na revisão — um aviso lista as reaproveitadas. Uma
-linha só no banco; editar a reaproveitada cria uma versão só desta prova.
-
-**A fila é o PostgreSQL.** O worker roda a extração num laço próprio, uma etapa
-por vez, uma importação por vez no ambiente inteiro:
-
-| Etapa | O que faz | Chama o Gemini |
-|---|---|---|
-| preparar | divide cada página em regiões com sobreposição, sem renderizar a página inteira | não |
-| metadados | órgão, ano, cargo, caderno e total, lidos só da capa | sim |
-| gabarito | leitura determinística do texto — o gabarito de um tipo (número, letra e situação linha a linha, ou a tabela Questão/Alternativa sem situação), ou a relação do site da FCC com todos, de onde sai o tipo do caderno lido na capa; Gemini só se o PDF não tiver texto | às vezes |
-| uma por região | questões, textos de apoio e retângulos das figuras | sim |
-| consolidação | aplica o gabarito, ordena e classifica por matéria as questões de seção genérica | sim, só texto |
-
-Cada etapa é reservada por uma tentativa (`tentativa`, `reserva_ate`),
-renovada enquanto roda; o resultado só grava se a tentativa ainda detiver a
-reserva — um worker que travou, ou uma importação cancelada no meio, não
-sobrescreve nada. Falha transitória volta à fila com espera que dobra (15 s a
-4 min, seis tentativas por etapa: `prova.EsperaParaRepetir`); recusa do
-documento para. Sobrecarga do Gemini (503) e cota (429) já passam ao próximo
-modelo da cadeia dentro da mesma chamada. Há teto de chamadas e de tempo por
-importação.
-
-As regiões se sobrepõem, então a mesma questão chega duas vezes:
-`Rascunho.Mesclar` prefere a versão completa, junta fragmentos e **avisa**
-quando duas leituras completas divergem. A sobreposição não basta para questão
-alta ou que começa rente à borda — uma região a vê sem o fim, a seguinte a vê
-sem o número e a pula. Por isso, depois da última região, cada questão que
-ficou sem as cinco alternativas ganha uma **releitura**: uma região a mais,
-centrada na borda que a cortou (o retângulo que o modelo dá para a questão erra
-por dezenas de pontos; a borda é exata) ou, quando a questão faltou ou veio
-vazia, entre as vizinhas lidas — passando do topo ou do pé da página, na página
-vizinha; recortes que se repetiriam viram um só. A releitura tem a medida da
-própria página: um PDF escaneado pode ter a capa com o dobro do tamanho das
-outras. Da releitura só entra o que estava incompleto
-(`Rascunho.AplicarReleitura`), e a releitura que o processador recusa vira
-alerta, sem derrubar a importação. O processador não confia na estimativa: com
-o número da questão (`QuestaoDaReleitura`), o OCR acha "42." na região, na
-página dela e nas vizinhas, e lê só a questão, do número até a seguinte
-(`localizar_questao`) — a posição que o modelo dá para as vizinhas chegou a
-errar a página. Na revisão, "Reler" faz o mesmo sob demanda,
-e o filtro "Com problema" mostra as questões com defeito. Quando nem isso
-acerta, o curador marca no original o **trecho** que ficou errado ("Ler de
-novo", no painel ao lado da questão) — ela inteira, só o enunciado ou só as
-alternativas que faltaram: a etapa `EtapaTrecho` lê só aquele retângulo, como
-está, sem procurar a questão pelo número, e volta direto à revisão, sem
-consolidar de novo. O que o trecho trouxe entra sem comparar com a leitura
-antiga — quem apontou onde está foi o curador —: o enunciado, se veio, e cada
-alternativa pela letra; o resto da questão, a matéria, a resposta e os textos
-ligados ficam (`Rascunho.AplicarTrecho`). O texto de apoio tem o mesmo "Ler de
-novo" (trecho `ta:<id>`): o processador pede só o texto (`texto_de_apoio`) e, se
-a IA não o transcreve — obra publicada, recitação —, usa o texto do PDF naquele
-retângulo ou o OCR dele, com aviso para conferir; do texto ficam as questões
-ligadas (`Rascunho.AplicarTrechoDeApoio`). Sem o número dentro do trecho, o
-modelo chuta outro, e vale a única questão lida. O retângulo começa do alto da
-questão até pouco depois do começo da seguinte (`trechoInicial`) — a área que a
-extração deu é só o que ela leu, e na questão sem alternativas era o enunciado —,
-e as bordas se esticam com o dedo. Arredondado na tela, o retângulo passava da
-página por um centésimo e era recusado; agora ele volta para dentro da região,
-e o processador aceita meio ponto além da borda. Se a questão continua sem as
-cinco alternativas, um alerta diz para esticar até a (E). O trecho é a última
-região da lista, rotulada `t<número>`. Quando o Gemini se
-recusa a transcrever o texto de apoio (recitação de obra publicada), o
-processador pede só a estrutura e transcreve o texto por OCR do retângulo, com
-alerta para o curador. Recusada até a estrutura — as questões citam trechos do
-texto —, o OCR transcreve os textos, e as linhas dele dizem onde cada um vai
-do aviso à fonte: as faixas de fora, onde estão as questões, são lidas de novo
-sem o texto (`faixas_de_questoes`).
-
-**Questão que a IA não lê sai do OCR, não vira texto de apoio.** Antes, a
-região recusada sem aviso de texto virava um texto de apoio com o OCR inteiro,
-e as questões dela faltavam. O desenho da questão da FCC — enunciado e "(A)" a
-"(E)", cada alternativa começando a linha — separa as questões nas linhas do
-OCR (`questoes_do_texto.questoes_das_linhas`), com as trocas típicas da letra
-("(AJ", "(Cj", "(4)") e o número à margem, lido ou deduzido das vizinhas. A
-questão vem marcada `LidaPorOCR`: qualquer leitura da IA da mesma questão — a
-região vizinha, a releitura, o trecho marcado — passa na frente
-(`Mesclar`, `AplicarReleitura`); ela ganha releitura sozinha mesmo inteira, e
-nunca é dada como conferida sem o curador. Numa bateria com os doze cadernos
-locais e a IA recusando todas as 226 regiões, 92,6% das 739 questões voltaram
-com o número certo (antes, nenhuma, e 224 textos de apoio de questões); 25
-voltaram com número trocado, por isso a conferência.
-
-**A matéria é da questão, não da seção.** O caderno põe quarenta questões sob
-"Conhecimentos Específicos"; a consolidação manda o resumo de todas numa chamada
-só, para a mesma matéria ter o mesmo nome na prova toda, e troca pela sugestão
-só a seção genérica — título que já é matéria ("Língua Portuguesa") manda. Na
-revisão, "Sugerir matérias" faz o mesmo sob demanda, sem gravar.
-
-**O assunto é do curador.** Dentro da matéria, o assunto ("Crase", "Redes
-TCP/IP e protocolos") é o que o treino filtra, e só junta questões se o nome
-for o mesmo em todas as provas — por isso a extração não o preenche. O editor
-sugere as matérias e os assuntos que o catálogo publicado já usa; a questão
-reaproveitada de outra prova traz o assunto de lá (`Reaproveitar`); e mudar a
-classificação não desfaz a conferência, porque não muda o que a questão diz.
-Mora no `lugar` (jsonb) — o filtro roda no navegador, não no SQL.
-
-**O curador edita texto, não blocos.** Cada campo (enunciado, alternativa,
-texto de apoio) é um texto só, com marcação curta: `**negrito**`, `*itálico*`,
-`__sublinhado__`, crases para `comando` no meio da frase, três crases em volta
-de um bloco de código e `[figura 1]` onde a figura entra. O frontend converte
-nos dois sentidos (`lib/provas/marcacao.ts`); o que se grava continua sendo a
-lista de blocos — sem os vazios que a extração deixa, que o curador não
-enxergaria (`Rascunho.LimparBlocos`; o espaço entre dois trechos formatados
-fica). Código que a IA transcreveu como prosa — o SQL partido por uma
-lacuna sublinhada, por exemplo — o processador junta num bloco de código, com a
-lacuna escrita dentro (`___I___`). Figuras guardam o tamanho na tela
-(`Largura`, % da coluna), que é apresentação: mudar não desfaz conferência.
-
-**Figura nunca vem da IA.** O Gemini aponta o retângulo; o processador recorta
-o PDF original. Antes, ajusta o retângulo aos pixels (`ajustar_figura`): o
-trecho vira faixas de tinta, o núcleo é a maior faixa dentro da caixa, e a
-figura cresce com título e rótulos até esbarrar em prosa — faixa que passa da
-figura pelos dois lados. Vale para PDF de texto e escaneado. O tamanho na tela
-(`Largura`) é a proporção que a figura tem no caderno em relação à questão
-(`DimensionarFiguras`): o recorte sai com até 2,8 vezes a resolução do PDF, e no
-tamanho do arquivo um diagrama pequeno ocupava a coluna inteira. O curador ajusta o retângulo na tela, e o recorte tem id
-derivado do documento e das coordenadas — pedir o mesmo recorte de novo não
-grava outro arquivo.
-
-**O cargo tem código e nome.** O código ("F06", de "Caderno de Prova 'F06'",
-na capa e no alto das páginas; em alguns concursos só número, como "24") é o
-que o gabarito cita e o que o confere; o
-nome por extenso (`CargoNome`) é o que o aluno lê e busca. A leitura da capa às
-vezes devolve o nome no lugar do código: o processador o passa para o nome
-(`acertar_cargo`) e tira o código do quadro do candidato — do texto do PDF ou,
-na capa escaneada, do OCR dela, que perdoa as trocas típicas ("Cademo de Prova
-'FO6, Tipo" é F06). Sem código mesmo assim, a pendência diz onde achá-lo, com
-um botão na revisão que usa o do gabarito.
-
-**Capa que não diz o total não trava a prova.** Caderno sem capa, ou com capa
-noutro formato (o do MPEAL), chegava com total 0, e cada questão virava uma
-pendência de numeração. O total vem então da numeração do gabarito do cargo
-(`TotalPeloGabarito`, com alerta para conferir), e as pendências nomeiam o
-campo vazio e a etapa em que se preenche, em vez de pedir para conferir tudo.
-
-**O curador confere só o que tem problema.** No fim da importação, a questão
-inteira, com as cinco alternativas preenchidas, a resposta do gabarito, os
-textos que cita ligados e nenhum alerta da extração falando dela já vem
-conferida (`Rascunho.ConfirmarSemProblema`). Questão com figura, só depois que
-o curador confere cada recorte — só olhando o original se sabe se pegou a
-figura inteira; conferido o último, a questão fica conferida
-(`ConfirmarPelosRecortes`). A revisão as destaca — filtro "Com figura", ponto
-no mapa, aviso na questão.
-
-**Vai ao catálogo o que está pronto; o resto fica de fora sem travar.**
-`Rascunho.ParaPublicar` escolhe as questões conferidas (quando o ambiente
-exige) e com linha no gabarito, inteiras, com as figuras recortadas e os textos
-que usam conferidos. A que não atende fica de fora com o motivo (`DeFora`) — 56
-conferidas publicam mesmo com 4 por transcrever — e o número dela entra nas
-excluídas da revisão publicada, que reaberta deixa corrigir e publicar de novo.
-`Pendencias` só impede publicar quando não sobra nenhuma; identificação que a
-capa não deu e gabarito de outro cargo ou caderno são `Avisos`. O gabarito que
-o banco recusa (letra fora de A–E, número com zero à esquerda) é acertado ou
-descartado linha a linha. A resposta de uma questão só vem do gabarito
-oficial, nunca da IA, e editar algo desfaz a conferência dele
-(`InvalidarEdicoes`) — a tela avisa quais voltaram a pedir conferência. Trocar
-o gabarito só desconfere a questão cuja letra mudou; a que ganha a resposta que
-não tinha continua conferida (`AplicarGabarito`). O que foi alterado e não salvo fica numa cópia no navegador
-(`rascunhoLocal.ts`), recuperada se o celular recarregar a aba; ela só vale
-sobre a mesma versão salva. Qualquer questão pode sair da prova
-(`Rascunho.Excluidas`) — a anulada, a estragada, a que a extração não achou e
-não vale transcrever: deixa de ser esperada, `Total` continua o da capa, o
-gabarito fica inteiro e o catálogo conta só as que ficaram (`QuestoesNaProva`).
-Rascunho e revisão gravados antes guardam a chave antiga `AnuladasExcluidas`,
-que a leitura do repositório ainda entende; e marcar o trecho da excluída a
-devolve à prova. `PROVAS_EXIGIR_CONFERENCIA=false`
-publica também a questão não conferida — para testar o fluxo antes de haver
-quem revise —, mas a integridade continua valendo. A prova de pacote entra sem
-pedir conferência nem gabarito: já foi publicada noutro ambiente.
-
-**Resolver não grava nada.** A prova publicada abre uma questão por vez: o
-nome da prova com as matérias em etiquetas que filtram, uma barra presa com a
-navegação e o mapa das questões (cor por acerto, ponto onde há nota), e atalhos
-de teclado (setas, A–E, Enter, N). A questão aberta vai no endereço (`?q=7`).
-"Estudar" só aparece com anotação: anda só pelas questões anotadas e mostra só
-a nota, sem repetir a questão. As respostas ficam no navegador
-(`localStorage`, por prova); registrar o desempenho no servidor é outra
-entrega, com tabela própria.
-
-**O treino por matéria junta as questões de todas as provas.** A tela
-Questões tem duas entradas: a prova inteira (`/provas/{id}`) e as questões de
-uma ou mais matérias (`/questoes/resolver`). `GET /api/provas/questoes` lista as
-questões publicadas sem o conteúdo — prova, número, matéria, assunto, resposta — uma vez
-por conteúdo: a questão que caiu igual em dois cargos vem da prova que estreou
-primeiro no catálogo (a primeira revisão, para republicar não trocar a
-ocorrência e fazer a questão parecer nunca resolvida). Duas grafias da mesma
-matéria ("Noções Sobre…" e "Noções sobre…") viram um nome só em
-`prova.Avulsas`, e é por isso que o filtro por matéria roda no service, não no
-SQL. O conteúdo vem da prova (`GET /api/provas/{id}`), carregada na vez da
-questão. O filtro de situação — não resolvidas, as que errou — é do navegador,
-porque as respostas também são; e o treino grava no mesmo lugar que a prova
-inteira: resolvida num, aparece resolvida no outro. As matérias aparecem em
-três grupos — básicas (português, matemática e noções de informática, como
-Word e Excel), legislação e específicas de TI —, e o nome do grupo marca todas as dele. A matéria é texto livre, então o
-grupo sai do nome (`prova.GrupoDaMateria`); o que não é básica nem legislação é
-específica. Com matéria escolhida,
-aparecem os assuntos dela; o assunto restringe só a própria matéria —
-Crase em Português não tira Redes do treino.
-
-**A anotação é do estudante, por questão.** Markdown (título, lista, tarefa,
-citação, código, link — só `http`, `https` e `mailto` viram link), salvo sozinho
-enquanto se digita, visível só para quem escreveu. É guardada por prova e
-número, não pela revisão: publicar uma revisão nova ou tirar a prova do catálogo
-não a apaga. Gravar texto vazio apaga a nota (`ProvaService.Anotar`). Na
-questão ainda não respondida, a nota fica fechada, a um clique — ela costuma
-dizer qual é a resposta.
-
-**O texto de apoio é só o texto.** No caderno da FCC ele vem como título da
-seção, aviso ("Considere o texto … questões de 1 a 10"), texto e fonte. O
-processador lê a faixa de questões no aviso — é ela que liga o texto às
-questões das regiões seguintes — e depois tira do material o que vem antes do
-texto e o começo de questão que o recorte pegue depois da fonte. O aviso não se
-perde: fica em `Apoio.Aviso`, ao lado de onde o texto está no caderno
-(`Apoio.Origens`), para o curador conferir a faixa. Quando o Gemini recusa a
-região inteira e só o OCR a lê, os textos são achados pelo aviso e já chegam
-ligados às questões que ele cita. Na revisão, os textos têm etapa própria, antes
-das questões: ligar "1-10" põe o texto nas dez de uma vez, e texto sem questão é
-pendência. Na tela do aluno, cada questão mostra o seu texto num recolhível
-aberto; quem o fecha numa questão o encontra fechado nas outras que o usam.
-
-**A prova vai de um ambiente a outro por pacote.** Para estrear o catálogo em
-produção sem importar e revisar de novo, a curadoria exporta as provas publicadas
-num .zip só (`GET /api/provas/pacotes`, ou `?prova=` para uma): um LEIA-ME e uma
-pasta por prova, com `prova.json` (conteúdo da revisão em vigor, regiões, nomes e
-o mapa das figuras), `prova.pdf`, `gabarito.pdf` e `figuras/questao-11-<uuid>.png`.
-Tudo sem compressão: o navegador lê o .zip sem biblioteca (`lib/provas/pacote.ts`)
-e importa uma prova por vez (`POST /api/provas/pacotes`, multipart com o
-prova.json e os arquivos), porque o pacote inteiro passaria do limite de envio do
-nginx. A prova entra publicada, sem fila nem conferência — já foi revisada lá —,
-mas não com pendência de integridade, nem se já está no catálogo ou se o caderno
-(pelo hash) já foi importado ali. As figuras mantêm o id, que é o que os blocos
-citam; o PDF ganha id novo. O prova.json é contrato (`testdata/prova_pacote.json`,
-`formatoDoPacote`).
-
-**A folha de alterações muda só o que ela cita.** Depois dos recursos, a FCC
-publica a "Alteração de gabarito e Atribuição de questões": por cargo e por
-tipo de caderno, as questões que trocaram de resposta e as atribuídas a todos —
-anuladas, ponto de quem quer que seja. Trocar o arquivo do gabarito por essa
-folha apagaria as respostas que não mudaram, então ela tem caminho próprio
-(`POST /api/provas/importacoes/{id}/alteracoes` → `AplicarAlteracoesDeGabarito`
-→ `Rascunho.AplicarAlteracoes`): a leitura é determinística, do texto do PDF
-(`ler_alteracoes`), pega só o trecho do cargo e do tipo desta prova, e o
-gabarito passa a definitivo. A questão que mudou de letra volta a pedir
-conferência; o aviso diz quais foram. Folha de outro cargo é recusada, em vez
-de mudar nada.
-
-**Questão sem resposta no gabarito não chega ao aluno.** A prova pode ser
-importada e publicada antes de o gabarito sair — o que falta é só ele —, mas
-responder sem ter como conferir não é treinar: a publicação pela revisão e a
-pelo pacote só levam ao catálogo a questão com linha no gabarito (`Criterios`),
-e a leitura esconde o que ficou de fora — `Publicacao.SoComGabarito` na prova e
-no catálogo, `TemGabarito` no treino (`prova.Avulsas`). A anulada tem linha,
-sem letra, e continua na prova. O curador continua vendo tudo: a revisão abre
-da publicação inteira (`Repo.Publicacao`), e a prova sem gabarito fica na lista
-com "sem gabarito" no lugar da contagem.
-
-**Prova sem respostas, com o PDF do gabarito, lê o gabarito de novo.** As provas
-publicadas antes de o gabarito ter tabela própria (`cc242b2`) perderam as
-respostas — ficaram no JSON antigo, que ninguém lê —, e o pacote delas saiu sem
-gabarito. O PDF continuou guardado, e o leitor determinístico o lê inteiro. Por
-isso a importação do pacote sem respostas lê o PDF que veio junto, e "Abrir
-revisão" de uma prova publicada sem respostas já nasce com o gabarito na fila
-(`EtapaSoGabarito`): quando volta, é publicar.
-
-**A prova importada duas vezes sai pela curadoria.** "Excluir prova" apaga de vez
-a prova e tudo o que veio dela — revisões, questões, textos, gabarito, anotações e
-as importações que a publicaram ou revisam (`ProvaRepo.ExcluirProva`, numa
-transação); o conteúdo guardado uma vez para dois cargos fica na outra prova, e os
-PDFs sem dono saem na limpeza do worker. Recusa enquanto uma importação dela
-processa. "Tirar do catálogo" só esconde. "Editar título" troca o nome do cargo
-da publicada sem revisão (`RenomearProva`); o código do cargo muda pela revisão,
-porque confere o gabarito e acha a repetida.
-
-**A mesma prova não entra duas vezes.** O hash é só o do caderno: reenviar o
-mesmo PDF, com outro gabarito ou sem ele, acha a importação que já existe
-(índice único no hash). Outro arquivo da mesma prova é pego pela capa: logo
-depois dela, a importação com a mesma banca, órgão, ano e código do cargo de
-uma prova publicada ou de outra importação ativa (`MesmaProva`; o tipo do
-caderno não conta) para ali, sem ler gabarito nem questão — cancelada, com o
-motivo, e segurando o hash (`Importacao.JaImportada`). A revisão de uma
-publicada é ela mesma e não conta; e a publicação recusa a repetida que passou
-pela capa sem código. A curadoria mostra, inteiro, o nome com que cada PDF foi
-enviado (`nome_documento`, `nome_gabarito`; `prova.NomeDoArquivo`): é por ele
-que o curador reconhece a prova quando a capa foi mal lida.
-
-**Cancelar solta os PDFs; excluir apaga o rascunho.** Cancelada pelo curador,
-a importação perde o hash (`Importacao.Cancelar`) e os mesmos arquivos podem
-recomeçar do zero. Excluir
-apaga a importação, com etapas e vínculos; a publicada é o histórico da prova e
-não sai, e a que está processando precisa parar antes.
-
-**Os arquivos moram no volume `provas_data`**, compartilhado por backend,
-worker e processador, e não expiram. O banco registra quem referencia cada
-arquivo: é isso que decide quem pode baixá-lo (curador vê rascunhos; os demais,
-só o que pertence a uma prova visível) e o que a limpeza pode apagar. Rascunho
-parado há 30 dias é cancelado; 30 dias depois, os arquivos que só ele usava
-saem — e os de uma importação excluída, pelo mesmo caminho. O backup de cada deploy copia banco e volume sob o mesmo advisory lock da
-limpeza.
-
----
-
 ## 📜 Migrations
 
-A baseline é `000001_initial_schema`; as seguintes são numeradas em sequência.
-Migrations criam **estrutura** — nada de backfill, função, trigger ou regra de
-negócio. Isso não é convenção: `TestMigrations_NaoContemLogicaDeNegocio` falha
-o build se aparecer.
+Uma baseline só: `000001_initial_schema`. Migrations criam **estrutura** —
+nada de backfill, função, trigger ou regra de negócio. Isso não é convenção:
+`TestMigrations_NaoContemLogicaDeNegocio` falha o build se aparecer.
 
 O runner aplica só os `.up.sql`, em ordem, cada um numa transação, com advisory
-lock (server e worker podem subir juntos). Os `.down.sql` existem para desfazer
-à mão em desenvolvimento; o runner nunca os executa. Migration destrutiva
-declara o `-- contract:` (ver [ci-cd.md](ci-cd.md)).
+lock (server e worker podem subir juntos). O `.down.sql` existe para desfazer a
+baseline à mão em desenvolvimento; o runner nunca o executa.
 
 ---
 
@@ -575,15 +215,12 @@ declara o `-- contract:` (ver [ci-cd.md](ci-cd.md)).
 | 📤 | `ExportacaoService` | CSV do plano |
 | 📥 | `ImportacaoTECService` | planilha do TEC Concursos |
 | 🏛️ | `ConcursoService` | catálogo e assistente de edital |
-| 📚 | `ProvaService` | curadoria e consulta do catálogo de provas; fila de extração (worker) |
 | 🔐 | `AuthService` | cadastro, login, rotação de token, tema |
 | 🔔 | `NotificacaoService` | lembretes diários (worker) |
 
 O worker roda duas tarefas na virada do dia, nesta ordem: `CronogramaService`
 absorve os dias perdidos e `NotificacaoService` manda os lembretes — o lembrete
-conta o que estudar hoje, e hoje só está certo depois do replanejamento. A fila
-de provas corre ao lado, num laço próprio: uma extração de minutos não atrasa a
-virada do dia, nem o contrário.
+conta o que estudar hoje, e hoje só está certo depois do replanejamento.
 
 Nenhum deles tem interface: os handlers dependem do tipo concreto. Uma interface
 com uma implementação só seria indireção sem ganho.
@@ -650,22 +287,7 @@ POST      …/plano/{compactar,restaurar-ordem}
 GET       …/plano/{estatisticas,caderno,dossie,export.csv}
 POST      …/plano/anotacoes    PATCH|DELETE …/plano/anotacoes/{id}
 POST      …/plano/tec{,/preview}
-
-GET       /api/provas                          ← catálogo (?ano, orgao, cargo, disciplina, offset)
-GET       /api/provas/{id}                     ← ?numero= e ?disciplina= filtram as questões
-GET       /api/provas/arquivos/{id}            ← PDF ou recorte
-POST      /api/provas/{id}/{revisar,reextrair,excluir}                     ← curadoria
-PATCH|DELETE /api/provas/{id}                     ← título; tirar do catálogo
-GET|POST  /api/provas/pacotes                   ← levar a outro ambiente (.zip; uma prova por envio)
-GET|POST  /api/provas/importacoes              GET|PATCH /api/provas/importacoes/{id}
-POST      /api/provas/importacoes/{id}/{publicar,cancelar,reprocessar,excluir,reler,trecho,recortar,gabarito,alteracoes,materias}
-GET       /api/provas/anotacoes/{id}           PUT /api/provas/anotacoes/{id}/{numero}   ← do estudante
 ```
-
-Nenhuma rota de provas pode ter o `{id}` no terceiro segmento seguido de outro
-segmento: `/api/provas/{id}/questoes` conflitaria com `/api/provas/arquivos/{id}`,
-e o ServeMux entra em pânico ao registrar. `TestRouter_RotasDeProvasNaoConflitam`
-monta o router inteiro para pegar isso.
 
 ---
 
@@ -682,12 +304,6 @@ Conceitos de negócio em português, sem acento nos identificadores:
 | Atividade | `plano.Atividade` | `atividades` | `itens` |
 | Registro | `plano.RegistroAtividade` | `registros_atividade` | campos da atividade |
 | Anotação | `plano.Anotacao` | `anotacoes` | `anotacoes` |
-| Prova | `prova.Publicacao` | `provas`, `provas_revisoes` | `prova` |
-| Importação | `prova.Importacao` | `provas_importacoes` | `importacao` |
-| Rascunho | `prova.Rascunho` | `provas_importacoes.rascunho` | `rascunho` |
-| Questão | `prova.Questao` | `provas_questoes` (lugar) + `provas_questoes_conteudo` | `questoes` |
-| Material de apoio | `prova.Apoio` | `provas_apoios` (lugar) + `provas_apoios_conteudo` | `apoios` |
-| Anotação de questão | `prova.Anotacao` | `provas_anotacoes` | `anotacao` |
 
 Termos técnicos universais ficam em inglês: HTTP, JSON, JWT, handler,
 middleware, repository, adapter, service, port, worker, request, response,
