@@ -178,7 +178,8 @@ qual campo mudou e por quê — o frontend depende disso.
 **Todo deploy passa pela pipeline do GitLab, sempre nesta ordem: staging
 primeiro, produção depois. Nunca direto.**
 
-- `staging` recebe o push na `main`, automaticamente.
+- `staging` recebe o push na `main`, automaticamente — depois de o job `e2e`
+  passar contra as imagens daquele build.
 - `produção` só é liberada por tag, com aprovação manual na pipeline, e só
   depois de o `smoke_test` de staging passar. A tag é a data (`v2026.09.12`) e
   quem a cria é o `make release`, nunca um `git tag` à mão.

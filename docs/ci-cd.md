@@ -62,6 +62,7 @@ git push (main)
    ├── unit_test ─── testes dos 3 serviços + integração com Postgres real
    ├── build ─────── constrói as imagens (ainda não publica)
    ├── artifact_test  sobe as imagens e exige resposta em /health
+   │   └── e2e ──────  o app inteiro pelo navegador, contra essas imagens
    ├── publish ───── envia ao Registry e captura o DIGEST
    ├── deploy_staging  Ansible promove o digest → staging
    └── smoke_test ── staging responde
@@ -76,6 +77,15 @@ Operate → Environments
 
 Cada estágio depende do anterior. Um teste vermelho não bloqueia só a si mesmo:
 impede que o build sequer comece, e portanto que qualquer deploy aconteça.
+
+O job `e2e` é do projeto, não do template (`.gitlab-ci.yml`): roda a mesma
+suíte do `make e2e` (`e2e/ci.sh`) com as imagens que o build acabou de fazer, e
+o `publish` espera por ele — uma imagem que quebra um fluxo do usuário não
+chega ao Registry. O relatório (`e2e/relatorio/`, com o print de cada cenário)
+fica como artefato do job por 30 dias, passe ou falhe. A imagem do Playwright
+(3,5 GB) é guardada no registry do runner na primeira pipeline de cada versão;
+as seguintes a puxam de lá. Ao subir o `ref` do template, confira se o `needs`
+do `publish` dele mudou: o do projeto repete a lista inteira.
 
 ## Publicar uma versão em produção
 

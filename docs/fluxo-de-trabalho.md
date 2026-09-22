@@ -117,6 +117,16 @@ Playwright, com o trace de cada falha).
 
 - `MANTER=1 make e2e` deixa o stack de pé no fim, para investigar.
 - `E2E_ARGS="-g C7" make e2e` roda só os testes que casam com o filtro.
+- `E2E_EM_CONTAINER=1 make e2e` roda o Playwright dentro da imagem oficial,
+  como a pipeline — sem depender do node da máquina.
+
+O `edital-processor` desse stack é um dublê (`e2e/duble-processador`) que
+devolve sempre a mesma leitura de edital: é o que deixa o assistente de
+importação ser testado inteiro sem Gemini. O processador de verdade tem a
+suíte dele (`make check-processor`).
+
+A pipeline roda a mesma suíte no job `e2e` — ver
+[ci-cd.md](ci-cd.md#o-caminho-de-uma-mudança).
 
 Funcionalidade nova ganha primeiro a linha no catálogo — como ela pode quebrar
 —, depois o teste, depois o código.
