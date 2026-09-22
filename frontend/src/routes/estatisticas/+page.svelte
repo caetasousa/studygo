@@ -17,11 +17,8 @@
 	});
 
 	const maxHoras = $derived(dados ? Math.max(1, ...dados.serie.map((p) => p.horas)) : 1);
-	const pctAcerto = $derived(
-		dados && dados.questoesTotal > 0
-			? Math.round(((dados.acertoPct ?? 0) / dados.questoesTotal) * 100)
-			: null
-	);
+	// A API já manda o percentual; nulo quando ainda não há questão registrada.
+	const pctAcerto = $derived(dados?.acertoPct ?? null);
 	const maxSemana = $derived(
 		dados ? Math.max(1, ...dados.porSemana.map((s) => Math.max(s.horasPrevisto, s.horas))) : 1
 	);

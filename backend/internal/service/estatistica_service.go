@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"studygo/internal/domain/plano"
@@ -89,8 +90,10 @@ func (s *EstatisticaService) Estatisticas(
 
 	var acertoPct *int
 
+	// Arredonda como o resumo do plano (balanceamento.go): com divisão inteira,
+	// 16 de 22 dava 72% aqui e 73% na tela Hoje, para o mesmo estudo.
 	if stats.QuestoesTotal > 0 {
-		v := stats.AcertosTotal * 100 / stats.QuestoesTotal
+		v := int(math.Round(float64(stats.AcertosTotal) / float64(stats.QuestoesTotal) * 100))
 		acertoPct = &v
 	}
 
