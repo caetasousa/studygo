@@ -34,13 +34,13 @@ ANSIBLE_DIR := ansible
 REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
-        check check-backend check-frontend check-processor check-db fmt lint \
+        check check-backend check-frontend check-processor check-db e2e fmt lint \
         status commit push release deploy provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
 	@echo "studygo — make <alvo>"
 	@echo
-	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo
 	@echo "Exemplos:"
@@ -98,6 +98,15 @@ check-processor: ## ruff + mypy --strict + pytest
 # `-p 1`, já que os testes não disputam schema nenhum.
 check-db: ## Testes de integração com PostgreSQL efêmero (exige Docker)
 	cd backend && go test -tags=integration ./...
+
+# O app inteiro, pelo navegador: a suíte de e2e/testes contra um stack
+# descartável com as imagens de produção (projeto compose studygo-e2e, banco
+# vazio, portas próprias). Cada teste cobre um item de e2e/CENARIOS.md, e o
+# relatório conferível fica em e2e/relatorio/resumo.md.
+#
+# Fora do `check` pelo mesmo motivo do check-db: exige Docker e leva minutos.
+e2e: ## Testes E2E do app inteiro num stack isolado (exige Docker)
+	./e2e/rodar.sh
 
 # Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um
 # template externo fixado por tag. Acrescentar aqui uma ferramenta que o runner

@@ -98,6 +98,29 @@ Mudou o **contrato HTTP**? O snapshot em
 com `ATUALIZAR_CONTRATO=1 go test ./internal/adapter/httpapi` e diga no commit
 qual campo mudou — `frontend/src/lib/types.ts` muda junto.
 
+### O app inteiro, pelo navegador
+
+```bash
+make e2e
+```
+
+Sobe um stack descartável com as imagens de produção (projeto compose
+`studygo-e2e`, banco vazio, portas 25173/28080/25432, `e2e/stack.env` no lugar
+do `.env`), roda a suíte Playwright de `e2e/testes` e derruba tudo no fim — o
+banco local não é tocado. Leva menos de um minuto.
+
+Cada teste cobre um item de [`e2e/CENARIOS.md`](../e2e/CENARIOS.md), o catálogo
+de como cada funcionalidade pode quebrar, escrito antes dos testes. O resultado
+fica em `e2e/relatorio/`: `resumo.md` (cada cenário com o resultado, o print do
+estado final, o commit e as imagens usadas) e `html/index.html` (o relatório do
+Playwright, com o trace de cada falha).
+
+- `MANTER=1 make e2e` deixa o stack de pé no fim, para investigar.
+- `E2E_ARGS="-g C7" make e2e` roda só os testes que casam com o filtro.
+
+Funcionalidade nova ganha primeiro a linha no catálogo — como ela pode quebrar
+—, depois o teste, depois o código.
+
 `make fmt` formata o Go (`gofmt`) e o Python (`ruff format`) antes de commitar.
 
 > Os testes marcados `integration` e `gemini` do `edital-processor` são pulados
@@ -204,6 +227,7 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 | `make up` `down` `restart` `ps` `logs` | stack local |
 | `make rebuild` `reset` `prod-local` | variações do stack local |
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
+| `make check-db` · `make e2e` | banco real · o app inteiro pelo navegador (exigem Docker) |
 | `make fmt` | formatação |
 | `make status` `commit` | git |
 | `make push` · `make release` | publicar (staging, depois produção) |

@@ -125,6 +125,20 @@ token, hash, slug, upsert, batch.
 **Comentários e godoc em português.** Eles explicam por que o código é assim —
 não repetem o que ele faz.
 
+## 🧪 Testes
+
+- **NUNCA** escreva testes unitários depois de escrever o código.
+- Prefira altamente testes E2E como o único mecanismo de teste. Use-os para
+  verificar se recursos complexos funcionam. No final dos testes E2E, produza
+  um artefato verificável e repetível.
+- Se for necessário testar um sistema em isolamento, **PRIMEIRO** escreva todas
+  as maneiras pelas quais ele poderia falhar, **DEPOIS** escreva o código.
+
+A suíte E2E vive em `e2e/`: o catálogo de falhas em `e2e/CENARIOS.md` (cada
+teste cita o id que cobre) e o relatório de cada execução em
+`e2e/relatorio/resumo.md`. Como rodar e o que ela sobe estão em
+[`docs/fluxo-de-trabalho.md`](docs/fluxo-de-trabalho.md).
+
 ## ✅ Comandos e verificação
 
 O `Makefile` é a interface principal. Rode `make` para listar os alvos.
@@ -134,10 +148,11 @@ O `Makefile` é a interface principal. Rode `make` para listar os alvos.
 | 🐳 | `make up` / `make down` | stack local |
 | ⚡ | `make check` | checks dos três serviços — sem Docker |
 | 🐘 | `make check-db` | integração com PostgreSQL efêmero — **exige Docker** |
+| 🧭 | `make e2e` | o app inteiro pelo navegador, num stack isolado — **exige Docker** |
 | 🎨 | `make fmt` | formatação Go e Python |
 
 Durante a implementação, rode primeiro os testes relacionados. Antes de entregar
-uma mudança transversal, rode `make check` e `make check-db`.
+uma mudança transversal, rode `make check`, `make check-db` e `make e2e`.
 
 `make check` não precisa de Docker. `make check-db` sobe containers efêmeros
 (Testcontainers) e **nunca** toca no banco local — não há `TEST_DATABASE_URL`,

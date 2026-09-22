@@ -16,3 +16,7 @@
 # Cobertura gerada pelos testes do backend
 backend/coverage.out
 backend/cover.html
+
+# Suíte E2E: dependências e o relatório de cada execução
+e2e/node_modules/
+e2e/relatorio/
