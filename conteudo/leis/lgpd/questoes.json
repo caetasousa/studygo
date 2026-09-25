@@ -1,0 +1,436 @@
+{
+ "unidades": [
+  {
+   "ref": "lgpd-u1",
+   "titulo": "Arts. 5º e 6º — Definições e princípios",
+   "dispositivos": [
+    "art5",
+    "art6"
+   ],
+   "hash": "b768de3bbce804e613ef510e4a3be9edaa712bc4d764b9aa3e36f6af8dedbb32"
+  },
+  {
+   "ref": "lgpd-u2",
+   "titulo": "Arts. 12 e 13 — Dados anonimizados e pesquisa em saúde pública",
+   "dispositivos": [
+    "art12",
+    "art13"
+   ],
+   "hash": "61da16cad0e7739ac95c038b90b6c97c5d1b6b619a8c887ce1b141fa40611a32"
+  },
+  {
+   "ref": "lgpd-u3",
+   "titulo": "Arts. 46 a 51 — Segurança e boas práticas",
+   "dispositivos": [
+    "art46",
+    "art47",
+    "art48",
+    "art49",
+    "art50",
+    "art51"
+   ],
+   "hash": "6e3e722effaffdd555bcdbd90f684e0a49172eee6db07732b5e0d4b1d3846d8f"
+  }
+ ],
+ "questoes": [
+  {
+   "id": "lgpd-u1-01",
+   "unidade": "lgpd-u1",
+   "enunciado": "Nos termos da LGPD, dado pessoal sensível é aquele sobre",
+   "alternativas": [
+    "endereço residencial e número de telefone, quando vinculado a uma pessoa natural.",
+    "origem racial ou étnica, convicção religiosa, opinião política, dado referente à saúde, dado genético ou biométrico, quando vinculado a uma pessoa natural.",
+    "renda e patrimônio de pessoa jurídica.",
+    "qualquer informação relacionada a pessoa natural identificável.",
+    "dados financeiros e bancários, quando vinculados a uma pessoa natural."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 5º, II: o rol de dados sensíveis é taxativo; dados financeiros, de endereço ou de contato são pessoais, mas não sensíveis. A definição genérica do item D é a de dado pessoal (inciso I).",
+   "dispositivos": [
+    "art5.inc2"
+   ],
+   "trecho": "dado referente à saúde ou à vida sexual, dado genético ou biométrico, quando vinculado a uma pessoa natural"
+  },
+  {
+   "id": "lgpd-u1-02",
+   "unidade": "lgpd-u1",
+   "enunciado": "Segundo a LGPD, a pessoa natural ou jurídica, de direito público ou privado, que realiza o tratamento de dados pessoais em nome do controlador é o",
+   "alternativas": [
+    "encarregado.",
+    "titular.",
+    "operador.",
+    "agente de fiscalização.",
+    "órgão de pesquisa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 5º, VII. Controlador DECIDE (inciso VI); operador EXECUTA em nome dele; encarregado é o canal de comunicação (inciso VIII).",
+   "dispositivos": [
+    "art5.inc7"
+   ],
+   "trecho": "que realiza o tratamento de dados pessoais em nome do controlador"
+  },
+  {
+   "id": "lgpd-u1-03",
+   "unidade": "lgpd-u1",
+   "enunciado": "Para a LGPD, anonimização é a",
+   "alternativas": [
+    "utilização de meios técnicos razoáveis e disponíveis no momento do tratamento, por meio dos quais um dado perde a possibilidade de associação, direta ou indireta, a um indivíduo.",
+    "substituição dos dados por códigos que só o controlador consegue reverter com informação mantida separadamente.",
+    "suspensão temporária de qualquer operação de tratamento.",
+    "exclusão de dado armazenado em banco de dados.",
+    "criptografia dos dados com chave pública."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 5º, XI. A alternativa B descreve a PSEUDONIMIZAÇÃO (art. 13, § 4º); C é bloqueio (XIII); D, eliminação (XIV).",
+   "dispositivos": [
+    "art5.inc11"
+   ],
+   "trecho": "por meio dos quais um dado perde a possibilidade de associação, direta ou indireta, a um indivíduo"
+  },
+  {
+   "id": "lgpd-u1-04",
+   "unidade": "lgpd-u1",
+   "enunciado": "O consentimento, nos termos da LGPD, é a manifestação",
+   "alternativas": [
+    "expressa e por escrito pela qual o titular autoriza qualquer tratamento de seus dados.",
+    "tácita do titular, presumida pela utilização do serviço.",
+    "livre, informada e inequívoca pela qual o titular concorda com o tratamento de seus dados pessoais para uma finalidade determinada.",
+    "do controlador sobre a finalidade do tratamento.",
+    "livre e genérica, válida para todas as finalidades do controlador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 5º, XII: livre, informada e inequívoca, para finalidade DETERMINADA — consentimento genérico não vale.",
+   "dispositivos": [
+    "art5.inc12"
+   ],
+   "trecho": "manifestação livre, informada e inequívoca"
+  },
+  {
+   "id": "lgpd-u1-05",
+   "unidade": "lgpd-u1",
+   "enunciado": "O princípio da LGPD que determina a limitação do tratamento ao mínimo necessário para a realização de suas finalidades, com abrangência dos dados pertinentes, proporcionais e não excessivos, é o da",
+   "alternativas": [
+    "adequação.",
+    "finalidade.",
+    "prevenção.",
+    "necessidade.",
+    "qualidade dos dados."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 6º, III: necessidade (a ideia de minimização de dados). Adequação é a compatibilidade com as finalidades informadas (inciso II).",
+   "dispositivos": [
+    "art6.inc3"
+   ],
+   "trecho": "limitação do tratamento ao mínimo necessário para a realização de suas finalidades"
+  },
+  {
+   "id": "lgpd-u1-06",
+   "unidade": "lgpd-u1",
+   "enunciado": "A garantia, aos titulares, de consulta facilitada e gratuita sobre a forma e a duração do tratamento, bem como sobre a integralidade de seus dados pessoais, corresponde, na LGPD, ao princípio do(a)",
+   "alternativas": [
+    "transparência.",
+    "livre acesso.",
+    "qualidade dos dados.",
+    "responsabilização.",
+    "finalidade."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 6º, IV: livre acesso. Transparência (inciso VI) é informação clara sobre a realização do tratamento e os agentes.",
+   "dispositivos": [
+    "art6.inc4"
+   ],
+   "trecho": "garantia, aos titulares, de consulta facilitada e gratuita sobre a forma e a duração do tratamento"
+  },
+  {
+   "id": "lgpd-u1-07",
+   "unidade": "lgpd-u1",
+   "enunciado": "A demonstração, pelo agente, da adoção de medidas eficazes e capazes de comprovar a observância e o cumprimento das normas de proteção de dados pessoais, inclusive da eficácia dessas medidas, é, na LGPD, o princípio da",
+   "alternativas": [
+    "segurança.",
+    "prevenção.",
+    "transparência.",
+    "não discriminação.",
+    "responsabilização e prestação de contas."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 6º, X: responsabilização e prestação de contas (accountability).",
+   "dispositivos": [
+    "art6.inc10"
+   ],
+   "trecho": "responsabilização e prestação de contas"
+  },
+  {
+   "id": "lgpd-u1-08",
+   "unidade": "lgpd-u1",
+   "enunciado": "Conforme a LGPD, a utilização de medidas técnicas e administrativas aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda ou alteração traduz o princípio da",
+   "alternativas": [
+    "segurança.",
+    "prevenção.",
+    "necessidade.",
+    "adequação.",
+    "livre acesso."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 6º, VII: segurança. Prevenção (VIII) é adotar medidas para prevenir danos.",
+   "dispositivos": [
+    "art6.inc7"
+   ],
+   "trecho": "utilização de medidas técnicas e administrativas aptas a proteger os dados pessoais de acessos não autorizados"
+  },
+  {
+   "id": "lgpd-u1-09",
+   "unidade": "lgpd-u1",
+   "enunciado": "Nos termos da LGPD, o relatório de impacto à proteção de dados pessoais é documentação",
+   "alternativas": [
+    "da autoridade nacional, obrigatória para todo tratamento.",
+    "do operador, que descreve apenas os incidentes ocorridos.",
+    "do encarregado, dirigida exclusivamente aos titulares.",
+    "do controlador que contém a descrição dos processos de tratamento de dados pessoais que podem gerar riscos às liberdades civis e aos direitos fundamentais, bem como medidas, salvaguardas e mecanismos de mitigação de risco.",
+    "do titular, que autoriza o tratamento de dados sensíveis."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 5º, XVII: é documentação do CONTROLADOR.",
+   "dispositivos": [
+    "art5.inc17"
+   ],
+   "trecho": "documentação do controlador que contém a descrição dos processos de tratamento de dados pessoais"
+  },
+  {
+   "id": "lgpd-u2-01",
+   "unidade": "lgpd-u2",
+   "enunciado": "De acordo com a LGPD, os dados anonimizados",
+   "alternativas": [
+    "são sempre considerados dados pessoais.",
+    "não serão considerados dados pessoais, salvo quando o processo de anonimização for revertido, utilizando exclusivamente meios próprios, ou quando, com esforços razoáveis, puder ser revertido.",
+    "não serão considerados dados pessoais em nenhuma hipótese.",
+    "são considerados dados pessoais sensíveis.",
+    "só deixam de ser dados pessoais após autorização da autoridade nacional."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 12, caput: a anonimização tira o dado da LGPD, salvo se revertida (ou reversível com esforços razoáveis).",
+   "dispositivos": [
+    "art12"
+   ],
+   "trecho": "Os dados anonimizados não serão considerados dados pessoais para os fins desta Lei"
+  },
+  {
+   "id": "lgpd-u2-02",
+   "unidade": "lgpd-u2",
+   "enunciado": "Na determinação do que seja razoável para reverter a anonimização, a LGPD manda considerar fatores objetivos, tais como",
+   "alternativas": [
+    "a intenção subjetiva do controlador.",
+    "o valor comercial dos dados.",
+    "custo e tempo necessários para reverter o processo, de acordo com as tecnologias disponíveis, e a utilização exclusiva de meios próprios.",
+    "a quantidade de titulares envolvidos.",
+    "a natureza pública ou privada do controlador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 12, § 1º: custo, tempo, tecnologias disponíveis e uso exclusivo de meios próprios.",
+   "dispositivos": [
+    "art12.par1"
+   ],
+   "trecho": "tais como custo e tempo necessários para reverter o processo de anonimização"
+  },
+  {
+   "id": "lgpd-u2-03",
+   "unidade": "lgpd-u2",
+   "enunciado": "Segundo a LGPD, a pseudonimização é o tratamento por meio do qual um dado perde a possibilidade de associação, direta ou indireta, a um indivíduo,",
+   "alternativas": [
+    "de forma definitiva e irreversível.",
+    "senão pelo uso de informação adicional mantida separadamente pelo controlador em ambiente controlado e seguro.",
+    "mediante autorização da autoridade nacional.",
+    "desde que haja consentimento do titular.",
+    "apenas nos órgãos de pesquisa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 13, § 4º: a pseudonimização é reversível com a informação adicional guardada à parte — por isso o dado pseudonimizado continua pessoal.",
+   "dispositivos": [
+    "art13.par4"
+   ],
+   "trecho": "senão pelo uso de informação adicional mantida separadamente pelo controlador"
+  },
+  {
+   "id": "lgpd-u2-04",
+   "unidade": "lgpd-u2",
+   "enunciado": "Na realização de estudos em saúde pública, o órgão de pesquisa que tiver acesso a bases de dados pessoais, conforme a LGPD,",
+   "alternativas": [
+    "poderá transferir os dados a terceiros, desde que anonimizados.",
+    "poderá divulgar dados pessoais nos resultados, com consentimento do titular.",
+    "será o responsável pela segurança da informação, não permitida, em circunstância alguma, a transferência dos dados a terceiro.",
+    "compartilhará a responsabilidade pela segurança com a autoridade nacional.",
+    "está dispensado de manter os dados em ambiente controlado."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 13, § 2º: responsabilidade do órgão de pesquisa e vedação absoluta de transferência a terceiro; § 1º veda revelar dados pessoais nos resultados em qualquer hipótese.",
+   "dispositivos": [
+    "art13.par2"
+   ],
+   "trecho": "não permitida, em circunstância alguma, a transferência dos dados a terceiro"
+  },
+  {
+   "id": "lgpd-u2-05",
+   "unidade": "lgpd-u2",
+   "enunciado": "A divulgação dos resultados ou de qualquer excerto de estudo em saúde pública realizado com base de dados pessoais, nos termos da LGPD,",
+   "alternativas": [
+    "em nenhuma hipótese poderá revelar dados pessoais.",
+    "poderá revelar dados pessoais sensíveis, se anonimizados.",
+    "depende de autorização judicial.",
+    "poderá revelar dados pessoais com consentimento do órgão de pesquisa.",
+    "é vedada."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 13, § 1º: a divulgação é permitida, mas nunca pode revelar dados pessoais.",
+   "dispositivos": [
+    "art13.par1"
+   ],
+   "trecho": "em nenhuma hipótese poderá revelar dados pessoais"
+  },
+  {
+   "id": "lgpd-u3-01",
+   "unidade": "lgpd-u3",
+   "enunciado": "As medidas de segurança, técnicas e administrativas, aptas a proteger os dados pessoais, segundo a LGPD, deverão ser observadas",
+   "alternativas": [
+    "apenas após a entrada do produto em operação.",
+    "somente quando houver dados sensíveis.",
+    "a partir da primeira auditoria da autoridade nacional.",
+    "desde a fase de concepção do produto ou do serviço até a sua execução.",
+    "apenas durante a fase de testes do sistema."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 46, § 2º: privacidade desde a concepção (privacy by design).",
+   "dispositivos": [
+    "art46.par2"
+   ],
+   "trecho": "desde a fase de concepção do produto ou do serviço até a sua execução"
+  },
+  {
+   "id": "lgpd-u3-02",
+   "unidade": "lgpd-u3",
+   "enunciado": "A obrigação de garantir a segurança da informação em relação aos dados pessoais, conforme a LGPD, alcança os agentes de tratamento ou qualquer outra pessoa que intervenha em uma das fases do tratamento,",
+   "alternativas": [
+    "apenas enquanto durar o tratamento.",
+    "mesmo após o seu término.",
+    "somente se houver contrato escrito.",
+    "apenas quando se tratar de dados sensíveis.",
+    "até a comunicação à autoridade nacional."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 47: a obrigação persiste mesmo após o término do tratamento.",
+   "dispositivos": [
+    "art47"
+   ],
+   "trecho": "mesmo após o seu término"
+  },
+  {
+   "id": "lgpd-u3-03",
+   "unidade": "lgpd-u3",
+   "enunciado": "Ocorrendo incidente de segurança que possa acarretar risco ou dano relevante aos titulares, a LGPD determina que",
+   "alternativas": [
+    "o operador comunique apenas à autoridade policial.",
+    "o encarregado comunique apenas aos titulares, em até 24 horas.",
+    "o controlador comunique à autoridade nacional e ao titular.",
+    "o controlador comunique apenas à autoridade nacional, sob sigilo.",
+    "a comunicação seja facultativa quando os dados forem criptografados."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 48, caput: quem comunica é o CONTROLADOR, à ANPD E ao titular, em prazo razoável definido pela autoridade (§ 1º).",
+   "dispositivos": [
+    "art48"
+   ],
+   "trecho": "O controlador deverá comunicar à autoridade nacional e ao titular"
+  },
+  {
+   "id": "lgpd-u3-04",
+   "unidade": "lgpd-u3",
+   "enunciado": "Entre as informações que a comunicação de incidente de segurança deverá mencionar, no mínimo, conforme a LGPD, estão",
+   "alternativas": [
+    "os nomes de todos os empregados envolvidos no tratamento.",
+    "o faturamento do controlador no último exercício.",
+    "a descrição da natureza dos dados pessoais afetados, os riscos relacionados ao incidente e os motivos da demora, se a comunicação não tiver sido imediata.",
+    "o parecer jurídico do encarregado.",
+    "a lista de clientes do operador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 48, § 1º: natureza dos dados, titulares envolvidos, medidas de proteção, riscos, motivos da demora e medidas de reversão ou mitigação.",
+   "dispositivos": [
+    "art48.par1.inc1",
+    "art48.par1.inc5"
+   ],
+   "trecho": "os motivos da demora, no caso de a comunicação não ter sido imediata"
+  },
+  {
+   "id": "lgpd-u3-05",
+   "unidade": "lgpd-u3",
+   "enunciado": "No juízo de gravidade do incidente de segurança, a autoridade nacional avaliará, segundo a LGPD, eventual comprovação de que foram adotadas medidas técnicas adequadas que tornem os dados pessoais afetados",
+   "alternativas": [
+    "ininteligíveis, no âmbito e nos limites técnicos de seus serviços, para terceiros não autorizados a acessá-los.",
+    "públicos, para evitar especulação.",
+    "eliminados em até 24 horas.",
+    "transferidos para outro controlador.",
+    "anonimizados de forma irreversível, em qualquer caso."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 48, § 3º: dados ininteligíveis para terceiros não autorizados (ex.: criptografia) pesam no juízo de gravidade.",
+   "dispositivos": [
+    "art48.par3"
+   ],
+   "trecho": "que tornem os dados pessoais afetados ininteligíveis"
+  },
+  {
+   "id": "lgpd-u3-06",
+   "unidade": "lgpd-u3",
+   "enunciado": "Entre as providências que a autoridade nacional poderá determinar ao controlador, após verificar a gravidade de um incidente, a LGPD prevê",
+   "alternativas": [
+    "a prisão do encarregado.",
+    "a ampla divulgação do fato em meios de comunicação.",
+    "a dissolução da pessoa jurídica.",
+    "o bloqueio de todos os sistemas do controlador por prazo indeterminado.",
+    "a transferência da base de dados à autoridade nacional."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 48, § 2º, I e II: ampla divulgação do fato e medidas para reverter ou mitigar os efeitos.",
+   "dispositivos": [
+    "art48.par2.inc1"
+   ],
+   "trecho": "ampla divulgação do fato em meios de comunicação"
+  },
+  {
+   "id": "lgpd-u3-07",
+   "unidade": "lgpd-u3",
+   "enunciado": "Quanto às regras de boas práticas e de governança, a LGPD estabelece que controladores e operadores",
+   "alternativas": [
+    "são obrigados a formulá-las, sob pena de multa.",
+    "só podem formulá-las mediante autorização prévia da autoridade nacional.",
+    "poderão formulá-las, individualmente ou por meio de associações, e elas deverão ser publicadas e atualizadas periodicamente.",
+    "poderão formulá-las, dispensada a publicação.",
+    "devem submetê-las a homologação judicial."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 50, caput e § 3º: formulação FACULTATIVA ('poderão'), com publicação e atualização periódica; a ANPD pode reconhecê-las e divulgá-las.",
+   "dispositivos": [
+    "art50",
+    "art50.par3"
+   ],
+   "trecho": "poderão formular regras de boas práticas e de governança"
+  },
+  {
+   "id": "lgpd-u3-08",
+   "unidade": "lgpd-u3",
+   "enunciado": "O programa de governança em privacidade que o controlador poderá implementar, segundo a LGPD, deve, no mínimo,",
+   "alternativas": [
+    "ser aplicável apenas aos dados coletados após sua implantação.",
+    "ser aprovado pela autoridade nacional antes de entrar em vigor.",
+    "restringir-se aos dados pessoais sensíveis.",
+    "ser revisto a cada cinco anos.",
+    "contar com planos de resposta a incidentes e remediação e ser atualizado constantemente com base em monitoramento contínuo e avaliações periódicas."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 50, § 2º, I, g e h. O programa abrange TODO o conjunto de dados sob controle, independentemente de como foram coletados (alínea b).",
+   "dispositivos": [
+    "art50.par2.inc1.alig",
+    "art50.par2.inc1.alih"
+   ],
+   "trecho": "conte com planos de resposta a incidentes e remediação"
+  }
+ ]
+}

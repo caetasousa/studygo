@@ -20,3 +20,11 @@ backend/cover.html
 # Suíte E2E: dependências e o relatório de cada execução
 e2e/node_modules/
 e2e/relatorio/
+
+# Leis: o original baixado fica só na máquina de quem captura (o sha256 dele
+# está no captura.md), e o pacote é gerado por `make leis-pacote`.
+conteudo/leis/*/original.*
+conteudo/leis/pacotes/
+
+# Permissões locais do Claude Code (as skills em .claude/skills são versionadas)
+.claude/settings.local.json

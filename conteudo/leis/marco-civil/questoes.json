@@ -1,0 +1,488 @@
+{
+ "unidades": [
+  {
+   "ref": "marco-civil-u1",
+   "titulo": "Arts. 1º a 8º — Fundamentos, princípios, conceitos e direitos do usuário",
+   "dispositivos": [
+    "art1",
+    "art2",
+    "art3",
+    "art4",
+    "art5",
+    "art6",
+    "art7",
+    "art8"
+   ],
+   "hash": "76f5672419a2fe637899687279dd01495c335aaab5321e6e9a8552f5771a08dc"
+  },
+  {
+   "ref": "marco-civil-u2",
+   "titulo": "Arts. 9º a 17 — Neutralidade de rede e guarda de registros",
+   "dispositivos": [
+    "art9",
+    "art10",
+    "art11",
+    "art12",
+    "art13",
+    "art14",
+    "art15",
+    "art16",
+    "art17"
+   ],
+   "hash": "15a6f343c514a82de17f4d05acd02bdc9da233975fab8dded5b8de77e6788919"
+  }
+ ],
+ "questoes": [
+  {
+   "id": "marco-civil-u1-01",
+   "unidade": "marco-civil-u1",
+   "enunciado": "De acordo com o Marco Civil da Internet (Lei nº 12.965/2014), a disciplina do uso da internet no Brasil tem como fundamento",
+   "alternativas": [
+    "a neutralidade de rede.",
+    "o respeito à liberdade de expressão.",
+    "a proteção dos dados pessoais.",
+    "a soberania digital do Estado.",
+    "a segurança nacional."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 2º, caput: o fundamento é o respeito à liberdade de expressão. Neutralidade de rede e proteção de dados são PRINCÍPIOS (art. 3º, IV e III).",
+   "dispositivos": [
+    "art2"
+   ],
+   "trecho": "tem como fundamento o respeito à liberdade de expressão"
+  },
+  {
+   "id": "marco-civil-u1-02",
+   "unidade": "marco-civil-u1",
+   "enunciado": "É princípio da disciplina do uso da internet no Brasil, expresso no Marco Civil da Internet,",
+   "alternativas": [
+    "o reconhecimento da escala mundial da rede.",
+    "a abertura e a colaboração.",
+    "a preservação e garantia da neutralidade de rede.",
+    "a finalidade social da rede.",
+    "a pluralidade e a diversidade."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 3º, IV. As demais alternativas são FUNDAMENTOS (art. 2º, I, IV, VI e III) — a FCC gosta de trocar os dois róis.",
+   "dispositivos": [
+    "art3.inc4"
+   ],
+   "trecho": "preservação e garantia da neutralidade de rede"
+  },
+  {
+   "id": "marco-civil-u1-03",
+   "unidade": "marco-civil-u1",
+   "enunciado": "Os princípios expressos no Marco Civil da Internet, segundo a própria lei,",
+   "alternativas": [
+    "excluem outros previstos em tratados internacionais.",
+    "prevalecem sobre a Constituição Federal.",
+    "aplicam-se apenas aos provedores de conexão.",
+    "não excluem outros previstos no ordenamento jurídico pátrio relacionados à matéria ou nos tratados internacionais em que o Brasil seja parte.",
+    "dependem de regulamentação para produzir efeitos."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 3º, parágrafo único: o rol não é exaustivo.",
+   "dispositivos": [
+    "art3.parunico"
+   ],
+   "trecho": "Os princípios expressos nesta Lei não excluem outros previstos no ordenamento jurídico pátrio"
+  },
+  {
+   "id": "marco-civil-u1-04",
+   "unidade": "marco-civil-u1",
+   "enunciado": "Para os efeitos do Marco Civil da Internet, o código atribuído a um terminal de uma rede para permitir sua identificação, definido segundo parâmetros internacionais, é",
+   "alternativas": [
+    "o endereço de protocolo de internet (endereço IP).",
+    "o registro de conexão.",
+    "o sistema autônomo.",
+    "o terminal.",
+    "a aplicação de internet."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 5º, III.",
+   "dispositivos": [
+    "art5.inc3"
+   ],
+   "trecho": "o código atribuído a um terminal de uma rede para permitir sua identificação"
+  },
+  {
+   "id": "marco-civil-u1-05",
+   "unidade": "marco-civil-u1",
+   "enunciado": "Nos termos do Marco Civil da Internet, o conjunto de informações referentes à data e hora de início e término de uma conexão à internet, sua duração e o endereço IP utilizado pelo terminal denomina-se",
+   "alternativas": [
+    "registro de acesso a aplicações de internet.",
+    "conexão à internet.",
+    "dado pessoal.",
+    "log de aplicação.",
+    "registro de conexão."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 5º, VI. Registro de ACESSO A APLICAÇÕES (inciso VIII) é data e hora de uso de uma aplicação a partir de um IP.",
+   "dispositivos": [
+    "art5.inc6"
+   ],
+   "trecho": "o conjunto de informações referentes à data e hora de início e término de uma conexão à internet"
+  },
+  {
+   "id": "marco-civil-u1-06",
+   "unidade": "marco-civil-u1",
+   "enunciado": "Segundo o Marco Civil da Internet, é assegurado ao usuário a não suspensão da conexão à internet,",
+   "alternativas": [
+    "salvo por débito diretamente decorrente de sua utilização.",
+    "em nenhuma hipótese.",
+    "salvo por ordem da autoridade administrativa.",
+    "salvo por decisão do provedor de aplicações.",
+    "salvo por inadimplemento de qualquer natureza com o provedor."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 7º, IV: só o débito DIRETAMENTE decorrente da utilização autoriza a suspensão.",
+   "dispositivos": [
+    "art7.inc4"
+   ],
+   "trecho": "salvo por débito diretamente decorrente de sua utilização"
+  },
+  {
+   "id": "marco-civil-u1-07",
+   "unidade": "marco-civil-u1",
+   "enunciado": "A inviolabilidade e o sigilo das comunicações privadas armazenadas do usuário, conforme o Marco Civil da Internet, são assegurados",
+   "alternativas": [
+    "salvo por requisição do Ministério Público.",
+    "de forma absoluta, sem exceção.",
+    "salvo por ordem judicial.",
+    "salvo por requisição da autoridade policial.",
+    "salvo por consentimento do provedor."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 7º, III: a única exceção é a ordem judicial.",
+   "dispositivos": [
+    "art7.inc3"
+   ],
+   "trecho": "inviolabilidade e sigilo de suas comunicações privadas armazenadas, salvo por ordem judicial"
+  },
+  {
+   "id": "marco-civil-u1-08",
+   "unidade": "marco-civil-u1",
+   "enunciado": "O consentimento do usuário sobre coleta, uso, armazenamento e tratamento de dados pessoais, nos termos do Marco Civil da Internet, deverá ser",
+   "alternativas": [
+    "tácito, quando o serviço for gratuito.",
+    "expresso e ocorrer de forma destacada das demais cláusulas contratuais.",
+    "renovado anualmente.",
+    "dispensado nas relações de consumo.",
+    "dado por escrito, com firma reconhecida."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 7º, IX: consentimento EXPRESSO, de forma DESTACADA das demais cláusulas.",
+   "dispositivos": [
+    "art7.inc9"
+   ],
+   "trecho": "que deverá ocorrer de forma destacada das demais cláusulas contratuais"
+  },
+  {
+   "id": "marco-civil-u1-09",
+   "unidade": "marco-civil-u1",
+   "enunciado": "Ao término da relação entre as partes, o usuário tem direito, segundo o Marco Civil da Internet, à exclusão definitiva dos dados pessoais que tiver fornecido a determinada aplicação de internet,",
+   "alternativas": [
+    "automaticamente, sem necessidade de requerimento.",
+    "apenas mediante ordem judicial.",
+    "salvo se o provedor for estrangeiro.",
+    "somente após cinco anos.",
+    "a seu requerimento, ressalvadas as hipóteses de guarda obrigatória de registros previstas em lei."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 7º, X: a exclusão é a REQUERIMENTO do usuário, ressalvada a guarda obrigatória.",
+   "dispositivos": [
+    "art7.inc10"
+   ],
+   "trecho": "a seu requerimento, ao término da relação entre as partes"
+  },
+  {
+   "id": "marco-civil-u1-10",
+   "unidade": "marco-civil-u1",
+   "enunciado": "São nulas de pleno direito, conforme o Marco Civil da Internet, as cláusulas contratuais que, em contrato de adesão,",
+   "alternativas": [
+    "prevejam a arbitragem.",
+    "fixem o foro do domicílio do consumidor.",
+    "estabeleçam a cobrança pelo serviço de conexão.",
+    "não ofereçam como alternativa ao contratante a adoção do foro brasileiro para solução de controvérsias decorrentes de serviços prestados no Brasil.",
+    "limitem a velocidade da conexão contratada."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 8º, parágrafo único, II.",
+   "dispositivos": [
+    "art8.parunico.inc2"
+   ],
+   "trecho": "não ofereçam como alternativa ao contratante a adoção do foro brasileiro"
+  },
+  {
+   "id": "marco-civil-u1-11",
+   "unidade": "marco-civil-u1",
+   "enunciado": "De acordo com o Marco Civil da Internet, o acesso à internet é",
+   "alternativas": [
+    "serviço público de titularidade da União.",
+    "essencial ao exercício da cidadania.",
+    "direito condicionado à prévia identificação do usuário.",
+    "atividade privativa das empresas de telecomunicações.",
+    "direito fundamental previsto no art. 5º da Constituição Federal."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 7º, caput: 'essencial ao exercício da cidadania'.",
+   "dispositivos": [
+    "art7"
+   ],
+   "trecho": "O acesso à internet é essencial ao exercício da cidadania"
+  },
+  {
+   "id": "marco-civil-u2-01",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Pelo princípio da neutralidade de rede, o responsável pela transmissão, comutação ou roteamento, segundo o Marco Civil da Internet, tem o dever de",
+   "alternativas": [
+    "priorizar os pacotes de dados de serviços pagos.",
+    "tratar de forma isonômica quaisquer pacotes de dados, sem distinção por conteúdo, origem e destino, serviço, terminal ou aplicação.",
+    "bloquear conteúdos ilícitos independentemente de ordem judicial.",
+    "analisar o conteúdo dos pacotes para garantir a segurança da rede.",
+    "tratar de forma diferenciada os pacotes conforme o terminal utilizado."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 9º, caput: tratamento isonômico, sem distinção por conteúdo, origem e destino, serviço, terminal ou aplicação.",
+   "dispositivos": [
+    "art9"
+   ],
+   "trecho": "tem o dever de tratar de forma isonômica quaisquer pacotes de dados"
+  },
+  {
+   "id": "marco-civil-u2-02",
+   "unidade": "marco-civil-u2",
+   "enunciado": "A discriminação ou degradação do tráfego, nos termos do Marco Civil da Internet, somente poderá decorrer de",
+   "alternativas": [
+    "requisitos técnicos indispensáveis à prestação adequada dos serviços e aplicações e priorização de serviços de emergência.",
+    "interesses comerciais do provedor, desde que informados ao usuário.",
+    "ordem da Agência Nacional de Telecomunicações.",
+    "congestionamento da rede em horário de pico, a critério do provedor.",
+    "acordo entre o provedor e o usuário."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 9º, § 1º, I e II; a regulamentação é do Presidente da República, ouvidos o CGI.br e a Anatel.",
+   "dispositivos": [
+    "art9.par1.inc1",
+    "art9.par1.inc2"
+   ],
+   "trecho": "priorização de serviços de emergência"
+  },
+  {
+   "id": "marco-civil-u2-03",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Na provisão de conexão à internet, onerosa ou gratuita, o Marco Civil da Internet",
+   "alternativas": [
+    "permite filtrar o conteúdo dos pacotes para fins comerciais.",
+    "permite monitorar os pacotes de dados mediante consentimento tácito.",
+    "veda bloquear, monitorar, filtrar ou analisar o conteúdo dos pacotes de dados, respeitado o disposto no art. 9º.",
+    "obriga o provedor a analisar o conteúdo dos pacotes.",
+    "veda apenas o bloqueio de pacotes, permitida sua análise."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 9º, § 3º: vedados o bloqueio, o monitoramento, a filtragem e a análise do conteúdo dos pacotes.",
+   "dispositivos": [
+    "art9.par3"
+   ],
+   "trecho": "é vedado bloquear, monitorar, filtrar ou analisar o conteúdo dos pacotes de dados"
+  },
+  {
+   "id": "marco-civil-u2-04",
+   "unidade": "marco-civil-u2",
+   "enunciado": "O provedor responsável pela guarda somente será obrigado a disponibilizar os registros de conexão e de acesso a aplicações de internet, conforme o Marco Civil da Internet,",
+   "alternativas": [
+    "mediante requisição da autoridade policial.",
+    "mediante requisição do Ministério Público.",
+    "mediante solicitação de qualquer interessado.",
+    "mediante ordem judicial.",
+    "mediante requisição da autoridade administrativa."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 10, § 1º: ordem judicial. Autoridades administrativas com competência legal podem acessar só os DADOS CADASTRAIS (§ 3º).",
+   "dispositivos": [
+    "art10.par1"
+   ],
+   "trecho": "mediante ordem judicial"
+  },
+  {
+   "id": "marco-civil-u2-05",
+   "unidade": "marco-civil-u2",
+   "enunciado": "O acesso aos dados cadastrais que informem qualificação pessoal, filiação e endereço, segundo o Marco Civil da Internet,",
+   "alternativas": [
+    "depende sempre de ordem judicial.",
+    "é vedado em qualquer hipótese.",
+    "é livre a qualquer pessoa.",
+    "depende de consentimento expresso do titular.",
+    "pode ser feito, na forma da lei, pelas autoridades administrativas que detenham competência legal para a sua requisição."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 10, § 3º: dados cadastrais não exigem ordem judicial quando requisitados por autoridade administrativa competente.",
+   "dispositivos": [
+    "art10.par3"
+   ],
+   "trecho": "pelas autoridades administrativas que detenham competência legal para a sua requisição"
+  },
+  {
+   "id": "marco-civil-u2-06",
+   "unidade": "marco-civil-u2",
+   "enunciado": "A legislação brasileira deve ser respeitada nas operações de coleta, guarda e tratamento de dados por provedores, segundo o Marco Civil da Internet,",
+   "alternativas": [
+    "mesmo que as atividades sejam realizadas por pessoa jurídica sediada no exterior, desde que oferte serviço ao público brasileiro ou pelo menos uma integrante do mesmo grupo econômico possua estabelecimento no Brasil.",
+    "apenas quando o provedor tiver sede no Brasil.",
+    "apenas quando todos os atos ocorrerem em território nacional.",
+    "apenas quando ambos os terminais estiverem no Brasil.",
+    "somente se houver tratado internacional."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 11, caput e § 2º: basta um dos atos no território nacional; alcança pessoa jurídica estrangeira que oferte serviço ao público brasileiro ou tenha integrante do grupo estabelecida no Brasil.",
+   "dispositivos": [
+    "art11.par2"
+   ],
+   "trecho": "mesmo que as atividades sejam realizadas por pessoa jurídica sediada no exterior"
+  },
+  {
+   "id": "marco-civil-u2-07",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Entre as sanções previstas no Marco Civil da Internet para infrações às normas sobre guarda de registros e dados está a multa de até",
+   "alternativas": [
+    "2% do faturamento do grupo econômico no Brasil.",
+    "10% do faturamento do grupo econômico no Brasil no seu último exercício, excluídos os tributos.",
+    "50 milhões de reais por infração.",
+    "10% do faturamento mundial do grupo econômico.",
+    "20% do lucro líquido do infrator."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 12, II: até 10% do faturamento do grupo econômico NO BRASIL, excluídos os tributos. (O teto de 2% e R$ 50 milhões é da LGPD.)",
+   "dispositivos": [
+    "art12.inc2"
+   ],
+   "trecho": "multa de até 10% (dez por cento) do faturamento do grupo econômico no Brasil"
+  },
+  {
+   "id": "marco-civil-u2-08",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Tratando-se de empresa estrangeira, pelo pagamento da multa prevista no Marco Civil da Internet",
+   "alternativas": [
+    "responde apenas a matriz no exterior.",
+    "não há responsabilidade no Brasil.",
+    "responde subsidiariamente o representante legal.",
+    "responde solidariamente sua filial, sucursal, escritório ou estabelecimento situado no País.",
+    "responde o Estado brasileiro, com direito de regresso."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 12, parágrafo único: responsabilidade SOLIDÁRIA da filial, sucursal, escritório ou estabelecimento no País.",
+   "dispositivos": [
+    "art12.parunico"
+   ],
+   "trecho": "responde solidariamente pelo pagamento da multa"
+  },
+  {
+   "id": "marco-civil-u2-09",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Na provisão de conexão à internet, o administrador de sistema autônomo deve manter os registros de conexão, sob sigilo, em ambiente controlado e de segurança, pelo prazo de",
+   "alternativas": [
+    "6 meses.",
+    "2 anos.",
+    "1 ano.",
+    "5 anos.",
+    "90 dias."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 13: registros de CONEXÃO, 1 ano. Registros de acesso a APLICAÇÕES, 6 meses (art. 15).",
+   "dispositivos": [
+    "art13"
+   ],
+   "trecho": "pelo prazo de 1 (um) ano"
+  },
+  {
+   "id": "marco-civil-u2-10",
+   "unidade": "marco-civil-u2",
+   "enunciado": "O provedor de aplicações de internet constituído na forma de pessoa jurídica que exerça essa atividade de forma organizada, profissionalmente e com fins econômicos deverá manter os registros de acesso a aplicações de internet pelo prazo de",
+   "alternativas": [
+    "1 ano.",
+    "6 meses.",
+    "3 meses.",
+    "2 anos.",
+    "30 dias."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 15, caput: 6 meses, sob sigilo, em ambiente controlado e de segurança.",
+   "dispositivos": [
+    "art15"
+   ],
+   "trecho": "pelo prazo de 6 (seis) meses"
+  },
+  {
+   "id": "marco-civil-u2-11",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Requerida cautelarmente pela autoridade policial ou administrativa ou pelo Ministério Público a guarda dos registros de conexão por prazo superior ao legal, a autoridade requerente terá, para ingressar com o pedido de autorização judicial de acesso,",
+   "alternativas": [
+    "30 dias contados do requerimento.",
+    "90 dias contados do requerimento.",
+    "60 dias contados da resposta do provedor.",
+    "10 dias contados do requerimento.",
+    "60 dias contados a partir do requerimento."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 13, § 3º: 60 dias a partir do REQUERIMENTO; sem o pedido no prazo, o requerimento perde a eficácia (§ 4º).",
+   "dispositivos": [
+    "art13.par3"
+   ],
+   "trecho": "terá o prazo de 60 (sessenta) dias, contados a partir do requerimento"
+  },
+  {
+   "id": "marco-civil-u2-12",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Na provisão de conexão, onerosa ou gratuita, quanto aos registros de acesso a aplicações de internet, o Marco Civil da Internet",
+   "alternativas": [
+    "veda sua guarda.",
+    "obriga sua guarda por 1 ano.",
+    "obriga sua guarda por 6 meses.",
+    "permite sua guarda com consentimento tácito do usuário.",
+    "permite sua guarda para fins estatísticos."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 14: o provedor de CONEXÃO não pode guardar registros de acesso a aplicações.",
+   "dispositivos": [
+    "art14"
+   ],
+   "trecho": "é vedado guardar os registros de acesso a aplicações de internet"
+  },
+  {
+   "id": "marco-civil-u2-13",
+   "unidade": "marco-civil-u2",
+   "enunciado": "A responsabilidade pela manutenção dos registros de conexão, segundo o Marco Civil da Internet,",
+   "alternativas": [
+    "pode ser transferida a empresa especializada, mediante contrato.",
+    "pode ser transferida à Anatel.",
+    "é compartilhada com o usuário.",
+    "não poderá ser transferida a terceiros.",
+    "pode ser transferida ao provedor de aplicações."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 13, § 1º: intransferível.",
+   "dispositivos": [
+    "art13.par1"
+   ],
+   "trecho": "não poderá ser transferida a terceiros"
+  },
+  {
+   "id": "marco-civil-u2-14",
+   "unidade": "marco-civil-u2",
+   "enunciado": "Conforme o Marco Civil da Internet, ressalvadas as hipóteses nele previstas, a opção por não guardar os registros de acesso a aplicações de internet",
+   "alternativas": [
+    "implica responsabilidade objetiva pelos danos decorrentes do uso dos serviços por terceiros.",
+    "implica responsabilidade subsidiária do provedor.",
+    "não implica responsabilidade sobre danos decorrentes do uso desses serviços por terceiros.",
+    "sujeita o provedor à multa de até 10% do faturamento.",
+    "é vedada a todo provedor de aplicações."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 17: não guardar os registros (quando não obrigatório) não gera responsabilidade por danos causados por terceiros.",
+   "dispositivos": [
+    "art17"
+   ],
+   "trecho": "não implica responsabilidade sobre danos decorrentes do uso desses serviços por terceiros"
+  }
+ ]
+}

@@ -1,0 +1,2536 @@
+{
+ "unidades": [
+  {
+   "ref": "go-lei-16168-u1",
+   "titulo": "Título I — Competência e jurisdição (arts. 1º a 5º)",
+   "dispositivos": [
+    "tit1"
+   ],
+   "hash": "1b0a12520da09e8b0f36e3043bfb11e6a9b05b5c3ada77549f5040d18786d8d2"
+  },
+  {
+   "ref": "go-lei-16168-u2",
+   "titulo": "Título II, Caps. I a III — Sede, Plenário, Câmaras e dirigentes (arts. 6º a 16-G)",
+   "dispositivos": [
+    "tit2.cap1",
+    "tit2.cap2",
+    "tit2.cap3"
+   ],
+   "hash": "18aae43bb173988cc31e97ecdba6c2c74f2cf27da018e414862db56e7dccf87d"
+  },
+  {
+   "ref": "go-lei-16168-u3",
+   "titulo": "Título II, Caps. IV a VII — Conselheiros, Auditores, Ministério Público de Contas e serviços (arts. 17 a 40)",
+   "dispositivos": [
+    "tit2.cap4",
+    "tit2.cap5",
+    "tit2.cap6",
+    "tit2.cap7"
+   ],
+   "hash": "3531caebff4ed3b83a986f9635f84aade6d5c37bbb4c2a30b2a020a158d9edfd"
+  },
+  {
+   "ref": "go-lei-16168-u4",
+   "titulo": "Título III — Controle interno (arts. 41 a 44-A)",
+   "dispositivos": [
+    "tit3"
+   ],
+   "hash": "f41b7c19f5635b7df98a6bf7dbd178ba223a9e326144bd32bfbe12e384e8807e"
+  },
+  {
+   "ref": "go-lei-16168-u5",
+   "titulo": "Título IV, Cap. I — Processo em geral, comunicações e prazos (arts. 45 a 55)",
+   "dispositivos": [
+    "tit4.cap1"
+   ],
+   "hash": "29b0dd806819a7bc66cf16d29634f19b96b45b88f2b7d9c326362ca071765322"
+  },
+  {
+   "ref": "go-lei-16168-u6",
+   "titulo": "Título IV, Cap. II, Seções I a III — Contas do Governador, tomada e prestação de contas e TCE (arts. 55-A a 65)",
+   "dispositivos": [
+    "tit4.cap2.sec1",
+    "tit4.cap2.sec2",
+    "tit4.cap2.sec3"
+   ],
+   "hash": "c836dbc4205024e1e27e4e357ec1e861cf2706c27e275cdb083d7e1a23efd663"
+  },
+  {
+   "ref": "go-lei-16168-u7",
+   "titulo": "Título IV, Cap. II, Seções IV e V — Decisões em contas e sua execução (arts. 66 a 84)",
+   "dispositivos": [
+    "tit4.cap2.sec4",
+    "tit4.cap2.sec5"
+   ],
+   "hash": "b7bd5fa65974b2d3ad7fb37a883bb7d80c6dacf76af8aeb001dbf787c3cdf2d5"
+  },
+  {
+   "ref": "go-lei-16168-u8",
+   "titulo": "Título IV, Cap. III, Seção I — Iniciativa da fiscalização, denúncia e representação (arts. 85 a 91)",
+   "dispositivos": [
+    "tit4.cap3.sec1"
+   ],
+   "hash": "9b0d47bae86acfa5d78b5adc480b51f5e09e7a0ead30e48c29704dc98aa37ae4"
+  },
+  {
+   "ref": "go-lei-16168-u9",
+   "titulo": "Título IV, Cap. III, Seções II a V — Instrumentos, plano, execução e objeto da fiscalização (arts. 92 a 103)",
+   "dispositivos": [
+    "tit4.cap3.sec2",
+    "tit4.cap3.sec3",
+    "tit4.cap3.sec4",
+    "tit4.cap3.sec5"
+   ],
+   "hash": "654089bf8ca1f39ca7eb286b734717f0efce4c273eb501933953c22f79b16ee2"
+  },
+  {
+   "ref": "go-lei-16168-u10",
+   "titulo": "Título IV, Caps. IV a V — Atos sujeitos a registro, prescrição e consulta (arts. 104 a 109)",
+   "dispositivos": [
+    "tit4.cap4",
+    "tit4.cap4-a",
+    "tit4.cap5"
+   ],
+   "hash": "c0b5e81b98331f9013829da2c1813fd7b1008b571ef2f2934e616278e7e059a7"
+  },
+  {
+   "ref": "go-lei-16168-u11",
+   "titulo": "Títulos V e VI — Sanções e medidas cautelares (arts. 110 a 119)",
+   "dispositivos": [
+    "tit5",
+    "tit6"
+   ],
+   "hash": "8ce702ba20832d00741e4489465c827139304b772eee4ef857cef033d40228d2"
+  },
+  {
+   "ref": "go-lei-16168-u12",
+   "titulo": "Título VII — Recursos e revisão (arts. 120 a 129)",
+   "dispositivos": [
+    "tit7"
+   ],
+   "hash": "68ad8f9097ee2fd97684cb9e55d7ca9b8b5be96bdafd1c463b2f6d2337b62d63"
+  },
+  {
+   "ref": "go-lei-16168-u13",
+   "titulo": "Títulos VIII e IX — Jurisprudência, incidentes e disposições gerais (arts. 129-A a 148)",
+   "dispositivos": [
+    "tit8",
+    "tit9"
+   ],
+   "hash": "8c69405a473aeae55197837b279dbb1ecf76cb0cd37ca50cbb93f3a75e860f41"
+  }
+ ],
+ "questoes": [
+  {
+   "id": "go-lei-16168-u1-01",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "De acordo com a Lei Orgânica do TCE-GO (Lei nº 16.168/2007), o parecer prévio sobre as contas prestadas anualmente pelo Governador deverá ser elaborado no prazo de",
+   "alternativas": [
+    "60 dias, a contar de seu recebimento.",
+    "45 dias, a contar do encerramento do exercício.",
+    "30 dias, a contar de seu recebimento.",
+    "90 dias, a contar de seu recebimento.",
+    "60 dias, a contar da abertura da sessão legislativa."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 1º, I: 60 dias do recebimento — o mesmo prazo da CF para as contas do Presidente.",
+   "dispositivos": [
+    "art1.inc1"
+   ],
+   "trecho": "mediante parecer prévio que deverá ser elaborado no prazo de 60 (sessenta) dias, a contar de seu recebimento"
+  },
+  {
+   "id": "go-lei-16168-u1-02",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Compete ao Tribunal de Contas do Estado de Goiás, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "julgar as contas prestadas anualmente pelo Governador.",
+    "apreciar, para fins de registro, as nomeações para cargo de provimento em comissão.",
+    "julgar as contas dos administradores e demais responsáveis por dinheiros, bens e valores públicos da administração direta e indireta.",
+    "sustar diretamente contratos da administração estadual, sem participação da Assembleia.",
+    "apreciar as contas dos administradores de fundações, mediante parecer prévio."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 1º, II: o TCE-GO JULGA as contas dos administradores; as do Governador ele APRECIA por parecer prévio (inciso I).",
+   "dispositivos": [
+    "art1.inc2"
+   ],
+   "trecho": "julgar as contas dos administradores e demais responsáveis por dinheiros, bens e valores públicos"
+  },
+  {
+   "id": "go-lei-16168-u1-03",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Verificada ilegalidade, o TCE-GO pode assinar prazo para que o órgão ou entidade adote as providências necessárias ao exato cumprimento da lei. Esse prazo, conforme a Lei nº 16.168/2007, é de",
+   "alternativas": [
+    "até 15 dias, improrrogável.",
+    "até 30 dias, prorrogável uma única vez por 15 dias.",
+    "até 60 dias, prorrogável por igual período.",
+    "até 90 dias, improrrogável.",
+    "até 30 dias, prorrogável por igual período."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 1º, XIX: até 30 dias, prorrogável por igual período. A CF (art. 71, IX) não fixa o número — a lei estadual fixa.",
+   "dispositivos": [
+    "art1.inc19"
+   ],
+   "trecho": "assinar prazo de até 30 (trinta) dias, prorrogável por igual período"
+  },
+  {
+   "id": "go-lei-16168-u1-04",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Em relação à sustação de contratos, a Lei Orgânica do TCE-GO estabelece que o Tribunal",
+   "alternativas": [
+    "susta diretamente o contrato, comunicando a decisão à Assembleia Legislativa.",
+    "requer à Assembleia Legislativa a sustação e decide a respeito se ela, no prazo de 90 dias, não efetivar as medidas cabíveis.",
+    "requer ao Governador a sustação, que deve decidir em 30 dias.",
+    "decide a respeito se a Assembleia Legislativa não se manifestar em 30 dias.",
+    "não tem competência sobre contratos, apenas sobre atos."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 1º, XXI e XXII: o Tribunal requer a sustação à Assembleia; se em 90 dias ela não agir, o Tribunal decide. Sustação direta, por medida cautelar, é do ATO impugnado (inciso XX).",
+   "dispositivos": [
+    "art1.inc21",
+    "art1.inc22"
+   ],
+   "trecho": "quando, no prazo de 90 (noventa) dias, a Assembléia Legislativa não efetivar as medidas que lhe forem cabíveis"
+  },
+  {
+   "id": "go-lei-16168-u1-05",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "O pronunciamento conclusivo sobre matéria submetida pela comissão permanente da Assembleia Legislativa, nos termos do art. 27 da Constituição Estadual, deve ser emitido pelo TCE-GO no prazo de",
+   "alternativas": [
+    "5 dias úteis.",
+    "15 dias contados da publicação da solicitação.",
+    "60 dias contados do recebimento da solicitação.",
+    "30 dias contados da data do recebimento da solicitação.",
+    "90 dias contados do recebimento."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 1º, XV: 30 dias do recebimento da solicitação.",
+   "dispositivos": [
+    "art1.inc15"
+   ],
+   "trecho": "no prazo de 30 (trinta) dias contados da data do recebimento da solicitação"
+  },
+  {
+   "id": "go-lei-16168-u1-06",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "No julgamento de contas e na fiscalização que lhe compete, o TCE-GO decidirá, segundo sua Lei Orgânica, sobre",
+   "alternativas": [
+    "a legalidade, a legitimidade, a economicidade, a eficiência, a eficácia, a efetividade, a razoabilidade e a proporcionalidade dos atos de gestão e das despesas deles decorrentes.",
+    "a legalidade e a conveniência política das despesas.",
+    "a legalidade e a legitimidade, vedado o exame de economicidade.",
+    "a oportunidade e a conveniência dos atos discricionários, com exclusividade.",
+    "apenas a legalidade dos atos de gestão."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 1º, § 1º: o rol estadual é mais amplo que o da CF (art. 70), incluindo eficiência, eficácia, efetividade, razoabilidade e proporcionalidade.",
+   "dispositivos": [
+    "art1.par1"
+   ],
+   "trecho": "a legalidade, a legitimidade, a economicidade, a eficiência, a eficácia, a efetividade, a razoabilidade e a proporcionalidade"
+  },
+  {
+   "id": "go-lei-16168-u1-07",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Quanto à sua prestação de contas, a Lei Orgânica determina que o Tribunal de Contas do Estado de Goiás",
+   "alternativas": [
+    "está dispensado de prestar contas, por ser órgão de controle.",
+    "prestará contas ao Governador, que as encaminhará à Assembleia.",
+    "prestará contas anuais à Assembleia Legislativa, bem como encaminhará relatórios trimestrais e anual de suas atividades.",
+    "prestará contas semestrais ao Tribunal de Justiça.",
+    "encaminhará apenas relatório anual à Assembleia, dispensada a prestação de contas."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 1º, § 3º: contas anuais à Assembleia + relatórios trimestrais e anual de atividades.",
+   "dispositivos": [
+    "art1.par3"
+   ],
+   "trecho": "O Tribunal de Contas prestará contas anuais à Assembléia Legislativa"
+  },
+  {
+   "id": "go-lei-16168-u1-08",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "O poder de investigação do TCE-GO, conforme sua Lei Orgânica, permite-lhe requisitar e examinar os elementos necessários ao exercício de suas atribuições",
+   "alternativas": [
+    "apenas mediante autorização judicial.",
+    "apenas por intermédio do Ministério Público de Contas.",
+    "somente durante auditorias previstas no plano de fiscalização.",
+    "desde que haja prévia comunicação ao gestor com 30 dias de antecedência.",
+    "a qualquer tempo, não lhe podendo ser sonegado processo, documento ou informação, a qualquer pretexto, sob pena de responsabilidade."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 1º, § 4º: amplo poder de investigação, a qualquer tempo, sem sonegação a qualquer pretexto.",
+   "dispositivos": [
+    "art1.par4"
+   ],
+   "trecho": "não lhe podendo ser sonegado processo, documento ou informação, a qualquer pretexto, sob pena de responsabilidade"
+  },
+  {
+   "id": "go-lei-16168-u1-09",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Segundo a Lei nº 16.168/2007, ao Tribunal de Contas do Estado de Goiás, no âmbito de sua competência e jurisdição,",
+   "alternativas": [
+    "é vedado expedir atos normativos.",
+    "assiste o poder regulamentar, podendo expedir atos normativos sobre matéria de sua atribuição, obrigando os jurisdicionados ao seu cumprimento, sob pena de responsabilidade.",
+    "cabe apenas propor projetos de lei à Assembleia sobre matéria de sua atribuição.",
+    "assiste o poder regulamentar, dependendo cada ato de aprovação da Assembleia.",
+    "cabe editar decretos autônomos com força de lei."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 2º: poder regulamentar sobre matéria de sua atribuição e organização dos processos, com força obrigatória para os jurisdicionados.",
+   "dispositivos": [
+    "art2"
+   ],
+   "trecho": "assiste o poder regulamentar"
+  },
+  {
+   "id": "go-lei-16168-u1-10",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "A jurisdição do Tribunal de Contas do Estado de Goiás, segundo sua Lei Orgânica, é",
+   "alternativas": [
+    "concorrente com a do Tribunal de Contas da União em todo o território estadual.",
+    "própria, mas dependente de homologação da Assembleia Legislativa.",
+    "restrita à capital do Estado.",
+    "própria e privativa em todo o território estadual, sobre as pessoas e matérias sujeitas à sua competência.",
+    "compartilhada com os Tribunais de Contas dos Municípios."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 3º: jurisdição própria e privativa em todo o território estadual.",
+   "dispositivos": [
+    "art3"
+   ],
+   "trecho": "tem jurisdição própria e privativa em todo o território estadual"
+  },
+  {
+   "id": "go-lei-16168-u1-11",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Os sucessores dos administradores e responsáveis estão sujeitos à jurisdição do TCE-GO, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "até o limite do valor do patrimônio transferido.",
+    "apenas se tiverem participado dos atos de gestão.",
+    "sem qualquer limite.",
+    "somente em caso de dolo do sucedido.",
+    "até o limite de dez vezes o valor do dano."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 4º, VIII: até o limite do patrimônio transferido (CF, art. 5º, XLV).",
+   "dispositivos": [
+    "art4.inc8"
+   ],
+   "trecho": "até o limite do valor do patrimônio transferido"
+  },
+  {
+   "id": "go-lei-16168-u1-12",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Os representantes do Estado na assembleia geral das empresas estatais e sociedades anônimas de cujo capital o Estado participe respondem perante o TCE-GO, pela prática de atos de gestão ruinosa ou liberalidade à custa das respectivas sociedades,",
+   "alternativas": [
+    "subsidiariamente aos membros do conselho fiscal.",
+    "isoladamente, excluídos os conselheiros.",
+    "solidariamente com os membros dos conselhos fiscal e de administração.",
+    "apenas se houver condenação judicial prévia.",
+    "somente perante a assembleia geral da empresa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 4º, IX: responsabilidade SOLIDÁRIA com os conselhos fiscal e de administração.",
+   "dispositivos": [
+    "art4.inc9"
+   ],
+   "trecho": "solidariamente, com os membros dos conselhos fiscal e de administração"
+  },
+  {
+   "id": "go-lei-16168-u1-13",
+   "unidade": "go-lei-16168-u1",
+   "enunciado": "Todo aquele que deva prestar contas ao TCE-GO é, nos termos de sua Lei Orgânica,",
+   "alternativas": [
+    "corresponsável com o órgão de controle interno pela exatidão das contas.",
+    "responsável apenas pela apresentação dos documentos, cabendo ao contador a exatidão.",
+    "isento de responsabilidade se houver parecer do controle interno.",
+    "responsável somente pelas despesas acima do limite de licitação.",
+    "pessoalmente responsável pela exatidão das contas e apresentação dos relatórios, balanços e demonstrativos contábeis da unidade sob a sua gestão."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 5º: responsabilidade PESSOAL do gestor pela exatidão das contas e demonstrativos.",
+   "dispositivos": [
+    "art5"
+   ],
+   "trecho": "é pessoalmente responsável pela exatidão das contas"
+  },
+  {
+   "id": "go-lei-16168-u2-01",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, o Tribunal de Contas do Estado de Goiás tem sede em Goiânia e compõe-se de",
+   "alternativas": [
+    "7 Conselheiros.",
+    "5 Conselheiros.",
+    "9 Conselheiros.",
+    "7 Conselheiros e 3 Auditores com direito a voto.",
+    "11 Conselheiros."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 6º: sete Conselheiros, como manda a CF (art. 75, parágrafo único) para os Tribunais de Contas estaduais.",
+   "dispositivos": [
+    "art6"
+   ],
+   "trecho": "compõe-se de 7 (sete) Conselheiros"
+  },
+  {
+   "id": "go-lei-16168-u2-02",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Conforme a Lei nº 16.168/2007, o Conselheiro do TCE-GO, depois de empossado, somente perderá o cargo",
+   "alternativas": [
+    "por decisão do Plenário, por maioria absoluta.",
+    "por decisão da Assembleia Legislativa.",
+    "por sentença judicial transitada em julgado.",
+    "mediante processo administrativo disciplinar conduzido pela Corregedoria.",
+    "por ato do Governador, após representação do Presidente do Tribunal."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 7º, § 1º: vitaliciedade — só sentença judicial transitada em julgado.",
+   "dispositivos": [
+    "art7.par1"
+   ],
+   "trecho": "somente perderá o cargo por sentença judicial transitada em julgado"
+  },
+  {
+   "id": "go-lei-16168-u2-03",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "De acordo com a Lei Orgânica do TCE-GO, os cargos de Auditor e de Procurador de Contas serão providos por concurso público de",
+   "alternativas": [
+    "provas, apenas.",
+    "provas ou de provas e títulos, a critério do Tribunal.",
+    "títulos, apenas.",
+    "provas, dispensado para os de confiança.",
+    "provas e títulos."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 7º, VI: quadro de pessoal por provas OU provas e títulos; Auditor e Procurador de Contas, obrigatoriamente, provas E títulos.",
+   "dispositivos": [
+    "art7.inc6"
+   ],
+   "trecho": "de provas e títulos, os de Auditor e de Procurador de Contas"
+  },
+  {
+   "id": "go-lei-16168-u2-04",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Aos Conselheiros e Auditores do TCE-GO aplicam-se subsidiariamente, no que couber, conforme sua Lei Orgânica, as disposições",
+   "alternativas": [
+    "do Estatuto dos Servidores Públicos do Estado de Goiás.",
+    "da Lei Orgânica da Magistratura Nacional – LOMAN.",
+    "da Lei Orgânica do Ministério Público.",
+    "da Consolidação das Leis do Trabalho.",
+    "do Regimento Interno da Assembleia Legislativa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 7º, § 2º: LOMAN, subsidiariamente.",
+   "dispositivos": [
+    "art7.par2"
+   ],
+   "trecho": "as disposições da Lei Orgânica da Magistratura Nacional – LOMAN"
+  },
+  {
+   "id": "go-lei-16168-u2-05",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "O Plenário do Tribunal de Contas, órgão máximo de deliberação, é dirigido por seu Presidente, que, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "vota em todas as deliberações.",
+    "não vota em hipótese alguma.",
+    "vota apenas nas eleições.",
+    "vota em caso de empate e nas eleições.",
+    "vota apenas em matéria administrativa."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 9º, parágrafo único: o Presidente vota em caso de empate e nas eleições.",
+   "dispositivos": [
+    "art9.parunico"
+   ],
+   "trecho": "O Presidente vota em caso de empate e nas eleições"
+  },
+  {
+   "id": "go-lei-16168-u2-06",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Quanto às Câmaras, a Lei Orgânica do TCE-GO estabelece que o Tribunal",
+   "alternativas": [
+    "divide-se em duas Câmaras deliberativas, compostas cada uma por três Conselheiros, com exclusão do Presidente do Tribunal.",
+    "divide-se em três Câmaras, compostas por dois Conselheiros cada uma.",
+    "divide-se em duas Câmaras, presididas pelo Presidente do Tribunal.",
+    "não possui Câmaras, deliberando apenas em Plenário.",
+    "divide-se em duas Câmaras, compostas por Conselheiros e Auditores em igual número."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 10: duas Câmaras de três Conselheiros cada, sem o Presidente (6 + Presidente = 7).",
+   "dispositivos": [
+    "art10"
+   ],
+   "trecho": "divide-se em duas Câmaras deliberativas, compostas cada uma por 3 (três) Conselheiros"
+  },
+  {
+   "id": "go-lei-16168-u2-07",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "O Presidente, o Vice-Presidente e o Corregedor-Geral do TCE-GO serão eleitos pelos Conselheiros, conforme a Lei Orgânica, para mandato de",
+   "alternativas": [
+    "1 ano, permitida uma reeleição.",
+    "2 anos, permitida a reeleição.",
+    "2 anos, com início em 1º de janeiro, vedada a reeleição.",
+    "3 anos, vedada a reeleição.",
+    "4 anos, coincidente com o mandato do Governador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 12, caput: dois anos, início em 1º de janeiro, VEDADA a reeleição. (A Ouvidoria e a ESCOEX, ao contrário, admitem recondução — arts. 16-C e 16-F.)",
+   "dispositivos": [
+    "art12"
+   ],
+   "trecho": "para mandato de 2 (dois) anos, com início em 1o de janeiro, vedada a reeleição"
+  },
+  {
+   "id": "go-lei-16168-u2-08",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "A eleição para os cargos de direção do TCE-GO, nos termos de sua Lei Orgânica, realiza-se em escrutínio secreto, exigida sempre a presença da maioria absoluta dos membros titulares,",
+   "alternativas": [
+    "admitida a convocação de Auditor para efeito de quorum.",
+    "admitido o voto por procuração.",
+    "admitida a participação de Procurador de Contas.",
+    "vedada a participação de Conselheiros licenciados.",
+    "vedada a convocação de Auditor para efeito de quorum."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 12, §§ 1º e 2º: vedado convocar Auditor para quorum; Conselheiros licenciados ou em férias PODEM votar.",
+   "dispositivos": [
+    "art12.par1"
+   ],
+   "trecho": "vedada a convocação de Auditor para efeito de quorum"
+  },
+  {
+   "id": "go-lei-16168-u2-09",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, NÃO se procederá a nova eleição se a vaga em cargo de direção ocorrer dentro dos",
+   "alternativas": [
+    "30 dias anteriores ao término do mandato.",
+    "60 dias anteriores ao término do mandato.",
+    "6 meses anteriores ao término do mandato.",
+    "90 dias anteriores ao término do mandato.",
+    "120 dias anteriores ao término do mandato."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 12, § 5º: 60 dias. Fora disso, a eleição para vaga eventual ocorre em até 30 dias após a vacância (§ 3º).",
+   "dispositivos": [
+    "art12.par5"
+   ],
+   "trecho": "Não se procederá a nova eleição se ocorrer vaga dentro dos 60 (sessenta) dias anteriores ao término do mandato"
+  },
+  {
+   "id": "go-lei-16168-u2-10",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Na eleição para a direção do TCE-GO, considerar-se-á eleito em primeiro escrutínio, conforme a Lei Orgânica, quem obtiver",
+   "alternativas": [
+    "maioria simples dos votos dos presentes.",
+    "unanimidade dos votos.",
+    "pelo menos cinco votos.",
+    "pelo menos quatro votos.",
+    "dois terços dos votos dos membros."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 13: 1º escrutínio, pelo menos quatro votos; 2º, maioria simples dos presentes; empate, o Conselheiro há mais tempo empossado.",
+   "dispositivos": [
+    "art13.inc1"
+   ],
+   "trecho": "em primeiro escrutínio, quem obtiver pelo menos quatro votos"
+  },
+  {
+   "id": "go-lei-16168-u2-11",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "A posse dos eleitos para a direção do TCE-GO, segundo sua Lei Orgânica, será dada em sessão plenária",
+   "alternativas": [
+    "extraordinária a ser realizada até o dia 21 de dezembro.",
+    "ordinária, no primeiro dia útil de janeiro.",
+    "solene, na Assembleia Legislativa.",
+    "extraordinária, no dia 1º de janeiro.",
+    "ordinária, até o dia 15 de novembro."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 14: sessão plenária extraordinária até 21 de dezembro; o mandato começa em 1º de janeiro.",
+   "dispositivos": [
+    "art14"
+   ],
+   "trecho": "será dada em sessão plenária extraordinária a ser realizada até o dia 21 de dezembro"
+  },
+  {
+   "id": "go-lei-16168-u2-12",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Nas ausências ou impedimentos do Presidente e do Vice-Presidente do TCE-GO, a Presidência será exercida, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "pelo Conselheiro mais jovem.",
+    "pelo Procurador-Geral de Contas.",
+    "pelo Corregedor-Geral e, na falta deste, pelo Conselheiro há mais tempo empossado.",
+    "pelo Auditor mais antigo.",
+    "pelo Conselheiro designado pelo Governador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 15, § 2º.",
+   "dispositivos": [
+    "art15.par2"
+   ],
+   "trecho": "a Presidência será exercida pelo Corregedor-Geral"
+  },
+  {
+   "id": "go-lei-16168-u2-13",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "Compete ao Corregedor-Geral do TCE-GO, nos termos da Lei Orgânica, entre outras atribuições,",
+   "alternativas": [
+    "representar o Tribunal perante os Poderes do Estado.",
+    "julgar as contas anuais do Presidente do Tribunal.",
+    "dar posse aos Conselheiros.",
+    "nomear os servidores do quadro de pessoal.",
+    "instaurar e presidir processo administrativo disciplinar contra servidores, membros do Tribunal, auditores, Procurador-Geral de Contas e procuradores de contas."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 16, II. Dar posse, nomear e representar o Tribunal são atribuições do PRESIDENTE (art. 15).",
+   "dispositivos": [
+    "art16.inc2"
+   ],
+   "trecho": "instaurar e presidir processo administrativo disciplinar"
+  },
+  {
+   "id": "go-lei-16168-u2-14",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "A Ouvidoria do TCE-GO, conforme sua Lei Orgânica, será dirigida por",
+   "alternativas": [
+    "um servidor efetivo eleito pelos demais.",
+    "um Conselheiro, designado pelo Presidente do Tribunal, para mandato de 2 anos, coincidente com o período de administração da Presidência, permitida a recondução.",
+    "um Auditor, para mandato de 2 anos, vedada a recondução.",
+    "o Corregedor-Geral, cumulativamente.",
+    "um Procurador de Contas, designado pelo Procurador-Geral."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 16-C: Conselheiro designado pelo Presidente, 2 anos, PERMITIDA a recondução — diferente da direção do Tribunal, que veda a reeleição.",
+   "dispositivos": [
+    "art16-c"
+   ],
+   "trecho": "permitida a recondução"
+  },
+  {
+   "id": "go-lei-16168-u2-15",
+   "unidade": "go-lei-16168-u2",
+   "enunciado": "A Escola Superior de Controle Externo – ESCOEX, criada na estrutura do TCE-GO, tem a finalidade de",
+   "alternativas": [
+    "julgar os recursos contra decisões das Câmaras.",
+    "realizar as auditorias operacionais do Tribunal.",
+    "promover a integração entre a sociedade e o Tribunal.",
+    "profissionalizar e qualificar os servidores e gestores públicos nas áreas de fiscalização, planejamento e gestão orçamentária, financeira, contábil, operacional, patrimonial e de pessoal.",
+    "substituir o controle interno dos órgãos estaduais."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 16-D. Integrar sociedade e Tribunal é a finalidade da OUVIDORIA (art. 16-A).",
+   "dispositivos": [
+    "art16-d"
+   ],
+   "trecho": "com a finalidade de profissionalizar e qualificar os servidores e gestores públicos"
+  },
+  {
+   "id": "go-lei-16168-u3-01",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Nos termos da Lei Orgânica do TCE-GO, os Conselheiros são nomeados pelo Governador dentre brasileiros que, entre outros requisitos, tenham",
+   "alternativas": [
+    "mais de 35 e menos de 65 anos de idade.",
+    "mais de 30 e menos de 70 anos de idade.",
+    "mais de 35 e menos de 70 anos de idade.",
+    "mais de 5 anos de atividade profissional na área jurídica.",
+    "formação obrigatória em Direito."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 17, I, no texto da Lei 16.168: mais de 35 e menos de 65 anos (a CF, art. 73, § 1º, hoje fala em 70 para o TCU — a questão pede a Lei Orgânica). Exige-se ainda mais de 10 anos de atividade (inciso IV).",
+   "dispositivos": [
+    "art17.inc1"
+   ],
+   "trecho": "ter mais de 35 (trinta e cinco) e menos de 65 (sessenta e cinco) anos de idade"
+  },
+  {
+   "id": "go-lei-16168-u3-02",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Quanto à escolha dos Conselheiros do TCE-GO, a Lei Orgânica estabelece que",
+   "alternativas": [
+    "quatro são escolhidos pelo Governador e três pela Assembleia Legislativa.",
+    "todos são escolhidos pela Assembleia Legislativa.",
+    "quatro são escolhidos pela Assembleia Legislativa e três pelo Governador, com aprovação da Assembleia, sendo um de livre escolha e dois entre Auditores e membros do Ministério Público junto ao Tribunal.",
+    "três são escolhidos pela Assembleia e quatro pelo Governador, todos de livre escolha.",
+    "quatro são escolhidos pela Assembleia e três pelo Governador, todos entre Auditores."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 18: 4 pela Assembleia; 3 pelo Governador (1 livre + 2 alternadamente entre Auditores e MP de Contas, em lista tríplice).",
+   "dispositivos": [
+    "art18.inc1",
+    "art18.inc2"
+   ],
+   "trecho": "4 (quatro) pela Assembleia Legislativa"
+  },
+  {
+   "id": "go-lei-16168-u3-03",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "As vagas de Conselheiro do TCE-GO, conforme sua Lei Orgânica, são preenchidas",
+   "alternativas": [
+    "livremente, conforme a conveniência do Governador.",
+    "alternadamente pela Assembleia e pelo Governador, independentemente da origem.",
+    "por concurso público de provas e títulos.",
+    "por antiguidade entre os Auditores.",
+    "obedecendo ao critério de origem de cada um, vinculando-se cada uma delas à respectiva categoria a que pertencem."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 18, parágrafo único: vinculação da vaga à categoria de origem.",
+   "dispositivos": [
+    "art18.parunico"
+   ],
+   "trecho": "obedecendo ao critério de origem de cada um"
+  },
+  {
+   "id": "go-lei-16168-u3-04",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, é vedado ao Conselheiro exercer, ainda que em disponibilidade, outro cargo ou função,",
+   "alternativas": [
+    "salvo cargo em comissão no Poder Executivo.",
+    "salvo uma de magistério.",
+    "salvo função em órgão de controle interno.",
+    "sem exceção.",
+    "salvo mandato eletivo municipal."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 22, I: a única exceção é uma função de magistério.",
+   "dispositivos": [
+    "art22.inc1"
+   ],
+   "trecho": "salvo uma de magistério"
+  },
+  {
+   "id": "go-lei-16168-u3-05",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "O Conselheiro do TCE-GO que se afastar do cargo por aposentadoria ou exoneração, conforme a Lei Orgânica, não poderá exercer advocacia ou representação perante o Tribunal antes de decorridos",
+   "alternativas": [
+    "2 anos.",
+    "1 ano.",
+    "5 anos.",
+    "3 anos.",
+    "4 anos."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 22, X: quarentena de 3 anos.",
+   "dispositivos": [
+    "art22.inc10"
+   ],
+   "trecho": "antes de decorridos 3 (três) anos do afastamento do cargo"
+  },
+  {
+   "id": "go-lei-16168-u3-06",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Nos termos da Lei Orgânica do TCE-GO, é vedado ao Conselheiro participar de sociedade comercial,",
+   "alternativas": [
+    "exceto como acionista ou cotista sem ingerência.",
+    "salvo como administrador sem remuneração.",
+    "em qualquer hipótese.",
+    "salvo em sociedade de economia mista.",
+    "salvo com autorização do Plenário."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 22, IV.",
+   "dispositivos": [
+    "art22.inc4"
+   ],
+   "trecho": "exceto como acionista ou cotista sem ingerência"
+  },
+  {
+   "id": "go-lei-16168-u3-07",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Havendo parentesco entre Conselheiros nomeados, a incompatibilidade prevista na Lei Orgânica do TCE-GO resolve-se, antes da posse,",
+   "alternativas": [
+    "contra o mais velho.",
+    "contra o que tiver menos tempo de serviço público.",
+    "contra o último nomeado ou contra o mais moço, se nomeados na mesma data.",
+    "por sorteio em sessão plenária.",
+    "contra o que tiver sido escolhido pelo Governador."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 23, parágrafo único, I; depois da posse, contra quem deu causa; se imputável a ambos, contra o de menos tempo no Tribunal.",
+   "dispositivos": [
+    "art23.parunico.inc1"
+   ],
+   "trecho": "contra o último nomeado ou contra o mais moço, se nomeados na mesma data"
+  },
+  {
+   "id": "go-lei-16168-u3-08",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Os Auditores do TCE-GO, conforme sua Lei Orgânica, são em número de",
+   "alternativas": [
+    "nove, nomeados pela Assembleia Legislativa.",
+    "cinco, nomeados pelo Presidente do Tribunal.",
+    "sete, de livre nomeação do Governador.",
+    "três, eleitos pelo Plenário.",
+    "sete, nomeados pelo Governador mediante concurso público de provas e títulos, em que será exigido curso superior."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 24: sete Auditores, concurso de provas e títulos, curso superior, requisitos de Conselheiro.",
+   "dispositivos": [
+    "art24"
+   ],
+   "trecho": "Os Auditores, em número de 7 (sete), são nomeados pelo Governador"
+  },
+  {
+   "id": "go-lei-16168-u3-09",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "O Auditor do TCE-GO, quando no exercício das demais atribuições da judicatura (fora da substituição de Conselheiro), terá, segundo a Lei Orgânica, as garantias e impedimentos de",
+   "alternativas": [
+    "Conselheiro titular.",
+    "Juiz de Direito de última entrância.",
+    "Procurador de Contas.",
+    "Desembargador do Tribunal de Justiça.",
+    "servidor efetivo do Tribunal."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 26: em substituição, as do Conselheiro; nas demais atribuições, inclusive vitaliciedade, as de Juiz de Direito de última entrância.",
+   "dispositivos": [
+    "art26"
+   ],
+   "trecho": "as de Juiz de Direito de última entrância"
+  },
+  {
+   "id": "go-lei-16168-u3-10",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "A substituição de Conselheiros pelos Auditores, conforme a Lei Orgânica do TCE-GO, observará critérios de rodízio,",
+   "alternativas": [
+    "admitida a vinculação permanente entre Auditor e Conselheiro.",
+    "dispensada a convocação prévia.",
+    "definidos pelo Governador.",
+    "vedada a vinculação permanente entre Auditor e Conselheiro.",
+    "limitados às sessões de Câmara."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 25, § 1º.",
+   "dispositivos": [
+    "art25.par1"
+   ],
+   "trecho": "vedada a vinculação permanente entre Auditor e Conselheiro"
+  },
+  {
+   "id": "go-lei-16168-u3-11",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "O Ministério Público junto ao Tribunal de Contas do Estado de Goiás, segundo a Lei Orgânica, compõe-se de",
+   "alternativas": [
+    "sete Procuradores de Contas, bacharéis em Direito, nomeados pelo Governador.",
+    "cinco Procuradores de Contas, nomeados pelo Procurador-Geral de Justiça.",
+    "membros do Ministério Público Estadual designados pelo Procurador-Geral de Justiça.",
+    "três Procuradores de Contas eleitos pela Assembleia.",
+    "sete Procuradores de Contas, de livre nomeação do Presidente do Tribunal."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 28: sete Procuradores de Contas, bacharéis em Direito, nomeados pelo Governador; princípios da unidade, indivisibilidade e independência funcional.",
+   "dispositivos": [
+    "art28"
+   ],
+   "trecho": "compõe-se de 7 (sete) Procuradores de Contas"
+  },
+  {
+   "id": "go-lei-16168-u3-12",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Para ingresso na carreira de Procurador de Contas do TCE-GO, a Lei Orgânica exige do bacharel em Direito, no mínimo,",
+   "alternativas": [
+    "2 anos de atividade jurídica.",
+    "5 anos de atividade jurídica.",
+    "3 anos de atividade jurídica.",
+    "10 anos de efetiva atividade profissional.",
+    "título de especialista em Direito Público."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 28, § 2º: 3 anos de atividade jurídica, concurso de provas e títulos com participação da OAB.",
+   "dispositivos": [
+    "art28.par2"
+   ],
+   "trecho": "no mínimo, 3 (três) anos de atividade jurídica"
+  },
+  {
+   "id": "go-lei-16168-u3-13",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "O Procurador-Geral de Contas, conforme a Lei Orgânica do TCE-GO, é nomeado em comissão pelo Governador para mandato de",
+   "alternativas": [
+    "2 anos, vedada a recondução, mediante lista tríplice do Plenário.",
+    "4 anos, permitida uma recondução.",
+    "3 anos, mediante eleição direta pelos Procuradores.",
+    "2 anos, de livre escolha do Governador.",
+    "2 anos, permitida uma recondução, mediante lista tríplice elaborada pelos integrantes da carreira."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 29-A: 2 anos, uma recondução, lista tríplice da própria carreira.",
+   "dispositivos": [
+    "art29-a"
+   ],
+   "trecho": "para mandato de 2 (dois) anos, permitida uma recondução"
+  },
+  {
+   "id": "go-lei-16168-u3-14",
+   "unidade": "go-lei-16168-u3",
+   "enunciado": "Ao servidor do TCE-GO, nos termos da Lei Orgânica, é vedada",
+   "alternativas": [
+    "a participação em cursos da ESCOEX.",
+    "a prestação de serviços particulares de consultoria ou assessoria a órgãos ou entidades sujeitos à jurisdição do Tribunal.",
+    "a filiação a associação de classe.",
+    "a representação à chefia contra responsáveis por órgãos fiscalizados.",
+    "a propositura de aplicação de multa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 37. Representar à chefia e propor multas são, ao contrário, OBRIGAÇÕES do servidor de controle externo (art. 38, II e III).",
+   "dispositivos": [
+    "art37"
+   ],
+   "trecho": "é vedada a prestação de serviços particulares de consultoria ou assessoria"
+  },
+  {
+   "id": "go-lei-16168-u4-01",
+   "unidade": "go-lei-16168-u4",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, mantêm, de forma integrada, sistema de controle interno",
+   "alternativas": [
+    "os Poderes Legislativo, Executivo e Judiciário, o Ministério Público Estadual, o Tribunal de Contas do Estado e o Tribunal de Contas dos Municípios.",
+    "apenas o Poder Executivo.",
+    "somente os órgãos da administração direta.",
+    "os Poderes Executivo e Legislativo, excluído o Judiciário.",
+    "apenas as entidades da administração indireta."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 41, caput: a lei estadual acrescenta ao rol da CF o MP Estadual, o TCE e o TCM.",
+   "dispositivos": [
+    "art41"
+   ],
+   "trecho": "bem como o Ministério Público Estadual, o Tribunal de Contas do Estado e o Tribunal de Contas dos Municípios"
+  },
+  {
+   "id": "go-lei-16168-u4-02",
+   "unidade": "go-lei-16168-u4",
+   "enunciado": "Os responsáveis pelo controle interno, ao tomarem conhecimento de qualquer irregularidade ou ilegalidade, darão ciência de imediato ao TCE-GO, conforme a Lei Orgânica, sob pena de",
+   "alternativas": [
+    "demissão.",
+    "multa de até 10% do dano.",
+    "responsabilidade solidária.",
+    "responsabilidade subsidiária.",
+    "suspensão por 30 dias."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 43, caput.",
+   "dispositivos": [
+    "art43"
+   ],
+   "trecho": "sob pena de responsabilidade solidária"
+  },
+  {
+   "id": "go-lei-16168-u4-03",
+   "unidade": "go-lei-16168-u4",
+   "enunciado": "No apoio ao controle externo, compete aos órgãos do sistema de controle interno, entre outras atividades previstas na Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "julgar as contas dos responsáveis sob seu controle.",
+    "aplicar multas aos gestores.",
+    "emitir parecer prévio sobre as contas do Governador.",
+    "sustar atos impugnados pelo Tribunal.",
+    "alertar formalmente a autoridade administrativa competente para que instaure tomada de contas especial, sempre que tiver conhecimento das ocorrências previstas em lei."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 42-A, III. Julgar contas e aplicar multas são competências do TCE; o controle interno alerta, audita e informa.",
+   "dispositivos": [
+    "art42-a.inc3"
+   ],
+   "trecho": "alertar formalmente a autoridade administrativa competente para que instaure tomada de contas especial"
+  },
+  {
+   "id": "go-lei-16168-u4-04",
+   "unidade": "go-lei-16168-u4",
+   "enunciado": "Na comunicação de irregularidade ao Tribunal, o dirigente do órgão de controle interno competente, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "deverá propor a pena a ser aplicada.",
+    "indicará as providências adotadas para evitar ocorrências semelhantes.",
+    "deverá obter prévia autorização do Secretário de Estado.",
+    "está dispensado de identificar os responsáveis.",
+    "deverá aguardar o fim do exercício financeiro."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 43, § 3º.",
+   "dispositivos": [
+    "art43.par3"
+   ],
+   "trecho": "indicará as providências adotadas para evitar ocorrências semelhantes"
+  },
+  {
+   "id": "go-lei-16168-u4-05",
+   "unidade": "go-lei-16168-u4",
+   "enunciado": "Sobre as contas de responsáveis e o parecer do controle interno, a Lei Orgânica do TCE-GO determina que emitirá expresso pronunciamento",
+   "alternativas": [
+    "o Governador do Estado.",
+    "o Procurador-Geral de Contas.",
+    "o Presidente da Assembleia Legislativa.",
+    "o Secretário de Estado ou a autoridade de nível hierárquico equivalente.",
+    "o Corregedor-Geral do Tribunal."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 44-A.",
+   "dispositivos": [
+    "art44-a"
+   ],
+   "trecho": "O Secretário de Estado ou a autoridade de nível hierárquico equivalente"
+  },
+  {
+   "id": "go-lei-16168-u5-01",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, são processos de fiscalização, entre outros,",
+   "alternativas": [
+    "a denúncia e a representação.",
+    "a prestação de contas do Governador e a tomada de contas especial.",
+    "a tomada de contas e a prestação de contas.",
+    "o recurso de reconsideração e o agravo.",
+    "a consulta e o incidente de inconstitucionalidade."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 45, II, d e e. Prestação de contas, tomada de contas e TCE são processos de CONTAS (inciso I).",
+   "dispositivos": [
+    "art45.inc2.alid",
+    "art45.inc2.alie"
+   ],
+   "trecho": "representação"
+  },
+  {
+   "id": "go-lei-16168-u5-02",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "Nos processos do TCE-GO, a Lei Orgânica determina a observância, entre outros, dos princípios",
+   "alternativas": [
+    "da inércia, da verdade formal e do sigilo.",
+    "do contraditório e da ampla defesa, apenas.",
+    "do contraditório, da ampla defesa, da oficialidade, da verdade material, do formalismo moderado, da publicidade e da segurança jurídica.",
+    "da oralidade e da identidade física do julgador.",
+    "do formalismo estrito e da imparcialidade."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 46.",
+   "dispositivos": [
+    "art46"
+   ],
+   "trecho": "do contraditório, da ampla defesa, da oficialidade, da verdade material, do formalismo moderado"
+  },
+  {
+   "id": "go-lei-16168-u5-03",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "As partes no processo perante o TCE-GO, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "só podem praticar atos processuais por intermédio de advogado.",
+    "dependem de autorização do Relator para atuar diretamente.",
+    "são representadas obrigatoriamente pela Procuradoria-Geral do Estado.",
+    "limitam-se ao responsável, excluído o interessado.",
+    "podem praticar os atos processuais diretamente, ainda que não sejam advogados, ou por intermédio de procurador regularmente constituído."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 47: responsável e interessado podem atuar sem advogado.",
+   "dispositivos": [
+    "art47"
+   ],
+   "trecho": "ainda que não sejam advogados"
+  },
+  {
+   "id": "go-lei-16168-u5-04",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "A distribuição de processos aos Conselheiros do TCE-GO, conforme a Lei Orgânica, é feita mediante",
+   "alternativas": [
+    "escolha do Presidente, conforme a especialidade.",
+    "sorteio, obedecendo ao princípio da publicidade e aos critérios de rodízio, alternância e igualdade numérica.",
+    "ordem de antiguidade dos Conselheiros.",
+    "vinculação permanente por unidade jurisdicionada.",
+    "sorteio, incluído o relator do acórdão recorrido em caso de recurso."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 48 e § 3º: sorteio; em recurso, o relator do acórdão é EXCLUÍDO do sorteio.",
+   "dispositivos": [
+    "art48"
+   ],
+   "trecho": "mediante sorteio, obedecendo ao princípio da publicidade"
+  },
+  {
+   "id": "go-lei-16168-u5-05",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "As provas que a parte quiser produzir perante o Tribunal de Contas do Estado de Goiás, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "podem ser testemunhais, colhidas em audiência.",
+    "podem ser apresentadas oralmente na sessão de julgamento.",
+    "dependem de perícia judicial.",
+    "devem sempre ser apresentadas de forma documental, mesmo as declarações pessoais de terceiros.",
+    "são dispensadas nos processos de fiscalização."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 52: prova sempre documental, inclusive declarações de terceiros.",
+   "dispositivos": [
+    "art52"
+   ],
+   "trecho": "devem sempre ser apresentadas de forma documental"
+  },
+  {
+   "id": "go-lei-16168-u5-06",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "O Conselheiro que pedir vista do processo em sessão deverá devolvê-lo ao Relator, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "na primeira sessão subsequente, se do Plenário, e na segunda, se de Câmara.",
+    "na segunda sessão subsequente, se do Plenário, e na primeira, se de Câmara.",
+    "em 10 dias úteis, em qualquer caso.",
+    "na sessão seguinte, em qualquer caso.",
+    "no prazo fixado pelo Presidente."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 53: Plenário → primeira sessão subsequente; Câmara → segunda. A inversão é a pegadinha.",
+   "dispositivos": [
+    "art53"
+   ],
+   "trecho": "na primeira sessão subseqüente, se do Plenário, e, na segunda, se de Câmara"
+  },
+  {
+   "id": "go-lei-16168-u5-07",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "Supre a falta da citação, nos termos da Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "a publicação do acórdão no Diário Oficial.",
+    "a intimação do procurador constituído em outro processo.",
+    "o comparecimento espontâneo do responsável, desde que havido após a determinação do Tribunal ou do Relator.",
+    "a manifestação do Ministério Público de Contas.",
+    "o decurso do prazo de defesa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 54, § 3º.",
+   "dispositivos": [
+    "art54.par3"
+   ],
+   "trecho": "Supre a falta da citação o comparecimento espontâneo do responsável"
+  },
+  {
+   "id": "go-lei-16168-u5-08",
+   "unidade": "go-lei-16168-u5",
+   "enunciado": "Os prazos referidos na Lei Orgânica do TCE-GO são contados",
+   "alternativas": [
+    "em dias corridos, incluindo o dia do começo.",
+    "em dias úteis, excluindo o dia do vencimento; o prazo de defesa é de 10 dias.",
+    "em dias úteis, incluindo o dia do começo; o prazo de defesa é de 30 dias.",
+    "em dias corridos; o prazo de defesa é de 15 dias.",
+    "em dias úteis, excluindo o dia do começo e incluindo o dia do vencimento; para as razões de defesa e justificativas, o prazo é de 15 dias."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 55, caput e § 2º, I: dias úteis, exclui o começo, inclui o vencimento; 15 dias para defesa; até 30 para atos de instrução. Fora da Região Metropolitana, os prazos começam após 3 dias úteis (§ 1º).",
+   "dispositivos": [
+    "art55",
+    "art55.par2.inc1"
+   ],
+   "trecho": "serão contados em dias úteis, excluindo o dia do começo e incluindo o dia do vencimento"
+  },
+  {
+   "id": "go-lei-16168-u6-01",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, as contas anuais prestadas pelo Governador deverão ser encaminhadas",
+   "alternativas": [
+    "à Assembleia Legislativa e ao Tribunal de Contas, concomitantemente, até 60 dias após a abertura da sessão legislativa.",
+    "somente ao Tribunal de Contas, até 30 dias após o encerramento do exercício.",
+    "à Assembleia Legislativa, que as remeterá ao Tribunal em 30 dias.",
+    "ao Tribunal de Contas, até 90 dias após a abertura da sessão legislativa.",
+    "à Assembleia Legislativa e ao Tribunal de Contas, até 31 de março."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 56, caput: encaminhamento concomitante, até 60 dias após a abertura da sessão legislativa.",
+   "dispositivos": [
+    "art56"
+   ],
+   "trecho": "concomitantemente, até 60 (sessenta) dias após a abertura da sessão legislativa"
+  },
+  {
+   "id": "go-lei-16168-u6-02",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "As contas prestadas pelo Governador, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "incluem apenas as do Poder Executivo.",
+    "incluem as dos demais Poderes, que receberão parecer prévio único.",
+    "incluem as dos Chefes dos Poderes Legislativo e Judiciário, do Ministério Público, do Tribunal de Contas dos Municípios e do Tribunal de Contas do Estado, que receberão parecer prévio separadamente.",
+    "excluem as do Tribunal de Contas do Estado, que é julgado pelo próprio Plenário.",
+    "incluem as das empresas estatais, dispensado o parecer prévio."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 56, § 1º: pareceres prévios SEPARADOS para cada Poder e órgão.",
+   "dispositivos": [
+    "art56.par1"
+   ],
+   "trecho": "as quais receberão parecer prévio, separadamente"
+  },
+  {
+   "id": "go-lei-16168-u6-03",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "A emissão dos pareceres prévios sobre as contas anuais dos Poderes, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "exclui a competência do Tribunal para julgar as contas dos administradores desses órgãos.",
+    "depende de prévia aprovação da Assembleia Legislativa.",
+    "é feita pelo Relator, sem deliberação colegiada.",
+    "substitui o julgamento das contas dos ordenadores de despesa.",
+    "não exclui a competência do Tribunal para o julgamento das contas dos administradores e demais responsáveis dos órgãos que compõem a Administração."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 57, § 1º: parecer sobre as contas de governo ≠ julgamento das contas de gestão dos administradores.",
+   "dispositivos": [
+    "art57.par1"
+   ],
+   "trecho": "não exclui a competência do Tribunal para o julgamento das contas dos administradores"
+  },
+  {
+   "id": "go-lei-16168-u6-04",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "O Relator das Contas do Governador, conforme a Lei Orgânica do TCE-GO, é",
+   "alternativas": [
+    "o Presidente do Tribunal, em qualquer exercício.",
+    "sorteado entre os Conselheiros, excluídos dos sorteios seguintes os já sorteados até que todos tenham sido contemplados.",
+    "o Conselheiro mais antigo.",
+    "indicado pelo Governador.",
+    "sorteado entre Conselheiros e Auditores."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 58: sorteio com alternatividade.",
+   "dispositivos": [
+    "art58",
+    "art58.parunico"
+   ],
+   "trecho": "os nomes dos Conselheiros sorteados serão excluídos dos sorteios seguintes"
+  },
+  {
+   "id": "go-lei-16168-u6-05",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "O ordenador de despesa e o dirigente de entidade que, por ação direta, conivência, negligência ou omissão, derem causa a prejuízo causado ao erário por agente subordinado respondem, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "subsidiariamente, após o agente.",
+    "somente se comprovado dolo.",
+    "apenas administrativamente.",
+    "solidariamente, nos limites da responsabilidade apurada.",
+    "integralmente, excluída a responsabilidade do agente."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 59, § 2º.",
+   "dispositivos": [
+    "art59.par2"
+   ],
+   "trecho": "são responsáveis solidários por prejuízo causado ao erário ou a terceiros"
+  },
+  {
+   "id": "go-lei-16168-u6-06",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "Nas tomadas ou prestações de contas, segundo a Lei Orgânica do TCE-GO, devem ser incluídos",
+   "alternativas": [
+    "todos os recursos, orçamentários e extraorçamentários, utilizados, arrecadados, guardados ou geridos pela unidade ou entidade ou pelos quais ela responda.",
+    "apenas os recursos extraorçamentários.",
+    "apenas os recursos orçamentários.",
+    "somente os recursos acima do limite de licitação.",
+    "apenas os recursos repassados por convênio."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 60, § 1º.",
+   "dispositivos": [
+    "art60.par1"
+   ],
+   "trecho": "devem ser incluídos todos os recursos, orçamentários e extra"
+  },
+  {
+   "id": "go-lei-16168-u6-07",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "A autoridade administrativa competente deverá instaurar tomada de contas especial, conforme a Lei Orgânica do TCE-GO, depois de esgotadas as medidas para o ressarcimento, quando, entre outras hipóteses,",
+   "alternativas": [
+    "o gestor for exonerado.",
+    "houver mera impropriedade formal sem dano.",
+    "houver omissão do dever de prestar contas.",
+    "o exercício financeiro se encerrar.",
+    "o controle interno emitir parecer com ressalva."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 62, I a IV: omissão de prestar contas, não comprovação de recursos repassados, desfalque ou desvio, e ato ilegal, ilegítimo ou antieconômico com dano. A omissão da autoridade gera responsabilidade solidária.",
+   "dispositivos": [
+    "art62.inc1"
+   ],
+   "trecho": "houver omissão do dever de prestar contas"
+  },
+  {
+   "id": "go-lei-16168-u6-08",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "Na ocorrência de perda ou extravio sem que se caracterize a má-fé de quem lhe deu causa, se o dano for imediatamente ressarcido, a Lei Orgânica do TCE-GO prevê que",
+   "alternativas": [
+    "será obrigatória a instauração de tomada de contas especial.",
+    "o processo será arquivado sem qualquer comunicação.",
+    "o responsável será multado em 10% do valor.",
+    "o fato será comunicado ao Ministério Público.",
+    "a autoridade administrativa comunicará o fato ao Tribunal na tomada ou prestação de contas, ficando dispensada a instauração de tomada de contas especial."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 62, § 2º.",
+   "dispositivos": [
+    "art62.par2"
+   ],
+   "trecho": "ficando dispensada a instauração de tomada de contas especial"
+  },
+  {
+   "id": "go-lei-16168-u6-09",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "Não atendido o dever de instaurar tomada de contas especial pela autoridade administrativa, o TCE-GO, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "julgará as contas irregulares de imediato.",
+    "determinará a instauração da tomada de contas especial, fixando prazo para cumprimento dessa decisão.",
+    "instaurará inquérito civil.",
+    "arquivará o processo por ausência de pressupostos.",
+    "requererá à Assembleia a instauração."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 62, § 3º.",
+   "dispositivos": [
+    "art62.par3"
+   ],
+   "trecho": "o Tribunal determinará a instauração da tomada de contas especial"
+  },
+  {
+   "id": "go-lei-16168-u6-10",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "A tomada de contas especial será desde logo encaminhada ao TCE-GO para julgamento, conforme a Lei Orgânica, se o dano ao erário for",
+   "alternativas": [
+    "de qualquer valor.",
+    "de valor igual ou superior ao fixado na Lei de Diretrizes Orçamentárias.",
+    "superior a mil salários mínimos.",
+    "de valor igual ou superior à quantia fixada em cada ano civil, na primeira sessão ordinária do Plenário do mês de dezembro, para vigorar no exercício subsequente.",
+    "de valor fixado pelo Governador em decreto."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 63: abaixo do valor de alçada, a TCE é anexada à tomada ou prestação de contas anual para julgamento conjunto (§ 2º).",
+   "dispositivos": [
+    "art63"
+   ],
+   "trecho": "se o dano ao erário for de valor igual ou superior à quantia fixada em cada ano civil"
+  },
+  {
+   "id": "go-lei-16168-u6-11",
+   "unidade": "go-lei-16168-u6",
+   "enunciado": "Não instaurada ou não concluída a tomada de contas especial, o TCE-GO, nos termos da Lei Orgânica,",
+   "alternativas": [
+    "provocará o órgão de controle interno e o Ministério Público Estadual para adoção das medidas legais pertinentes, sem prejuízo da instauração de uma Auditoria Especial.",
+    "declarará a prescrição.",
+    "julgará as contas regulares com ressalva.",
+    "comunicará o fato apenas à Assembleia Legislativa.",
+    "aplicará multa ao Governador."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 65.",
+   "dispositivos": [
+    "art65"
+   ],
+   "trecho": "provocará o órgão de controle interno e o Ministério Público Estadual"
+  },
+  {
+   "id": "go-lei-16168-u7-01",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "A decisão em processo de prestação ou tomada de contas pela qual o Tribunal ordena o trancamento das contas consideradas iliquidáveis é, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "terminativa.",
+    "definitiva.",
+    "preliminar.",
+    "cautelar.",
+    "interlocutória."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 66, § 3º. Definitiva é a que julga regulares, regulares com ressalva ou irregulares (§ 2º); preliminar é a anterior ao mérito (§ 1º).",
+   "dispositivos": [
+    "art66.par3"
+   ],
+   "trecho": "Terminativa é a decisão pela qual o Tribunal ordena o trancamento das contas"
+  },
+  {
+   "id": "go-lei-16168-u7-02",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Verificada irregularidade nas contas e havendo débito, o Relator ou o Tribunal ordenará a citação do responsável para, no prazo de",
+   "alternativas": [
+    "10 dias, apresentar razões de justificativa.",
+    "30 dias, recolher a quantia devida.",
+    "15 dias, apresentar alegações de defesa ou recolher a quantia devida, ou ainda adotar ambas as providências.",
+    "15 dias, apenas recolher a quantia devida.",
+    "60 dias, apresentar defesa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 67, II. Sem débito, a citação é para razões de justificativa, também em 15 dias (inciso III).",
+   "dispositivos": [
+    "art67.inc2"
+   ],
+   "trecho": "no prazo de 15 (quinze) dias, apresente alegações de defesa ou recolha a quantia devida"
+  },
+  {
+   "id": "go-lei-16168-u7-03",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Reconhecida pelo Tribunal a boa-fé, a liquidação tempestiva do débito atualizado monetariamente, não havendo outra irregularidade, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "suspende o processo por cinco anos.",
+    "levará ao julgamento das contas regulares, com quitação plena.",
+    "não altera o julgamento pela irregularidade.",
+    "extingue apenas a multa.",
+    "sanará o processo, e o Tribunal julgará as contas regulares com ressalva, dando quitação ao responsável."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 67, § 2º: regulares COM RESSALVA e quitação.",
+   "dispositivos": [
+    "art67.par2"
+   ],
+   "trecho": "hipótese em que o Tribunal julgará as contas regulares com ressalva"
+  },
+  {
+   "id": "go-lei-16168-u7-04",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "O responsável que não atender à citação, nos termos da Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "terá o processo suspenso.",
+    "será considerado revel pelo Tribunal, para todos os efeitos, dando-se prosseguimento ao processo.",
+    "será conduzido coercitivamente.",
+    "terá as contas automaticamente julgadas regulares com ressalva.",
+    "será citado por edital três vezes antes da revelia."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 67, § 3º.",
+   "dispositivos": [
+    "art67.par3"
+   ],
+   "trecho": "será considerado revel pelo Tribunal, para todos os efeitos"
+  },
+  {
+   "id": "go-lei-16168-u7-05",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "O TCE-GO julgará as tomadas e prestações de contas, conforme sua Lei Orgânica, até o término do",
+   "alternativas": [
+    "exercício em que lhe tiverem sido apresentadas.",
+    "mandato do Relator.",
+    "quinto ano seguinte à apresentação.",
+    "segundo exercício seguinte àquele em que lhe tiverem sido apresentadas.",
+    "exercício seguinte ao da apresentação."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 69.",
+   "dispositivos": [
+    "art69"
+   ],
+   "trecho": "até o término do segundo exercício seguinte àquele em que lhe tiverem sido apresentadas"
+  },
+  {
+   "id": "go-lei-16168-u7-06",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "As contas serão julgadas regulares com ressalva, segundo a Lei Orgânica do TCE-GO, quando evidenciarem",
+   "alternativas": [
+    "impropriedade ou qualquer outra falta de natureza formal de que não resulte dano ao erário.",
+    "dano ao erário de pequeno valor.",
+    "omissão no dever de prestar contas.",
+    "desfalque ressarcido.",
+    "descumprimento de determinação do Tribunal."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 73, caput. Omissão e descumprimento de determinação levam à irregularidade (art. 74, I e § 1º).",
+   "dispositivos": [
+    "art73"
+   ],
+   "trecho": "impropriedade ou qualquer outra falta de natureza formal de que não resulte dano ao erário"
+  },
+  {
+   "id": "go-lei-16168-u7-07",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Julgadas regulares as contas, o TCE-GO, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "dará quitação ao responsável com determinação de medidas corretivas.",
+    "arquivará o processo sem quitação.",
+    "dará quitação plena ao responsável.",
+    "encaminhará as contas à Assembleia para homologação.",
+    "aplicará multa simbólica."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 72, parágrafo único: quitação PLENA. Com ressalva, quitação com determinação (art. 73, § 2º).",
+   "dispositivos": [
+    "art72.parunico"
+   ],
+   "trecho": "o Tribunal dará quitação plena ao responsável"
+  },
+  {
+   "id": "go-lei-16168-u7-08",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Nas hipóteses de ato ilegal, ilegítimo ou antieconômico, dano ao erário ou desfalque, ao julgar irregulares as contas o TCE-GO fixará, segundo a Lei Orgânica, a responsabilidade solidária",
+   "alternativas": [
+    "apenas do ordenador de despesa.",
+    "do Governador e do ordenador de despesa.",
+    "do controle interno e do Secretário de Estado.",
+    "apenas do terceiro beneficiado.",
+    "do agente público que praticou ou atestou o ato irregular e de terceiro que, de qualquer modo, tenha concorrido para o cometimento do dano apurado."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 74, § 4º.",
+   "dispositivos": [
+    "art74.par4.inc1",
+    "art74.par4.inc2"
+   ],
+   "trecho": "do agente público que praticou ou atestou o ato irregular"
+  },
+  {
+   "id": "go-lei-16168-u7-09",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Verificados dano ao erário decorrente de ato de gestão ilegítimo ou antieconômico, ou desfalque ou desvio de dinheiros públicos, o TCE-GO, por ocasião do julgamento,",
+   "alternativas": [
+    "arquivará o processo.",
+    "determinará a remessa de cópia da documentação pertinente ao Ministério Público do Estado, para ajuizamento das ações cabíveis.",
+    "encaminhará o processo à Polícia Civil.",
+    "suspenderá o julgamento até decisão judicial.",
+    "comunicará apenas à Assembleia Legislativa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 74, § 5º.",
+   "dispositivos": [
+    "art74.par5"
+   ],
+   "trecho": "determinará a remessa de cópia da documentação pertinente ao Ministério Público do Estado"
+  },
+  {
+   "id": "go-lei-16168-u7-10",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Consideradas iliquidáveis as contas e arquivado o processo, o Tribunal poderá, à vista de novos elementos, autorizar o desarquivamento, conforme a Lei Orgânica do TCE-GO, dentro do prazo de",
+   "alternativas": [
+    "2 anos da decisão terminativa.",
+    "3 anos contados do arquivamento.",
+    "10 anos do fato.",
+    "5 anos contados da publicação da decisão terminativa.",
+    "1 ano contado da publicação."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 77, § 1º; passado o prazo sem nova decisão, as contas são consideradas encerradas (§ 2º).",
+   "dispositivos": [
+    "art77.par1"
+   ],
+   "trecho": "Dentro do prazo de 5 (cinco) anos contados da publicação"
+  },
+  {
+   "id": "go-lei-16168-u7-11",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "A decisão do TCE-GO de que resulte imputação de débito ou cominação de multa, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "torna a dívida líquida e certa e tem eficácia de título executivo.",
+    "depende de homologação judicial.",
+    "é mera recomendação ao gestor.",
+    "só é exigível após julgamento pela Assembleia.",
+    "depende de inscrição em dívida ativa pelo próprio Tribunal."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 79.",
+   "dispositivos": [
+    "art79"
+   ],
+   "trecho": "torna a dívida líquida e certa e tem eficácia de título executivo"
+  },
+  {
+   "id": "go-lei-16168-u7-12",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "Autorizado o recolhimento parcelado da importância devida, a falta de recolhimento de qualquer parcela, nos termos da Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "cancela o parcelamento apenas após três parcelas em atraso.",
+    "gera multa de 2% sobre a parcela.",
+    "importará no vencimento antecipado do saldo devedor.",
+    "suspende o processo.",
+    "não produz efeito até o fim do parcelamento."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 81, parágrafo único.",
+   "dispositivos": [
+    "art81.parunico"
+   ],
+   "trecho": "importará no vencimento antecipado do saldo devedor"
+  },
+  {
+   "id": "go-lei-16168-u7-13",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "O pagamento integral do débito e da multa, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "converte as contas irregulares em regulares.",
+    "impede a inclusão do nome na lista enviada à Justiça Eleitoral em qualquer caso.",
+    "converte as contas em regulares com ressalva.",
+    "extingue o processo sem julgamento.",
+    "não importa em modificação do julgamento quanto à irregularidade das contas."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 82, parágrafo único.",
+   "dispositivos": [
+    "art82.parunico"
+   ],
+   "trecho": "não importa em modificação do julgamento quanto à irregularidade das contas"
+  },
+  {
+   "id": "go-lei-16168-u7-14",
+   "unidade": "go-lei-16168-u7",
+   "enunciado": "O TCE-GO enviará ao Ministério Público Eleitoral, conforme sua Lei Orgânica, o nome dos responsáveis cujas contas houverem sido julgadas irregulares nos",
+   "alternativas": [
+    "8 anos anteriores às eleições, incluídos os sancionados só com multa.",
+    "5 anos imediatamente anteriores à época das eleições, excluídos os que tiveram contas irregulares sem imputação de débito e sancionados exclusivamente com multa.",
+    "3 anos anteriores às eleições.",
+    "5 anos anteriores, incluídos os processos com recurso de efeito suspensivo admitido.",
+    "10 anos anteriores às eleições."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 84, caput e §§ 1º e 2º.",
+   "dispositivos": [
+    "art84",
+    "art84.par1"
+   ],
+   "trecho": "nos 5 (cinco) anos imediatamente anteriores à época em que forem realizadas eleições"
+  },
+  {
+   "id": "go-lei-16168-u8-01",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "O prazo para o TCE-GO atender às solicitações de informações, pronunciamento, parecer ou auditorias feitas pela Assembleia Legislativa é, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "até 30 dias, contados do recebimento da solicitação, salvo outro fixado por mútuo entendimento entre o solicitante e a Presidência do Tribunal.",
+    "15 dias úteis, improrrogáveis.",
+    "60 dias contados da publicação da solicitação.",
+    "o fixado pelo Regimento Interno da Assembleia.",
+    "até 90 dias, prorrogáveis por igual período."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 86, § 2º.",
+   "dispositivos": [
+    "art86.par2"
+   ],
+   "trecho": "será de até 30 (trinta) dias, contados da data do recebimento da solicitação"
+  },
+  {
+   "id": "go-lei-16168-u8-02",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "São competentes para solicitar ao TCE-GO a realização de inspeções e auditorias, conforme a Lei Orgânica,",
+   "alternativas": [
+    "qualquer Deputado Estadual, individualmente.",
+    "o Governador e os Secretários de Estado.",
+    "o Presidente da Assembleia Legislativa e os Presidentes de Comissões da Assembleia, quando por estas aprovadas.",
+    "apenas a Mesa Diretora da Assembleia.",
+    "qualquer cidadão, mediante requerimento."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 86, § 1º. Cidadão DENUNCIA (art. 87), não solicita auditoria.",
+   "dispositivos": [
+    "art86.par1.inc1",
+    "art86.par1.inc2"
+   ],
+   "trecho": "Presidentes de Comissões da Assembléia Legislativa, quando por estas aprovadas"
+  },
+  {
+   "id": "go-lei-16168-u8-03",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "Em caso de urgência, a denúncia poderá ser encaminhada ao TCE-GO por meio eletrônico, com confirmação de recebimento e posterior remessa do original, segundo a Lei Orgânica, em",
+   "alternativas": [
+    "5 dias.",
+    "15 dias.",
+    "48 horas.",
+    "30 dias.",
+    "10 dias, contados a partir da confirmação."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 87, § 1º.",
+   "dispositivos": [
+    "art87.par1"
+   ],
+   "trecho": "posterior remessa do original em 10 (dez) dias"
+  },
+  {
+   "id": "go-lei-16168-u8-04",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "A denúncia que preencher os requisitos de admissibilidade, nos termos da Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "será publicada no Diário Oficial de imediato.",
+    "será apurada em caráter sigiloso, até que se comprove a sua procedência.",
+    "será remetida ao Ministério Público Estadual.",
+    "depende de ratificação pelo denunciante em audiência.",
+    "só será apurada se o denunciante for advogado."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 87, § 2º.",
+   "dispositivos": [
+    "art87.par2"
+   ],
+   "trecho": "será apurada em caráter sigiloso, até que se comprove a sua procedência"
+  },
+  {
+   "id": "go-lei-16168-u8-05",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "O denunciante, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "responde civilmente se a denúncia for julgada improcedente.",
+    "tem sua identidade divulgada ao final do processo.",
+    "deve pagar custas processuais.",
+    "não se sujeitará a nenhuma sanção administrativa, cível ou penal em decorrência da denúncia, salvo em caso de comprovada má-fé.",
+    "não pode requerer certidões do processo."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 88, parágrafo único.",
+   "dispositivos": [
+    "art88.parunico"
+   ],
+   "trecho": "salvo em caso de comprovada má-fé"
+  },
+  {
+   "id": "go-lei-16168-u8-06",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "Ao decidir sobre a denúncia, o TCE-GO, segundo sua Lei Orgânica, poderá manter ou não o sigilo quanto ao objeto da denúncia, devendo mantê-lo, em qualquer caso,",
+   "alternativas": [
+    "quanto à autoria.",
+    "quanto aos denunciados.",
+    "quanto aos valores envolvidos.",
+    "até o trânsito em julgado da ação penal.",
+    "apenas se o denunciante for servidor público."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 89, § 1º: o sigilo da AUTORIA é permanente.",
+   "dispositivos": [
+    "art89.par1"
+   ],
+   "trecho": "devendo mantê-lo, em qualquer caso, quanto à autoria"
+  },
+  {
+   "id": "go-lei-16168-u8-07",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "Decorrido o prazo de 90 dias a contar do recebimento da denúncia, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "a denúncia será arquivada.",
+    "o sigilo quanto à autoria cessa.",
+    "será obrigatoriamente fornecida ao denunciante a certidão dos despachos e fatos apurados, ainda que não estejam concluídas as investigações.",
+    "o processo será remetido ao Plenário para julgamento imediato.",
+    "o denunciante perde o direito à certidão."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 90, parágrafo único; concluído o processo, a certidão sai em até 15 dias do pedido (caput).",
+   "dispositivos": [
+    "art90.parunico"
+   ],
+   "trecho": "será obrigatoriamente fornecida a certidão de que trata este artigo"
+  },
+  {
+   "id": "go-lei-16168-u8-08",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "Têm legitimidade para representar ao TCE-GO, nos termos de sua Lei Orgânica, entre outros,",
+   "alternativas": [
+    "qualquer cidadão, por meio de representação.",
+    "as empresas licitantes, em qualquer caso.",
+    "apenas a Procuradoria-Geral de Contas.",
+    "somente os Deputados Estaduais.",
+    "os Ministérios Públicos da União, dos Estados e do Distrito Federal, os órgãos de controle interno e as unidades técnicas do Tribunal."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 91. O cidadão usa a DENÚNCIA (art. 87); a representação é de autoridades e órgãos.",
+   "dispositivos": [
+    "art91.inc1",
+    "art91.inc2",
+    "art91.inc7"
+   ],
+   "trecho": "os Ministérios Públicos da União, dos Estados, do Distrito Federal"
+  },
+  {
+   "id": "go-lei-16168-u8-09",
+   "unidade": "go-lei-16168-u8",
+   "enunciado": "A denúncia, segundo a Lei Orgânica do TCE-GO, somente poderá ser arquivada, mediante decisão do Relator ou do Tribunal,",
+   "alternativas": [
+    "a pedido do denunciado.",
+    "quando não observados os requisitos de admissibilidade ou quando não comprovada a sua procedência, após efetuadas as diligências pertinentes.",
+    "após 90 dias sem conclusão.",
+    "quando o denunciante desistir.",
+    "por decisão da Presidência."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 87, § 3º.",
+   "dispositivos": [
+    "art87.par3.inc1",
+    "art87.par3.inc2"
+   ],
+   "trecho": "quando não comprovada a sua procedência, após efetuadas as diligências pertinentes"
+  },
+  {
+   "id": "go-lei-16168-u9-01",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Constituem instrumentos utilizados para execução das atividades de fiscalização do TCE-GO, conforme sua Lei Orgânica, entre outros,",
+   "alternativas": [
+    "levantamentos, auditorias, inspeções, acompanhamentos, monitoramentos, relatório resumido da execução orçamentária e relatório de gestão fiscal.",
+    "denúncias, consultas e recursos.",
+    "apenas auditorias e inspeções.",
+    "tomadas de contas especiais e pareceres prévios.",
+    "mandados de segurança e ações civis públicas."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 92.",
+   "dispositivos": [
+    "art92"
+   ],
+   "trecho": "Constituem instrumentos utilizados para execução das atividades de fiscalização"
+  },
+  {
+   "id": "go-lei-16168-u9-02",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "As auditorias, acompanhamentos e monitoramentos do TCE-GO, segundo a Lei Orgânica, obedecerão ao plano de fiscalização",
+   "alternativas": [
+    "elaborado pela Assembleia Legislativa.",
+    "elaborado pelo Corregedor-Geral.",
+    "elaborado pela Presidência, em consulta aos Relatores das unidades jurisdicionadas, e aprovado pelo Plenário.",
+    "aprovado pelo Governador.",
+    "elaborado pelas unidades técnicas e aprovado pela Câmara."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 94, caput. Levantamentos e inspeções (salvo os de rotina) ocorrem por determinação do Plenário, da Câmara ou do Relator, independentemente de programação (§ 2º).",
+   "dispositivos": [
+    "art94"
+   ],
+   "trecho": "elaborado pela Presidência, em consulta aos Relatores das unidades jurisdicionadas, e aprovado pelo Plenário"
+  },
+  {
+   "id": "go-lei-16168-u9-03",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Ao servidor do TCE-GO credenciado para funções de fiscalização são asseguradas, conforme a Lei Orgânica, entre outras prerrogativas,",
+   "alternativas": [
+    "a quebra de sigilo bancário.",
+    "a busca e apreensão de documentos sem autorização judicial em residências.",
+    "a prisão em flagrante do responsável que sonegar documentos.",
+    "o afastamento cautelar do gestor.",
+    "o livre ingresso em órgãos e entidades sujeitos à jurisdição do Tribunal e o acesso irrestrito a todos os processos, documentos e informações necessários ao seu trabalho."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 95, I e II.",
+   "dispositivos": [
+    "art95.inc1",
+    "art95.inc2"
+   ],
+   "trecho": "livre ingresso em órgãos e entidades sujeitos à jurisdição do Tribunal"
+  },
+  {
+   "id": "go-lei-16168-u9-04",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "No caso de obstrução ao livre exercício da fiscalização ou sonegação de documento, o TCE-GO, segundo sua Lei Orgânica, primeiro",
+   "alternativas": [
+    "aplicará multa imediatamente.",
+    "assinará prazo para o atendimento, comunicando o fato à autoridade superior, para as medidas cabíveis.",
+    "requisitará força policial.",
+    "julgará as contas irregulares.",
+    "afastará o responsável do cargo."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 95, § 1º; vencido o prazo, vem a multa e a representação ao Presidente da Assembleia (§ 2º).",
+   "dispositivos": [
+    "art95.par1"
+   ],
+   "trecho": "o Tribunal assinará prazo para o atendimento"
+  },
+  {
+   "id": "go-lei-16168-u9-05",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Verificado, no curso da fiscalização, procedimento de que possa resultar dano ao erário, a fixação de prazo para pronunciamento do responsável, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "impede a adoção de medida cautelar até o recebimento dos esclarecimentos.",
+    "exige a oitiva prévia do Ministério Público de Contas.",
+    "suspende a fiscalização.",
+    "não impede que o Tribunal ou o Relator adote, desde logo, medida cautelar, independentemente do recebimento ou da análise prévia dos esclarecimentos.",
+    "transfere a competência ao Plenário."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 96, § 2º.",
+   "dispositivos": [
+    "art96.par2"
+   ],
+   "trecho": "não impede que o Tribunal ou o Relator adote, desde logo, medida cautelar"
+  },
+  {
+   "id": "go-lei-16168-u9-06",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Ao apreciar processo de fiscalização de atos e contratos, se configurada a ocorrência de desfalque, desvio de bens ou outra irregularidade de que resulte dano ao erário, o Relator ou o Tribunal, conforme a Lei Orgânica,",
+   "alternativas": [
+    "ordenará a conversão do processo em tomada de contas especial.",
+    "arquivará o processo.",
+    "determinará apenas providências corretivas.",
+    "remeterá o processo à Assembleia Legislativa.",
+    "aplicará somente advertência."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 99, III.",
+   "dispositivos": [
+    "art99.inc3"
+   ],
+   "trecho": "ordenará a conversão do processo em tomada de contas especial"
+  },
+  {
+   "id": "go-lei-16168-u9-07",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Verificadas tão somente falhas de natureza formal que não ensejem multa nem configurem indícios de débito, o Relator ou o Tribunal, na fiscalização de atos e contratos,",
+   "alternativas": [
+    "converterá o processo em tomada de contas especial.",
+    "aplicará multa ao responsável.",
+    "determinará a adoção de providências corretivas por parte do responsável ou de quem lhe haja sucedido, e o arquivamento ou apensamento do processo às contas.",
+    "sustará o ato.",
+    "citará o responsável para defesa em 30 dias."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 99, II.",
+   "dispositivos": [
+    "art99.inc2"
+   ],
+   "trecho": "determinará a adoção de providências corretivas por parte do responsável"
+  },
+  {
+   "id": "go-lei-16168-u9-08",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Verificada a ilegalidade de ato administrativo em execução e não atendida a determinação do Tribunal, o TCE-GO, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "solicitará à Assembleia a sustação.",
+    "aguardará o julgamento das contas anuais.",
+    "apenas comunicará o fato ao Ministério Público.",
+    "anulará o ato e demitirá o responsável.",
+    "sustará a execução do ato impugnado, comunicará a decisão à Assembleia Legislativa e ao Chefe do Poder Executivo e aplicará multa ao responsável."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 100, § 1º. Para CONTRATO, quem susta é a Assembleia; o Tribunal só decide se, em 90 dias, Assembleia ou Executivo não agirem (§§ 2º e 3º).",
+   "dispositivos": [
+    "art100.par1.inc1",
+    "art100.par1.inc2"
+   ],
+   "trecho": "sustará a execução do ato impugnado"
+  },
+  {
+   "id": "go-lei-16168-u9-09",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Ficará sujeita a multa, nos termos da Lei Orgânica do TCE-GO, a autoridade administrativa que",
+   "alternativas": [
+    "solicitar auditoria ao Tribunal.",
+    "transferir recursos estaduais a gestores omissos na prestação de contas de recursos anteriormente recebidos.",
+    "instaurar tomada de contas especial.",
+    "representar ao Tribunal.",
+    "celebrar convênio com Município adimplente."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 101, § 1º.",
+   "dispositivos": [
+    "art101.par1"
+   ],
+   "trecho": "transferir recursos estaduais a gestores omissos na prestação de contas"
+  },
+  {
+   "id": "go-lei-16168-u9-10",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Para fiscalizar o cálculo das quotas-partes do ICMS pertencentes aos Municípios, o TCE-GO receberá da Secretaria de Estado da Fazenda as informações e documentos utilizados, conforme a Lei Orgânica,",
+   "alternativas": [
+    "até 30 dias após o encerramento do exercício.",
+    "até 60 dias após a publicação dos índices provisórios.",
+    "mensalmente.",
+    "até 10 dias após a publicação dos índices definitivos.",
+    "somente quando requisitados."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 103.",
+   "dispositivos": [
+    "art103"
+   ],
+   "trecho": "até 10 (dez) dias após a publicação dos índices definitivos"
+  },
+  {
+   "id": "go-lei-16168-u9-11",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "Nos termos da Lei Orgânica do TCE-GO, as atividades dos órgãos e entidades jurisdicionados serão acompanhadas de forma seletiva e concomitante, mediante, entre outros meios,",
+   "alternativas": [
+    "consulta a sistemas informatizados da administração pública estadual, inclusive acesso irrestrito à sua base de dados.",
+    "interceptação de comunicações.",
+    "exclusivamente relatórios anuais.",
+    "entrevistas com a imprensa.",
+    "apenas denúncias de cidadãos."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 93, I.",
+   "dispositivos": [
+    "art93.inc1"
+   ],
+   "trecho": "inclusive acesso irrestrito à sua base de dados"
+  },
+  {
+   "id": "go-lei-16168-u9-12",
+   "unidade": "go-lei-16168-u9",
+   "enunciado": "O Tribunal estabelecerá no Regimento Interno a forma de fiscalização, conforme a Lei Orgânica do TCE-GO, entre outros,",
+   "alternativas": [
+    "dos contratos entre particulares.",
+    "das eleições municipais.",
+    "dos processos de desestatização, das concessões e permissões de serviço público e das parcerias público-privadas.",
+    "das decisões judiciais.",
+    "dos atos da Assembleia Legislativa sem reflexo financeiro."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 102, VI e VII.",
+   "dispositivos": [
+    "art102.inc6",
+    "art102.inc7"
+   ],
+   "trecho": "bem como as parcerias público-privadas"
+  },
+  {
+   "id": "go-lei-16168-u10-01",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "O acórdão do TCE-GO que considerar legal o ato e determinar o seu registro, segundo a Lei Orgânica, poderá ser revisto de ofício pelo Tribunal, com a oitiva da Procuradoria-Geral de Contas,",
+   "alternativas": [
+    "dentro do prazo de 5 anos do registro, se verificado que o ato viola a ordem jurídica, ou a qualquer tempo no caso de comprovada má-fé.",
+    "a qualquer tempo, em qualquer hipótese.",
+    "dentro de 2 anos do registro.",
+    "somente mediante recurso do interessado.",
+    "dentro de 10 anos do registro, se houver má-fé."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 105, § 2º.",
+   "dispositivos": [
+    "art105.par2"
+   ],
+   "trecho": "dentro do prazo de 5 (cinco) anos do registro"
+  },
+  {
+   "id": "go-lei-16168-u10-02",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "Considerado ilegal pelo TCE-GO o ato de concessão de aposentadoria, reforma ou pensão, o órgão competente fará cessar o pagamento, conforme a Lei Orgânica,",
+   "alternativas": [
+    "imediatamente, ainda que caiba recurso.",
+    "no prazo de 30 dias da publicação do acórdão.",
+    "no prazo de 15 dias, contados da ciência da decisão de que não caiba recurso, sob pena de responsabilidade solidária da autoridade administrativa omissa.",
+    "somente após decisão judicial.",
+    "no prazo de 60 dias, sob pena de multa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 107.",
+   "dispositivos": [
+    "art107"
+   ],
+   "trecho": "no prazo de 15 (quinze) dias, contados da ciência da decisão do Tribunal de Contas"
+  },
+  {
+   "id": "go-lei-16168-u10-03",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "Prescreve em quanto tempo, segundo a Lei Orgânica do TCE-GO, a pretensão punitiva do Tribunal nos feitos de qualquer natureza a seu cargo?",
+   "alternativas": [
+    "3 anos.",
+    "10 anos.",
+    "É imprescritível.",
+    "8 anos.",
+    "5 anos."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 107-A: cinco anos.",
+   "dispositivos": [
+    "art107-a"
+   ],
+   "trecho": "Prescreve em 5 (cinco) anos a pretensão punitiva"
+  },
+  {
+   "id": "go-lei-16168-u10-04",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "Nos processos de prestação e tomada de contas, a contagem do prazo prescricional da pretensão punitiva do TCE-GO inicia-se, conforme a Lei Orgânica,",
+   "alternativas": [
+    "da ocorrência do fato.",
+    "da autuação do feito no Tribunal.",
+    "do encerramento do exercício financeiro.",
+    "da citação do responsável.",
+    "da publicação do acórdão."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 107-A, § 1º, I; da ocorrência do fato é a regra dos DEMAIS casos (inciso III).",
+   "dispositivos": [
+    "art107-a.par1.inc1"
+   ],
+   "trecho": "da autuação do feito no Tribunal, nos casos de Prestação e Tomada de Contas"
+  },
+  {
+   "id": "go-lei-16168-u10-05",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "Interrompem a prescrição da pretensão punitiva do TCE-GO, segundo sua Lei Orgânica,",
+   "alternativas": [
+    "a determinação de diligência e a autuação do processo.",
+    "a denúncia e a representação.",
+    "a publicação do edital e o pedido de vista.",
+    "a citação válida do responsável e a interposição de recurso.",
+    "o sorteio do Relator."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 107-A, § 3º. A diligência SUSPENDE (não interrompe) a prescrição (§ 2º).",
+   "dispositivos": [
+    "art107-a.par3.inc1",
+    "art107-a.par3.inc2"
+   ],
+   "trecho": "a citação válida do responsável"
+  },
+  {
+   "id": "go-lei-16168-u10-06",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "A resposta do TCE-GO à consulta formulada por autoridade legitimada, conforme a Lei Orgânica,",
+   "alternativas": [
+    "tem caráter normativo e constitui prejulgamento da tese, mas não do fato ou caso concreto.",
+    "vincula apenas o consulente, sem caráter normativo.",
+    "constitui prejulgamento do caso concreto.",
+    "depende de homologação da Assembleia.",
+    "tem natureza de parecer opinativo."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 108, § 2º; consulta sobre caso concreto nem é conhecida (art. 109).",
+   "dispositivos": [
+    "art108.par2"
+   ],
+   "trecho": "tem caráter normativo e constitui prejulgamento da tese, mas não do fato ou caso concreto"
+  },
+  {
+   "id": "go-lei-16168-u10-07",
+   "unidade": "go-lei-16168-u10",
+   "enunciado": "As consultas ao TCE-GO, nos termos da Lei Orgânica, devem conter a indicação precisa do seu objeto, ser formuladas articuladamente e",
+   "alternativas": [
+    "ser subscritas por advogado.",
+    "ser acompanhadas do pagamento de taxa.",
+    "ser instruídas com parecer do órgão de assistência técnica ou jurídica da autoridade consulente.",
+    "tratar de caso concreto.",
+    "ser aprovadas pela Assembleia Legislativa."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 108, § 1º.",
+   "dispositivos": [
+    "art108.par1"
+   ],
+   "trecho": "instruídas com parecer do órgão de assistência técnica ou jurídica da autoridade consulente"
+  },
+  {
+   "id": "go-lei-16168-u11-01",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "Quando o responsável for julgado em débito, o TCE-GO poderá ainda aplicar-lhe, conforme sua Lei Orgânica, multa de até",
+   "alternativas": [
+    "2 vezes o valor atualizado do dano causado ao erário.",
+    "o valor do dano causado ao erário.",
+    "3 vezes o valor do dano.",
+    "10% do valor do dano.",
+    "100% do valor fixado no art. 112."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 111: multa proporcional ao dano, de até duas vezes o valor atualizado.",
+   "dispositivos": [
+    "art111"
+   ],
+   "trecho": "multa de até 2 (duas) vezes o valor atualizado do dano causado ao erário"
+  },
+  {
+   "id": "go-lei-16168-u11-02",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "Entre as multas do art. 112 da Lei Orgânica do TCE-GO, a aplicável por obstrução ao livre exercício das inspeções e auditorias determinadas varia de",
+   "alternativas": [
+    "10% a 30% do valor de referência.",
+    "20% a 50% do valor de referência.",
+    "50% a 70% do valor de referência.",
+    "30% a 100% do valor de referência.",
+    "10% a 15% do valor de referência."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 112, V: obstrução, 50% a 70%. Sonegação de documento é 20% a 50% (inciso VI).",
+   "dispositivos": [
+    "art112.inc5"
+   ],
+   "trecho": "50% (cinqüenta por cento) a 70% (setenta por cento)"
+  },
+  {
+   "id": "go-lei-16168-u11-03",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "A multa do art. 112 da Lei Orgânica do TCE-GO pela reincidência no descumprimento de decisão do Tribunal varia de",
+   "alternativas": [
+    "30% a 100%.",
+    "10% a 30%.",
+    "10% a 50%.",
+    "20% a 50%.",
+    "50% a 100%."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 112, VIII; o simples descumprimento de decisão é de 30% a 100% (inciso VII).",
+   "dispositivos": [
+    "art112.inc8"
+   ],
+   "trecho": "reincidência no descumprimento de decisão do Tribunal – 50% (cinqüenta por cento) a 100% (cem por cento)"
+  },
+  {
+   "id": "go-lei-16168-u11-04",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "O TCE-GO pode propor a assinatura de termos de ajustamento de gestão, conforme sua Lei Orgânica, para o efeito de",
+   "alternativas": [
+    "substituir o julgamento das contas.",
+    "afastar a aplicação de penalidades ou sanções e adequar os atos e procedimentos do órgão ou entidade controlada aos padrões de regularidade.",
+    "perdoar débitos já imputados.",
+    "transferir a responsabilidade ao controle interno.",
+    "suspender a prescrição."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 110-A.",
+   "dispositivos": [
+    "art110-a"
+   ],
+   "trecho": "termos de ajustamento de gestão"
+  },
+  {
+   "id": "go-lei-16168-u11-05",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "Sempre que o TCE-GO, por maioria absoluta de seus membros, considerar grave a infração cometida, o responsável ficará inabilitado para o exercício de cargo em comissão ou função de confiança na administração pública estadual por",
+   "alternativas": [
+    "2 a 4 anos.",
+    "8 a 10 anos.",
+    "até 5 anos.",
+    "5 a 8 anos.",
+    "prazo indeterminado."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 114: 5 a 8 anos, decisão por maioria absoluta.",
+   "dispositivos": [
+    "art114"
+   ],
+   "trecho": "por um período que variará de 5 (cinco) a 8 (oito) anos"
+  },
+  {
+   "id": "go-lei-16168-u11-06",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "Verificada fraude comprovada à licitação, o TCE-GO, nos termos de sua Lei Orgânica, declarará a inidoneidade do licitante fraudador para participar de licitação na administração pública estadual por",
+   "alternativas": [
+    "até 5 anos.",
+    "até 2 anos.",
+    "5 a 8 anos.",
+    "até 10 anos.",
+    "prazo indeterminado, até a reabilitação."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 115: até 5 anos.",
+   "dispositivos": [
+    "art115"
+   ],
+   "trecho": "por até 5 (cinco) anos"
+  },
+  {
+   "id": "go-lei-16168-u11-07",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "A indisponibilidade de bens do responsável, que o TCE-GO pode decretar nas circunstâncias que autorizam o afastamento cautelar, tem prazo, segundo a Lei Orgânica,",
+   "alternativas": [
+    "não superior a 6 meses.",
+    "de até 2 anos.",
+    "não superior a 1 ano.",
+    "indeterminado.",
+    "de 5 anos."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 117: por prazo não superior a um ano.",
+   "dispositivos": [
+    "art117"
+   ],
+   "trecho": "por prazo não superior a 1 (um) ano"
+  },
+  {
+   "id": "go-lei-16168-u11-08",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "O afastamento temporário do responsável, determinado cautelarmente pelo TCE-GO, é cabível, segundo a Lei Orgânica, se existirem indícios suficientes de que ele, prosseguindo no exercício de suas funções, possa",
+   "alternativas": [
+    "ser reeleito.",
+    "requerer aposentadoria.",
+    "obter promoção na carreira.",
+    "apresentar defesa intempestiva.",
+    "retardar ou dificultar a realização de procedimento de fiscalização, causar novo dano ao erário ou inviabilizar o seu ressarcimento."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 116; é solidariamente responsável a autoridade superior que, comunicada, não agir (parágrafo único).",
+   "dispositivos": [
+    "art116"
+   ],
+   "trecho": "possa retardar ou dificultar a realização de procedimento de fiscalização"
+  },
+  {
+   "id": "go-lei-16168-u11-09",
+   "unidade": "go-lei-16168-u11",
+   "enunciado": "A medida cautelar prevista na Lei Orgânica do TCE-GO pode ser adotada",
+   "alternativas": [
+    "somente mediante provocação do Ministério Público de Contas.",
+    "de ofício ou mediante provocação, em caso de urgência, de fundado receio de grave lesão ao erário ou a direito alheio ou de risco de ineficácia da decisão de mérito.",
+    "apenas após a citação do responsável.",
+    "apenas pelo Plenário, por maioria absoluta.",
+    "somente em processos de contas."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 119, caput; pode ser revista de ofício por quem a adotou ou pelo Tribunal (§ 2º).",
+   "dispositivos": [
+    "art119"
+   ],
+   "trecho": "poderá, de ofício ou mediante provocação, adotar medida cautelar"
+  },
+  {
+   "id": "go-lei-16168-u12-01",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "Segundo a Lei Orgânica do TCE-GO, NÃO cabe recurso de decisão que",
+   "alternativas": [
+    "converter processo em tomada de contas especial ou determinar a realização de citação, diligência, inspeção ou auditoria.",
+    "julgar as contas irregulares.",
+    "aplicar multa ao responsável.",
+    "negar registro a ato de aposentadoria.",
+    "adotar medida cautelar."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 121. Contra medida cautelar cabe AGRAVO (art. 128).",
+   "dispositivos": [
+    "art121.inc1",
+    "art121.inc2"
+   ],
+   "trecho": "converter processo em tomada de contas especial, ou determinar a sua instauração"
+  },
+  {
+   "id": "go-lei-16168-u12-02",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "Havendo mais de um responsável pelo mesmo fato, o recurso apresentado por um deles, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "aproveita apenas a quem recorreu.",
+    "aproveita a todos em qualquer fundamento.",
+    "aproveitará a todos, mesmo ao julgado à revelia, no que concerne às circunstâncias objetivas, não aproveitando no tocante aos fundamentos de natureza exclusivamente pessoal.",
+    "aproveita a todos, exceto ao revel.",
+    "suspende o processo para os demais."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 123.",
+   "dispositivos": [
+    "art123"
+   ],
+   "trecho": "aproveitará a todos, mesmo àquele que houver sido julgado à revelia"
+  },
+  {
+   "id": "go-lei-16168-u12-03",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "De decisão definitiva em processo de prestação ou tomada de contas cabe recurso de reconsideração, segundo a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "sem efeito suspensivo, no prazo de 5 dias.",
+    "ao Tribunal de Justiça, em 15 dias.",
+    "com efeito suspensivo, no prazo de 10 dias, quantas vezes forem necessárias.",
+    "ao Plenário, sem efeito suspensivo, em 30 dias.",
+    "com efeito suspensivo, uma só vez e por escrito, no prazo de 15 dias."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 125: efeito suspensivo, uma só vez, por escrito, 15 dias, ao colegiado que proferiu a decisão.",
+   "dispositivos": [
+    "art125"
+   ],
+   "trecho": "dentro do prazo de 15 (quinze) dias"
+  },
+  {
+   "id": "go-lei-16168-u12-04",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "O recurso de reconsideração intempestivo, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "jamais será conhecido.",
+    "será conhecido em razão da superveniência de fatos novos e dentro do período de 1 ano contado do término do prazo, caso em que não terá efeito suspensivo.",
+    "será conhecido como pedido de revisão, com efeito suspensivo.",
+    "será conhecido se o recorrente pagar multa.",
+    "será conhecido em até 5 anos, com efeito suspensivo."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 125, § 2º.",
+   "dispositivos": [
+    "art125.par2"
+   ],
+   "trecho": "dentro do período de 1 (um) ano"
+  },
+  {
+   "id": "go-lei-16168-u12-05",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "Cabem embargos de declaração, nos termos da Lei Orgânica do TCE-GO, quando houver obscuridade, omissão ou contradição em acórdão, devendo ser opostos no prazo de",
+   "alternativas": [
+    "15 dias.",
+    "10 dias.",
+    "3 dias.",
+    "5 dias.",
+    "30 dias."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 127, § 1º: 5 dias; eles suspendem os prazos para cumprimento e para os demais recursos (§ 2º).",
+   "dispositivos": [
+    "art127.par1"
+   ],
+   "trecho": "dentro do prazo de 5 (cinco) dias"
+  },
+  {
+   "id": "go-lei-16168-u12-06",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "De despacho decisório desfavorável à parte e de medida cautelar adotada pelo TCE-GO cabe, segundo a Lei Orgânica,",
+   "alternativas": [
+    "agravo, no prazo de 10 dias.",
+    "pedido de reexame, em 15 dias.",
+    "embargos de declaração, em 5 dias.",
+    "recurso de reconsideração, em 15 dias.",
+    "pedido de revisão, em 5 anos."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 128; o efeito suspensivo do agravo fica a critério do Presidente, do Presidente de Câmara ou do Relator.",
+   "dispositivos": [
+    "art128"
+   ],
+   "trecho": "cabe agravo, no prazo de 10 (dez) dias"
+  },
+  {
+   "id": "go-lei-16168-u12-07",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "O pedido de revisão de decisão definitiva em processo de contas, previsto na Lei Orgânica do TCE-GO, tem natureza similar à da ação rescisória e é",
+   "alternativas": [
+    "dirigido à Câmara, com efeito suspensivo, em 2 anos.",
+    "dirigido ao Relator, com efeito suspensivo, em 1 ano.",
+    "dirigido ao Plenário, sem efeito suspensivo, apresentado uma só vez, no prazo de 5 anos.",
+    "cabível apenas ao Ministério Público de Contas.",
+    "dirigido ao Plenário, com efeito suspensivo, em 5 anos."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 129: Plenário, sem efeito suspensivo, uma vez, 5 anos; fundado em erro de cálculo, falsidade ou insuficiência de documentos, ou documentos novos.",
+   "dispositivos": [
+    "art129"
+   ],
+   "trecho": "cabe pedido de revisão ao Plenário, de natureza jurídica similar à da ação rescisória, sem efeito suspensivo"
+  },
+  {
+   "id": "go-lei-16168-u12-08",
+   "unidade": "go-lei-16168-u12",
+   "enunciado": "Nos recursos interpostos pela Procuradoria-Geral de Contas tendentes a agravar a situação do responsável, a Lei Orgânica do TCE-GO exige",
+   "alternativas": [
+    "a oitiva prévia do Governador.",
+    "a manifestação da Assembleia Legislativa.",
+    "a aprovação por maioria absoluta do Plenário.",
+    "o depósito prévio do débito.",
+    "a instauração do contraditório, mediante concessão de oportunidade para oferecimento de contrarrazões recursais."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 124.",
+   "dispositivos": [
+    "art124"
+   ],
+   "trecho": "é necessária a instauração do contraditório"
+  },
+  {
+   "id": "go-lei-16168-u13-01",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "A decisão do TCE-GO que deliberar sobre o incidente de reconhecimento de inconstitucionalidade de lei ou ato normativo, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "solucionará a questão prejudicial, constituindo prejulgado a ser aplicado a todos os casos a serem submetidos ao Tribunal.",
+    "vale apenas para o caso concreto.",
+    "depende de confirmação pelo Supremo Tribunal Federal.",
+    "retira a lei do ordenamento jurídico.",
+    "vincula o Poder Judiciário."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 134.",
+   "dispositivos": [
+    "art134"
+   ],
+   "trecho": "constituindo prejulgado a ser aplicado a todos os casos"
+  },
+  {
+   "id": "go-lei-16168-u13-02",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "A Câmara do TCE-GO não submeterá a arguição de inconstitucionalidade ao Plenário, segundo a Lei Orgânica, quando",
+   "alternativas": [
+    "o Relator discordar da arguição.",
+    "a lei for estadual.",
+    "já houver o pronunciamento deste ou do Supremo Tribunal Federal sobre a questão.",
+    "o responsável for revel.",
+    "a Procuradoria-Geral de Contas não se manifestar."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 135.",
+   "dispositivos": [
+    "art135"
+   ],
+   "trecho": "quando já houver o pronunciamento deste ou do Supremo Tribunal Federal sobre a questão"
+  },
+  {
+   "id": "go-lei-16168-u13-03",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "Suscitada divergência entre deliberações anteriores do Tribunal, pode requerer a apreciação preliminar da controvérsia, conforme a Lei Orgânica do TCE-GO,",
+   "alternativas": [
+    "apenas o Presidente do Tribunal.",
+    "apenas o Relator do processo.",
+    "somente a Procuradoria-Geral de Contas.",
+    "qualquer cidadão.",
+    "Conselheiro, Auditor, representante da Procuradoria-Geral de Contas ou responsável."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 132; reconhecida a divergência, ouve-se o MP de Contas e a questão vai ao Plenário.",
+   "dispositivos": [
+    "art132"
+   ],
+   "trecho": "a requerimento de Conselheiro, Auditor, representante da Procuradoria-Geral de Contas ou responsável"
+  },
+  {
+   "id": "go-lei-16168-u13-04",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "Os ordenadores de despesa e os dirigentes de entidades remeterão ao TCE-GO cópia de suas declarações de rendimentos e de bens, cujo conteúdo, segundo a Lei Orgânica,",
+   "alternativas": [
+    "será publicado no Diário Eletrônico do Tribunal.",
+    "será mantido em sigilo, que poderá ser quebrado por decisão do Plenário em processo no qual fique comprovado enriquecimento ilícito por exercício irregular da função pública.",
+    "será livremente acessível a qualquer cidadão.",
+    "só poderá ser examinado com autorização judicial.",
+    "será encaminhado de imediato à Receita Federal."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 140, §§ 1º e 2º.",
+   "dispositivos": [
+    "art140.par1",
+    "art140.par2"
+   ],
+   "trecho": "O sigilo assegurado no § 1º poderá ser quebrado por decisão do Plenário"
+  },
+  {
+   "id": "go-lei-16168-u13-05",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "Aplicam-se subsidiariamente no TCE-GO, conforme sua Lei Orgânica,",
+   "alternativas": [
+    "as normas do Código Penal.",
+    "os regimentos de outros Tribunais de Contas.",
+    "as normas da CLT.",
+    "as disposições das normas processuais em vigor.",
+    "as normas do processo legislativo estadual."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 139.",
+   "dispositivos": [
+    "art139"
+   ],
+   "trecho": "Aplicam-se, subsidiariamente, no Tribunal de Contas as disposições das normas processuais em vigor"
+  },
+  {
+   "id": "go-lei-16168-u13-06",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "Para o exercício de sua competência institucional, o TCE-GO poderá requisitar aos órgãos e entidades estaduais a prestação de serviços técnicos especializados, conforme a Lei Orgânica,",
+   "alternativas": [
+    "sem quaisquer ônus, por prazo previamente fixado, sob pena de aplicação de multa.",
+    "mediante pagamento pelo Tribunal.",
+    "somente com autorização do Governador.",
+    "apenas em processos de consulta.",
+    "por prazo indeterminado."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 138.",
+   "dispositivos": [
+    "art138"
+   ],
+   "trecho": "sem quaisquer ônus, a prestação de serviços técnicos especializados"
+  },
+  {
+   "id": "go-lei-16168-u13-07",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "São meios de divulgação oficial do TCE-GO, além do Diário Oficial do Estado, segundo a Lei Orgânica,",
+   "alternativas": [
+    "apenas a página eletrônica do Tribunal.",
+    "os jornais de grande circulação.",
+    "a Revista, o Boletim, a Página eletrônica, o Quadro informativo e o Diário Eletrônico do Tribunal.",
+    "o Diário da Assembleia Legislativa.",
+    "somente o Diário Eletrônico do Tribunal."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 136.",
+   "dispositivos": [
+    "art136"
+   ],
+   "trecho": "são meios de divulgação oficial do Tribunal de Contas do Estado de Goiás"
+  },
+  {
+   "id": "go-lei-16168-u13-08",
+   "unidade": "go-lei-16168-u13",
+   "enunciado": "A Súmula de Jurisprudência do TCE-GO constitui-se, conforme a Lei Orgânica, de",
+   "alternativas": [
+    "decisões isoladas do Presidente.",
+    "pareceres da Procuradoria-Geral de Contas.",
+    "respostas a consultas sobre casos concretos.",
+    "decisões do Supremo Tribunal Federal.",
+    "princípios ou enunciados, resumindo teses, soluções, precedentes e entendimentos adotados reiteradamente pelo Tribunal."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 130.",
+   "dispositivos": [
+    "art130"
+   ],
+   "trecho": "resumindo teses, soluções, precedentes e entendimentos, adotados reiteradamente"
+  }
+ ]
+}

@@ -1,0 +1,916 @@
+{
+ "unidades": [
+  {
+   "ref": "cf88-u1",
+   "titulo": "Art. 37 — Disposições gerais da administração pública",
+   "dispositivos": [
+    "art37"
+   ],
+   "hash": "4ddeffc35b03d892818d6406b727c76009774e4e263f43993403562268b2dcf0"
+  },
+  {
+   "ref": "cf88-u2",
+   "titulo": "Arts. 38 a 41 — Servidores públicos",
+   "dispositivos": [
+    "art38",
+    "art39",
+    "art40",
+    "art41"
+   ],
+   "hash": "4a186a6a0f404a03de9bf014162f2fdc7deeb2e6daf57e9fa37f99f03c7173b4"
+  },
+  {
+   "ref": "cf88-u3",
+   "titulo": "Arts. 42 e 43 — Militares dos Estados e regiões",
+   "dispositivos": [
+    "art42",
+    "art43"
+   ],
+   "hash": "b9ee6be1bb3a95a7143ddc40648a33b9a126d900981ef5e516fc8317a59bf96e"
+  },
+  {
+   "ref": "cf88-u4",
+   "titulo": "Arts. 70 a 75 — Fiscalização contábil, financeira e orçamentária",
+   "dispositivos": [
+    "art70",
+    "art71",
+    "art72",
+    "art73",
+    "art74",
+    "art75"
+   ],
+   "hash": "599deb118a95204a90fb5773b740354b7dc988757a103eedec3291bbd21966a8"
+  }
+ ],
+ "questoes": [
+  {
+   "id": "cf88-u1-01",
+   "unidade": "cf88-u1",
+   "enunciado": "Nos termos do art. 37 da Constituição Federal, a administração pública direta e indireta de qualquer dos Poderes obedecerá aos princípios de",
+   "alternativas": [
+    "legalidade, impessoalidade, moralidade, publicidade e economicidade.",
+    "legalidade, impessoalidade, moralidade, publicidade e eficiência.",
+    "legalidade, isonomia, moralidade, publicidade e eficiência.",
+    "legalidade, impessoalidade, razoabilidade, publicidade e eficiência.",
+    "legalidade, impessoalidade, moralidade, motivação e eficiência."
+   ],
+   "gabarito": "B",
+   "comentario": "O caput do art. 37 lista cinco princípios expressos (LIMPE). Economicidade, isonomia, razoabilidade e motivação existem no ordenamento, mas não nesse rol.",
+   "dispositivos": [
+    "art37"
+   ],
+   "trecho": "legalidade, impessoalidade, moralidade, publicidade e eficiência"
+  },
+  {
+   "id": "cf88-u1-02",
+   "unidade": "cf88-u1",
+   "enunciado": "De acordo com a Constituição Federal, o prazo de validade do concurso público será de",
+   "alternativas": [
+    "até dois anos, prorrogável uma vez, por igual período.",
+    "dois anos, improrrogável.",
+    "até quatro anos, prorrogável uma vez, por igual período.",
+    "até dois anos, prorrogável sucessivamente por igual período.",
+    "até um ano, prorrogável uma vez, por até dois anos."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 37, III: ATÉ dois anos, prorrogável UMA vez, por IGUAL período.",
+   "dispositivos": [
+    "art37.inc3"
+   ],
+   "trecho": "o prazo de validade do concurso público será de até dois anos, prorrogável uma vez, por igual período"
+  },
+  {
+   "id": "cf88-u1-03",
+   "unidade": "cf88-u1",
+   "enunciado": "Segundo a Constituição Federal, a investidura em cargo ou emprego público depende de aprovação prévia em concurso público, ressalvadas",
+   "alternativas": [
+    "as contratações de empregados de empresas públicas.",
+    "as nomeações para funções de confiança.",
+    "as nomeações para cargo em comissão declarado em lei de livre nomeação e exoneração.",
+    "as admissões de estrangeiros, na forma da lei.",
+    "as nomeações de servidores de carreira para cargos de direção."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 37, II: a única ressalva é o cargo em comissão declarado em lei de livre nomeação e exoneração. Emprego público em estatal também exige concurso.",
+   "dispositivos": [
+    "art37.inc2"
+   ],
+   "trecho": "ressalvadas as nomeações para cargo em comissão declarado em lei de livre nomeação e exoneração"
+  },
+  {
+   "id": "cf88-u1-04",
+   "unidade": "cf88-u1",
+   "enunciado": "Conforme a Constituição Federal, as funções de confiança",
+   "alternativas": [
+    "podem ser exercidas por qualquer pessoa, desde que nomeada em comissão.",
+    "destinam-se às atribuições de direção, chefia, assessoramento e execução.",
+    "são preenchidas por servidores de carreira nos percentuais mínimos previstos em lei.",
+    "são exercidas exclusivamente por servidores ocupantes de cargo efetivo.",
+    "dependem de concurso público de provas e títulos."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 37, V: função de confiança é EXCLUSIVA de servidor efetivo; os cargos em comissão é que seguem percentuais mínimos para servidores de carreira. Ambos só para direção, chefia e assessoramento.",
+   "dispositivos": [
+    "art37.inc5"
+   ],
+   "trecho": "as funções de confiança, exercidas exclusivamente por servidores ocupantes de cargo efetivo"
+  },
+  {
+   "id": "cf88-u1-05",
+   "unidade": "cf88-u1",
+   "enunciado": "O direito de greve do servidor público, nos termos da Constituição Federal,",
+   "alternativas": [
+    "é vedado aos servidores públicos civis.",
+    "será exercido nos termos e nos limites definidos em lei específica.",
+    "será exercido nos termos de lei complementar.",
+    "é assegurado sem restrições, como aos trabalhadores em geral.",
+    "depende de autorização do chefe do respectivo Poder."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 37, VII: lei ESPECÍFICA (ordinária), não complementar. A livre associação sindical é garantida pelo inciso VI.",
+   "dispositivos": [
+    "art37.inc7"
+   ],
+   "trecho": "o direito de greve será exercido nos termos e nos limites definidos em lei específica"
+  },
+  {
+   "id": "cf88-u1-06",
+   "unidade": "cf88-u1",
+   "enunciado": "A remuneração dos servidores públicos, conforme a Constituição Federal, somente poderá ser fixada ou alterada por",
+   "alternativas": [
+    "decreto do chefe do Poder Executivo, assegurada revisão geral anual.",
+    "lei complementar, assegurada revisão geral bienal.",
+    "lei específica, observada a iniciativa privativa em cada caso, assegurada revisão geral anual, sempre na mesma data e sem distinção de índices.",
+    "lei específica, assegurada revisão anual com índices diferenciados por carreira.",
+    "resolução do respectivo Poder, assegurada revisão geral anual."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 37, X: lei específica, iniciativa privativa, revisão geral ANUAL, na MESMA data e SEM distinção de índices.",
+   "dispositivos": [
+    "art37.inc10"
+   ],
+   "trecho": "somente poderão ser fixados ou alterados por lei específica"
+  },
+  {
+   "id": "cf88-u1-07",
+   "unidade": "cf88-u1",
+   "enunciado": "No âmbito do Poder Executivo dos Estados, o limite remuneratório previsto na Constituição Federal é",
+   "alternativas": [
+    "o subsídio mensal do Governador.",
+    "o subsídio dos Desembargadores do Tribunal de Justiça.",
+    "o subsídio dos Deputados Estaduais.",
+    "noventa inteiros e vinte e cinco centésimos por cento do subsídio dos Ministros do Supremo Tribunal Federal.",
+    "o subsídio mensal dos Ministros do Supremo Tribunal Federal."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 37, XI: nos Estados, o teto do Executivo é o subsídio do Governador; do Legislativo, o dos Deputados Estaduais; do Judiciário, o dos Desembargadores (limitado a 90,25% do STF).",
+   "dispositivos": [
+    "art37.inc11"
+   ],
+   "trecho": "o subsídio mensal do Governador no âmbito do Poder Executivo"
+  },
+  {
+   "id": "cf88-u1-08",
+   "unidade": "cf88-u1",
+   "enunciado": "Quanto à acumulação remunerada de cargos públicos, a Constituição Federal a admite, havendo compatibilidade de horários, no caso de",
+   "alternativas": [
+    "dois cargos técnicos de qualquer natureza.",
+    "um cargo de professor com outro técnico ou científico, apenas.",
+    "dois cargos de profissionais de saúde, ainda que sem profissão regulamentada.",
+    "um cargo de professor com outro de qualquer natureza.",
+    "três cargos de professor."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 37, XVI, b, na redação vigente: professor com outro de QUALQUER natureza. Saúde exige profissões regulamentadas (alínea c).",
+   "dispositivos": [
+    "art37.inc16.alib"
+   ],
+   "trecho": "a de um cargo de professor com outro de qualquer natureza"
+  },
+  {
+   "id": "cf88-u1-09",
+   "unidade": "cf88-u1",
+   "enunciado": "Nos termos da Constituição Federal, somente por lei específica poderá ser",
+   "alternativas": [
+    "autorizada a criação de autarquia, cabendo à lei complementar definir suas áreas de atuação.",
+    "criada empresa pública e autorizada a instituição de autarquia.",
+    "criada fundação, cabendo à lei ordinária definir as áreas de sua atuação.",
+    "criada sociedade de economia mista, dispensada autorização para suas subsidiárias.",
+    "criada autarquia e autorizada a instituição de empresa pública, de sociedade de economia mista e de fundação."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 37, XIX: autarquia é CRIADA por lei; empresa pública, sociedade de economia mista e fundação têm a instituição AUTORIZADA por lei. Lei complementar define as áreas da fundação.",
+   "dispositivos": [
+    "art37.inc19"
+   ],
+   "trecho": "somente por lei específica poderá ser criada autarquia e autorizada a instituição de empresa pública, de sociedade de economia mista e de fundação"
+  },
+  {
+   "id": "cf88-u1-10",
+   "unidade": "cf88-u1",
+   "enunciado": "A criação de subsidiárias de empresa pública ou de sociedade de economia mista, segundo a Constituição Federal,",
+   "alternativas": [
+    "depende de autorização legislativa, em cada caso.",
+    "independe de autorização legislativa.",
+    "depende de lei complementar.",
+    "depende de decreto do Presidente da República.",
+    "é vedada."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 37, XX: depende de autorização legislativa, em cada caso — assim como a participação delas em empresa privada.",
+   "dispositivos": [
+    "art37.inc20"
+   ],
+   "trecho": "depende de autorização legislativa, em cada caso, a criação de subsidiárias"
+  },
+  {
+   "id": "cf88-u1-11",
+   "unidade": "cf88-u1",
+   "enunciado": "Sobre a publicidade dos atos, programas, obras e campanhas dos órgãos públicos, a Constituição Federal estabelece que",
+   "alternativas": [
+    "pode conter o nome da autoridade responsável, desde que em caráter informativo.",
+    "deverá ter caráter educativo, informativo ou de orientação social, dela não podendo constar nomes, símbolos ou imagens que caracterizem promoção pessoal.",
+    "é facultativa, salvo nos casos definidos em lei.",
+    "deverá ter caráter exclusivamente informativo, admitidos símbolos partidários.",
+    "é vedada em período eleitoral, em qualquer hipótese."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 37, § 1º: caráter educativo, informativo ou de orientação social, sem promoção pessoal de autoridades ou servidores.",
+   "dispositivos": [
+    "art37.par1"
+   ],
+   "trecho": "dela não podendo constar nomes, símbolos ou imagens que caracterizem promoção pessoal"
+  },
+  {
+   "id": "cf88-u1-12",
+   "unidade": "cf88-u1",
+   "enunciado": "A não observância das regras constitucionais sobre concurso público e seu prazo de validade implicará, conforme a Constituição Federal,",
+   "alternativas": [
+    "a anulabilidade do ato, convalidável pela autoridade superior.",
+    "apenas a punição da autoridade responsável.",
+    "a nulidade do ato e a punição da autoridade responsável, nos termos da lei.",
+    "a suspensão dos direitos políticos do servidor nomeado.",
+    "a nulidade do ato, sem punição da autoridade."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 37, § 2º: NULIDADE do ato E punição da autoridade responsável.",
+   "dispositivos": [
+    "art37.par2"
+   ],
+   "trecho": "implicará a nulidade do ato e a punição da autoridade responsável"
+  },
+  {
+   "id": "cf88-u1-13",
+   "unidade": "cf88-u1",
+   "enunciado": "Os atos de improbidade administrativa, segundo a Constituição Federal, importarão",
+   "alternativas": [
+    "a cassação dos direitos políticos e a perda da função pública.",
+    "a suspensão dos direitos políticos, a perda da função pública, a indisponibilidade dos bens e o ressarcimento ao erário, sem prejuízo da ação penal cabível.",
+    "a perda dos direitos políticos e a indisponibilidade dos bens, excluída a ação penal.",
+    "apenas o ressarcimento ao erário e a multa civil.",
+    "a suspensão dos direitos políticos e a prisão administrativa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 37, § 4º: SUSPENSÃO (não perda nem cassação) dos direitos políticos, perda da função, indisponibilidade dos bens e ressarcimento, sem prejuízo da ação penal.",
+   "dispositivos": [
+    "art37.par4"
+   ],
+   "trecho": "importarão a suspensão dos direitos políticos, a perda da função pública, a indisponibilidade dos bens e o ressarcimento ao erário"
+  },
+  {
+   "id": "cf88-u1-14",
+   "unidade": "cf88-u1",
+   "enunciado": "As pessoas jurídicas de direito privado prestadoras de serviços públicos, de acordo com a Constituição Federal,",
+   "alternativas": [
+    "respondem pelos danos que seus agentes causarem a terceiros apenas se comprovada culpa.",
+    "não respondem por danos, cabendo a responsabilidade ao ente público concedente.",
+    "respondem subsidiariamente, após o esgotamento do patrimônio do agente.",
+    "respondem pelos danos que seus agentes, nessa qualidade, causarem a terceiros, sem direito de regresso.",
+    "responderão pelos danos que seus agentes, nessa qualidade, causarem a terceiros, assegurado o direito de regresso contra o responsável nos casos de dolo ou culpa."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 37, § 6º: responsabilidade das pessoas de direito público E das privadas prestadoras de serviço público; regresso contra o agente só com dolo ou culpa.",
+   "dispositivos": [
+    "art37.par6"
+   ],
+   "trecho": "assegurado o direito de regresso contra o responsável nos casos de dolo ou culpa"
+  },
+  {
+   "id": "cf88-u1-15",
+   "unidade": "cf88-u1",
+   "enunciado": "Conforme a Constituição Federal, os prazos de prescrição para ilícitos que causem prejuízos ao erário serão estabelecidos em lei,",
+   "alternativas": [
+    "inclusive para as respectivas ações de ressarcimento.",
+    "apenas para ilícitos praticados por servidores.",
+    "ressalvadas as respectivas ações de ressarcimento.",
+    "vedada a prescrição para ilícitos dolosos.",
+    "fixados em cinco anos, em qualquer hipótese."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 37, § 5º: a lei fixa a prescrição dos ilícitos de qualquer agente, servidor ou não, RESSALVADAS as ações de ressarcimento.",
+   "dispositivos": [
+    "art37.par5"
+   ],
+   "trecho": "ressalvadas as respectivas ações de ressarcimento"
+  },
+  {
+   "id": "cf88-u1-16",
+   "unidade": "cf88-u1",
+   "enunciado": "Nos termos da Constituição Federal, o servidor titular de cargo efetivo que tenha sofrido limitação em sua capacidade física ou mental poderá ser readaptado",
+   "alternativas": [
+    "com a remuneração do cargo de destino, ainda que inferior.",
+    "independentemente de habilitação para o cargo de destino.",
+    "apenas por decisão judicial.",
+    "para exercício de cargo compatível com a limitação, desde que possua a habilitação e o nível de escolaridade exigidos, mantida a remuneração do cargo de origem.",
+    "somente se a limitação for temporária."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 37, § 13: readaptação exige habilitação e escolaridade do cargo de destino e mantém a remuneração do cargo de ORIGEM.",
+   "dispositivos": [
+    "art37.par13"
+   ],
+   "trecho": "mantida a remuneração do cargo de origem"
+  },
+  {
+   "id": "cf88-u2-01",
+   "unidade": "cf88-u2",
+   "enunciado": "O servidor público da administração direta investido no mandato de Prefeito, conforme a Constituição Federal,",
+   "alternativas": [
+    "será afastado do cargo, sendo-lhe facultado optar pela sua remuneração.",
+    "acumulará as duas remunerações, havendo compatibilidade de horários.",
+    "perderá o cargo efetivo.",
+    "será afastado sem direito a optar pela remuneração do cargo.",
+    "permanecerá no cargo, com redução de jornada."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 38, II: Prefeito é afastado e pode optar pela remuneração. Acumular, havendo compatibilidade de horários, é regra do VEREADOR (inciso III).",
+   "dispositivos": [
+    "art38.inc2"
+   ],
+   "trecho": "sendo-lhe facultado optar pela sua remuneração"
+  },
+  {
+   "id": "cf88-u2-02",
+   "unidade": "cf88-u2",
+   "enunciado": "Investido no mandato de Vereador, havendo compatibilidade de horários, o servidor público, nos termos da Constituição Federal,",
+   "alternativas": [
+    "será obrigatoriamente afastado do cargo.",
+    "perceberá as vantagens de seu cargo, sem prejuízo da remuneração do cargo eletivo.",
+    "deverá optar entre a remuneração do cargo e a do mandato.",
+    "terá o tempo de serviço contado apenas para aposentadoria.",
+    "perceberá somente a remuneração do cargo eletivo."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 38, III: com compatibilidade, o Vereador acumula; sem ela, aplica-se a regra do Prefeito (afastamento com opção).",
+   "dispositivos": [
+    "art38.inc3"
+   ],
+   "trecho": "perceberá as vantagens de seu cargo, emprego ou função, sem prejuízo da remuneração do cargo eletivo"
+  },
+  {
+   "id": "cf88-u2-03",
+   "unidade": "cf88-u2",
+   "enunciado": "Nos casos em que o exercício de mandato eletivo exija o afastamento do servidor, seu tempo de serviço será contado, segundo a Constituição Federal,",
+   "alternativas": [
+    "apenas para fins de aposentadoria.",
+    "para todos os efeitos legais, inclusive promoção por merecimento.",
+    "para todos os efeitos legais, exceto para promoção por merecimento.",
+    "somente para fins de disponibilidade.",
+    "para todos os efeitos legais, exceto para promoção por antiguidade."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 38, IV: conta para tudo, EXCETO promoção por merecimento.",
+   "dispositivos": [
+    "art38.inc4"
+   ],
+   "trecho": "seu tempo de serviço será contado para todos os efeitos legais, exceto para promoção por merecimento"
+  },
+  {
+   "id": "cf88-u2-04",
+   "unidade": "cf88-u2",
+   "enunciado": "De acordo com a Constituição Federal, serão remunerados exclusivamente por subsídio fixado em parcela única",
+   "alternativas": [
+    "todos os servidores públicos organizados em carreira.",
+    "apenas os membros do Poder Judiciário e do Ministério Público.",
+    "os ocupantes de cargos em comissão e funções de confiança.",
+    "o membro de Poder, o detentor de mandato eletivo, os Ministros de Estado e os Secretários Estaduais e Municipais.",
+    "os empregados das empresas públicas."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 39, § 4º, obrigatório para esses agentes. Para os servidores organizados em carreira o subsídio é FACULTATIVO (§ 8º: 'poderá').",
+   "dispositivos": [
+    "art39.par4"
+   ],
+   "trecho": "serão remunerados exclusivamente por subsídio fixado em parcela única"
+  },
+  {
+   "id": "cf88-u2-05",
+   "unidade": "cf88-u2",
+   "enunciado": "Quanto às escolas de governo, a Constituição Federal determina que",
+   "alternativas": [
+    "a União, os Estados e o Distrito Federal as manterão, constituindo-se a participação nos cursos um dos requisitos para a promoção na carreira.",
+    "apenas a União as manterá, sendo a participação nos cursos facultativa.",
+    "os Municípios são obrigados a mantê-las, vedados convênios.",
+    "a participação nos cursos é requisito para a aquisição da estabilidade.",
+    "a União, os Estados, o Distrito Federal e os Municípios as manterão, vedada a celebração de contratos entre os entes."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 39, § 2º: União, Estados e DF (Municípios não estão no rol); curso é requisito para PROMOÇÃO; convênios e contratos são facultados.",
+   "dispositivos": [
+    "art39.par2"
+   ],
+   "trecho": "constituindo-se a participação nos cursos um dos requisitos para a promoção na carreira"
+  },
+  {
+   "id": "cf88-u2-06",
+   "unidade": "cf88-u2",
+   "enunciado": "A incorporação de vantagens de caráter temporário ou vinculadas ao exercício de função de confiança ou de cargo em comissão à remuneração do cargo efetivo, segundo a Constituição Federal,",
+   "alternativas": [
+    "é permitida após cinco anos de exercício.",
+    "depende de lei específica de cada ente.",
+    "é permitida apenas às vantagens de caráter permanente.",
+    "é vedada.",
+    "é assegurada ao servidor estável."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 39, § 9º: é vedada, sem exceção temporal.",
+   "dispositivos": [
+    "art39.par9"
+   ],
+   "trecho": "É vedada a incorporação de vantagens de caráter temporário"
+  },
+  {
+   "id": "cf88-u2-07",
+   "unidade": "cf88-u2",
+   "enunciado": "O regime próprio de previdência social dos servidores titulares de cargos efetivos terá, conforme a Constituição Federal, caráter",
+   "alternativas": [
+    "contributivo e solidário, mediante contribuição do respectivo ente, de servidores ativos, de aposentados e de pensionistas.",
+    "exclusivamente contributivo, custeado apenas pelos servidores ativos.",
+    "solidário e não contributivo, custeado pelo Tesouro.",
+    "contributivo, vedada a contribuição de aposentados e pensionistas.",
+    "facultativo, conforme opção do servidor."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 40, caput: contributivo E solidário, com contribuição do ente, dos ativos, dos aposentados e dos pensionistas.",
+   "dispositivos": [
+    "art40"
+   ],
+   "trecho": "terá caráter contributivo e solidário"
+  },
+  {
+   "id": "cf88-u2-08",
+   "unidade": "cf88-u2",
+   "enunciado": "A aposentadoria compulsória do servidor abrangido por regime próprio ocorrerá, nos termos da Constituição Federal,",
+   "alternativas": [
+    "aos 65 anos de idade, com proventos integrais.",
+    "aos 70 anos de idade, ou aos 75 anos, na forma de lei complementar, com proventos proporcionais ao tempo de contribuição.",
+    "aos 75 anos de idade, com proventos integrais, em qualquer caso.",
+    "aos 70 anos de idade, com proventos integrais.",
+    "aos 62 anos, se mulher, e aos 65, se homem."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 40, § 1º, II: compulsória aos 70, ou 75 na forma de LC, com proventos PROPORCIONAIS. 62/65 anos é a idade mínima da voluntária na União (inciso III).",
+   "dispositivos": [
+    "art40.par1.inc2"
+   ],
+   "trecho": "aos 70 (setenta) anos de idade, ou aos 75 (setenta e cinco) anos de idade, na forma de lei complementar"
+  },
+  {
+   "id": "cf88-u2-09",
+   "unidade": "cf88-u2",
+   "enunciado": "No âmbito da União, a idade mínima para aposentadoria voluntária do servidor, prevista na Constituição Federal, é de",
+   "alternativas": [
+    "60 anos, se mulher, e 65 anos, se homem.",
+    "62 anos, se mulher, e 65 anos, se homem.",
+    "65 anos para ambos os sexos.",
+    "55 anos, se mulher, e 60 anos, se homem.",
+    "62 anos, se mulher, e 67 anos, se homem."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 40, § 1º, III: 62 (mulher) e 65 (homem) na União; nos demais entes, a idade é fixada nas respectivas Constituições e Leis Orgânicas.",
+   "dispositivos": [
+    "art40.par1.inc3"
+   ],
+   "trecho": "aos 62 (sessenta e dois) anos de idade, se mulher, e aos 65 (sessenta e cinco) anos de idade, se homem"
+  },
+  {
+   "id": "cf88-u2-10",
+   "unidade": "cf88-u2",
+   "enunciado": "Os ocupantes do cargo de professor que comprovem tempo de efetivo exercício das funções de magistério na educação infantil e nos ensinos fundamental e médio terão, segundo a Constituição Federal,",
+   "alternativas": [
+    "idade mínima reduzida em 10 anos.",
+    "aposentadoria com proventos integrais em qualquer caso.",
+    "idade mínima reduzida em 5 anos.",
+    "dispensa de tempo de contribuição.",
+    "idade mínima reduzida em 5 anos, inclusive no magistério superior."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 40, § 5º: redução de 5 anos, só para magistério na educação infantil, fundamental e médio — não o superior.",
+   "dispositivos": [
+    "art40.par5"
+   ],
+   "trecho": "terão idade mínima reduzida em 5 (cinco) anos"
+  },
+  {
+   "id": "cf88-u2-11",
+   "unidade": "cf88-u2",
+   "enunciado": "Aplica-se o Regime Geral de Previdência Social, conforme a Constituição Federal, ao agente público ocupante exclusivamente de",
+   "alternativas": [
+    "cargo efetivo com menos de três anos de exercício.",
+    "cargo efetivo em estágio probatório.",
+    "cargo vitalício.",
+    "cargo em comissão declarado em lei de livre nomeação e exoneração.",
+    "cargo efetivo acumulado com cargo em comissão."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 40, § 13: cargo em comissão exclusivo, outro cargo temporário (inclusive mandato eletivo) ou emprego público → RGPS.",
+   "dispositivos": [
+    "art40.par13"
+   ],
+   "trecho": "cargo em comissão declarado em lei de livre nomeação e exoneração"
+  },
+  {
+   "id": "cf88-u2-12",
+   "unidade": "cf88-u2",
+   "enunciado": "O regime de previdência complementar dos servidores ocupantes de cargo efetivo, nos termos da Constituição Federal,",
+   "alternativas": [
+    "oferecerá plano de benefícios somente na modalidade contribuição definida.",
+    "oferecerá plano de benefícios na modalidade benefício definido.",
+    "será instituído por lei de iniciativa do Poder Legislativo.",
+    "aplica-se automaticamente a todos os servidores, independentemente da data de ingresso.",
+    "é facultativo para os entes federativos."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 40, § 15: somente contribuição definida. É instituído por lei de iniciativa do EXECUTIVO (§ 14), e para quem ingressou antes só com prévia e expressa opção (§ 16).",
+   "dispositivos": [
+    "art40.par15"
+   ],
+   "trecho": "oferecerá plano de benefícios somente na modalidade contribuição definida"
+  },
+  {
+   "id": "cf88-u2-13",
+   "unidade": "cf88-u2",
+   "enunciado": "De acordo com a Constituição Federal, a lei",
+   "alternativas": [
+    "poderá estabelecer contagem de tempo de contribuição fictício para servidores com deficiência.",
+    "não poderá estabelecer qualquer forma de contagem de tempo de contribuição fictício.",
+    "poderá estabelecer contagem de tempo fictício apenas para fins de disponibilidade.",
+    "poderá estabelecer contagem em dobro de licença-prêmio não gozada.",
+    "disporá sobre a contagem de tempo fictício para professores."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 40, § 10: vedação absoluta ao tempo de contribuição fictício.",
+   "dispositivos": [
+    "art40.par10"
+   ],
+   "trecho": "A lei não poderá estabelecer qualquer forma de contagem de tempo de contribuição fictício"
+  },
+  {
+   "id": "cf88-u2-14",
+   "unidade": "cf88-u2",
+   "enunciado": "São estáveis, segundo a Constituição Federal, os servidores nomeados para cargo de provimento efetivo em virtude de concurso público após",
+   "alternativas": [
+    "dois anos de efetivo exercício.",
+    "três anos de efetivo exercício, dispensada qualquer avaliação.",
+    "cinco anos de efetivo exercício.",
+    "três anos de efetivo exercício, sendo obrigatória, como condição, a avaliação especial de desempenho por comissão instituída para essa finalidade.",
+    "o término do estágio probatório de dois anos."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 41, caput e § 4º: três anos de efetivo exercício + avaliação especial de desempenho obrigatória.",
+   "dispositivos": [
+    "art41",
+    "art41.par4"
+   ],
+   "trecho": "é obrigatória a avaliação especial de desempenho por comissão instituída para essa finalidade"
+  },
+  {
+   "id": "cf88-u2-15",
+   "unidade": "cf88-u2",
+   "enunciado": "O servidor público estável, nos termos da Constituição Federal, só perderá o cargo",
+   "alternativas": [
+    "em virtude de sentença judicial, ainda que pendente de recurso.",
+    "mediante processo administrativo, dispensada a ampla defesa em caso de flagrante.",
+    "mediante procedimento de avaliação periódica de desempenho, na forma de lei ordinária.",
+    "por decisão do chefe do respectivo Poder, em caso de extinção do órgão.",
+    "em virtude de sentença judicial transitada em julgado, mediante processo administrativo com ampla defesa, ou mediante avaliação periódica de desempenho, na forma de lei complementar."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 41, § 1º: sentença TRANSITADA em julgado; PAD com ampla defesa; avaliação periódica na forma de lei COMPLEMENTAR, com ampla defesa.",
+   "dispositivos": [
+    "art41.par1"
+   ],
+   "trecho": "O servidor público estável só perderá o cargo"
+  },
+  {
+   "id": "cf88-u2-16",
+   "unidade": "cf88-u2",
+   "enunciado": "Invalidada por sentença judicial a demissão do servidor estável, este será reintegrado, e o eventual ocupante da vaga, se estável, conforme a Constituição Federal,",
+   "alternativas": [
+    "será exonerado, com direito a indenização.",
+    "será reconduzido ao cargo de origem, sem direito a indenização, aproveitado em outro cargo ou posto em disponibilidade com remuneração proporcional ao tempo de serviço.",
+    "permanecerá no cargo, ficando o reintegrado em disponibilidade.",
+    "será demitido, sem direito a indenização.",
+    "será posto em disponibilidade com remuneração integral."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 41, § 2º: recondução ao cargo de origem, sem indenização, ou aproveitamento, ou disponibilidade com remuneração PROPORCIONAL.",
+   "dispositivos": [
+    "art41.par2"
+   ],
+   "trecho": "reconduzido ao cargo de origem, sem direito a indenização"
+  },
+  {
+   "id": "cf88-u3-01",
+   "unidade": "cf88-u3",
+   "enunciado": "Os membros das Polícias Militares e dos Corpos de Bombeiros Militares, segundo a Constituição Federal, são",
+   "alternativas": [
+    "servidores civis dos Estados, submetidos ao regime do art. 40.",
+    "militares da União, cedidos aos Estados.",
+    "militares dos Estados, do Distrito Federal e dos Territórios.",
+    "agentes de segurança pública municipais.",
+    "empregados públicos regidos pela CLT."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 42, caput: militares dos Estados, do DF e dos Territórios, organizados com base na hierarquia e disciplina.",
+   "dispositivos": [
+    "art42"
+   ],
+   "trecho": "são militares dos Estados, do Distrito Federal e dos Territórios"
+  },
+  {
+   "id": "cf88-u3-02",
+   "unidade": "cf88-u3",
+   "enunciado": "As patentes dos oficiais dos militares dos Estados, do Distrito Federal e dos Territórios, conforme a Constituição Federal, são conferidas",
+   "alternativas": [
+    "pelo Presidente da República.",
+    "pelos respectivos governadores.",
+    "pelo Comandante-Geral da corporação.",
+    "pela Assembleia Legislativa.",
+    "pelo Ministro da Defesa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 42, § 1º, parte final: patentes conferidas pelos respectivos governadores.",
+   "dispositivos": [
+    "art42.par1"
+   ],
+   "trecho": "sendo as patentes dos oficiais conferidas pelos respectivos governadores"
+  },
+  {
+   "id": "cf88-u3-03",
+   "unidade": "cf88-u3",
+   "enunciado": "Aos militares dos Estados, do Distrito Federal e dos Territórios aplica-se a regra constitucional de acumulação de cargos do art. 37, XVI,",
+   "alternativas": [
+    "vedada qualquer acumulação.",
+    "com prevalência da atividade militar.",
+    "desde que haja autorização do Governador.",
+    "apenas para cargos de professor.",
+    "com prevalência do cargo civil."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 42, § 3º: aplica-se o art. 37, XVI, com prevalência da atividade militar.",
+   "dispositivos": [
+    "art42.par3"
+   ],
+   "trecho": "com prevalência da atividade militar"
+  },
+  {
+   "id": "cf88-u3-04",
+   "unidade": "cf88-u3",
+   "enunciado": "Para efeitos administrativos, a Constituição Federal prevê que a União poderá articular sua ação em um mesmo complexo geoeconômico e social, visando",
+   "alternativas": [
+    "à centralização da arrecadação tributária.",
+    "à criação de novos Estados.",
+    "ao seu desenvolvimento e à redução das desigualdades regionais.",
+    "à extinção de Municípios deficitários.",
+    "à substituição dos planos estaduais de desenvolvimento."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 43, caput: desenvolvimento e redução das desigualdades regionais.",
+   "dispositivos": [
+    "art43"
+   ],
+   "trecho": "visando a seu desenvolvimento e à redução das desigualdades regionais"
+  },
+  {
+   "id": "cf88-u3-05",
+   "unidade": "cf88-u3",
+   "enunciado": "Entre os incentivos regionais previstos na Constituição Federal, na forma da lei, estão",
+   "alternativas": [
+    "juros favorecidos para financiamento de atividades prioritárias e isenções, reduções ou diferimento temporário de tributos federais.",
+    "isenção permanente de todos os tributos estaduais.",
+    "transferência obrigatória de receitas municipais para a União.",
+    "perdão de dívidas de pessoas jurídicas com a União.",
+    "vedação de tarifas públicas nas regiões de baixa renda."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 43, § 2º, II e III: juros favorecidos e isenções, reduções ou diferimento TEMPORÁRIO de tributos FEDERAIS.",
+   "dispositivos": [
+    "art43.par2.inc2",
+    "art43.par2.inc3"
+   ],
+   "trecho": "juros favorecidos para financiamento de atividades prioritárias"
+  },
+  {
+   "id": "cf88-u4-01",
+   "unidade": "cf88-u4",
+   "enunciado": "Nos termos da Constituição Federal, o Tribunal de Contas da União aprecia as contas prestadas anualmente pelo Presidente da República mediante parecer prévio, que deverá ser elaborado em",
+   "alternativas": [
+    "trinta dias a contar de seu recebimento.",
+    "sessenta dias a contar de seu recebimento.",
+    "noventa dias a contar do encerramento do exercício.",
+    "sessenta dias a contar da abertura da sessão legislativa.",
+    "cento e vinte dias a contar de seu recebimento."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 71, I: o parecer prévio sobre as contas do Presidente sai em sessenta dias do recebimento. A FCC costuma trocar o prazo e o marco inicial.",
+   "dispositivos": [
+    "art71.inc1"
+   ],
+   "trecho": "mediante parecer prévio que deverá ser elaborado em sessenta dias a contar de seu recebimento"
+  },
+  {
+   "id": "cf88-u4-02",
+   "unidade": "cf88-u4",
+   "enunciado": "De acordo com a Constituição Federal, compete ao Tribunal de Contas da União",
+   "alternativas": [
+    "julgar as contas prestadas anualmente pelo Presidente da República.",
+    "apreciar, para fins de registro, as nomeações para cargo de provimento em comissão.",
+    "julgar as contas dos administradores e demais responsáveis por dinheiros, bens e valores públicos da administração direta e indireta.",
+    "sustar diretamente a execução de contratos considerados irregulares.",
+    "legislar sobre normas gerais de fiscalização financeira da União."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 71, II: o TCU JULGA as contas dos administradores; as do Presidente ele só APRECIA, por parecer prévio (inciso I), e quem julga é o Congresso.",
+   "dispositivos": [
+    "art71.inc2"
+   ],
+   "trecho": "julgar as contas dos administradores e demais responsáveis por dinheiros, bens e valores públicos da administração direta e indireta"
+  },
+  {
+   "id": "cf88-u4-03",
+   "unidade": "cf88-u4",
+   "enunciado": "Segundo a Constituição Federal, NÃO está sujeita à apreciação do Tribunal de Contas da União, para fins de registro, a legalidade",
+   "alternativas": [
+    "dos atos de admissão de pessoal em fundação instituída e mantida pelo Poder Público.",
+    "das concessões de aposentadorias.",
+    "das concessões de pensões.",
+    "das nomeações para cargo de provimento em comissão.",
+    "das concessões de reformas."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 71, III: a apreciação para registro alcança admissões, aposentadorias, reformas e pensões, excetuadas as nomeações para cargo em comissão.",
+   "dispositivos": [
+    "art71.inc3"
+   ],
+   "trecho": "excetuadas as nomeações para cargo de provimento em comissão"
+  },
+  {
+   "id": "cf88-u4-04",
+   "unidade": "cf88-u4",
+   "enunciado": "Verificada ilegalidade em contrato, a Constituição Federal estabelece que o ato de sustação",
+   "alternativas": [
+    "será adotado diretamente pelo Congresso Nacional, e, se este ou o Poder Executivo não efetivar as medidas cabíveis em noventa dias, o Tribunal decidirá a respeito.",
+    "será adotado diretamente pelo Tribunal de Contas da União, que comunicará a decisão à Câmara dos Deputados e ao Senado Federal.",
+    "será adotado pelo Senado Federal, e, se este não se pronunciar em trinta dias, o Tribunal decidirá a respeito.",
+    "caberá ao Poder Executivo, mediante representação do Tribunal, no prazo de noventa dias.",
+    "será adotado pelo Congresso Nacional, vedada qualquer decisão do Tribunal sobre a matéria."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 71, §§ 1º e 2º: contrato é sustado pelo Congresso; só se Congresso ou Executivo não agirem em 90 dias o TCU decide. Sustar diretamente é para ATOS (inciso X), não para contratos.",
+   "dispositivos": [
+    "art71.par1",
+    "art71.par2"
+   ],
+   "trecho": "No caso de contrato, o ato de sustação será adotado diretamente pelo Congresso Nacional"
+  },
+  {
+   "id": "cf88-u4-05",
+   "unidade": "cf88-u4",
+   "enunciado": "As decisões do Tribunal de Contas da União de que resulte imputação de débito ou multa, conforme a Constituição Federal,",
+   "alternativas": [
+    "dependem de homologação judicial para serem executadas.",
+    "só produzem efeitos após aprovação do Congresso Nacional.",
+    "têm natureza de mera recomendação ao órgão fiscalizado.",
+    "devem ser inscritas em dívida ativa pelo próprio Tribunal.",
+    "terão eficácia de título executivo."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 71, § 3º: imputação de débito ou multa tem eficácia de título executivo — dispensa homologação e aprovação legislativa.",
+   "dispositivos": [
+    "art71.par3"
+   ],
+   "trecho": "terão eficácia de título executivo"
+  },
+  {
+   "id": "cf88-u4-06",
+   "unidade": "cf88-u4",
+   "enunciado": "Diante de indícios de despesas não autorizadas, a Comissão mista permanente poderá solicitar à autoridade governamental responsável que preste esclarecimentos no prazo de",
+   "alternativas": [
+    "três dias; não prestados, a Comissão solicitará ao Tribunal pronunciamento conclusivo em quinze dias.",
+    "cinco dias; não prestados ou insuficientes, a Comissão solicitará ao Tribunal pronunciamento conclusivo em trinta dias.",
+    "dez dias; não prestados, a Comissão sustará a despesa de imediato.",
+    "cinco dias; não prestados, o Tribunal sustará a despesa em trinta dias.",
+    "trinta dias; não prestados, a Comissão proporá ao Senado a sustação da despesa."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 72 e § 1º: cinco dias para a autoridade; depois, trinta dias para o pronunciamento conclusivo do Tribunal. Quem propõe a sustação ao Congresso é a Comissão (§ 2º).",
+   "dispositivos": [
+    "art72",
+    "art72.par1"
+   ],
+   "trecho": "no prazo de cinco dias, preste os esclarecimentos necessários"
+  },
+  {
+   "id": "cf88-u4-07",
+   "unidade": "cf88-u4",
+   "enunciado": "Os Ministros do Tribunal de Contas da União serão nomeados dentre brasileiros que tenham, entre outros requisitos,",
+   "alternativas": [
+    "mais de trinta e cinco e menos de sessenta e cinco anos de idade.",
+    "mais de trinta e menos de setenta anos de idade.",
+    "mais de cinco anos de exercício de função que exija conhecimentos jurídicos ou contábeis.",
+    "formação superior exclusivamente em Direito ou Ciências Contábeis.",
+    "mais de trinta e cinco e menos de setenta anos de idade."
+   ],
+   "gabarito": "E",
+   "comentario": "Art. 73, § 1º, I e IV: idade entre 35 e 70 anos e mais de DEZ anos de atividade que exija os conhecimentos do inciso III (jurídicos, contábeis, econômicos, financeiros ou de administração pública).",
+   "dispositivos": [
+    "art73.par1.inc1"
+   ],
+   "trecho": "mais de trinta e cinco e menos de setenta anos de idade"
+  },
+  {
+   "id": "cf88-u4-08",
+   "unidade": "cf88-u4",
+   "enunciado": "Quanto à escolha dos Ministros do Tribunal de Contas da União, a Constituição Federal determina que",
+   "alternativas": [
+    "um terço será escolhido pelo Presidente da República, com aprovação do Senado Federal, e dois terços pelo Congresso Nacional.",
+    "dois terços serão escolhidos pelo Presidente da República e um terço pelo Senado Federal.",
+    "todos serão escolhidos pelo Congresso Nacional, dentre auditores e membros do Ministério Público junto ao Tribunal.",
+    "metade será escolhida pelo Presidente da República e metade pela Câmara dos Deputados.",
+    "um terço será escolhido pelo Congresso Nacional e dois terços pelo Presidente da República, com aprovação do Senado."
+   ],
+   "gabarito": "A",
+   "comentario": "Art. 73, § 2º: 1/3 pelo Presidente (com aprovação do Senado; dois deles entre auditores e MP de Contas, em lista tríplice) e 2/3 pelo Congresso. A inversão das frações é a pegadinha clássica.",
+   "dispositivos": [
+    "art73.par2.inc1",
+    "art73.par2.inc2"
+   ],
+   "trecho": "um terço pelo Presidente da República, com aprovação do Senado Federal"
+  },
+  {
+   "id": "cf88-u4-09",
+   "unidade": "cf88-u4",
+   "enunciado": "Os responsáveis pelo controle interno, ao tomarem conhecimento de qualquer irregularidade ou ilegalidade, dela darão ciência ao Tribunal de Contas da União, sob pena de",
+   "alternativas": [
+    "perda do cargo.",
+    "responsabilidade subsidiária.",
+    "responsabilidade solidária.",
+    "crime de responsabilidade.",
+    "multa proporcional ao dano."
+   ],
+   "gabarito": "C",
+   "comentario": "Art. 74, § 1º: a omissão gera responsabilidade SOLIDÁRIA, não subsidiária.",
+   "dispositivos": [
+    "art74.par1"
+   ],
+   "trecho": "sob pena de responsabilidade solidária"
+  },
+  {
+   "id": "cf88-u4-10",
+   "unidade": "cf88-u4",
+   "enunciado": "As Constituições estaduais disporão sobre os Tribunais de Contas respectivos, que, nos termos da Constituição Federal, serão integrados por",
+   "alternativas": [
+    "nove Conselheiros.",
+    "cinco Conselheiros.",
+    "onze Conselheiros.",
+    "sete Conselheiros.",
+    "número de Conselheiros fixado em lei estadual."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 75, parágrafo único: sete Conselheiros nos Tribunais de Contas estaduais; o TCU é que tem nove Ministros (art. 73).",
+   "dispositivos": [
+    "art75.parunico"
+   ],
+   "trecho": "que serão integrados por sete Conselheiros"
+  },
+  {
+   "id": "cf88-u4-11",
+   "unidade": "cf88-u4",
+   "enunciado": "Conforme a Constituição Federal, é parte legítima para, na forma da lei, denunciar irregularidades ou ilegalidades perante o Tribunal de Contas da União",
+   "alternativas": [
+    "apenas o Ministério Público junto ao Tribunal.",
+    "qualquer cidadão, partido político, associação ou sindicato.",
+    "apenas os responsáveis pelo controle interno.",
+    "qualquer cidadão, desde que assistido por advogado.",
+    "apenas partido político com representação no Congresso Nacional."
+   ],
+   "gabarito": "B",
+   "comentario": "Art. 74, § 2º: qualquer cidadão, partido político, associação ou sindicato — sem exigência de representação no Congresso nem de advogado.",
+   "dispositivos": [
+    "art74.par2"
+   ],
+   "trecho": "Qualquer cidadão, partido político, associação ou sindicato é parte legítima"
+  }
+ ]
+}
