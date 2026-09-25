@@ -2,7 +2,6 @@
   "accessExpiresAt": "string",
   "accessToken": "string",
   "usuario": {
-    "curador": "bool",
     "email": "string",
     "id": "string",
     "nome": "string",

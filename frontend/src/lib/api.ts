@@ -158,7 +158,7 @@ export const api = {
 	// ---- legislação ----
 	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),
 
-	/** Só a curadoria importa; o pacote vai como está, o servidor valida. */
+	/** O pacote vai como está; quem valida é o servidor. */
 	importarLei: (pacote: unknown) =>
 		request<ImportacaoDeLei>('/api/leis', { method: 'POST', body: JSON.stringify(pacote) }),
 

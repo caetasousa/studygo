@@ -12,7 +12,6 @@ import (
 //	I2  uma questão que mudou de texto perde o id — e com ele as respostas (L3)
 //	I3  a questão que saiu do pacote é apagada, levando as respostas junto
 //	I4  a questão que volta ao pacote continua desativada
-//	I5  a curadoria vale para qualquer conta, ou "*" vale fora do ambiente de desenvolvimento
 
 func TestPlanejar_MesmoPacoteNaoMudaNada(t *testing.T) {
 	q := pacoteValido().Questoes[0]
@@ -61,29 +60,6 @@ func TestPlanejar_QuestaoQueVoltaEReativada(t *testing.T) {
 	plano := PlanejarImportacao(gravadas, []Questao{q})
 	if len(plano.Atualizadas) != 1 || plano.Atualizadas[0].ID != id {
 		t.Fatalf("I4: a questão que voltou não foi reativada: %+v", plano)
-	}
-}
-
-func TestCuradoria(t *testing.T) {
-	c, err := NovaCuradoria([]string{" Ana@Exemplo.com ", "bia@exemplo.com"}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !c.Pode("ana@exemplo.com") || !c.Pode("BIA@exemplo.com") || c.Pode("caio@exemplo.com") {
-		t.Fatal("I5: a lista de curadores não foi respeitada")
-	}
-
-	if vazia, _ := NovaCuradoria(nil, false); vazia.Pode("ana@exemplo.com") {
-		t.Fatal("I5: sem lista, ninguém importa")
-	}
-
-	if _, err := NovaCuradoria([]string{"*"}, false); err == nil {
-		t.Fatal("I5: \"*\" aceito fora do desenvolvimento")
-	}
-
-	todos, err := NovaCuradoria([]string{"*"}, true)
-	if err != nil || !todos.Pode("qualquer@um.com") {
-		t.Fatal("I5: \"*\" não vale em desenvolvimento")
 	}
 }
 

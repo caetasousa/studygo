@@ -18,8 +18,6 @@ services:
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
       EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
       EDITAL_PROCESSOR_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
-      # E-mails (separados por vírgula) das contas que importam leis.
-      LEIS_CURADORES: "${LEIS_CURADORES:-}"
     depends_on:
       postgres:
         condition: service_healthy

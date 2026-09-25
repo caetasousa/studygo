@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -33,11 +32,6 @@ type Config struct {
 	// servidor é qual publicação ele está servindo.
 	Versao string
 	Deploy string
-
-	// LeisCuradores são os e-mails das contas que importam leis no catálogo.
-	// "*" (qualquer conta) só vale em desenvolvimento — quem confere é o
-	// domínio (lei.NovaCuradoria), na partida.
-	LeisCuradores []string
 }
 
 // Argon2Params configures the argon2id password hasher. Defaults follow the
@@ -61,7 +55,6 @@ func Load() (Config, error) {
 		EditalProcessorToken: os.Getenv("EDITAL_PROCESSOR_TOKEN"),
 		Versao:               getEnv("APP_VERSAO", "dev"),
 		Deploy:               os.Getenv("APP_DEPLOY"),
-		LeisCuradores:        strings.Split(os.Getenv("LEIS_CURADORES"), ","),
 	}
 
 	argon2, err := lerArgon2()

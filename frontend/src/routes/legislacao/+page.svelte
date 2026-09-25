@@ -3,7 +3,6 @@
 	import IconButton from '$lib/components/IconButton.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import { auth } from '$lib/stores/auth.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import type { ImportacaoDeLei, LeiResumo, LeisDaMateria } from '$lib/types';
 
@@ -15,9 +14,9 @@
 	 * sozinho: um número que aparece de passagem num tópico não faz da lei
 	 * matéria da prova.
 	 *
-	 * A importação aparece só para a curadoria: o catálogo é o mesmo para todo
-	 * mundo, e o servidor recusa quem não está em LEIS_CURADORES de qualquer
-	 * jeito.
+	 * A importação fica aberta a qualquer conta enquanto o app é de teste
+	 * (decisão de 25/09/2026): o catálogo é o mesmo para todo mundo, então
+	 * importar aqui publica a lei para todos.
 	 */
 	const slug = $derived(concursoStore.ativoSlug);
 
@@ -104,25 +103,23 @@
 <div class="page">
 	{#if erro}<div class="form-error" role="alert">{erro}</div>{/if}
 
-	{#if auth.usuario?.curador}
-		<div class="card importar">
-			<div class="card-body">
-				<h2 class="sec" style="margin-top:0">Importar lei</h2>
-				<p class="page-sub" style="margin-top:0">
-					O pacote sai de <code>make leis-pacote</code> (em <code>conteudo/leis/pacotes/</code>). Importar a
-					mesma versão de novo não duplica nada; uma versão nova preserva as respostas das questões que
-					continuam.
-				</p>
-				<label class="arquivo">
-					<span>Pacote da lei (.json)</span>
-					<input type="file" accept=".json,application/json" disabled={importando} onchange={importar} />
-				</label>
-				{#if importando}<p class="page-sub">Importando…</p>{/if}
-				{#if resultado}<p class="ok" role="status">{resultado}</p>{/if}
-				{#if erroImportacao}<div class="form-error" role="alert">{erroImportacao}</div>{/if}
-			</div>
+	<div class="card importar">
+		<div class="card-body">
+			<h2 class="sec" style="margin-top:0">Importar lei</h2>
+			<p class="page-sub" style="margin-top:0">
+				O pacote sai de <code>make leis-pacote</code> (em <code>conteudo/leis/pacotes/</code>). Importar a
+				mesma versão de novo não duplica nada; uma versão nova preserva as respostas das questões que
+				continuam.
+			</p>
+			<label class="arquivo">
+				<span>Pacote da lei (.json)</span>
+				<input type="file" accept=".json,application/json" disabled={importando} onchange={importar} />
+			</label>
+			{#if importando}<p class="page-sub">Importando…</p>{/if}
+			{#if resultado}<p class="ok" role="status">{resultado}</p>{/if}
+			{#if erroImportacao}<div class="form-error" role="alert">{erroImportacao}</div>{/if}
 		</div>
-	{/if}
+	</div>
 
 	{#if carregado}
 		{#each materias as m (m.disciplinaId)}

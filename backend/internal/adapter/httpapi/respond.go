@@ -62,7 +62,7 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, validacao.Msg
 	}
 
-	// O pacote de lei lista os problemas: a curadoria corrige todos de uma vez.
+	// O pacote de lei lista os problemas: quem importa corrige todos de uma vez.
 	var pacote lei.ErrPacoteInvalido
 	if errors.As(err, &pacote) {
 		return http.StatusUnprocessableEntity, pacote.Error()
@@ -106,9 +106,6 @@ func classificar(err error) (int, string) {
 		errors.Is(err, plano.ErrAnotacaoNaoEncontrada),
 		errors.Is(err, plano.ErrAtividadeNaoEncontrada):
 		return http.StatusNotFound, err.Error()
-
-	case errors.Is(err, lei.ErrSemPermissao):
-		return http.StatusForbidden, err.Error()
 
 	case errors.Is(err, lei.ErrNaoEncontrada),
 		errors.Is(err, lei.ErrQuestaoNaoEncontrada):

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"studygo/internal/adapter/editalproc"
 	"studygo/internal/adapter/httpapi"
 	"studygo/internal/adapter/postgres"
-	"studygo/internal/domain/lei"
 	"studygo/internal/platform/config"
 	"studygo/internal/platform/db"
 	"studygo/internal/platform/httpserver"
@@ -73,12 +71,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
-
-	curadoria, err := lei.NovaCuradoria(cfg.LeisCuradores, cfg.Versao == "dev")
-	if err != nil {
-		return fmt.Errorf("LEIS_CURADORES: %w", err)
-	}
-	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), usuarioRepo, concursoRepo, curadoria)
+	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo)
 
 	// Os seis casos de uso do plano compartilham as mesmas dependências.
 	deps := service.Dependencias{
@@ -94,7 +87,7 @@ func run(logger *slog.Logger) error {
 		Health: httpapi.NewHealthHandler(
 			service.NewHealthService(pool, db.NovoSchema(pool), cfg.Versao, cfg.Deploy), logger,
 		),
-		Auth: httpapi.NewAuthHandler(authService, leiService.EhCurador, cfg.RefreshTTL, logger),
+		Auth: httpapi.NewAuthHandler(authService, cfg.RefreshTTL, logger),
 		Concurso: httpapi.NewConcursoHandler(
 			service.NewConcursoService(concursoRepo, editalProc), logger,
 		),

@@ -155,7 +155,7 @@ func TestContratoHTTP_Sessao(t *testing.T) {
 		RefreshToken:   "nao-pode-sair-no-corpo",
 	}
 
-	compararComGolden(t, "sessao.json", forma(t, toAuthResponse(u, par, false)))
+	compararComGolden(t, "sessao.json", forma(t, toAuthResponse(u, par)))
 }
 
 // forma serializa v e troca cada escalar pelo nome do tipo, reduzindo listas ao

@@ -197,7 +197,7 @@ func questaoParaPacote(q lei.Questao) questaoPacoteDTO {
 	}
 }
 
-// EscreverPacoteLei grava o pacote que a curadoria importa.
+// EscreverPacoteLei grava o pacote que se importa em Legislação.
 func EscreverPacoteLei(w io.Writer, p lei.Pacote) error {
 	d := pacoteLeiDTO{
 		Formato: p.Formato,

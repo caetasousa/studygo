@@ -13,7 +13,7 @@ Página para visualizar: https://claude.ai/artifact/NAoePLNHEiHicrravEGhYy
 |---|---|
 | 0 · Catálogo e cenários | ✅ `conteudo/leis/normas.toml` (17 entradas), grupo L no `e2e/CENARIOS.md`, falhas da captura em `edital-processor/app/leis/README.md` |
 | 1 · Captura | ✅ CF/88, Lei 16.168, LGPD e Marco Civil capturadas **com conferência do Gemini**, texto conferido com o original; faltam os links da Constituição de Goiás e do Regimento Interno |
-| 2 · Leitura no app | ✅ migration 000008, importação pela curadoria, menu Legislação, leitor com sumário e link direto; E2E L1–L10 verdes |
+| 2 · Leitura no app | ✅ migration 000008, importação pela tela (qualquer conta logada, por ora), menu Legislação, leitor com sumário e link direto; E2E L1–L10 verdes |
 | 3 · Questões A | ✅ 228 questões em 22 unidades (CF 48, Lei 16.168 133, LGPD 22, Marco Civil 25), validadas por `make leis-validar` |
 | 4 · Produção | ⏳ com você: commit, `make push`, conferir em staging, `make release`, importar (roteiro em `docs/deploy.md`) |
 | 5 · B e C | ⏳ com você: preencher `link` no `normas.toml`; a captura e o pacote de só leitura já funcionam |
@@ -68,7 +68,7 @@ Antes de qualquer código.
   demais com `link:` vazio para você preencher.
 - `e2e/CENARIOS.md`, grupo **L**: como a legislação pode quebrar para quem usa
   (importar pacote; versão repetida não duplica; versão nova preserva respostas;
-  artigo traz as questões que o citam; resposta gravada; só curador importa;
+  artigo traz as questões que o citam; resposta gravada; qualquer conta importa;
   link direto para o dispositivo; sugestão de vínculo pelo tópico).
 - Lista de como a captura erra, por fonte: riscado, entidades, linha partida,
   "Art. 1º-A", parágrafo único, revogado, cabeçalho fora do padrão, PDF.
@@ -102,8 +102,9 @@ Ainda sem questões.
 
 - Migrations a partir da **000008**: `leis`, `leis_versoes`,
   `leis_dispositivos`, `disciplinas_leis`.
-- Importar pacote (um JSON por lei, formato `studygo.lei/1`) só por curador
-  (`LEIS_CURADORES`); mesma versão não duplica; versão nova vira a ativa.
+- Importar pacote (um JSON por lei, formato `studygo.lei/1`) — qualquer conta
+  logada, enquanto o app é de teste; mesma versão não duplica; versão nova
+  vira a ativa.
 - Menu "Meu concurso → **Legislação**"; vínculo com a matéria **sugerido pelo
   tópico** ("nº 16.168" no tópico ⇒ Lei 16.168), você confirma.
 - `/leis/<slug>`: sumário navegável, texto em hierarquia, link direto por

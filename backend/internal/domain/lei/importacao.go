@@ -1,10 +1,6 @@
 package lei
 
-import (
-	"strings"
-
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
 // QuestaoGravada é o que a importação precisa saber das questões que já
 // existem: quem é quem, e se mudou.
@@ -61,38 +57,4 @@ func PlanejarImportacao(gravadas []QuestaoGravada, doPacote []Questao) PlanoDeIm
 	}
 
 	return plano
-}
-
-// Curadoria é quem pode importar leis: o catálogo é de todos, então publicar
-// nele não pode ser de qualquer conta.
-type Curadoria struct {
-	emails map[string]bool
-	todos  bool
-}
-
-// NovaCuradoria lê a lista de e-mails. "*" (qualquer conta) só existe em
-// desenvolvimento: em produção, recusar na partida é melhor que abrir o
-// catálogo por um erro de configuração.
-func NovaCuradoria(emails []string, desenvolvimento bool) (Curadoria, error) {
-	c := Curadoria{emails: map[string]bool{}}
-	for _, e := range emails {
-		e = strings.ToLower(strings.TrimSpace(e))
-		switch e {
-		case "":
-		case "*":
-			if !desenvolvimento {
-				return Curadoria{}, ErrCuradoriaAbertaDemais
-			}
-			c.todos = true
-		default:
-			c.emails[e] = true
-		}
-	}
-
-	return c, nil
-}
-
-// Pode diz se a conta com este e-mail importa leis.
-func (c Curadoria) Pode(email string) bool {
-	return c.todos || c.emails[strings.ToLower(strings.TrimSpace(email))]
 }

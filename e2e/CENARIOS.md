@@ -68,7 +68,8 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 ## L. Legislação
 
 A lei chega por um pacote montado localmente (`conteudo/leis/`, ver
-`PLANO-LEGISLACAO.md`) e importado por um curador. O stack de E2E importa um
+`PLANO-LEGISLACAO.md`) e importado pela tela. Enquanto o app é de teste,
+qualquer conta logada importa (decisão de 25/09/2026). O stack de E2E importa um
 pacote pequeno e fixo (`e2e/fixtures/lei-exemplo.json`).
 
 | id | Como quebra | O que o usuário vê |
@@ -76,7 +77,7 @@ pacote pequeno e fixo (`e2e/fixtures/lei-exemplo.json`).
 | L1 | o pacote importado não vira uma lei legível, ou chega com o texto diferente do pacote | lei vazia, ou uma palavra da lei trocada |
 | L2 | importar o mesmo pacote de novo duplica a lei, os dispositivos ou as questões | a lei aparece duas vezes, questões repetidas |
 | L3 | uma versão nova da lei apaga as respostas das questões que não mudaram | o progresso volta a zero a cada atualização |
-| L4 | uma conta que não é curadora consegue importar | qualquer um publica "lei" no catálogo |
+| L4 | uma conta comum não vê a importação, ou é recusada ao importar | quem testa não consegue publicar uma lei |
 | L5 | clicar no artigo não traz as questões que o citam, ou traz as de outro artigo | a questão não bate com o que se está lendo |
 | L6 | a resposta não é gravada, ou o gabarito e o trecho não aparecem | responde e não aprende nada |
 | L7 | o selo do artigo e o progresso da unidade não refletem as respostas | não se sabe o que falta nem onde errou |

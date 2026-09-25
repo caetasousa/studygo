@@ -170,7 +170,7 @@ que o CSV não leva é a conta em si (cadastre de novo).
 | | Onde | Arquivo | Contém |
 |---|---|---|---|
 | 🗒️ | Inventário | `ansible/inventory/<ambiente>/hosts.ini` (gitignored) | IP da VPS, usuário, chave |
-| 🔐 | Segredos | `ansible/inventory/<ambiente>/group_vars/app/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token`, `leis_curadores` |
+| 🔐 | Segredos | `ansible/inventory/<ambiente>/group_vars/app/secrets.yml` (gitignored) | `jwt_secret`, `postgres_password`, `letsencrypt_email`, `gemini_api_key`, `edital_processor_token` |
 | 📄 | Não-secreto | `ansible/inventory/<ambiente>/group_vars/app/main.yml` (versionado) | `app_domain`, portas, nome do banco |
 
 `<ambiente>` é `staging` ou `production`: cada um tem inventário e segredos
@@ -179,15 +179,14 @@ próprios, e nenhum comando escolhe um deles por omissão.
 ## ⚖️ Publicar uma lei
 
 A lei não passa pela pipeline como código: ela é **dado**, importado pela
-curadoria depois que a versão do app que a lê já está no ar.
+tela depois que a versão do app que a lê já está no ar. Enquanto o app é de
+teste, qualquer conta logada importa (decisão de 25/09/2026).
 
-1. O e-mail de quem importa vai em `leis_curadores` — nos segredos que a
-   pipeline usa (`ANSIBLE_SECRETS` no GitLab), não só no arquivo local.
-2. Na sua máquina: `make leis-validar` e `make leis-pacote`.
-3. Staging: entre com a conta curadora, **Legislação → Importar lei**, um
-   pacote de `conteudo/leis/pacotes/` por vez. Abra a lei, confira um artigo
-   com questões e o link direto (`/leis/cf88#art71`).
-4. Produção: o mesmo, depois do `make release` da versão que trouxe a
+1. Na sua máquina: `make leis-validar` e `make leis-pacote`.
+2. Staging: **Legislação → Importar lei**, um pacote de
+   `conteudo/leis/pacotes/` por vez. Abra a lei, confira um artigo com
+   questões e o link direto (`/leis/cf88#art71`).
+3. Produção: o mesmo, depois do `make release` da versão que trouxe a
    migration 000008.
 
 Importar de novo o mesmo pacote não duplica nada; uma versão nova da lei

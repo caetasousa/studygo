@@ -24,11 +24,9 @@ import (
 const Formato = "studygo.lei/1"
 
 var (
-	ErrNaoEncontrada         = errors.New("lei não encontrada")
-	ErrQuestaoNaoEncontrada  = errors.New("questão não encontrada")
-	ErrSemPermissao          = errors.New("só a curadoria importa leis")
-	ErrAlternativaInvalida   = errors.New("alternativa inválida: escolha de A a E")
-	ErrCuradoriaAbertaDemais = errors.New(`LEIS_CURADORES="*" só vale em desenvolvimento`)
+	ErrNaoEncontrada        = errors.New("lei não encontrada")
+	ErrQuestaoNaoEncontrada = errors.New("questão não encontrada")
+	ErrAlternativaInvalida  = errors.New("alternativa inválida: escolha de A a E")
 )
 
 // ErrPacoteInvalido traz os problemas do pacote, para quem importa corrigir
@@ -98,7 +96,7 @@ type Questao struct {
 	Trecho       string
 }
 
-// Pacote é o que a curadoria importa: uma versão da lei e as questões dela.
+// Pacote é o que se importa: uma versão da lei e as questões dela.
 type Pacote struct {
 	Formato      string
 	Lei          Lei

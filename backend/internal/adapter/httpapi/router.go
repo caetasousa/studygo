@@ -139,8 +139,8 @@ func NewRouter(
 	protegida("POST "+base+"/tec/preview", h.Plano.PreviewTEC)
 	protegida("POST "+base+"/tec", h.Plano.ImportarTEC)
 
-	// Legislação: o catálogo é global; a importação é só da curadoria, e quem
-	// decide isso é o serviço, não a rota.
+	// Legislação: o catálogo é global e, por ora, qualquer conta logada importa
+	// uma lei — decisão de 25/09/2026, enquanto o app é de teste.
 	protegida("GET /api/leis", h.Lei.Catalogo)
 	protegida("POST /api/leis", h.Lei.Importar)
 	protegida("GET /api/leis/{slug}", h.Lei.Ler)

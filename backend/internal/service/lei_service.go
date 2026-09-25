@@ -16,23 +16,11 @@ import (
 // guarda as respostas e os vínculos entre lei e matéria.
 type LeiService struct {
 	leis      port.LeiRepository
-	usuarios  port.UsuarioRepository
 	concursos port.ConcursoRepository
-	curadoria lei.Curadoria
 }
 
-func NewLeiService(
-	leis port.LeiRepository,
-	usuarios port.UsuarioRepository,
-	concursos port.ConcursoRepository,
-	curadoria lei.Curadoria,
-) *LeiService {
-	return &LeiService{leis: leis, usuarios: usuarios, concursos: concursos, curadoria: curadoria}
-}
-
-// EhCurador diz se a conta importa leis — a tela usa para mostrar o botão.
-func (s *LeiService) EhCurador(email string) bool {
-	return s.curadoria.Pode(email)
+func NewLeiService(leis port.LeiRepository, concursos port.ConcursoRepository) *LeiService {
+	return &LeiService{leis: leis, concursos: concursos}
 }
 
 // ResultadoDaImportacaoDeLei conta o que a importação fez.
@@ -47,14 +35,9 @@ type ResultadoDaImportacaoDeLei struct {
 	Mantidas    int
 }
 
-func (s *LeiService) Importar(ctx context.Context, usuarioID uuid.UUID, p lei.Pacote) (ResultadoDaImportacaoDeLei, error) {
-	u, err := s.usuarios.PorID(ctx, usuarioID)
-	if err != nil {
-		return ResultadoDaImportacaoDeLei{}, err
-	}
-	if !s.curadoria.Pode(u.Email) {
-		return ResultadoDaImportacaoDeLei{}, lei.ErrSemPermissao
-	}
+// Importar publica a lei no catálogo. Qualquer conta logada importa (decisão
+// de 25/09/2026, enquanto o app é de teste); a rota já exige sessão.
+func (s *LeiService) Importar(ctx context.Context, p lei.Pacote) (ResultadoDaImportacaoDeLei, error) {
 	if err := p.Validar(); err != nil {
 		return ResultadoDaImportacaoDeLei{}, err
 	}

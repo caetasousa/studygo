@@ -1,5 +1,5 @@
 // Command leis confere as questões escritas sobre uma lei capturada e monta o
-// pacote que a curadoria importa ("studygo.lei/1").
+// pacote que se importa no app ("studygo.lei/1").
 //
 // Roda na máquina de quem estuda, sobre conteudo/leis/<slug>/:
 //

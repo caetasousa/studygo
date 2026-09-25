@@ -178,9 +178,10 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
        └── disciplinas_leis ──► disciplinas
 ```
 
-- **O catálogo é global e só a curadoria publica.** A lei é a mesma para todo
-  mundo; quem importa está em `LEIS_CURADORES` (e-mails). `*` só vale com
-  `APP_VERSAO=dev` — em qualquer outro ambiente o backend recusa subir.
+- **O catálogo é global, e qualquer conta logada importa.** A lei é a mesma
+  para todo mundo. Restringir quem publica (havia uma lista de curadores) saiu
+  em 25/09/2026, enquanto o app é de teste; volta quando a autenticação estiver
+  completa.
 - **A lei não nasce no app.** Ela é capturada fora (`edital-processor/app/leis`,
   sem rota HTTP), as questões são escritas localmente, e o app importa o
   pacote pronto (`studygo.lei/1`) já validado pelo mesmo `lei.Pacote.Validar`
@@ -320,7 +321,7 @@ GET       …/plano/{estatisticas,caderno,dossie,export.csv}
 POST      …/plano/anotacoes    PATCH|DELETE …/plano/anotacoes/{id}
 POST      …/plano/tec{,/preview}
 
-GET    /api/leis                        POST /api/leis   ← importar pacote (só curadoria)
+GET    /api/leis                        POST /api/leis   ← importar pacote (qualquer conta logada)
 GET    /api/leis/{slug}                 ← texto ativo + questões (sem gabarito até responder)
 POST   /api/leis/questoes/{id}/respostas
 GET    /api/concursos/{slug}/leis       ← por matéria: vinculadas e sugeridas pelo tópico

@@ -67,7 +67,6 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `LEMBRETE_INTERVALO` | | `24h` | força intervalo fixo em vez de acordar na virada do dia. Existe para desenvolver sem esperar a meia-noite; em produção fica vazio |
 | `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
 | `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
-| `LEIS_CURADORES` | | vazio | e-mails (separados por vírgula) das contas que importam leis em **Legislação**. Localmente, `*` libera qualquer conta; fora de `APP_VERSAO=dev` o backend recusa o `*` |
 
 ---
 

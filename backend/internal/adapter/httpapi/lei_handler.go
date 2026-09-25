@@ -40,12 +40,6 @@ func (h *LeiHandler) Catalogo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LeiHandler) Importar(w http.ResponseWriter, r *http.Request) {
-	id, ok := usuarioID(r.Context())
-	if !ok {
-		writeError(w, r, h.logger, errNaoAutenticado)
-		return
-	}
-
 	var d pacoteLeiDTO
 	if err := decodeLimitado(w, r, &d, maxCorpoPacoteLei); err != nil {
 		if errors.Is(err, errRequisicaoInvalida) {
@@ -55,7 +49,7 @@ func (h *LeiHandler) Importar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.leis.Importar(r.Context(), id, d.paraDominio())
+	res, err := h.leis.Importar(r.Context(), d.paraDominio())
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return

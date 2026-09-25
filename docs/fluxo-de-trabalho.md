@@ -245,7 +245,7 @@ make leis-capturar slug=cf88        # ou prioridade=A; sem_gemini=1 só com as r
 #    elas ficam em conteudo/leis/<slug>/questoes.json
 make leis-validar atualizar=1       # a mesma validação da importação
 
-# 4. o que a curadoria importa em Legislação → Importar lei
+# 4. o que se importa em Legislação → Importar lei
 make leis-pacote                    # conteudo/leis/pacotes/<slug>.json
 ```
 

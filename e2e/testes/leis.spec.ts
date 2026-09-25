@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { request as novoRequest, type APIRequestContext, type Page } from '@playwright/test';
-import { test, expect, SENHA, Api } from './base';
+import { test, expect, Api, cadastrar, emailUnico } from './base';
 
 // O catálogo de leis é global: dois testes importando "lei-e2e" ao mesmo tempo
 // disputariam a mesma lei. Cada teste importa uma cópia com slug, número e
@@ -43,23 +43,19 @@ function numeroUnico() {
 	return `${randomInt(10, 99)}.${randomInt(100, 999)}`;
 }
 
-// A conta curadora é uma só (LEIS_CURADORES no e2e/stack.env). Testes em
-// paralelo tentam criá-la ao mesmo tempo: quem chega depois só entra.
-const CURADORIA = 'curadoria@e2e.local';
-
-async function sessaoDaCuradoria(baseURL: string): Promise<{ request: APIRequestContext; token: string }> {
+// Quem importa é uma conta à parte da do teste — como na vida real, quem
+// publica a lei não é quem a estuda. Qualquer conta importa (L4).
+async function outraSessao(baseURL: string): Promise<{ request: APIRequestContext; token: string }> {
 	const request = await novoRequest.newContext({
 		baseURL,
 		extraHTTPHeaders: { 'X-Forwarded-For': `10.200.${randomInt(1, 255)}.${randomInt(1, 255)}` }
 	});
-	let res = await request.post('/api/auth/register', { data: { email: CURADORIA, nome: 'Curadoria', senha: SENHA } });
-	if (res.status() === 409) res = await request.post('/api/auth/login', { data: { email: CURADORIA, senha: SENHA } });
-	expect(res.ok(), await res.text()).toBeTruthy();
-	return { request, token: (await res.json()).accessToken };
+	const { token } = await cadastrar(request, emailUnico('importa'));
+	return { request, token };
 }
 
 async function importar(baseURL: string, p: Pacote) {
-	const { request, token } = await sessaoDaCuradoria(baseURL);
+	const { request, token } = await outraSessao(baseURL);
 	const res = await request.post('/api/leis', { data: p, headers: { Authorization: `Bearer ${token}` } });
 	expect(res.ok(), await res.text()).toBeTruthy();
 	const corpo = await res.json();
@@ -102,9 +98,9 @@ test.describe('legislação', () => {
 		const arquivo = test.info().outputPath(`${p.lei.slug}.json`);
 		writeFileSync(arquivo, JSON.stringify(p));
 
-		// A curadoria usa a tela, como vai usar em produção.
-		const { request, token } = await sessaoDaCuradoria(baseURL!);
-		await new Api(request, token).concurso('Curadoria E2E');
+		// A importação pela tela, como em produção.
+		const { request, token } = await outraSessao(baseURL!);
+		await new Api(request, token).concurso('Importação E2E');
 		const contexto = await browser.newContext({ storageState: await request.storageState() });
 		const page = await contexto.newPage();
 		await page.goto('/legislacao');
@@ -164,17 +160,19 @@ test.describe('legislação', () => {
 		await expect(page.getByRole('button', { name: 'Questões do Art. 2º', exact: true })).toHaveCount(0);
 	});
 
-	test('[L4] uma conta que não é curadora não importa', async ({ page, api, conta }) => {
+	test('[L4] qualquer conta logada importa, pela tela ou pela API', async ({ page, api, conta }) => {
+		const p = copia(pacote(), idUnico(), numeroUnico());
 		const res = await page.request.post('/api/leis', {
-			data: copia(pacote(), idUnico(), numeroUnico()),
+			data: p,
 			headers: { Authorization: `Bearer ${conta.token}` }
 		});
-		expect(res.status()).toBe(403);
+		expect(res.status(), await res.text()).toBe(201);
 
-		await api.concurso('Sem curadoria E2E');
+		await api.concurso('Conta comum E2E');
 		await page.goto('/legislacao');
 		await expect(page.getByRole('heading', { name: 'Legislação', level: 1 })).toBeVisible();
-		await expect(page.getByLabel('Pacote da lei (.json)')).toHaveCount(0);
+		await expect(page.getByLabel('Pacote da lei (.json)')).toBeVisible();
+		await expect(page.getByRole('link', { name: p.lei.curto })).toBeVisible();
 	});
 
 	test('[L5] clicar no artigo traz as questões que o citam, e só elas', async ({ api, page, baseURL }) => {

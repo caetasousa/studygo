@@ -123,7 +123,7 @@ leis-capturar: ## Baixa e organiza leis de normas.toml (slug=cf88 | prioridade=A
 leis-validar: ## Confere as questões de lei como a importação confere (atualizar=1: hash de unidade nova)
 	cd backend && go run ./cmd/leis validar $(if $(atualizar),-atualizar) $(slug)
 
-leis-pacote: ## Monta em conteudo/leis/pacotes/ o que a curadoria importa (slug=… ou todas)
+leis-pacote: ## Monta em conteudo/leis/pacotes/ o que se importa em Legislação (slug=… ou todas)
 	cd backend && go run ./cmd/leis pacote $(slug)
 
 # Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um

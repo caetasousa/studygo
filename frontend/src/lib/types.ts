@@ -9,8 +9,6 @@ export interface Usuario {
 	email: string;
 	nome: string;
 	temaUi: 'light' | 'dark' | 'system';
-	/** A conta importa leis no catálogo (LEIS_CURADORES no backend). */
-	curador: boolean;
 }
 
 /**
