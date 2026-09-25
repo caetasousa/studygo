@@ -9,6 +9,8 @@ export interface Usuario {
 	email: string;
 	nome: string;
 	temaUi: 'light' | 'dark' | 'system';
+	/** A conta importa leis no catálogo (LEIS_CURADORES no backend). */
+	curador: boolean;
 }
 
 /**
@@ -566,4 +568,104 @@ export interface Dossie {
 	disciplina: string;
 	markdown: string;
 	fontes: DossieFonte[];
+}
+
+// ---- legislação ----
+
+export type TipoDispositivo =
+	| 'parte'
+	| 'livro'
+	| 'titulo'
+	| 'capitulo'
+	| 'secao'
+	| 'subsecao'
+	| 'artigo'
+	| 'paragrafo'
+	| 'inciso'
+	| 'alinea'
+	| 'item'
+	| 'nome'
+	| 'preambulo'
+	| 'fecho'
+	| 'solto';
+
+export interface Dispositivo {
+	/** Endereço jurídico e âncora do link direto: "art71.inc2". */
+	ref: string;
+	pai: string | null;
+	tipo: TipoDispositivo;
+	rotulo: string;
+	nome: string;
+	texto: string;
+	notas: string[];
+	anteriores: string[];
+	revogado: boolean;
+}
+
+export interface UnidadeDeLei {
+	ref: string;
+	titulo: string;
+	dispositivos: string[];
+	hash: string;
+}
+
+export interface CorrecaoDeQuestao {
+	escolhida: string;
+	acertou: boolean;
+	gabarito: string;
+	comentario: string;
+	trecho: string;
+	respondidaEm: string;
+}
+
+export interface QuestaoDeLei {
+	id: string;
+	unidade: string;
+	dispositivos: string[];
+	enunciado: string;
+	alternativas: string[];
+	/** Só existe depois de respondida: o gabarito não vem antes. */
+	resposta: CorrecaoDeQuestao | null;
+}
+
+export interface LeiIdentidade {
+	slug: string;
+	nome: string;
+	curto: string;
+	reconhecer: string[];
+	fonte: string;
+}
+
+export interface LeituraDeLei {
+	lei: LeiIdentidade;
+	versao: string;
+	dispositivos: Dispositivo[];
+	unidades: UnidadeDeLei[];
+	questoes: QuestaoDeLei[];
+}
+
+export interface LeiResumo {
+	slug: string;
+	nome: string;
+	curto: string;
+	fonte: string;
+	versao: string;
+	questoes: number;
+	importadaEm: string;
+}
+
+export interface LeisDaMateria {
+	disciplinaId: string;
+	codigo: string;
+	nome: string;
+	vinculadas: LeiResumo[];
+	sugeridas: LeiResumo[];
+}
+
+export interface ImportacaoDeLei {
+	slug: string;
+	curto: string;
+	versao: string;
+	novaVersao: boolean;
+	questoes: { novas: number; atualizadas: number; desativadas: number; mantidas: number };
 }

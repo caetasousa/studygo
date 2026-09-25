@@ -88,7 +88,7 @@ func authDeTeste(t *testing.T) (*AuthHandler, *contaFake) {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	svc := service.NewAuthService(repo, senhaFake{}, fakeTokens{id: repo.conta.ID}, relogioFake{}, 720*time.Hour)
 
-	return NewAuthHandler(svc, 720*time.Hour, quiet), repo
+	return NewAuthHandler(svc, func(string) bool { return false }, 720*time.Hour, quiet), repo
 }
 
 func cookieDaResposta(t *testing.T, rec *httptest.ResponseRecorder) *http.Cookie {

@@ -14,14 +14,23 @@ type AuthHandler struct {
 	auth   *service.AuthService
 	logger *slog.Logger
 
+	// curador diz se a conta importa leis: a tela só mostra a importação a quem
+	// pode usá-la. Quem decide é a curadoria do LeiService.
+	curador func(email string) bool
+
 	// refreshTTL é o mesmo prazo do token no banco, e serve só para dar ao
 	// cookie um Max-Age igual: um cookie que durasse mais entregaria um token
 	// já morto, e um que durasse menos encurtaria a sessão sem motivo.
 	refreshTTL time.Duration
 }
 
-func NewAuthHandler(auth *service.AuthService, refreshTTL time.Duration, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{auth: auth, refreshTTL: refreshTTL, logger: logger}
+func NewAuthHandler(
+	auth *service.AuthService,
+	curador func(email string) bool,
+	refreshTTL time.Duration,
+	logger *slog.Logger,
+) *AuthHandler {
+	return &AuthHandler{auth: auth, curador: curador, refreshTTL: refreshTTL, logger: logger}
 }
 
 type registerRequest struct {
@@ -49,6 +58,8 @@ type usuarioResponse struct {
 	Email  string `json:"email"`
 	Nome   string `json:"nome"`
 	TemaUI string `json:"temaUi"`
+	// Curador: a conta importa leis no catálogo (LEIS_CURADORES).
+	Curador bool `json:"curador"`
 }
 
 func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +76,7 @@ func (h *AuthHandler) Cadastrar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.gravarRefresh(w, r, pair.RefreshToken)
-	writeJSON(w, h.logger, http.StatusCreated, toAuthResponse(u, pair))
+	writeJSON(w, h.logger, http.StatusCreated, toAuthResponse(u, pair, h.curador(u.Email)))
 }
 
 func (h *AuthHandler) Entrar(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +93,7 @@ func (h *AuthHandler) Entrar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.gravarRefresh(w, r, pair.RefreshToken)
-	writeJSON(w, h.logger, http.StatusOK, toAuthResponse(u, pair))
+	writeJSON(w, h.logger, http.StatusOK, toAuthResponse(u, pair, h.curador(u.Email)))
 }
 
 // Renovar troca o cookie por uma sessão nova. É também o que restaura a sessão
@@ -108,7 +119,7 @@ func (h *AuthHandler) Renovar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.gravarRefresh(w, r, pair.RefreshToken)
-	writeJSON(w, h.logger, http.StatusOK, toAuthResponse(u, pair))
+	writeJSON(w, h.logger, http.StatusOK, toAuthResponse(u, pair, h.curador(u.Email)))
 }
 
 // Sair é idempotente: apaga o cookie sempre, e revoga no banco o que houver.
@@ -142,28 +153,31 @@ func (h *AuthHandler) Eu(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
+	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u, h.curador(u.Email)))
 }
 
-func toAuthResponse(u usuario.Usuario, pair service.ParDeTokens) authResponse {
+func toAuthResponse(u usuario.Usuario, pair service.ParDeTokens, curador bool) authResponse {
 	return authResponse{
-		Usuario:         toUsuarioResponse(u),
+		Usuario:         toUsuarioResponse(u, curador),
 		AccessToken:     pair.AccessToken,
 		AccessExpiresAt: pair.AccessExpiraEm,
 	}
 }
 
-func toUsuarioResponse(u usuario.Usuario) usuarioResponse {
+func toUsuarioResponse(u usuario.Usuario, curador bool) usuarioResponse {
 	return usuarioResponse{
-		ID:     u.ID.String(),
-		Email:  u.Email,
-		Nome:   u.Nome,
-		TemaUI: string(u.TemaUI),
+		ID:      u.ID.String(),
+		Email:   u.Email,
+		Nome:    u.Nome,
+		TemaUI:  string(u.TemaUI),
+		Curador: curador,
 	}
 }
 
 type temaRequest struct {
 	TemaUI string `json:"temaUi"`
+	// Curador: a conta importa leis no catálogo (LEIS_CURADORES).
+	Curador bool `json:"curador"`
 }
 
 // DefinirTema grava a preferência visual da conta. Ela é do USUÁRIO, não do
@@ -196,5 +210,5 @@ func (h *AuthHandler) DefinirTema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u))
+	writeJSON(w, h.logger, http.StatusOK, toUsuarioResponse(u, h.curador(u.Email)))
 }

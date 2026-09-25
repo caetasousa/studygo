@@ -1,0 +1,204 @@
+{
+ "formato": "studygo.lei/1",
+ "lei": {
+  "slug": "lei-e2e",
+  "nome": "Lei de Exemplo do E2E — Lei nº 99.999, de 1º/01/2026",
+  "curto": "Lei E2E",
+  "reconhecer": [
+   "99.999"
+  ],
+  "fonte": "https://example.invalid/lei-99999"
+ },
+ "versao": "e2e-v2",
+ "dispositivos": [
+  {
+   "ref": "preambulo1",
+   "pai": null,
+   "tipo": "preambulo",
+   "rotulo": "",
+   "nome": "",
+   "texto": "LEI Nº 99.999, DE 1º DE JANEIRO DE 2026",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "cap1",
+   "pai": null,
+   "tipo": "capitulo",
+   "rotulo": "CAPÍTULO I",
+   "nome": "DO CONTROLE EXTERNO",
+   "texto": "CAPÍTULO I",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art1",
+   "pai": "cap1",
+   "tipo": "artigo",
+   "rotulo": "Art. 1º",
+   "nome": "",
+   "texto": "Art. 1º O controle externo, a cargo da Assembleia, será exercido com o auxílio do Tribunal de Contas, ao qual compete:",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art1.inc1",
+   "pai": "art1",
+   "tipo": "inciso",
+   "rotulo": "I",
+   "nome": "",
+   "texto": "I - apreciar as contas prestadas anualmente pelo Governador;",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art1.inc2",
+   "pai": "art1",
+   "tipo": "inciso",
+   "rotulo": "II",
+   "nome": "",
+   "texto": "II - julgar as contas dos administradores e demais responsáveis por dinheiros públicos;",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art1.par1",
+   "pai": "art1",
+   "tipo": "paragrafo",
+   "rotulo": "§ 1º",
+   "nome": "",
+   "texto": "§ 1º O parecer prévio será emitido em sessenta dias.",
+   "notas": [
+    "(Redação dada pela Lei nº 99.998, de 2025)"
+   ],
+   "anteriores": [
+    "§ 1º O parecer prévio será emitido em noventa dias."
+   ],
+   "revogado": false
+  },
+  {
+   "ref": "art2",
+   "pai": "cap1",
+   "tipo": "artigo",
+   "rotulo": "Art. 2º",
+   "nome": "",
+   "texto": "Art. 2º O Tribunal de Contas tem sede na Capital.",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art2.parunico",
+   "pai": "art2",
+   "tipo": "paragrafo",
+   "rotulo": "Parágrafo único",
+   "nome": "",
+   "texto": "Parágrafo único. O Tribunal pode criar unidades técnicas descentralizadas.",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "cap2",
+   "pai": null,
+   "tipo": "capitulo",
+   "rotulo": "CAPÍTULO II",
+   "nome": "DAS DISPOSIÇÕES FINAIS",
+   "texto": "CAPÍTULO II",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  },
+  {
+   "ref": "art3",
+   "pai": "cap2",
+   "tipo": "artigo",
+   "rotulo": "Art. 3º",
+   "nome": "",
+   "texto": "Art. 3º Esta Lei entra em vigor trinta dias após a data de sua publicação.",
+   "notas": [],
+   "anteriores": [],
+   "revogado": false
+  }
+ ],
+ "unidades": [
+  {
+   "ref": "u1",
+   "titulo": "Arts. 1º e 2º — competência e sede",
+   "dispositivos": [
+    "art1",
+    "art2"
+   ],
+   "hash": "f6bfd882927d5d38112802f2d86d9f700ca9148dd4c6c46f4d0e156193dddd37"
+  },
+  {
+   "ref": "u2",
+   "titulo": "Art. 3º — vigência",
+   "dispositivos": [
+    "art3"
+   ],
+   "hash": "0524d0228a18a6ed096febe773adacaa9fddb000dbeb145b476fa818d2dbd43d"
+  }
+ ],
+ "questoes": [
+  {
+   "id": "e2e-01",
+   "unidade": "u1",
+   "enunciado": "Segundo a Lei nº 99.999, compete ao Tribunal de Contas:",
+   "alternativas": [
+    "emitir o parecer definitivo sobre as contas do Governador.",
+    "julgar as contas dos administradores e demais responsáveis por dinheiros públicos.",
+    "julgar as contas prestadas anualmente pelo Governador.",
+    "sustar contratos diretamente.",
+    "legislar sobre finanças públicas."
+   ],
+   "gabarito": "B",
+   "comentario": "O art. 1º, II, dá ao Tribunal a competência de JULGAR as contas dos administradores; as do Governador ele só aprecia (inciso I).",
+   "dispositivos": [
+    "art1.inc2"
+   ],
+   "trecho": "julgar as contas dos administradores e demais responsáveis por dinheiros públicos"
+  },
+  {
+   "id": "e2e-02",
+   "unidade": "u1",
+   "enunciado": "O controle externo, conforme a Lei nº 99.999, está a cargo:",
+   "alternativas": [
+    "do Tribunal de Contas, com o auxílio da Assembleia.",
+    "do Governador.",
+    "da Assembleia, com o auxílio do Tribunal de Contas.",
+    "do Ministério Público de Contas.",
+    "do Poder Judiciário."
+   ],
+   "gabarito": "C",
+   "comentario": "O caput do art. 1º põe o controle externo a cargo da Assembleia, exercido com o auxílio do Tribunal.",
+   "dispositivos": [
+    "art1"
+   ],
+   "trecho": "a cargo da Assembleia, será exercido com o auxílio do Tribunal de Contas"
+  },
+  {
+   "id": "e2e-04",
+   "unidade": "u2",
+   "enunciado": "A Lei nº 99.999 entra em vigor:",
+   "alternativas": [
+    "noventa dias após publicada.",
+    "em 1º de janeiro do ano seguinte.",
+    "após regulamentação.",
+    "trinta dias após a data de sua publicação.",
+    "na data de sua publicação."
+   ],
+   "gabarito": "D",
+   "comentario": "Art. 3º, na redação nova: trinta dias após a publicação.",
+   "dispositivos": [
+    "art3"
+   ],
+   "trecho": "trinta dias após a data de sua publicação"
+  }
+ ]
+}

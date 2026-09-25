@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"studygo/internal/domain/concurso"
+	"studygo/internal/domain/lei"
 	"studygo/internal/domain/plano"
 	"studygo/internal/domain/usuario"
 	"studygo/internal/port"
@@ -61,6 +62,12 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, validacao.Msg
 	}
 
+	// O pacote de lei lista os problemas: a curadoria corrige todos de uma vez.
+	var pacote lei.ErrPacoteInvalido
+	if errors.As(err, &pacote) {
+		return http.StatusUnprocessableEntity, pacote.Error()
+	}
+
 	// A tag repetida nomeia a tag, então é um tipo e não um sentinela.
 	var tagRepetida concurso.ErrCodigoRepetido
 	if errors.As(err, &tagRepetida) {
@@ -99,6 +106,17 @@ func classificar(err error) (int, string) {
 		errors.Is(err, plano.ErrAnotacaoNaoEncontrada),
 		errors.Is(err, plano.ErrAtividadeNaoEncontrada):
 		return http.StatusNotFound, err.Error()
+
+	case errors.Is(err, lei.ErrSemPermissao):
+		return http.StatusForbidden, err.Error()
+
+	case errors.Is(err, lei.ErrNaoEncontrada),
+		errors.Is(err, lei.ErrQuestaoNaoEncontrada):
+		return http.StatusNotFound, err.Error()
+
+	case errors.Is(err, lei.ErrAlternativaInvalida),
+		errors.Is(err, errPacoteIlegivel):
+		return http.StatusUnprocessableEntity, err.Error()
 
 	case errors.Is(err, errRequisicaoInvalida):
 		return http.StatusBadRequest, err.Error()

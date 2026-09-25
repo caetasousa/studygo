@@ -36,6 +36,7 @@
 			titulo: 'Meu concurso',
 			itens: [
 				{ href: '/conteudo', icon: 'conteudo', label: 'Conteúdo programático' },
+				{ href: '/legislacao', icon: 'lei', label: 'Legislação' },
 				{ href: '/datas', icon: 'datas', label: 'Datas do edital' }
 			]
 		},
@@ -62,6 +63,8 @@
 	function isActive(href: string): boolean {
 		if (href === '/') return page.url.pathname === '/';
 		if (href === '/concursos') return page.url.pathname === '/concursos';
+		// O leitor de uma lei (/leis/cf88) é parte da Legislação.
+		if (href === '/legislacao') return /^\/(legislacao|leis\/)/.test(page.url.pathname);
 		return page.url.pathname.startsWith(href);
 	}
 

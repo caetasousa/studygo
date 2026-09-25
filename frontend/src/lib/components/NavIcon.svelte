@@ -6,6 +6,7 @@
 		| 'estatisticas'
 		| 'caderno'
 		| 'datas'
+		| 'lei'
 		| 'conteudo'
 		| 'config'
 		| 'concursos'
@@ -97,6 +98,10 @@
 		<!-- plain calendar: the edital's dated milestones -->
 		<rect x="4" y="5" width="16" height="15" rx="2.5" />
 		<path d="M4 10h16M9 3.5v3M15 3.5v3" />
+	{:else if name === 'lei'}
+		<!-- open book: the law, read article by article -->
+		<path d="M12 6.8c-1.9-1.3-4.3-1.8-7-1.5v12.9c2.7-.3 5.1.2 7 1.5 1.9-1.3 4.3-1.8 7-1.5V5.3c-2.7-.3-5.1.2-7 1.5z" />
+		<path d="M12 6.8v12.9" />
 	{:else if name === 'conteudo'}
 		<!-- indented list: subjects with their topics -->
 		<path d="M9 6.5h10M11.5 12h7.5M11.5 17.5h7.5" />

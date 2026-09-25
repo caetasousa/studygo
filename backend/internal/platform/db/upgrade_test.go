@@ -30,18 +30,19 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 
 	total := quantasMigrations(t)
 
-	// Volta o banco para o estado de quem só tinha a baseline: a linha some de
-	// schema_migrations e a coluna que a última migration criou é desfeita.
+	// Volta o banco para o estado de quem ainda não tinha a última migration:
+	// a linha some de schema_migrations e o que ela criou é desfeito. Quando
+	// uma migration nova entrar, é aqui que se desfaz o que ELA cria.
 	if _, err := pool.Exec(ctx,
 		`DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)`,
 	); err != nil {
 		t.Fatalf("rebobinando schema_migrations: %v", err)
 	}
 
-	if _, err := pool.Exec(ctx,
-		`ALTER TABLE disciplinas DROP COLUMN IF EXISTS notebook_url`,
+	if _, err := pool.Exec(ctx, `DROP TABLE disciplinas_leis, leis_respostas, leis_questoes,
+		leis_unidades, leis_dispositivos, leis_versoes, leis`,
 	); err != nil {
-		t.Fatalf("rebobinando a coluna: %v", err)
+		t.Fatalf("rebobinando as tabelas da legislação: %v", err)
 	}
 
 	// O runner precisa aplicar só o que falta, sem tropeçar no que já existe.
@@ -61,10 +62,9 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 	var existe bool
 	if err := pool.QueryRow(ctx, `
 		SELECT EXISTS (
-			SELECT 1 FROM information_schema.columns
-			 WHERE table_name = 'disciplinas' AND column_name = 'notebook_url'
+			SELECT 1 FROM information_schema.tables WHERE table_name = 'leis'
 		)`).Scan(&existe); err != nil {
-		t.Fatalf("conferindo a coluna: %v", err)
+		t.Fatalf("conferindo a tabela: %v", err)
 	}
 
 	if !existe {

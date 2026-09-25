@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -44,6 +45,29 @@ func quantasMigrations(t *testing.T) int {
 	return len(entradas)
 }
 
+// maiorMigration é o número da última migration do bundle. Não é a contagem:
+// as 000004–000007 saíram junto com o catálogo de provas (provasGo) e a
+// numeração continua em 000008, então há um buraco de propósito.
+func maiorMigration(t *testing.T) int {
+	t.Helper()
+
+	entradas, err := fs.Glob(migrations.FS, "*.up.sql")
+	if err != nil {
+		t.Fatalf("listando migrations: %v", err)
+	}
+
+	maior := 0
+	for _, e := range entradas {
+		n, err := strconv.Atoi(strings.SplitN(e, "_", 2)[0])
+		if err != nil {
+			t.Fatalf("migration sem número: %s", e)
+		}
+		maior = max(maior, n)
+	}
+
+	return maior
+}
+
 func TestMain(m *testing.M) {
 	codigo := m.Run()
 	pgtest.Encerrar()
@@ -62,9 +86,10 @@ func TestMigrate_CriaSchemaAPartirDeBancoVazio(t *testing.T) {
 
 	esperadas := []string{
 		"anotacoes", "atividades", "concursos", "conteudo_programatico",
-		"disciplinas", "fontes", "marco_checks", "marcos",
-		"plano_disciplinas", "planos", "refresh_tokens", "registros_atividade",
-		"registros_dia", "schema_migrations", "temas", "usuarios",
+		"disciplinas", "disciplinas_leis", "fontes", "leis", "leis_dispositivos",
+		"leis_questoes", "leis_respostas", "leis_unidades", "leis_versoes",
+		"marco_checks", "marcos", "plano_disciplinas", "planos", "refresh_tokens",
+		"registros_atividade", "registros_dia", "schema_migrations", "temas", "usuarios",
 	}
 
 	obtidas := tabelas(t, pool)
@@ -169,8 +194,7 @@ func TestSchema_VersaoEAMaiorMigrationAplicada(t *testing.T) {
 		t.Fatalf("lendo a versão: %v", err)
 	}
 
-	// As migrations são numeradas em sequência a partir de 1.
-	ultima := quantasMigrations(t)
+	ultima := maiorMigration(t)
 	if versao != ultima {
 		t.Fatalf("versão = %d, quer %d", versao, ultima)
 	}

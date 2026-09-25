@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"studygo/internal/domain/lei"
 	"studygo/internal/domain/usuario"
 	"studygo/internal/service"
 
@@ -154,7 +155,7 @@ func TestContratoHTTP_Sessao(t *testing.T) {
 		RefreshToken:   "nao-pode-sair-no-corpo",
 	}
 
-	compararComGolden(t, "sessao.json", forma(t, toAuthResponse(u, par)))
+	compararComGolden(t, "sessao.json", forma(t, toAuthResponse(u, par, false)))
 }
 
 // forma serializa v e troca cada escalar pelo nome do tipo, reduzindo listas ao
@@ -247,4 +248,33 @@ func compararComGolden(t *testing.T, nome, atual string) {
 			nome, esperado, atual,
 		)
 	}
+}
+
+func TestContratoHTTP_LeituraDaLei(t *testing.T) {
+	t.Parallel()
+
+	// Uma questão respondida e uma não: a resposta só existe na primeira, e o
+	// contrato precisa descrever as duas formas.
+	agora := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
+	l := service.LeituraDaLei{
+		Lei: lei.Lei{Slug: "cf88", Nome: "Constituição", Curto: "CF", Fonte: "https://x", Reconhecer: []string{"CF"}},
+		Texto: lei.Texto{
+			Versao: "v1",
+			Dispositivos: []lei.Dispositivo{
+				{Ref: "art71", Tipo: "artigo", Rotulo: "Art. 71", Texto: "Art. 71. O controle…"},
+				{Ref: "art71.inc2", Pai: "art71", Tipo: "inciso", Rotulo: "II", Texto: "II - julgar…",
+					Notas: []string{"(Redação dada…)"}, Anteriores: []string{"II - antigo"}, Revogado: false},
+			},
+			Unidades: []lei.Unidade{{Ref: "u1", Titulo: "Arts. 70 a 75", Dispositivos: []string{"art71"}, Hash: "h"}},
+		},
+		Questoes: []service.QuestaoParaLeitor{
+			{ID: uuid.New(), Unidade: "u1", Dispositivos: []string{"art71"}, Enunciado: "e",
+				Alternativas: []string{"a", "b", "c", "d", "e"},
+				Resposta:     &service.Correcao{Escolhida: "A", Acertou: true, Gabarito: "A", Comentario: "c", Trecho: "t", Em: agora}},
+			{ID: uuid.New(), Unidade: "u1", Dispositivos: []string{"art71"}, Enunciado: "e2",
+				Alternativas: []string{"a", "b", "c", "d", "e"}},
+		},
+	}
+
+	compararComGolden(t, "leitura_lei.json", forma(t, leituraParaDTO(l)))
 }

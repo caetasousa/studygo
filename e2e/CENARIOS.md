@@ -65,6 +65,25 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | D7 | compactar não fecha o vão deixado no cronograma, ou desfaz a ordem manual | dias vazios no meio e conteúdo espremido no fim |
 | D8 | reorganizar a partir de uma data mexe no que já foi estudado, ou não refaz o que vem depois | histórico reescrito, ou plano velho |
 
+## L. Legislação
+
+A lei chega por um pacote montado localmente (`conteudo/leis/`, ver
+`PLANO-LEGISLACAO.md`) e importado por um curador. O stack de E2E importa um
+pacote pequeno e fixo (`e2e/fixtures/lei-exemplo.json`).
+
+| id | Como quebra | O que o usuário vê |
+|---|---|---|
+| L1 | o pacote importado não vira uma lei legível, ou chega com o texto diferente do pacote | lei vazia, ou uma palavra da lei trocada |
+| L2 | importar o mesmo pacote de novo duplica a lei, os dispositivos ou as questões | a lei aparece duas vezes, questões repetidas |
+| L3 | uma versão nova da lei apaga as respostas das questões que não mudaram | o progresso volta a zero a cada atualização |
+| L4 | uma conta que não é curadora consegue importar | qualquer um publica "lei" no catálogo |
+| L5 | clicar no artigo não traz as questões que o citam, ou traz as de outro artigo | a questão não bate com o que se está lendo |
+| L6 | a resposta não é gravada, ou o gabarito e o trecho não aparecem | responde e não aprende nada |
+| L7 | o selo do artigo e o progresso da unidade não refletem as respostas | não se sabe o que falta nem onde errou |
+| L8 | o link direto para um dispositivo não abre a lei naquele ponto | o cronograma e o caderno não conseguem apontar para o artigo |
+| L9 | o tópico que cita a lei ("nº 16.168") não sugere a lei para a matéria, ou a sugestão confirmada não fica gravada | a lei não aparece no menu Legislação da matéria |
+| L10 | a redação anterior ou as notas de redação se misturam ao texto vigente | o estudante decora um texto revogado |
+
 ## Fora da suíte, de propósito
 
 - **A importação de desempenho do TEC** (o CSV do TEC no caderno de erros)

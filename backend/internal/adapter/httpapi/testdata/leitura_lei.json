@@ -1,0 +1,56 @@
+{
+  "dispositivos": [
+    {
+      "anteriores": [],
+      "nome": "string",
+      "notas": [],
+      "pai": null,
+      "ref": "string",
+      "revogado": "bool",
+      "rotulo": "string",
+      "texto": "string",
+      "tipo": "string"
+    }
+  ],
+  "lei": {
+    "curto": "string",
+    "fonte": "string",
+    "nome": "string",
+    "reconhecer": [
+      "string"
+    ],
+    "slug": "string"
+  },
+  "questoes": [
+    {
+      "alternativas": [
+        "string"
+      ],
+      "dispositivos": [
+        "string"
+      ],
+      "enunciado": "string",
+      "id": "string",
+      "resposta": {
+        "acertou": "bool",
+        "comentario": "string",
+        "escolhida": "string",
+        "gabarito": "string",
+        "respondidaEm": "string",
+        "trecho": "string"
+      },
+      "unidade": "string"
+    }
+  ],
+  "unidades": [
+    {
+      "dispositivos": [
+        "string"
+      ],
+      "hash": "string",
+      "ref": "string",
+      "titulo": "string"
+    }
+  ],
+  "versao": "string"
+}

@@ -14,6 +14,7 @@ type Handlers struct {
 	Auth     *AuthHandler
 	Concurso *ConcursoHandler
 	Plano    *PlanoHandler
+	Lei      *LeiHandler
 }
 
 // Limites reúne os limitadores das rotas que merecem um teto próprio.
@@ -137,6 +138,16 @@ func NewRouter(
 
 	protegida("POST "+base+"/tec/preview", h.Plano.PreviewTEC)
 	protegida("POST "+base+"/tec", h.Plano.ImportarTEC)
+
+	// Legislação: o catálogo é global; a importação é só da curadoria, e quem
+	// decide isso é o serviço, não a rota.
+	protegida("GET /api/leis", h.Lei.Catalogo)
+	protegida("POST /api/leis", h.Lei.Importar)
+	protegida("GET /api/leis/{slug}", h.Lei.Ler)
+	protegida("POST /api/leis/questoes/{id}/respostas", h.Lei.Responder)
+	protegida("GET /api/concursos/{slug}/leis", h.Lei.DoConcurso)
+	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/leis/{lei}", h.Lei.Vincular)
+	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/leis/{lei}", h.Lei.Desvincular)
 
 	return mux
 }

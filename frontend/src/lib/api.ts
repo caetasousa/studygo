@@ -16,7 +16,12 @@ import type {
 	PreviewTEC,
 	RegistroInput,
 	RegistroDiaInput,
-	Usuario
+	Usuario,
+	CorrecaoDeQuestao,
+	ImportacaoDeLei,
+	LeiResumo,
+	LeisDaMateria,
+	LeituraDeLei
 } from '$lib/types';
 
 export class ApiError extends Error {
@@ -150,6 +155,30 @@ function bodyDe(fonte: FonteEdital | null, extras: ExtrasEdital = {}): RequestIn
 }
 
 export const api = {
+	// ---- legislação ----
+	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),
+
+	/** Só a curadoria importa; o pacote vai como está, o servidor valida. */
+	importarLei: (pacote: unknown) =>
+		request<ImportacaoDeLei>('/api/leis', { method: 'POST', body: JSON.stringify(pacote) }),
+
+	lerLei: (slug: string) => request<LeituraDeLei>(`/api/leis/${encodeURIComponent(slug)}`),
+
+	responderQuestao: (id: string, alternativa: string) =>
+		request<CorrecaoDeQuestao>(`/api/leis/questoes/${encodeURIComponent(id)}/respostas`, {
+			method: 'POST',
+			body: JSON.stringify({ alternativa })
+		}),
+
+	leisDoConcurso: (slug: string) =>
+		request<{ disciplinas: LeisDaMateria[] }>(`/api/concursos/${encodeURIComponent(slug)}/leis`),
+
+	vincularLei: (slug: string, disciplinaId: string, lei: string, ligar: boolean) =>
+		request<void>(
+			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/leis/${encodeURIComponent(lei)}`,
+			{ method: ligar ? 'PUT' : 'DELETE' }
+		),
+
 	// ---- concursos ----
 	listarConcursos: () => request<ConcursoLista>('/api/concursos'),
 
