@@ -42,6 +42,10 @@ known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["N806"]
+# Texto de lei usa travessão e meia-risca de verdade ("IV – julgar"): o aviso
+# de caractere ambíguo seria sobre o próprio dado.
+"app/leis/*" = ["RUF001", "RUF002", "RUF003"]
+"tests/unit/test_leis_*" = ["N806", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -58,7 +62,7 @@ ignore_missing_imports = true
 # PyMuPDF ships type hints but they are incomplete: nearly every method comes
 # back as untyped, so strict mode's no-untyped-call fires on ordinary use.
 # Scope the relaxation to the two modules that touch it directly.
-module = ["app.services.extraction", "app.services.validation", "app.services.ocr"]
+module = ["app.services.extraction", "app.services.validation", "app.services.ocr", "app.leis.captura"]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]

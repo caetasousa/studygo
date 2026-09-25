@@ -67,7 +67,7 @@ class GeminiProvider:
         client = self._get_client()
         contents = "\n\n".join([request.system, *request.chunks])
         config = gt.GenerateContentConfig(
-            system_instruction=PREAMBLE,
+            system_instruction=request.instruction or PREAMBLE,
             response_mime_type="application/json",
             response_schema=request.response_schema,
             temperature=0.0,

@@ -19,6 +19,9 @@ class StructuredRequest(BaseModel):
     chunks: list[str]
     # JSON schema the response must conform to.
     response_schema: dict[str, object]
+    # Instrução de sistema própria do pedido. Sem ela vale o preâmbulo de
+    # edital do provider; a captura de leis precisa de outra.
+    instruction: str | None = None
 
 
 class LLMProvider(Protocol):
