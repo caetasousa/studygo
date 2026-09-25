@@ -34,6 +34,8 @@ services:
       CORS_ORIGIN: "https://{{ app_domain }}"
       EDITAL_PROCESSOR_URL: "http://edital-processor:8000"
       EDITAL_PROCESSOR_TOKEN: "{{ edital_processor_token }}"
+      # E-mails das contas que importam leis (vazio = ninguém importa).
+      LEIS_CURADORES: "{{ leis_curadores | default('') }}"
       # O que o /health responde: qual publicação está no ar (ver deploy.yml).
       APP_VERSAO: "{{ app_versao }}"
       APP_DEPLOY: "{{ deploy_pipeline_id | default('') }}"

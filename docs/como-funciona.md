@@ -20,6 +20,11 @@ o sistema acompanha o progresso.
 Também dá para enviar o PDF do edital e deixar o sistema extrair as matérias
 sozinho, em vez de digitar tudo à mão.
 
+Para as matérias que são texto de lei, há a **Legislação**: a lei aparece
+artigo por artigo, e cada artigo traz questões sobre ele. A lei não é baixada
+pelo app — ela é organizada no computador de quem cuida do conteúdo, conferida
+palavra por palavra com o texto oficial, e só então publicada.
+
 ---
 
 ## As quatro peças

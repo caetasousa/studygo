@@ -141,8 +141,9 @@ O catálogo de provas saiu para o projeto provasGo em 21/09/2026, e as
 migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
-sumiu, e o código não as lê. Por isso **a próxima migration é a 000008**: uma
-000004 nova seria dada como aplicada nesses bancos e nunca rodaria.
+sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
+legislação) e **a próxima migration é a 000009**: uma 000004 nova seria dada
+como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:
 
@@ -167,6 +168,37 @@ Regras que o schema carrega:
 - A UNIQUE `(plano_id, data, posicao)` é DEFERRABLE porque mover uma matéria
   renumera o dia inteiro dentro de uma transação, passando por estados
   intermediários que colidiriam.
+
+### Legislação (000008)
+
+```
+leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai, tipo, texto, notas, anteriores)
+       │                  └── leis_unidades       (o recorte do edital com questões)
+       ├── leis_questoes ──── leis_respostas ──► usuarios
+       └── disciplinas_leis ──► disciplinas
+```
+
+- **O catálogo é global e só a curadoria publica.** A lei é a mesma para todo
+  mundo; quem importa está em `LEIS_CURADORES` (e-mails). `*` só vale com
+  `APP_VERSAO=dev` — em qualquer outro ambiente o backend recusa subir.
+- **A lei não nasce no app.** Ela é capturada fora (`edital-processor/app/leis`,
+  sem rota HTTP), as questões são escritas localmente, e o app importa o
+  pacote pronto (`studygo.lei/1`) já validado pelo mesmo `lei.Pacote.Validar`
+  que roda no `make leis-validar`.
+- **Exceção consciente à identidade por id:** entre versões, o dispositivo é
+  identificado pela `ref` jurídica (`art71.inc2`) — é assim que a lei é citada,
+  e é a âncora do link direto. As questões guardam as refs que citam
+  (`text[]`), resolvidas contra a versão ativa.
+- **Versão repetida não duplica; versão nova não apaga.** A versão é o hash dos
+  dispositivos; reimportá-la só reativa. As questões casam pela chave do pacote:
+  a que mudou mantém o id (e as respostas), a que saiu é desativada, nunca
+  apagada — `leis_respostas → leis_questoes` é RESTRICT.
+- **O gabarito só sai depois da resposta.** O leitor recebe as questões sem
+  gabarito; a correção vem do servidor, e a última resposta de cada questão é a
+  que conta no selo do artigo e no progresso da unidade.
+- **O vínculo lei ↔ matéria é sugerido, não imposto.** `lei.CitadaEm` procura os
+  trechos de `reconhecer` ("16.168") nos tópicos da matéria; o estudante
+  confirma e o vínculo vai para `disciplinas_leis`, pelo id da disciplina.
 
 ### O dia vira em Brasília
 
@@ -287,6 +319,12 @@ POST      …/plano/{compactar,restaurar-ordem}
 GET       …/plano/{estatisticas,caderno,dossie,export.csv}
 POST      …/plano/anotacoes    PATCH|DELETE …/plano/anotacoes/{id}
 POST      …/plano/tec{,/preview}
+
+GET    /api/leis                        POST /api/leis   ← importar pacote (só curadoria)
+GET    /api/leis/{slug}                 ← texto ativo + questões (sem gabarito até responder)
+POST   /api/leis/questoes/{id}/respostas
+GET    /api/concursos/{slug}/leis       ← por matéria: vinculadas e sugeridas pelo tópico
+PUT|DELETE /api/concursos/{slug}/disciplinas/{id}/leis/{lei}
 ```
 
 ---

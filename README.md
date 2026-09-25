@@ -42,6 +42,11 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   um **dossiê pronto para o NotebookLM** por disciplina (ementa + leis + suas
   anotações).
 - **Datas do edital** — cronograma oficial com checklist e alertas de prazo.
+- **Legislação interativa** — a lei seca do edital, capturada da fonte oficial
+  (Planalto, Casa Civil de Goiás) sem que a IA toque no texto, organizada em
+  artigos, incisos e alíneas com link direto para cada dispositivo. Clique no
+  artigo e resolva as questões (estilo da banca) que o citam; o gabarito vem
+  com o trecho da lei grifado, e cada artigo mostra quanto você acertou.
 - **Lembretes de revisão espaçada** — um worker calcula os temas de D-1/D-7/D-30
   que vencem no dia (hoje só loga; e-mail fica atrás da mesma interface).
 - **Multiusuário** — conta por e-mail/senha (argon2id + JWT), cada usuário com

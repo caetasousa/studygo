@@ -229,6 +229,30 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 
 ---
 
+## ⚖️ Legislação: capturar, escrever questões, publicar
+
+A lei é organizada na sua máquina; produção só importa o pacote pronto.
+
+```bash
+# 1. baixar e organizar (normas de conteudo/leis/normas.toml; a chave do
+#    Gemini vem do .env da raiz)
+make leis-capturar slug=cf88        # ou prioridade=A; sem_gemini=1 só com as regras
+
+# 2. conferir conteudo/leis/<slug>/captura.md — divergência regra × Gemini
+#    revisada vai para `aceitar` no normas.toml, com o motivo
+
+# 3. questões: peça ao Claude Code para seguir .claude/skills/questoes-de-lei;
+#    elas ficam em conteudo/leis/<slug>/questoes.json
+make leis-validar atualizar=1       # a mesma validação da importação
+
+# 4. o que a curadoria importa em Legislação → Importar lei
+make leis-pacote                    # conteudo/leis/pacotes/<slug>.json
+```
+
+Como a captura pode errar, e o que ela confere antes de gravar, está em
+`edital-processor/app/leis/README.md`. O original baixado e os pacotes não vão
+para o Git (o sha256 do original fica no `captura.md`).
+
 ## 📖 Resumo dos alvos
 
 | Alvo | Para quê |
@@ -239,6 +263,7 @@ provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
 | `make check-db` · `make e2e` | banco real · o app inteiro pelo navegador (exigem Docker) |
 | `make fmt` | formatação |
+| `make leis-capturar` `leis-validar` `leis-pacote` | legislação: capturar, conferir questões, montar pacote |
 | `make status` `commit` | git |
 | `make push` · `make release` | publicar (staging, depois produção) |
 | `make provision env=…` | mexer na infra |
