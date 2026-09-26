@@ -1,6 +1,6 @@
 ---
-# Docker sem root, do usuário de deploy. É o que permite um servidor dentro do
-# WSL: todas as distros do WSL2 dividem a mesma rede, e um segundo Docker
+# Docker sem root, do usuário de deploy do projeto. É o que permite um
+# servidor dentro do WSL: todas as distros do WSL2 dividem a mesma rede, e um segundo Docker
 # comum brigaria com o da distro de desenvolvimento pelo docker0 e pelo
 # iptables. O rootless roda numa rede própria (slirp4netns) e só publica as
 # portas pedidas, em localhost.

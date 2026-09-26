@@ -1,10 +1,9 @@
 {#
   As imagens chegam por digest (repo@sha256:...), vindas do job publish. É o que
-  garante que staging e produção rodam exatamente os bytes que passaram nos
+  garante que o servidor roda exatamente os bytes que passaram nos
   testes — uma tag poderia ser reapontada entre um deploy e outro.
 
-  Os nomes de projeto/volume derivam de app_dir, então staging e produção
-  coexistem na mesma VPS sem disputar volume nem container.
+  Os nomes de projeto/volume derivam de app_dir.
 #}
 services:
   frontend:
@@ -23,8 +22,8 @@ services:
     security_opt:
       - no-new-privileges:true
 {% if mem_limit_backend is defined %}
-    # Teto de memória: os dois ambientes dividem a mesma VPS, e sem limite um
-    # vazamento em homologação derruba a produção por OOM.
+    # Teto de memória opcional (mem_limit_* no inventário), para quando vários
+    # projetos dividirem o servidor.
     mem_limit: "{{ mem_limit_backend }}"
 {% endif %}
     environment:
@@ -70,7 +69,7 @@ services:
     environment:
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
-      # Sem intervalo fixo: em produção o worker acorda na virada do dia, que
+      # Sem intervalo fixo: no servidor o worker acorda na virada do dia, que
       # é quando o replanejamento precisa acontecer. Definir lembrete_intervalo
       # volta ao modo de intervalo — útil só para depurar.
 {% if lembrete_intervalo is defined %}

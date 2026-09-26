@@ -10,45 +10,13 @@
     state: absent
   notify: reload nginx
 
-- name: Check for existing Let's Encrypt certificate
-  stat:
-    path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
-  register: nginx_cert_check
-
-# Recusa qualquer Host sem vhost próprio. Sem isto o nginx entrega o primeiro
-# vhost que encontra, e um subdomínio novo apontado para o IP cai na aplicação
-# real — foi o que aconteceu com staging.cronograma antes de ser provisionado.
-# Só com IP público: atrás do túnel só o cloudflared chega ao nginx, e este
-# vhost precisa de um certificado que ali não existe.
-- name: Deploy default vhost that refuses unknown hosts
-  when: (borda | default('letsencrypt')) != 'cloudflare'
-  ansible.builtin.template:
-    src: "{{ playbook_dir }}/templates/default-deny.conf.j2"
-    dest: /etc/nginx/sites-available/000-default-deny.conf
-    mode: '0644'
-  vars:
-    letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
-  notify: reload nginx
-
-- name: Enable default deny vhost
-  when: (borda | default('letsencrypt')) != 'cloudflare'
-  ansible.builtin.file:
-    src: /etc/nginx/sites-available/000-default-deny.conf
-    dest: /etc/nginx/sites-enabled/000-default-deny.conf
-    state: link
-  notify: reload nginx
-
-# Um arquivo por ambiente. Com nome fixo, provisionar staging sobrescreveria o
-# vhost de produção — os dois ambientes dividem este nginx.
-# Produção continua em annygo.conf, do nome antigo do projeto: renomear deixaria
-# os dois habilitados ao mesmo tempo, servindo o que o nginx lesse primeiro.
+# Um arquivo por projeto (vhost_file): outro projeto no mesmo servidor tem o
+# seu, na sua própria porta.
 - name: Deploy studygo vhost
   template:
     src: "{{ playbook_dir }}/templates/app.conf.j2"
     dest: /etc/nginx/sites-available/{{ vhost_file }}
     mode: '0644'
-  vars:
-    letsencrypt_cert_exists: "{{ nginx_cert_check.stat.exists }}"
   notify: reload nginx
 
 - name: Enable studygo vhost

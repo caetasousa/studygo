@@ -21,11 +21,9 @@ editar código
      │
      ├── git add <arquivos>
      ├── make commit m="..." . roda os checks de novo e commita
-     ├── make push .......... você, sempre → pipeline implanta em staging
-     │
-     └── make release go=1 .. tag de produção → botão manual na pipeline
+     └── make push .......... você, sempre → pipeline testa e implanta no servidor
               │
-              └── make health  confirma qual versão está no ar
+              └── make servidor-health  confirma qual versão está no ar
 ```
 
 ---
@@ -55,7 +53,7 @@ make reset
 ```
 
 Para ver como fica **de verdade** (imagens de produção, sem hot reload, igual ao
-que roda na VPS):
+que roda no servidor):
 
 ```bash
 make prod-local
@@ -176,62 +174,56 @@ Escopos usados aqui: `backend`, `frontend`, `ansible`, `docker`, `nginx`,
 
 **O push é sempre um ato seu** — `make commit` nunca empurra nada. `make push` é
 o invólucro que mostra o que vai subir e envia a `main` aos dois remotes (GitLab
-primeiro, depois o espelho); tags ficam de fora, e só `make release go=1` envia
-uma.
+primeiro, depois o espelho); tags ficam de fora.
 
 ---
 
 ## 4️⃣ Publicar
 
 ```bash
-make push                     # main → pipeline implanta em staging sozinha
-make release                  # mostra a tag de produção e o que entra nela
-make release go=1             # cria a tag e envia → libera o botão de produção
-make health                   # que versão está no ar (versao, deploy, schema)
+make push                     # main → pipeline testa e implanta no servidor
+make servidor-health          # que versão está no ar (versao, deploy, schema)
+make servidor-endereco        # o endereço público da vez
 ```
 
 Quem publica é a pipeline, não a sua máquina: ela roda os mesmos checks, constrói
-a imagem **uma vez**, testa a imagem de pé e promove esse mesmo digest para
-staging e produção. Voltar atrás é o botão **Rollback environment** do GitLab.
-Detalhes, versão e rollback em [ci-cd.md](ci-cd.md).
+a imagem **uma vez**, testa a imagem de pé e promove esse mesmo digest para o
+servidor. Há um ambiente só; não se cria tag de versão. Voltar atrás é o botão
+**Rollback environment** do GitLab. Detalhes em [ci-cd.md](ci-cd.md).
 
-Quando a mudança for de **infraestrutura** (nginx, firewall, certificado), e não
-de código:
+Quando a mudança for de **infraestrutura** (nginx, túnel, Docker), e não de
+código:
 
 ```bash
-make provision env=staging     # ensaie aqui primeiro
-make provision env=production  # e só então no ambiente real
+make provision                # tudo, inclusive o apt upgrade da role common
+make provision tags=nginx     # só uma peça (nginx, cloudflared, docker, common)
 ```
 
-`env` é obrigatório: os dois ambientes dividem a mesma VPS. Use `tags=nginx`
-(ou `certbot`) para não arrastar o `apt upgrade` da role `common` junto.
-
-Depois do deploy, para olhar a VPS sem abrir SSH na mão:
+Depois do deploy, para olhar o servidor sem abrir SSH na mão:
 
 ```bash
-make deploy-status                       # docker compose ps remoto (produção)
-make deploy-status env=staging           # o mesmo, em staging
-make deploy-logs svc=backend             # últimas 80 linhas
-make deploy-logs svc=backend env=staging
+make servidor-status              # containers
+make servidor-logs svc=backend    # últimas linhas de log
 ```
 
 ### 📦 O que o deploy faz
 
 A pipeline constrói as imagens **uma vez**, publica no Registry e o Ansible
-promove o mesmo digest na VPS — nada é montado na sua máquina, e o código-fonte
+promove o mesmo digest no servidor — nada é montado na sua máquina, e o código-fonte
 nunca vai para o servidor. Antes de subir, o deploy copia o banco; as migrations
 rodam sozinhas no boot do backend (com advisory lock, então o worker pode subir
 junto). Repetir o deploy é seguro. O caminho completo está em
 [ci-cd.md](ci-cd.md).
 
-O passo a passo do **primeiro** deploy de um servidor novo (bootstrap, lockdown,
-provisionamento) está em [deploy.md](deploy.md) — aquilo roda uma vez só.
+O passo a passo de montar o servidor do zero (bootstrap, provisionamento,
+túnel) está em [deploy.md](deploy.md) e [cloudflare-tunnel.md](cloudflare-tunnel.md)
+— aquilo roda uma vez só.
 
 ---
 
 ## ⚖️ Legislação: capturar, escrever questões, publicar
 
-A lei é organizada na sua máquina; produção só importa o pacote pronto.
+A lei é organizada na sua máquina; o servidor só importa o pacote pronto.
 
 ```bash
 # 1. baixar e organizar (normas de conteudo/leis/normas.toml; a chave do
@@ -265,6 +257,6 @@ para o Git (o sha256 do original fica no `captura.md`).
 | `make fmt` | formatação |
 | `make leis-capturar` `leis-validar` `leis-pacote` | legislação: capturar, conferir questões, montar pacote |
 | `make status` `commit` | git |
-| `make push` · `make release` | publicar (staging, depois produção) |
-| `make provision env=…` | mexer na infra |
-| `make deploy-status` `deploy-logs` `health` | olhar a produção |
+| `make push` | publicar (a pipeline testa e implanta) |
+| `make provision` | mexer na infra do servidor |
+| `make servidor-status` `servidor-logs` `servidor-health` `servidor-endereco` | olhar o servidor |

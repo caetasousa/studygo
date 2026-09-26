@@ -126,14 +126,13 @@ Você mexeu no código. E agora?
 ```
 1. você escreve o código
 2. testa na sua máquina        → make check
-3. envia                        → git push gitlab main
+3. envia                        → make push
 4. a esteira testa de novo, sozinha
-5. vai para o ambiente de teste automaticamente
-6. você confere se ficou bom
-7. clica para publicar de verdade
+5. passando tudo, vai para o servidor automaticamente
+6. você confere se ficou bom    → make servidor-health
 ```
 
-Os passos 4 a 7 são automáticos, menos o último — publicar exige um clique seu.
+Os passos 4 e 5 são automáticos. Se algo quebrou, voltar atrás é um clique.
 
 **Por que a máquina testa de novo, se você já testou?** Porque a sua máquina
 tem coisas que o servidor não tem. Um código que funciona só aí não serve.
@@ -142,21 +141,24 @@ Detalhes em [ci-cd.md](ci-cd.md).
 
 ---
 
-## Os dois ambientes
+## Onde o sistema fica no ar
 
-| | Produção | Homologação |
-|---|---|---|
-| Endereço | cronograma.caetasousa.tech | staging.cronograma.caetasousa.tech |
-| Quem usa | pessoas de verdade | só você, para conferir |
-| Dados | reais | de teste |
-| Como publica | você clica | automático |
+Num servidor próprio: uma segunda distro Linux (`ubuntu-server`) dentro do WSL
+deste mesmo computador, separada da que se usa para programar. Ela não tem
+porta aberta para a internet: um programa da Cloudflare, o **túnel**, abre uma
+conexão de dentro para fora, e as visitas chegam por ela.
 
-São duas cópias do sistema, com bancos separados. A ideia é testar em
-homologação antes de mexer no que as pessoas usam.
+| | |
+|---|---|
+| Endereço | `https://<palavras>.trycloudflare.com` — muda quando o túnel reinicia; `make servidor-endereco` mostra o da vez |
+| Quem usa | você e quem estiver testando |
+| Dados | de teste |
+| Como publica | automático, a cada envio para a `main` |
 
-> ⚠️ Os dois vivem no mesmo servidor. Estão separados em tudo que guarda dados,
-> mas dividem processador e memória. Se homologação consumir demais, produção
-> sente. Por isso homologação tem limite de memória.
+> ⚠️ O servidor é este computador: com ele desligado, o site sai do ar. E o
+> navegador pode avisar "site perigoso" no endereço `trycloudflare.com` — é a
+> fama do serviço grátis, não um problema do app. Um domínio próprio resolve
+> ([cloudflare-tunnel.md](cloudflare-tunnel.md)).
 
 ---
 
@@ -182,9 +184,9 @@ homologação antes de mexer no que as pessoas usam.
 
 **O site está fora do ar?**
 ```bash
-make health              # produção respondeu?
-make deploy-status       # os programas estão rodando?
-make deploy-logs svc=backend    # o que o backend registrou?
+make servidor-health            # o servidor respondeu?
+make servidor-status            # os programas estão rodando?
+make servidor-logs svc=backend  # o que o backend registrou?
 ```
 
 **Publiquei e quebrou?**
@@ -207,5 +209,6 @@ make logs                # vê o que está acontecendo
 | entender o dia a dia de trabalho | [fluxo-de-trabalho.md](fluxo-de-trabalho.md) |
 | publicar ou desfazer uma publicação | [ci-cd.md](ci-cd.md) |
 | mexer no servidor | [deploy.md](deploy.md) |
+| entender o túnel da Cloudflare | [cloudflare-tunnel.md](cloudflare-tunnel.md) |
 | entender as decisões técnicas | [arquitetura.md](arquitetura.md) |
 | saber quais comandos existem | `make` |

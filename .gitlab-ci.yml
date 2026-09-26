@@ -8,24 +8,26 @@ include:
     ref: 'v1.1.8'
     file: '/templates/app-pipeline.yml'
 
-# Voltar uma versão é o botão do próprio GitLab: Operate > Environments >
-# production > "Rollback environment" na versão desejada. Ele reexecuta o
-# deploy_production daquela pipeline, com os digests dela, sem reconstruir
-# nada (docs/ci-cd.md).
-#
-# O rollback_production do template fica desligado aqui. Ele pede três digests
-# colados à mão e não passa --vault-password-file ao playbook — sem ela os
-# secrets.yml não são decifrados e o deploy falha. Um botão chamado rollback ao
-# lado do de produção, que não funciona na hora da pressa, é pior que nenhum.
-# Quando o template o corrigir ou remover, este bloco sai junto com o ref.
+# Não há produção: o único ambiente é o servidor próprio (a distro
+# ubuntu-server do WSL), alimentado pelo push na main. Os jobs de produção do
+# template — que só rodariam numa tag — ficam desligados, para uma tag criada
+# por engano não mandar nada a lugar nenhum.
+deploy_production:
+  rules:
+    - when: never
+
+verify:
+  rules:
+    - when: never
+
 rollback_production:
   rules:
     - when: never
 
-# O smoke_test do template chama um endereço fixo (o staging da VPS, que não
-# existe mais). O servidor agora é a distro ubuntu-server do WSL desta mesma
-# máquina, sem domínio próprio: o job, num container do runner, chega ao nginx
-# dela pela bridge do Docker — o mesmo caminho do SSH do deploy e do registry.
+# O smoke_test do template chama um endereço fixo, de um domínio que não
+# existe mais. O servidor é a distro ubuntu-server do WSL desta mesma máquina,
+# sem domínio próprio: o job, num container do runner, chega ao nginx dela
+# pela bridge do Docker — o mesmo caminho do SSH do deploy e do registry.
 smoke_test:
   script:
     - curl -fsS --retry 5 --retry-delay 4 "http://172.17.0.1:8480/health"

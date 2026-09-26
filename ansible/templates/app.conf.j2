@@ -1,23 +1,20 @@
 {#
-  Vhost da aplicação. Um arquivo por ambiente (ver vhost_file no inventário),
-  porque staging e produção dividem este mesmo nginx.
+  Vhost da aplicação, atrás do túnel da Cloudflare: o visitante chega pelo
+  cloudflared, em localhost, e o TLS termina na Cloudflare
+  (docs/cloudflare-tunnel.md). Um arquivo por projeto (vhost_file).
 
   As zonas de limite têm nome derivado do vhost DE PROPÓSITO: limit_req_zone
-  vive no contexto http, que é compartilhado pelos dois ambientes, e dois
-  arquivos declarando `auth` fariam o nginx recusar a recarga inteira com
-  "limit_req_zone auth is already bound".
-
-  borda: cloudflare (servidor no WSL) — o nginx escuta só em localhost e quem
-  entrega o tráfego é o cloudflared; o TLS termina na Cloudflare.
+  vive no contexto http, que é compartilhado por todos os projetos do
+  servidor, e dois arquivos declarando `auth` fariam o nginx recusar a recarga
+  inteira com "limit_req_zone auth is already bound".
 #}
-{% set via_cloudflare = (borda | default('letsencrypt')) == 'cloudflare' %}
 {% set zona = vhost_file | regex_replace('\.conf$', '') | regex_replace('[^a-zA-Z0-9]', '_') %}
 {% macro comum() %}
     # 429 e não o 503 padrão: a semântica é "você excedeu", não "eu caí", e o
     # frontend já sabe ler 429.
     #
-    # Dentro do server, e não no topo do arquivo: staging e produção moram na
-    # mesma VPS, e no nível http a diretiva duplicaria entre os dois vhosts —
+    # Dentro do server, e não no topo do arquivo: vários projetos dividem este
+    # nginx, e no nível http a diretiva duplicaria entre os vhosts —
     # "limit_req_status directive is duplicate", e o nginx recusa a
     # configuração inteira. As zonas não têm esse problema porque o nome delas
     # leva o vhost.
@@ -34,8 +31,8 @@
     client_max_body_size 24m;
 
     # O default do nginx (60s) é bem menor do que a importação de edital
-    # legitimamente leva: OCR mais as chamadas do Gemini, numa VPS com menos
-    # CPU que a máquina de desenvolvimento, passa de um minuto sem drama. O
+    # legitimamente leva: OCR mais as chamadas do Gemini passam de um minuto
+    # sem drama. O
     # nginx do container do frontend já espera 300s pelo mesmo motivo (ver
     # frontend/nginx.conf) — igualar aqui é o que impede a BORDA de cortar a
     # conexão primeiro e entregar um 504 ao navegador com a importação ainda
@@ -45,8 +42,8 @@
     proxy_read_timeout 300s;
 {% endmacro %}
 {% macro cabecalhos_tls() %}
-    # HSTS só sob TLS: anunciar a política num vhost que atende em texto claro
-    # não faz sentido, e o navegador ignora.
+    # O visitante sempre chega por HTTPS (a Cloudflare termina o TLS), então a
+    # política de HSTS vale mesmo com o túnel entregando em http aqui.
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
@@ -76,9 +73,9 @@
         # primeiro da lista e trocaria de identidade a cada requisição —
         # justamente a identidade que o limitador do backend usa para contar.
         proxy_set_header X-Forwarded-For $remote_addr;
-        # Atrás do túnel a conexão até aqui é http; o protocolo do visitante é o
-        # que a Cloudflare informa.
-        proxy_set_header X-Forwarded-Proto {{ '$http_x_forwarded_proto' if via_cloudflare else '$scheme' }};
+        # A conexão até aqui é http; o protocolo do visitante é o que a
+        # Cloudflare informa.
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
 {% endmacro %}
 {% macro rotas() %}
     # Autenticação é onde a força bruta bate, e o único lugar em que uma rajada
@@ -105,7 +102,6 @@
 limit_req_zone $binary_remote_addr zone=geral_{{ zona }}:10m rate=240r/m;
 limit_req_zone $binary_remote_addr zone=auth_{{ zona }}:5m rate=20r/m;
 
-{% if via_cloudflare %}
 server {
     # Aceita qualquer nome: só o cloudflared chega aqui, e quem decide que
     # domínio aponta para o túnel é o painel da Cloudflare.
@@ -124,36 +120,3 @@ server {
 {{ cabecalhos_tls() }}
 {{ rotas() }}
 }
-{% else %}
-server {
-    listen 80;
-    listen [::]:80;
-    server_name {{ app_domain }} {{ app_domain_www }};
-
-{% if letsencrypt_cert_exists %}
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    server_name {{ app_domain }} {{ app_domain_www }};
-
-    ssl_certificate     /etc/letsencrypt/live/{{ app_domain }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{ app_domain }}/privkey.pem;
-{{ comum() }}
-{{ cabecalhos_tls() }}
-{{ rotas() }}
-}
-{% else %}
-{{ comum() }}
-{{ rotas() }}
-}
-{% endif %}
-{% endif %}

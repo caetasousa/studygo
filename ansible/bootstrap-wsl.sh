@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Prepara a distro do WSL que faz de servidor para o Ansible entrar nela.
 #
-# É o bootstrap.yml deste tipo de servidor. Não é um playbook porque o
-# Ansible entra por SSH — e é justamente o SSH que este script cria. Na VPS o
-# provedor entregava um root por SSH; aqui o equivalente é `wsl.exe -u root`.
-# Todo o resto (Docker rootless, nginx, túnel) é do site.yml.
+# Não é um playbook porque o Ansible entra por SSH — e é justamente o SSH que
+# este script cria. O acesso de root vem do `wsl.exe -u root`. Todo o resto
+# (Docker rootless, nginx, túnel) é do site.yml.
 #
 # Idempotente: rodar de novo num servidor pronto não muda nada, e o script
 # diz o que mudou. Uso, a partir da distro de desenvolvimento:
@@ -94,8 +93,7 @@ if ! id "$usuario" >/dev/null 2>&1; then
 fi
 id -nG "$usuario" | grep -qw sudo || { usermod -aG sudo "$usuario"; feito "$usuario no grupo sudo"; }
 
-# O Ansible do site.yml instala pacotes e serviços: sudo sem senha, como o
-# bootstrap.yml faz na VPS.
+# O Ansible do site.yml instala pacotes e serviços: sudo sem senha.
 if grava "/etc/sudoers.d/$usuario" "$usuario ALL=(ALL) NOPASSWD:ALL"; then
 	chmod 440 "/etc/sudoers.d/$usuario"
 	visudo -cf "/etc/sudoers.d/$usuario" >/dev/null
@@ -123,5 +121,5 @@ done
 if [ "$mudou" = 0 ]; then
 	echo "nada a mudar: o servidor já está como este script descreve"
 else
-	echo "$mudou mudança(s). Próximo passo: ansible-playbook site.yml -i inventory/<ambiente>/hosts.ini"
+	echo "$mudou mudança(s). Próximo passo: make provision"
 fi

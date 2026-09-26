@@ -1,16 +1,13 @@
 # O repositório é público: inventários reais carregam IP de servidor e
-# secrets.yml carrega credenciais. Só os *.example são versionados.
+# secrets.yml carrega credenciais. Só os *.example são versionados — em
+# qualquer nível do inventário, para que um arquivo antigo esquecido na
+# máquina de alguém nunca apareça como "não rastreado".
 .env
 *.retry
 .vault_pass
 
-# As duas primeiras linhas guardam o que sobrou do formato antigo de
-# inventário (um só, sem ambiente) na máquina de quem provisionou antes dele.
-inventory/hosts.ini
-inventory/group_vars/vps/secrets.yml
+hosts.ini
+!hosts.ini.example
 
-inventory/*/hosts.ini
-!inventory/*/hosts.ini.example
-
-inventory/*/group_vars/app/secrets.yml
-!inventory/*/group_vars/app/secrets.yml.example
+secrets.yml
+!secrets.yml.example

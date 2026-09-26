@@ -1,26 +1,23 @@
 ---
 # Promove um artefato já construído e testado pela pipeline. Este playbook NÃO
 # compila nada: recebe digests imutáveis, faz pull deles do Registry e sobe a
-# stack. Se ele pudesse construir, o que roda em produção deixaria de ser
+# stack. Se ele pudesse construir, o que roda no servidor deixaria de ser
 # necessariamente o que passou nos testes.
 #
 # Uso (a pipeline preenche isto; veja templates/app-pipeline.yml):
-#   ansible-playbook deploy.yml -i inventory/production/hosts.ini \
+#   ansible-playbook deploy.yml -i inventory/staging/hosts.ini \
 #     -e "backend_image=registry.gitlab.com/.../backend@sha256:..." \
 #     -e ...
 - name: Deploy studygo (backend + worker + frontend)
   hosts: app
-  # No servidor do WSL o Docker é o do usuário de deploy (rootless): o deploy
-  # roda como ele, sem root, falando com o daemon dele.
-  become: "{{ not (docker_rootless | default(false)) }}"
+  # O Docker é o do usuário de deploy (rootless): o deploy roda como ele, sem
+  # root, falando com o daemon dele.
+  become: false
   gather_facts: false
   environment: "{{ docker_env | default({}) }}"
 
   vars:
-    # Diretório da stack em execução na VPS. Ainda /opt/annygo em produção, do
-    # nome antigo do projeto: mudar aqui implantaria num diretório novo e vazio,
-    # deixando a stack antiga rodando com os dados.
-    remote_app_dir: "{{ app_dir | default('/opt/annygo') }}"
+    remote_app_dir: "{{ app_dir }}"
     previous_state_file: "{{ remote_app_dir }}/.deploy-anterior"
     backup_dir: "{{ remote_app_dir }}/backups"
 
@@ -30,13 +27,10 @@
     # reexecuta o job da versão antiga, e com ele volta a tag antiga.
     app_versao: "{{ lookup('env', 'CI_COMMIT_TAG') or lookup('env', 'CI_COMMIT_SHORT_SHA') or 'desconhecida' }}"
 
-    # Onde conferir se a aplicação subiu. Na VPS, pelo domínio, do runner: é o
-    # caminho do usuário, com TLS e nginx. Atrás do túnel, no próprio servidor,
-    # pelo nginx em localhost — o mesmo que o cloudflared usa —, para o deploy
-    # não depender de DNS nem do painel da Cloudflare.
-    via_cloudflare: "{{ (borda | default('letsencrypt')) == 'cloudflare' }}"
-    health_url: "{{ ('http://127.0.0.1:' ~ nginx_porta) if via_cloudflare | bool else ('https://' ~ app_domain) }}/health"
-    health_delegate: "{{ inventory_hostname if via_cloudflare | bool else 'localhost' }}"
+    # Onde conferir se a aplicação subiu: no próprio servidor, pelo nginx em
+    # localhost — o mesmo caminho do cloudflared —, para o deploy não depender
+    # de DNS nem do painel da Cloudflare.
+    health_url: "http://127.0.0.1:{{ nginx_porta }}/health"
 
   pre_tasks:
     # Digest, não tag. Uma tag pode ser reapontada; o digest identifica bytes.
@@ -64,13 +58,11 @@
       ansible.builtin.ping:
 
     - name: Descobrir o daemon Docker do usuário de deploy (rootless)
-      when: docker_rootless | default(false)
       ansible.builtin.command: id -u
       register: uid_deploy
       changed_when: false
 
     - name: Apontar o Docker para o daemon rootless
-      when: docker_rootless | default(false)
       ansible.builtin.set_fact:
         docker_env:
           DOCKER_HOST: "unix:///run/user/{{ uid_deploy.stdout }}/docker.sock"
@@ -90,9 +82,8 @@
     # migrations no boot, e rollback de código não desfaz schema. Se a versão
     # nova trouxer uma migration destrutiva, é deste arquivo que se volta.
     #
-    # Nos dois ambientes, não só em produção: assim o passo roda em staging a
-    # cada push e chega a produção já exercitado — o mesmo motivo de staging
-    # vir primeiro.
+    # A cada deploy: assim o passo é exercitado a cada push, e não só no dia
+    # em que a cópia for necessária.
     - name: Ver se há um banco de pé para copiar
       ansible.builtin.command: docker compose ps --status running --services
       args:
@@ -214,7 +205,6 @@
           delay: 5
           register: health
           until: health.status == 200
-          delegate_to: "{{ health_delegate }}"
           become: false
 
         - name: Confirmar a versão implantada
@@ -268,7 +258,6 @@
           until: health_rollback.status == 200
           when: anterior.stat.exists
           failed_when: false
-          delegate_to: "{{ health_delegate }}"
           become: false
 
         - name: Encerrar a sessão do Registry
@@ -277,8 +266,8 @@
           failed_when: false
 
         # O job precisa terminar vermelho: um rollback bem-sucedido conserta o
-        # ambiente, não a versão. Se o playbook saísse verde, a pipeline seguiria
-        # para produção com um artefato que já falhou em homologação.
+        # ambiente, não a versão. Se o playbook saísse verde, a pipeline daria
+        # por publicado um artefato que falhou.
         - name: Falhar o deploy mesmo com o rollback feito
           ansible.builtin.fail:
             msg: >-

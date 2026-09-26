@@ -15,7 +15,7 @@ Página para visualizar: https://claude.ai/artifact/NAoePLNHEiHicrravEGhYy
 | 1 · Captura | ✅ CF/88, Lei 16.168, LGPD e Marco Civil capturadas **com conferência do Gemini**, texto conferido com o original; faltam os links da Constituição de Goiás e do Regimento Interno |
 | 2 · Leitura no app | ✅ migration 000008, importação pela tela (qualquer conta logada, por ora), menu Legislação, leitor com sumário e link direto; E2E L1–L10 verdes |
 | 3 · Questões A | ✅ 228 questões em 22 unidades (CF 48, Lei 16.168 133, LGPD 22, Marco Civil 25), validadas por `make leis-validar` |
-| 4 · Produção | ⏳ com você: commit, `make push`, conferir em staging, `make release`, importar (roteiro em `docs/deploy.md`) |
+| 4 · No ar | ⏳ código publicado no servidor; falta importar os pacotes pela tela (roteiro em `docs/deploy.md`) |
 | 5 · B e C | ⏳ com você: preencher `link` no `normas.toml`; a captura e o pacote de só leitura já funcionam |
 
 O que mudou em relação ao desenho abaixo: o catálogo é TOML (a biblioteca
@@ -136,12 +136,13 @@ Feitas pelo Claude Code, na sua máquina.
 **Pronto quando:** todas as unidades A com questões validadas e os cenários L
 de resposta verdes.
 
-## Fase 4 — Produção · fim da semana 4
+## Fase 4 — No ar · fim da semana 4
 
 - `make leis-pacote` → commit → `make push` → pipeline (com o job `e2e`) →
-  staging: importar o pacote e conferir → `make release` → produção: importar.
+  servidor: importar o pacote e conferir. (Desde 25/09/2026 há um servidor
+  só; não há produção separada nem `make release`.)
 
-**Pronto quando:** as normas A com questões no ar em produção.
+**Pronto quando:** as normas A com questões no ar no servidor.
 
 ## Fase 5 — Normas B e C · conforme você informar os links
 

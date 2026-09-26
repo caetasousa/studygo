@@ -66,8 +66,8 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
 | 🤖 | **Gemini API** | importação opcional do concurso a partir do edital (`GEMINI_API_KEY`) |
 | 🔔 | **worker** | `cmd/worker` — lembretes diários de revisão espaçada |
 | 🐳 | **Docker Compose** | `postgres + backend + worker + frontend`, com **hot reload** no desenvolvimento |
-| 🌐 | **nginx + Let's Encrypt** | reverse proxy de borda + HTTPS na VPS |
-| 📕 | **Ansible** | provisiona a VPS e faz o deploy (imagens buildadas localmente e enviadas prontas) |
+| 🌐 | **nginx + Cloudflare Tunnel** | reverse proxy no servidor; HTTPS e acesso público pelo túnel, sem porta aberta |
+| 📕 | **Ansible** | provisiona o servidor e promove as imagens que a pipeline construiu e testou |
 
 ---
 
@@ -109,14 +109,81 @@ rebuild — o `docker-compose.override.yml` é carregado sozinho pelo Compose e
 aponta frontend e backend para os estágios `dev`. `--build` só quando mudar
 dependência.
 
+## 🛠️ Comandos (`make`)
+
+Todo atalho do projeto é um alvo do `Makefile`. `make` sozinho lista os alvos
+com a descrição de uma linha que fica no próprio Makefile — se esta tabela e
+ele discordarem, vale o Makefile.
+
+### Rodar na sua máquina
+
+| Comando | O que faz |
+|---|---|
+| `make up` | sobe o app inteiro no Docker (banco, backend, worker, frontend e processador de editais) com hot reload: salvou o arquivo, a mudança aparece sem rebuild |
+| `make down` | para o app local; os dados do banco continuam |
+| `make restart` | reinicia todos os serviços, ou só um: `make restart svc=backend` |
+| `make logs` | acompanha os logs ao vivo; `svc=backend` para ver um serviço só |
+| `make ps` | mostra quais containers estão rodando |
+| `make rebuild` | reconstrói as imagens e sobe; use quando mudar uma dependência (go.mod, package.json, pyproject) |
+| `make reset` | ⚠️ derruba tudo **apagando o banco local** e sobe de novo, vazio |
+| `make prod-local` | sobe as imagens de produção na sua máquina, sem hot reload — para ver o app como ele roda no servidor |
+
+### Conferir antes de commitar
+
+| Comando | O que faz |
+|---|---|
+| `make check` | roda as três verificações abaixo; é o que a pipeline roda. Não precisa de Docker |
+| `make check-backend` | Go: compila, `go vet` e os testes |
+| `make check-frontend` | frontend: `svelte-check` (tipos) e os testes do vitest |
+| `make check-processor` | processador de editais: ruff, mypy estrito e pytest |
+| `make check-db` | testes que precisam de PostgreSQL de verdade (migrations, repositórios); sobe um banco descartável por teste e nunca toca o seu. Exige Docker |
+| `make e2e` | o app inteiro pelo navegador (Playwright), num stack isolado e com banco vazio. Cada teste cobre um item de `e2e/CENARIOS.md`, e o relatório com um print por cenário fica em `e2e/relatorio/`. Exige Docker; `MANTER=1 make e2e` deixa o stack de pé para investigar |
+| `make fmt` | formata o código Go (gofmt) e o Python (ruff format) |
+| `make lint` | lint do backend com o golangci-lint (fora do `check` de propósito) |
+| `make cobertura` | cobertura dos testes do backend, incluindo os de integração. Exige Docker |
+| `make seguranca` | procura vulnerabilidades conhecidas nas dependências dos três serviços (govulncheck, npm audit, pip-audit); depende da rede |
+
+### Legislação
+
+| Comando | O que faz |
+|---|---|
+| `make leis-capturar slug=cf88` | baixa a lei da fonte oficial, separa texto vigente, redação anterior e notas, e organiza em artigos e incisos em `conteudo/leis/<slug>/`. `prioridade=A` captura todas as normas A de `normas.toml`; `sem_gemini=1` dispensa a conferência do Gemini |
+| `make leis-validar` | confere as questões escritas sobre as leis exatamente como a importação vai conferir; `atualizar=1` preenche o hash das unidades novas |
+| `make leis-pacote` | monta em `conteudo/leis/pacotes/` o arquivo que se importa em **Legislação → Importar lei**; `slug=…` para uma lei só |
+
+### Git e publicação
+
+| Comando | O que faz |
+|---|---|
+| `make status` | `git status` resumido |
+| `make commit m="tipo(escopo): mensagem"` | roda o `make check` e, passando, commita **só o que você já pôs no stage** (não faz `git add` sozinho) |
+| `make push` | envia o branch ao GitLab — o que dispara a pipeline e, na `main`, o deploy no servidor — e ao espelho do GitHub |
+| `make deploy` | não implanta nada: explica que o deploy é só pela pipeline e sai com erro |
+
+### Servidor
+
+O servidor é a distro `ubuntu-server` do WSL desta máquina, publicada por um
+túnel da Cloudflare ([docs/deploy.md](docs/deploy.md),
+[docs/cloudflare-tunnel.md](docs/cloudflare-tunnel.md)). Um ambiente só; a
+aplicação chega lá só pela pipeline.
+
+| Comando | O que faz |
+|---|---|
+| `make servidor-endereco` | mostra o endereço público atual (`*.trycloudflare.com`), que muda a cada reinício do túnel |
+| `make servidor-health` | consulta o `/health` no servidor e pelo endereço público: responde? que versão e que schema estão no ar? |
+| `make servidor-status` | lista os containers da aplicação no servidor (o Docker rootless do usuário `studygo`) |
+| `make servidor-logs svc=backend` | últimas linhas de log de um serviço no servidor; sem `svc`, de todos |
+| `make provision` | reaplica a infraestrutura do servidor com o Ansible (Docker rootless, nginx, túnel); `tags=nginx` para uma parte só. Nunca publica a aplicação |
+
 ## 📚 Documentação
 
 | | Documento | Para quê |
 |---|---|---|
 | 🐣 | **[docs/como-funciona.md](docs/como-funciona.md)** | **comece por aqui** — o projeto explicado sem jargão |
 | 📐 | **[docs/arquitetura.md](docs/arquitetura.md)** | camadas, modelo de dados, contrato HTTP e vocabulário |
-| 🔄 | **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** | o caminho de uma mudança: `check` → `commit` → `deploy` |
+| 🔄 | **[docs/fluxo-de-trabalho.md](docs/fluxo-de-trabalho.md)** | o caminho de uma mudança: `check` → `commit` → `push` |
 | 🚀 | **[docs/rodar-local.md](docs/rodar-local.md)** | rodar localmente, `.env`, hot-reload, checagens |
-| 🚢 | **[docs/deploy.md](docs/deploy.md)** | provisionar a VPS pela primeira vez (Ansible) |
+| 🚢 | **[docs/deploy.md](docs/deploy.md)** | o servidor no WSL: montar do zero e manter (Ansible) |
+| ☁️ | **[docs/cloudflare-tunnel.md](docs/cloudflare-tunnel.md)** | o túnel da Cloudflare: como foi montado, endereço fixo, problemas |
 | 🔁 | **[docs/ci-cd.md](docs/ci-cd.md)** | a esteira: publicar, promover por digest e voltar atrás |
 | 🤖 | **[CLAUDE.md](CLAUDE.md)** | convenções para contribuir (e para a IA seguir) |

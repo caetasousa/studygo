@@ -7,7 +7,7 @@
 - `backend/`: API Go e worker.
 - `frontend/`: SPA SvelteKit/Svelte 5.
 - `edital-processor/`: serviço interno Python/FastAPI para processar editais.
-- `ansible/`: provisionamento e deploy da VPS.
+- `ansible/`: provisionamento e deploy do servidor (WSL + túnel da Cloudflare).
 
 O backend utiliza um único hexágono. Não introduza bounded contexts, ORM,
 frameworks ou novas camadas arquiteturais sem apresentar uma necessidade
@@ -25,7 +25,8 @@ Evite duplicar informações destes arquivos:
 | 📐 | `docs/arquitetura.md` | decisões estruturais, modelo de dados e vocabulário |
 | 🚀 | `docs/rodar-local.md` | ambiente local e variáveis |
 | 🔄 | `docs/fluxo-de-trabalho.md` | desenvolvimento, checks e commits |
-| 🚢 | `docs/deploy.md` | VPS, Ansible e produção |
+| 🚢 | `docs/deploy.md` | o servidor no WSL e o Ansible |
+| ☁️ | `docs/cloudflare-tunnel.md` | o túnel da Cloudflare |
 | 🔁 | `docs/ci-cd.md` | pipeline, runners, digest e rollback |
 | 📌 | manifests, lockfiles, Dockerfiles | versões das dependências |
 
@@ -170,50 +171,44 @@ com `ATUALIZAR_CONTRATO=1 go test ./internal/adapter/httpapi` e diga no commit
 qual campo mudou e por quê — o frontend depende disso.
 
 > [!CAUTION]
-> `make reset` apaga o banco local. `make provision`, `bootstrap.yml` e
-> `lockdown.yml` afetam dados ou infraestrutura: execute somente mediante
-> pedido explícito.
+> `make reset` apaga o banco local. `make provision` e `ansible/bootstrap-wsl.sh`
+> afetam dados ou infraestrutura: execute somente mediante pedido explícito.
 
 ## 🚢 Deploy
 
-> [!IMPORTANT]
-> **Desde 25/09/2026 só existe o ambiente da esteira (`staging`).** A VPS foi
-> suspensa; o servidor é a distro `ubuntu-server` do WSL desta máquina,
-> publicada por um túnel da Cloudflare (ver `docs/deploy.md`). "Mandar para
-> produção" hoje é `make push` na `main`. Não rode `make release` nem crie tag
-> sem pedido explícito — não há `deploy_production` para onde ela vá.
+**Há um ambiente só**, que a esteira chama de `staging`: a distro
+`ubuntu-server` do WSL desta máquina, publicada por um túnel da Cloudflare
+(`docs/deploy.md`, `docs/cloudflare-tunnel.md`). Não há produção, VPS nem tag
+de versão: "mandar para produção" é `make push` na `main`. Não crie tag.
 
-**Todo deploy passa pela pipeline do GitLab, sempre nesta ordem: staging
-primeiro, produção depois. Nunca direto.**
-
-- `staging` recebe o push na `main`, automaticamente — depois de o job `e2e`
-  passar contra as imagens daquele build.
-- `produção` só é liberada por tag, com aprovação manual na pipeline, e só
-  depois de o `smoke_test` de staging passar. A tag é a data (`v2026.09.12`) e
-  quem a cria é o `make release`, nunca um `git tag` à mão.
+- O push na `main` implanta automaticamente — depois de o job `e2e` passar
+  contra as imagens daquele build, e seguido do `smoke_test`.
 - Não existe caminho manual. Não crie um: nem alvo de Makefile, nem script,
   nem `ansible-playbook deploy.yml` na mão. Se aparecer um, remova.
 - O Ansible não constrói nada — ele promove digests que a pipeline já testou.
   Compilar na máquina de quem publica desfaz a garantia de que o que subiu é
   o que passou nos testes.
+- Mudança no servidor (pacote, serviço, configuração) é código versionado em
+  `ansible/`, aplicado com `make provision` — nunca um comando solto nele.
 
-Precisa de uma correção urgente em produção? Ela também passa por staging.
 Para voltar atrás sem esperar, use o **Rollback environment** do GitLab
-(Operate → Environments → production), que reexecuta o `deploy_production` de
-uma versão anterior com os digests dela, sem reconstruir. O `rollback_production`
-do template fica desligado no `.gitlab-ci.yml` — não o religue.
+(Operate → Environments → staging), que reexecuta o `deploy_staging` de uma
+pipeline anterior com os digests dela, sem reconstruir. Os jobs de produção do
+template (`deploy_production`, `verify`, `rollback_production`) ficam
+desligados no `.gitlab-ci.yml` — não os religue.
 
-## 🔐 Segurança e produção
+## 🔐 Segurança e servidor
 
 > [!CAUTION]
 > O repositório é **público**. Nunca exponha credenciais, tokens, chaves
 > privadas, arquivos `.env`, inventários privados, IPs de acesso ou artefatos
 > pessoais. O domínio público da aplicação pode ser versionado.
 
-No servidor atual (WSL), o usuário de deploy é `studygo` — um por projeto.
-A VPS de produção (suspensa) utilizava nomes legados `annyGo`, incluindo usuário SSH, chave,
-diretório, vhost e identidade do PostgreSQL. Não os renomeie como parte de uma
-refatoração comum e nunca sobrescreva `~/.ssh/annygo_deploy`.
+No servidor, o usuário de deploy é `studygo` — um por projeto, com o seu
+Docker rootless; um projeto novo ganha o seu usuário. A chave da esteira é
+`~/.ssh/studygo_ci`: nunca a sobrescreva. Não instale firewall nem o Docker de
+sistema na `ubuntu-server`: a rede do WSL2 é a mesma da distro de
+desenvolvimento.
 
 Não faça upgrades major de runtime, banco ou sistema operacional como trabalho
 incidental. Quando um upgrade fizer parte da tarefa, verifique compatibilidade

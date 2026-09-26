@@ -9,9 +9,4 @@ collections:
   - name: community.docker
     version: ">=3.13.0"
 
-  # ufw: usado pela role common para o firewall da VPS.
-  - name: community.general
-    version: ">=9.0.0"
 
-  - name: ansible.posix
-    version: ">=1.5.0"

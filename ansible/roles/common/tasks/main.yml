@@ -13,19 +13,9 @@
     name:
       - curl
       - git
-      # A VPS passa semanas sem ninguém olhando: correção de segurança do
+      # O servidor passa semanas sem ninguém olhando: correção de segurança do
       # sistema entra sozinha.
       - unattended-upgrades
-    state: present
-
-# O fail2ban já sobe vigiando o SSH ao ser instalado, e os bloqueios dele vão
-# para o iptables — que no servidor do WSL é o da máquina de desenvolvimento.
-- name: Install firewall packages (servidor com IP público)
-  when: firewall_local | default(true)
-  apt:
-    name:
-      - ufw
-      - fail2ban
     state: present
 
 - name: Apply security updates automatically
@@ -36,52 +26,7 @@
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
 
-# Firewall e fail2ban só num servidor com IP público. No servidor do WSL
-# (borda: cloudflare) a rede é a MESMA da distro de desenvolvimento: um ufw
-# com "deny by default" fecharia o desenvolvimento e o runner da esteira, e
-# nada precisa entrar de fora — o cloudflared sai para a Cloudflare.
-- name: Firewall e bloqueio de força bruta (servidor com IP público)
-  when: firewall_local | default(true)
-  block:
-    # Só o SSH: a borda já tem limite de requisição por IP, e banir ali pelo
-    # nginx levaria junto quem está atrás do mesmo NAT.
-    - name: Ban repeated SSH failures
-      copy:
-        dest: /etc/fail2ban/jail.d/sshd.local
-        mode: '0644'
-        content: |
-          [sshd]
-          enabled = true
-          maxretry = 5
-          findtime = 10m
-          bantime = 1h
-      notify: restart fail2ban
-
-    - name: Ensure fail2ban is enabled and running
-      systemd:
-        name: fail2ban
-        enabled: true
-        state: started
-
-    - name: Allow SSH through firewall
-      ufw:
-        rule: allow
-        port: '22'
-        proto: tcp
-
-    - name: Allow HTTP through firewall
-      ufw:
-        rule: allow
-        port: '80'
-        proto: tcp
-
-    - name: Allow HTTPS through firewall
-      ufw:
-        rule: allow
-        port: '443'
-        proto: tcp
-
-    - name: Enable firewall (deny by default)
-      ufw:
-        state: enabled
-        policy: deny
+# Sem firewall local, de propósito: a rede do WSL2 é a mesma para todas as
+# distros, e um ufw com "deny by default" aqui fecharia a distro de
+# desenvolvimento e o runner da esteira. Nada precisa entrar de fora — o
+# cloudflared só faz conexões de saída.
