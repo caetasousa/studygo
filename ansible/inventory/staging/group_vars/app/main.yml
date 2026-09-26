@@ -25,12 +25,21 @@ vhost_file: studygo-staging.conf
 # rede das duas. Daí o Docker do usuário de deploy, sem firewall local, e a
 # borda pelo cloudflared — nenhuma porta aberta para fora.
 docker_rootless: true
-deploy_user: annyGo
+# Um usuário por projeto no servidor: com o Docker rootless, cada usuário tem
+# o próprio daemon, os próprios volumes e as próprias imagens — outro projeto
+# neste mesmo servidor não enxerga nem derruba este. (Na VPS era annyGo, do
+# nome antigo do projeto; aqui não há legado a preservar.)
+deploy_user: studygo
+# Nome dos recursos do servidor que são por projeto (o serviço do endereço
+# temporário, por exemplo).
+projeto: studygo
 firewall_local: false
 borda: cloudflare
-# Onde o nginx escuta e para onde o túnel aponta (painel da Cloudflare:
-# Public Hostname → HTTP → localhost:8480).
-nginx_listen: 127.0.0.1:8480
+# A porta do nginx. O túnel aponta para localhost:8480 (painel da Cloudflare:
+# Route → HTTP → localhost:8480); o smoke_test da esteira, num container do
+# runner, chega por 172.17.0.1:8480. Escutar em todas as interfaces não expõe
+# nada fora do PC: o WSL em modo NAT não publica porta na rede local.
+nginx_porta: 8480
 # Sem domínio próprio (os de caetasousa.tech se foram com a VPS): o endereço
 # público é um *.trycloudflare.com que muda a cada reinício do serviço — veja
 # com `make servidor-endereco`. Com um domínio na Cloudflare, aponte-o para o

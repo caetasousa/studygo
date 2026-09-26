@@ -4,7 +4,7 @@
 # porta aberta para fora, e o HTTPS fica com a Cloudflare.
 #
 # O túnel é criado no painel da Cloudflare (Zero Trust → Networks → Tunnels),
-# que dá o token e onde se aponta o domínio para http://{{ nginx_listen }}.
+# que dá o token e onde se aponta o domínio para http://localhost:{{ nginx_porta }}.
 # O token fica em cloudflared_token, no secrets.yml do ambiente (Vault).
 - name: Chave do repositório da Cloudflare
   get_url:
@@ -52,16 +52,16 @@
 - name: Serviço do endereço temporário (trycloudflare)
   when: cloudflared_rapido | default(false)
   copy:
-    dest: /etc/systemd/system/cloudflared-rapido.service
+    dest: /etc/systemd/system/cloudflared-{{ projeto }}.service
     mode: '0644'
     content: |
       [Unit]
-      Description=Quick Tunnel da Cloudflare para o nginx do studygo
+      Description=Quick Tunnel da Cloudflare para o nginx do {{ projeto }}
       After=network-online.target nginx.service
       Wants=network-online.target
 
       [Service]
-      ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://{{ nginx_listen }}
+      ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:{{ nginx_porta }}
       Restart=on-failure
       RestartSec=5s
 
@@ -72,7 +72,7 @@
 - name: Manter o endereço temporário de pé
   when: cloudflared_rapido | default(false)
   systemd:
-    name: cloudflared-rapido
+    name: cloudflared-{{ projeto }}
     enabled: true
     state: "{{ 'restarted' if unidade_rapido.changed else 'started' }}"
     daemon_reload: true

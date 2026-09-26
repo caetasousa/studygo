@@ -129,10 +129,10 @@ leis-pacote: ## Monta em conteudo/leis/pacotes/ o que se importa em Legislação
 # ------------------------------------------------------------------- servidor
 
 # O endereço público do servidor no WSL (Quick Tunnel da Cloudflare). Muda a
-# cada reinício do serviço cloudflared-rapido; o log guarda o da vez.
+# cada reinício do serviço cloudflared-studygo; o log guarda o da vez.
 servidor-endereco: ## Mostra o endereço público atual (*.trycloudflare.com) do servidor no WSL
-	@ssh -i ~/.ssh/annygo_deploy -p 2222 annyGo@127.0.0.1 \
-		"sudo journalctl -u cloudflared-rapido --no-pager -o cat | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1" \
+	@ssh -i ~/.ssh/studygo_ci -p 2222 studygo@127.0.0.1 \
+		"sudo journalctl -u cloudflared-studygo --no-pager -o cat | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1" \
 		|| echo "servidor fora do ar? confira: wsl.exe -l -v"
 
 # Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um

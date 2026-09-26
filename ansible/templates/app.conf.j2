@@ -109,10 +109,10 @@ limit_req_zone $binary_remote_addr zone=auth_{{ zona }}:5m rate=20r/m;
 server {
     # Aceita qualquer nome: só o cloudflared chega aqui, e quem decide que
     # domínio aponta para o túnel é o painel da Cloudflare.
-    listen {{ nginx_listen }} default_server;
+    listen {{ nginx_porta }} default_server;
     server_name _;
 
-    # Toda conexão chega do cloudflared, em localhost. Sem isto o limitador
+    # O visitante chega pelo cloudflared, em localhost. Sem isto o limitador
     # contaria a internet inteira como um visitante só (127.0.0.1), e o
     # X-Forwarded-For que o backend usa seria o mesmo para todos. O IP do
     # visitante vem no cabeçalho que a Cloudflare põe — e só é aceito de

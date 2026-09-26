@@ -22,6 +22,15 @@ rollback_production:
   rules:
     - when: never
 
+# O smoke_test do template chama um endereço fixo (o staging da VPS, que não
+# existe mais). O servidor agora é a distro ubuntu-server do WSL desta mesma
+# máquina, sem domínio próprio: o job, num container do runner, chega ao nginx
+# dela pela bridge do Docker — o mesmo caminho do SSH do deploy e do registry.
+smoke_test:
+  script:
+    - curl -fsS --retry 5 --retry-delay 4 "http://172.17.0.1:8480/health"
+    - echo "OK - staging respondeu"
+
 # --- E2E ---------------------------------------------------------------------
 # O app inteiro pelo navegador, contra as imagens que o build acabou de fazer:
 # a mesma suíte do `make e2e`, num stack descartável dentro do docker do job

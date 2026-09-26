@@ -47,14 +47,15 @@ do WSL da própria máquina de desenvolvimento, publicado por um **túnel da
 Cloudflare**:
 
 ```
-navegador ─► Cloudflare (HTTPS) ─► cloudflared ─► nginx 127.0.0.1:8480
+navegador ─► Cloudflare (HTTPS) ─► cloudflared ─► nginx :8480
                                    (ubuntu-server)   └─► frontend ─► backend ─► postgres
 ```
 
 Por que é diferente da VPS — **todas as distros do WSL2 dividem a mesma
 rede** (mesmo IP, mesmas portas, mesmo iptables):
 
-- **Docker rootless**, do usuário `annyGo`: um segundo Docker comum brigaria
+- **Docker rootless**, do usuário `studygo` — um usuário por projeto, cada
+  um com o próprio daemon e os próprios volumes. Um segundo Docker comum brigaria
   com o da distro de desenvolvimento pelo `docker0` e pelo iptables. O
   rootless tem rede própria e só publica as portas pedidas, em localhost.
 - **Sem ufw nem fail2ban** (`firewall_local: false`): um "deny by default"
@@ -66,7 +67,7 @@ rede** (mesmo IP, mesmas portas, mesmo iptables):
   localhost); sem isso todo mundo contaria como 127.0.0.1 no limite de taxa.
 - **Só no ar com o PC ligado** e a distro de pé.
 - **Endereço temporário.** Sem domínio próprio, o público entra por um Quick
-  Tunnel (`*.trycloudflare.com`, serviço `cloudflared-rapido`), que muda a
+  Tunnel (`*.trycloudflare.com`, serviço `cloudflared-studygo`), que muda a
   cada reinício — `make servidor-endereco` mostra o da vez. O túnel com token
   (`cloudflared_token`) já está conectado e espera um domínio na Cloudflare
   apontado para `localhost:8480`.
@@ -74,23 +75,27 @@ rede** (mesmo IP, mesmas portas, mesmo iptables):
   não pelo domínio: não depende de DNS nem do painel da Cloudflare.
 
 Tudo isso está no inventário (`inventory/staging/group_vars/app/main.yml`:
-`docker_rootless`, `borda: cloudflare`, `firewall_local`, `nginx_listen`) e o
+`docker_rootless`, `borda: cloudflare`, `firewall_local`, `nginx_porta`) e o
 `site.yml` escolhe os papéis por ele.
 
 ### Montar do zero
 
 ```bash
-# 1. uma vez, como root na distro (sshd na 2222 e o usuário de deploy):
-#    wsl.exe -d ubuntu-server -u root   → openssh-server, usuário annyGo com
-#    sudo sem senha, ~/.ssh/annygo_deploy.pub e ~/.ssh/studygo_ci.pub em
-#    authorized_keys, sshd só por chave e ssh.socket na 2222 (0.0.0.0 e [::])
+# 1. como root na distro (o "root por SSH" que o provedor dava na VPS):
+#    pacotes, sshd na 2222 só por chave, e o usuário de deploy do projeto com
+#    a chave da esteira. Idempotente; usuários a remover vão no fim.
+wsl.exe -d ubuntu-server -u root -- bash -s -- \
+  studygo "$(cat ~/.ssh/studygo_ci.pub)" \
+  < ansible/bootstrap-wsl.sh
 
 # 2. provisionar, desta distro
 cd ansible
 ssh-keyscan -p 2222 127.0.0.1 >> ~/.ssh/known_hosts
-ansible-playbook site.yml -i inventory/staging/hosts.ini   # hosts.ini: 127.0.0.1, porta 2222
+sed 's/SEU_IP_AQUI/127.0.0.1/' inventory/staging/hosts.ini.example > inventory/staging/hosts.ini
+ansible-playbook site.yml -i inventory/staging/hosts.ini
 
-# 3. túnel: token do painel da Cloudflare em cloudflared_token (secrets.yml, Vault)
+# 3. túnel com token (para um domínio próprio): cloudflared_token no
+#    secrets.yml (Vault), e o playbook de novo
 ansible-vault edit inventory/staging/group_vars/app/secrets.yml
 ansible-playbook site.yml -i inventory/staging/hosts.ini --tags cloudflared
 ```

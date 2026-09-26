@@ -35,7 +35,7 @@
     # pelo nginx em localhost — o mesmo que o cloudflared usa —, para o deploy
     # não depender de DNS nem do painel da Cloudflare.
     via_cloudflare: "{{ (borda | default('letsencrypt')) == 'cloudflare' }}"
-    health_url: "{{ ('http://' ~ nginx_listen) if via_cloudflare | bool else ('https://' ~ app_domain) }}/health"
+    health_url: "{{ ('http://127.0.0.1:' ~ nginx_porta) if via_cloudflare | bool else ('https://' ~ app_domain) }}/health"
     health_delegate: "{{ inventory_hostname if via_cloudflare | bool else 'localhost' }}"
 
   pre_tasks:

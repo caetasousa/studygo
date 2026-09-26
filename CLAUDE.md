@@ -210,7 +210,8 @@ do template fica desligado no `.gitlab-ci.yml` — não o religue.
 > privadas, arquivos `.env`, inventários privados, IPs de acesso ou artefatos
 > pessoais. O domínio público da aplicação pode ser versionado.
 
-A produção ainda utiliza nomes legados `annyGo`, incluindo usuário SSH, chave,
+No servidor atual (WSL), o usuário de deploy é `studygo` — um por projeto.
+A VPS de produção (suspensa) utilizava nomes legados `annyGo`, incluindo usuário SSH, chave,
 diretório, vhost e identidade do PostgreSQL. Não os renomeie como parte de uma
 refatoração comum e nunca sobrescreva `~/.ssh/annygo_deploy`.
 
