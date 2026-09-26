@@ -121,6 +121,19 @@ make servidor-health            # a aplicação responde? que versão está no a
 make servidor-status            # containers
 make servidor-logs svc=backend  # logs
 make servidor-endereco          # o endereço público da vez
+make servidor-desligar          # para o app, o Docker, o nginx e o túnel
+make servidor-ligar             # religa tudo e mostra o endereço novo
+```
+
+Desligar não encerra a distro, de propósito: o kernel do WSL é um só, e o
+desligamento dela desfaz a ponte com o Windows também na distro de
+desenvolvimento (`schtasks.exe` e `wsl.exe` passam a dar "Exec format
+error"). Se isso acontecer, ligar o servidor pelo `make servidor-ligar`
+funciona mesmo assim, e a ponte volta registrando-a de novo pelo servidor:
+
+```bash
+ssh -i ~/.ssh/studygo_ci -p 2222 studygo@127.0.0.1 \
+  "sudo sh -c 'echo \":WSLInterop:M::MZ::/init:PF\" > /proc/sys/fs/binfmt_misc/register'"
 ```
 
 Sem `tags`, o `site.yml` roda tudo, inclusive o `apt upgrade` da role

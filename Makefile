@@ -36,11 +36,13 @@ ANSIBLE_DIR := ansible
 SERVIDOR     := ssh -i ~/.ssh/studygo_ci -p 2222 studygo@127.0.0.1
 SERVIDOR_APP := /opt/studygo-staging
 DOCKER_SRV   := DOCKER_HOST=unix:///run/user/$$(id -u)/docker.sock docker compose -f $(SERVIDOR_APP)/docker-compose.yml
+SERVIDOR_DISTRO := ubuntu-server
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
         check check-backend check-frontend check-processor check-db e2e fmt lint \
         servidor-endereco \
-        status commit push deploy provision servidor-status servidor-logs servidor-health
+        status commit push deploy provision servidor-status servidor-logs servidor-health \
+        servidor-ligar servidor-desligar
 
 help: ## Lista os alvos disponíveis
 	@echo "studygo — make <alvo>"
@@ -221,3 +223,49 @@ servidor-health: ## Diz se o app responde no servidor e pelo endereço público,
 	@url=$$($(MAKE) -s servidor-endereco); \
 	echo "público:  $$url"; \
 	echo "          $$(curl -fsS -m 15 $$url/health 2>/dev/null || echo 'não respondeu')"
+
+# Ligar e desligar o servidor daqui. Desligar para o que gasta recurso — os
+# containers (o Postgres fecha limpo), o Docker rootless, o nginx e o túnel —,
+# e a distro fica ociosa. Encerrar a distro não dá: o kernel do WSL é um só, e o
+# desligamento dela desfaz o binfmt do interop também na distro de
+# desenvolvimento (schtasks.exe e wsl.exe passam a dar "Exec format error").
+# Desligado, o app sai do ar e a esteira não implanta até ele voltar.
+#
+# Ligar religa tudo; se a distro estiver parada (depois de reiniciar o PC), sobe
+# antes pela tarefa agendada studygo-servidor (docs/deploy.md). O start é nos
+# mesmos containers, da versão já implantada: não é um deploy. O schtasks vai
+# pelo /init, a ponte do WSL, chamado direto — funciona mesmo sem o binfmt (o
+# argv[0] vem repetido porque o WSLInterop é registrado com o flag P).
+SCHTASKS = /init /mnt/c/Windows/system32/schtasks.exe schtasks.exe
+servidor-rodando = wsl.exe -l --running -q 2>/dev/null | tr -d '\0\r' | LC_ALL=C grep -qx '$(SERVIDOR_DISTRO)'
+SESSAO_SRV = export XDG_RUNTIME_DIR=/run/user/$$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$$(id -u)/bus
+
+servidor-desligar: ## Para o app, o Docker, o nginx e o túnel do servidor (a distro fica ociosa)
+	@if ! $(servidor-rodando); then echo "a distro do servidor não está rodando: nada a desligar"; exit 0; fi; \
+	echo "parando os containers, o Docker, o nginx e o túnel..."; \
+	$(SERVIDOR) '$(DOCKER_SRV) stop >/dev/null 2>&1; $(SESSAO_SRV); systemctl --user stop docker; sudo systemctl stop nginx cloudflared-studygo' \
+		|| { echo "não consegui parar tudo: make servidor-status"; exit 1; }; \
+	echo "servidor desligado; a distro fica ociosa. Para voltar: make servidor-ligar"
+
+servidor-ligar: ## Liga o servidor, espera o app responder e mostra o endereço público novo
+	@if ! $(servidor-rodando); then \
+		echo "subindo a distro do servidor..."; \
+		for i in 1 2 3 4 5 6; do \
+			$(SCHTASKS) /Run /TN studygo-servidor >/dev/null 2>&1 \
+				|| { echo "a tarefa studygo-servidor não existe no Windows (docs/deploy.md)"; exit 1; }; \
+			sleep 5; if $(servidor-rodando); then break; fi; \
+		done; \
+	fi; \
+	printf 'esperando o servidor'; \
+	for i in $$(seq 1 60); do timeout 5 $(SERVIDOR) true 2>/dev/null && break; printf '.'; sleep 2; done; echo; \
+	$(SERVIDOR) '$(SESSAO_SRV); sudo systemctl start nginx cloudflared-studygo; systemctl --user start docker && $(DOCKER_SRV) start' >/dev/null 2>&1; \
+	printf 'esperando o app'; \
+	for i in $$(seq 1 60); do curl -fsS -m 3 http://127.0.0.1:8480/health >/dev/null 2>&1 && break; printf '.'; sleep 2; done; echo; \
+	curl -fsS -m 5 http://127.0.0.1:8480/health >/dev/null 2>&1 || { echo "o app não respondeu em 2 min: make servidor-status"; exit 1; }; \
+	echo "servidor: $$(curl -fsS -m 5 http://127.0.0.1:8480/health)"; \
+	printf 'esperando o endereço público'; \
+	for i in $$(seq 1 30); do \
+		url=$$($(MAKE) -s servidor-endereco); \
+		curl -fsS -m 10 "$$url/health" >/dev/null 2>&1 && break; printf '.'; sleep 3; \
+	done; echo; \
+	echo "público:  $$url"

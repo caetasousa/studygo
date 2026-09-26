@@ -55,6 +55,12 @@
     - snapd.seeded.service
     # Interface de pacotes do desktop, acordada pelo apt; o Ansible usa o apt direto.
     - packagekit.service
+    # Parado, ele desfaz TODOS os binfmt do kernel — e o kernel é o mesmo da
+    # distro de desenvolvimento, que perde a ponte com o Windows (schtasks.exe,
+    # wsl.exe: "Exec format error"). O servidor não registra binfmt nenhum.
+    # Encerrar a distro ainda desfaz a ponte: por isso o make
+    # servidor-desligar para os serviços e deixa a distro ociosa.
+    - systemd-binfmt.service
     # Só o ajudante de desligamento: as atualizações de segurança continuam,
     # pelo timer apt-daily-upgrade.
     - unattended-upgrades.service
