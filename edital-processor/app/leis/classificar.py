@@ -8,6 +8,7 @@ certeza ("Art. 71." é artigo) e ele discorda, a captura para.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.leis import rotulos
@@ -205,12 +206,18 @@ async def _pedir_lote(provider: LLMProvider, grupo: list[Paragrafo]) -> list[dic
 
 
 async def por_gemini(
-    paragrafos: list[Paragrafo], provider: LLMProvider, lote: int = 150
+    paragrafos: list[Paragrafo],
+    provider: LLMProvider,
+    lote: int = 150,
+    ao_lote: Callable[[int, int], None] | None = None,
 ) -> list[Classe | None]:
     """A classe que o Gemini dá a cada parágrafo vigente; None nos demais."""
     enviados = [p for p in paragrafos if not p.anterior and p.texto]
     tipos: dict[str, str] = {}
-    for inicio in range(0, len(enviados), lote):
+    total = -(-len(enviados) // lote)
+    for n, inicio in enumerate(range(0, len(enviados), lote)):
+        if ao_lote is not None:
+            ao_lote(n, total)
         grupo = enviados[inicio : inicio + lote]
         itens = await _pedir_lote(provider, grupo)
         for item in itens:

@@ -1,7 +1,8 @@
-"""O que tem de ser verdade antes de a captura gravar a lei.
+"""O que tem de ser verdade antes de a lei poder ser publicada.
 
-Cada verificação devolve problemas em português; qualquer problema impede a
-gravação do `lei.json` (o `captura.md` é gravado sempre, com o motivo).
+Cada verificação devolve problemas em português. O salto de numeração
+(`SALTO`) pode ser legítimo — a lei pulou mesmo um número — e vira aviso para a
+pessoa conferir; o resto impede a publicação.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import re
 from app.leis.limpeza import Paragrafo, normalizar, texto_visivel
 from app.leis.montar import Montagem
 
+SALTO = "artigo fora de sequência: "
 _REF_ARTIGO = re.compile(r"^(?:(adct)\.)?art(\d+)(?:-([a-z]{1,2}))?$")
 
 
@@ -53,10 +55,9 @@ def _na_ordem(html: str, paragrafos: list[Paragrafo]) -> list[str]:
     return problemas
 
 
-def _sequencia(montagem: Montagem, aceitar: list[str]) -> list[str]:
+def _sequencia(montagem: Montagem) -> list[str]:
     """Os artigos vigentes crescem de um em um (5, 5-A, 6); um salto só passa
-    se o artigo que falta existe como revogado, ou se foi declarado em
-    `aceitar`.
+    calado se o artigo que falta existe como revogado.
 
     Os revogados ficam fora da ordem de propósito: o Planalto põe o artigo
     incluído por medida provisória e depois revogado onde ele entrou na
@@ -81,21 +82,8 @@ def _sequencia(montagem: Montagem, aceitar: list[str]) -> list[str]:
         cresce = (numero, sufixo) > (n0, s0)
         faltam = [n for n in range(n0 + 1, numero) if (dominio, n) not in revogados]
         if not cresce or faltam:
-            salto = f"{antes[2] if antes else 'início'} → {ref}"
-            if salto not in aceitar:
-                problemas.append(f"artigo fora de sequência: {salto}")
+            problemas.append(f"{SALTO}{antes[2] if antes else 'início'} → {ref}")
         ultimo[dominio] = (numero, sufixo, ref)
-    return problemas
-
-
-def _recorte(montagem: Montagem, recorte: list[str]) -> list[str]:
-    refs = {d.ref for d in montagem.dispositivos}
-    problemas = []
-    for faixa in recorte:
-        for ref in faixa.split("-art") if "-art" in faixa else [faixa]:
-            ref = ref if ref.startswith(("art", "adct")) else f"art{ref}"
-            if ref not in refs:
-                problemas.append(f"o recorte {faixa!r} cita {ref}, que não existe na lei")
     return problemas
 
 
@@ -103,8 +91,6 @@ def verificar(
     html: str | None,
     paragrafos: list[Paragrafo],
     montagem: Montagem,
-    recorte: list[str],
-    aceitar: list[str] | None = None,
 ) -> list[str]:
     problemas = list(montagem.problemas)
     if _sha(texto_remontado(montagem)) != _sha(texto_dos_paragrafos(paragrafos, montagem)):
@@ -114,6 +100,5 @@ def verificar(
         )
     if html is not None:
         problemas.extend(_na_ordem(html, paragrafos))
-    problemas.extend(_sequencia(montagem, aceitar or []))
-    problemas.extend(_recorte(montagem, recorte))
+    problemas.extend(_sequencia(montagem))
     return problemas

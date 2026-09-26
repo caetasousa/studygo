@@ -278,3 +278,22 @@ func TestContratoHTTP_LeituraDaLei(t *testing.T) {
 
 	compararComGolden(t, "leitura_lei.json", forma(t, leituraParaDTO(l)))
 }
+
+// A prévia da captura é o que a tela de Legislação lê para decidir se a lei
+// pode ser publicada e o que a pessoa precisa revisar.
+func TestContratoHTTP_CapturaDaLei(t *testing.T) {
+	c := lei.Captura{
+		ID: "c1", Estado: lei.CapturaPronta, Etapa: "verificando", Feitos: 2, Total: 2,
+		Resultado: &lei.ResultadoDaCaptura{
+			Fonte: "https://www.planalto.gov.br/l1.htm", Gemini: true, Versao: "v1",
+			Dispositivos: []lei.Dispositivo{
+				{Ref: "cap1", Tipo: "capitulo", Rotulo: "CAPÍTULO I", Nome: "DO CONTROLE", Texto: "CAPÍTULO I"},
+				{Ref: "art1", Pai: "cap1", Tipo: "artigo", Rotulo: "Art. 1º", Texto: "Art. 1º Texto."},
+			},
+			Avisos: []lei.Aviso{{ID: "p0003: a regra diz artigo", Texto: "…", Trecho: "Art. 1º Texto."}},
+			Resumo: lei.ResumoDaCaptura{Vigentes: 3, Tipos: map[string]int{"artigo": 1}},
+		},
+	}
+
+	compararComGolden(t, "captura_lei.json", forma(t, capturaParaDTO(c)))
+}

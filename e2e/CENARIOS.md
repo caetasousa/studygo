@@ -67,23 +67,32 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 
 ## L. Legislação
 
-A lei chega por um pacote montado localmente (`conteudo/leis/`, ver
-`PLANO-LEGISLACAO.md`) e importado pela tela. Enquanto o app é de teste,
-qualquer conta logada importa (decisão de 25/09/2026). O stack de E2E importa um
-pacote pequeno e fixo (`e2e/fixtures/lei-exemplo.json`).
+A lei é capturada pela tela: cola-se o link da fonte oficial, o
+`edital-processor` baixa e organiza, e a pessoa revisa a prévia antes de
+publicar. As questões são escritas fora do app e entram pela tela, contra o
+texto já publicado. Enquanto o app é de teste, qualquer conta logada captura e
+importa (decisão de 25/09/2026). No stack de E2E o dublê do processador devolve
+uma lei pequena e fixa (`e2e/fixtures/lei-exemplo.json`) para links do
+Planalto terminados em `e2e/…`.
 
 | id | Como quebra | O que o usuário vê |
 |---|---|---|
-| L1 | o pacote importado não vira uma lei legível, ou chega com o texto diferente do pacote | lei vazia, ou uma palavra da lei trocada |
-| L2 | importar o mesmo pacote de novo duplica a lei, os dispositivos ou as questões | a lei aparece duas vezes, questões repetidas |
-| L3 | uma versão nova da lei apaga as respostas das questões que não mudaram | o progresso volta a zero a cada atualização |
-| L4 | uma conta comum não vê a importação, ou é recusada ao importar | quem testa não consegue publicar uma lei |
+| L1 | a lei capturada e publicada não vira uma lei legível, ou chega com o texto diferente do que o processador leu | lei vazia, ou uma palavra da lei trocada |
+| L2 | publicar a mesma captura (ou a mesma versão) de novo duplica a lei, os dispositivos ou as questões | a lei aparece duas vezes, questões repetidas |
+| L3 | atualizar o texto da lei apaga as questões ou as respostas; ou importar as questões de novo zera as respostas das que não mudaram | o progresso volta a zero a cada atualização |
+| L4 | uma conta comum não vê a captura e a importação, ou é recusada | quem testa não consegue publicar uma lei |
 | L5 | clicar no artigo não traz as questões que o citam, ou traz as de outro artigo | a questão não bate com o que se está lendo |
 | L6 | a resposta não é gravada, ou o gabarito e o trecho não aparecem | responde e não aprende nada |
 | L7 | o selo do artigo e o progresso da unidade não refletem as respostas | não se sabe o que falta nem onde errou |
 | L8 | o link direto para um dispositivo não abre a lei naquele ponto | o cronograma e o caderno não conseguem apontar para o artigo |
 | L9 | o tópico que cita a lei ("nº 16.168") não sugere a lei para a matéria, ou a sugestão confirmada não fica gravada | a lei não aparece no menu Legislação da matéria |
 | L10 | a redação anterior ou as notas de redação se misturam ao texto vigente | o estudante decora um texto revogado |
+| L11 | uma captura com problema que bloqueia (texto que não confere, artigo perdido) pode ser publicada | lei quebrada no catálogo de todos |
+| L12 | um aviso da captura (o Gemini discordou da regra, salto na numeração) é publicado sem a pessoa marcar que revisou, ou não aparece na prévia | a lei entra com um tipo de dispositivo errado que ninguém viu |
+| L13 | um link fora das fontes oficiais é aceito, ou o erro não diz o que fazer | o servidor baixa qualquer coisa; ou a pessoa não sabe por que falhou |
+| L14 | a publicação de uma lei nova com o nome curto de outra sobrescreve a existente | a Constituição some debaixo de uma lei homônima |
+| L15 | importar questões aceita uma questão cujo trecho não está na lei, ou uma unidade escrita para outra redação | questão que a lei não sustenta |
+| L16 | a captura que ainda está rodando trava a tela, ou some se a pessoa esperar | ninguém sabe se terminou |
 
 ## Fora da suíte, de propósito
 
@@ -91,9 +100,9 @@ pacote pequeno e fixo (`e2e/fixtures/lei-exemplo.json`).
   não é coberta: decisão de 22/09/2026. O parser dele tem teste em
   `backend/internal/domain/tec`.
 - **O Gemini de verdade.** No stack de E2E o `edital-processor` é trocado por
-  um dublê (`e2e/duble-processador/`) que devolve sempre a mesma leitura: o
-  assistente é testado inteiro, sem custo, sem rede e sem resposta diferente a
-  cada execução. Quem testa o processador de verdade — PDF, OCR e o contrato
+  um dublê (`e2e/duble-processador/`) que devolve sempre a mesma leitura — do
+  edital e da lei: o assistente e a captura são testados inteiros, sem custo,
+  sem rede e sem resposta diferente a cada execução. Quem testa o processador de verdade — PDF, OCR e o contrato
   com a IA — é a suíte dele (`make check-processor`), e o contrato entre os
   dois lados tem teste no Go (`adapter/editalproc`).
 

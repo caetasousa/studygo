@@ -7,28 +7,30 @@ Legislação Institucional (LEG, 8 questões) e Legislação Aplicada à TI (LEG
 
 Página para visualizar: https://claude.ai/artifact/NAoePLNHEiHicrravEGhYy
 
-## Situação — 25/09/2026
+## Situação — 26/09/2026
 
 | Fase | Estado |
 |---|---|
-| 0 · Catálogo e cenários | ✅ `conteudo/leis/normas.toml` (17 entradas), grupo L no `e2e/CENARIOS.md`, falhas da captura em `edital-processor/app/leis/README.md` |
+| 0 · Catálogo e cenários | ✅ as normas do edital em `conteudo/leis/README.md` (17), grupo L no `e2e/CENARIOS.md`, falhas da captura em `edital-processor/app/leis/README.md` |
 | 1 · Captura | ✅ CF/88, Lei 16.168, LGPD e Marco Civil capturadas **com conferência do Gemini**, texto conferido com o original; faltam os links da Constituição de Goiás e do Regimento Interno |
-| 2 · Leitura no app | ✅ migration 000008, importação pela tela (qualquer conta logada, por ora), menu Legislação, leitor com sumário e link direto; E2E L1–L10 verdes |
-| 3 · Questões A | ✅ 228 questões em 22 unidades (CF 48, Lei 16.168 133, LGPD 22, Marco Civil 25), validadas por `make leis-validar` |
-| 4 · No ar | ⏳ código publicado no servidor; falta importar os pacotes pela tela (roteiro em `docs/deploy.md`) |
-| 5 · B e C | ⏳ com você: preencher `link` no `normas.toml`; a captura e o pacote de só leitura já funcionam |
+| 2 · Leitura no app | ✅ migration 000008, captura pela tela (**Legislação → Adicionar lei**, qualquer conta logada, por ora), menu Legislação, leitor com sumário e link direto; E2E L1–L16 verdes |
+| 3 · Questões A | ✅ 228 questões em 22 unidades (CF 48, Lei 16.168 133, LGPD 22, Marco Civil 25), em `conteudo/leis/<slug>/questoes.json`; entram pela página da lei |
+| 4 · No ar | ⏳ falta capturar as quatro leis no servidor e importar as questões delas (roteiro em `docs/deploy.md`) |
+| 5 · B e C | ⏳ com você: levantar os links e capturar pela tela; lei sem questões já é lida normalmente |
 
-O que mudou em relação ao desenho abaixo: o catálogo é TOML (a biblioteca
-padrão do Python lê, sem dependência nova); o pacote é **um JSON por lei**
-(`conteudo/leis/pacotes/<slug>.json`), não um `.zip`; as refs citadas pela
-questão ficam num array da própria questão, e não em tabela à parte; a
-divergência entre regra e Gemini só bloqueia quando a estrutura está em jogo e
-o palpite dele é possível — a revisada vai para `aceitar` no `normas.toml`.
+O que mudou em relação ao desenho abaixo: em 26/09/2026 a captura saiu da
+linha de comando e virou tela — cola-se o link, o `edital-processor` devolve a
+prévia, e quem publica é o backend. Com isso saíram o `normas.toml`, o pacote
+(`studygo.lei/1` num arquivo) e os `make leis-*`. As refs citadas pela questão
+ficam num array da própria questão, e não em tabela à parte; a divergência
+entre regra e Gemini só pesa quando a estrutura está em jogo e o palpite dele é
+possível — e vira aviso na prévia, marcado como revisado antes de publicar.
 
 ## Decisões
 
-- A lei é **baixada e organizada localmente**; produção só importa um pacote e
-  exibe.
+- A lei é **baixada e organizada pelo processador, a pedido da tela**; a
+  pessoa revisa a prévia antes de publicar (até 25/09/2026 era local, por
+  linha de comando).
 - O Gemini **só classifica** os parágrafos numerados (artigo, inciso,
   capítulo…); nunca devolve texto. O texto final vem do original e só é gravado
   se conferir 100% com ele (hash).
@@ -36,7 +38,7 @@ o palpite dele é possível — a revisada vai para `aceitar` no `normas.toml`.
   edital, estilo **FCC (A–E)**, feitas pelo **Claude Code localmente**. Cada uma
   cita o trecho literal que a justifica.
 - As normas B e C (e as A sem fonte confirmada) entram pelo **link que você
-  informa** em `conteudo/leis/normas.toml`; delas, por enquanto, só a leitura.
+  cola na tela**; delas, por enquanto, só a leitura.
 - Fora do escopo: TEC, Qconcursos, importar pelo link dentro do app, gerar
   questões em produção ou com o Gemini, questões por artigo/inciso, normas que o
   edital não cita.
@@ -138,19 +140,18 @@ de resposta verdes.
 
 ## Fase 4 — No ar · fim da semana 4
 
-- `make leis-pacote` → commit → `make push` → pipeline (com o job `e2e`) →
-  servidor: importar o pacote e conferir. (Desde 25/09/2026 há um servidor
-  só; não há produção separada nem `make release`.)
+- No servidor: **Legislação → Adicionar lei** com os links de
+  `conteudo/leis/README.md`; revisar os avisos (os já conhecidos estão lá) e
+  publicar; depois, na página de cada lei, importar o `questoes.json` dela.
 
 **Pronto quando:** as normas A com questões no ar no servidor.
 
 ## Fase 5 — Normas B e C · conforme você informar os links
 
-- Você preenche `link:` em `conteudo/leis/normas.toml`.
-- Eu capturo, verifico e publico **só a leitura** (mesmo pacote, mesma
-  importação). Questões delas ficam para depois.
-
-**Pronto quando:** cada norma com link publicada para leitura.
+- Você cola o link em **Legislação → Adicionar lei**, revisa e publica **só a
+  leitura**; o vínculo com a matéria sai do tópico, como nas A.
+- Se o TCE-GO só tiver PDF escaneado: a captura recusa (bloqueio); texto
+  conferido à mão fica para as normas C, no pior caso.
 
 ## Depois (não agora)
 
@@ -169,4 +170,4 @@ norma mudar na fonte.
 - **Questão ruim** → trecho literal obrigatório, validador, sua revisão, e
   desativar sem apagar respostas.
 - **Norma alterada depois** → hash por unidade marca as questões
-  desatualizadas; recapturar antes de cada pacote.
+  desatualizadas; recapturar pela tela quando a norma mudar.

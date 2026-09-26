@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// Como um pacote de lei pode chegar errado — escrito antes do código. O pacote
-// é montado na máquina de quem estuda (captura + questões do Claude Code) e
-// importado em produção; o que passar daqui vai para a tela do estudante.
+// Como uma lei com as questões pode chegar errada — escrito antes do código. O
+// texto vem da captura, as questões são escritas fora do app; o que passar
+// daqui vai para a tela do estudante.
 //
 //	P1  sem formato, formato de outra versão, sem slug, slug fora do padrão, sem nome ou sem versão
 //	P2  nenhum dispositivo

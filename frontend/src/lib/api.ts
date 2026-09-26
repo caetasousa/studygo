@@ -18,10 +18,13 @@ import type {
 	RegistroDiaInput,
 	Usuario,
 	CorrecaoDeQuestao,
-	ImportacaoDeLei,
+	CapturaDeLei,
+	ImportacaoDeQuestoes,
 	LeiResumo,
 	LeisDaMateria,
-	LeituraDeLei
+	LeituraDeLei,
+	PedidoDePublicacao,
+	PublicacaoDeLei
 } from '$lib/types';
 
 export class ApiError extends Error {
@@ -158,9 +161,24 @@ export const api = {
 	// ---- legislação ----
 	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),
 
-	/** O pacote vai como está; quem valida é o servidor. */
-	importarLei: (pacote: unknown) =>
-		request<ImportacaoDeLei>('/api/leis', { method: 'POST', body: JSON.stringify(pacote) }),
+	/** Começa a captura da lei do link; a prévia vem de `capturaDeLei`. */
+	capturarLei: (link: string) =>
+		request<{ id: string }>('/api/leis/capturas', { method: 'POST', body: JSON.stringify({ link }) }),
+
+	capturaDeLei: (id: string) => request<CapturaDeLei>(`/api/leis/capturas/${encodeURIComponent(id)}`),
+
+	publicarLei: (id: string, pedido: PedidoDePublicacao) =>
+		request<PublicacaoDeLei>(`/api/leis/capturas/${encodeURIComponent(id)}/publicacao`, {
+			method: 'POST',
+			body: JSON.stringify(pedido)
+		}),
+
+	/** O questoes.json vai como está; quem valida é o servidor. */
+	importarQuestoes: (slug: string, arquivo: unknown) =>
+		request<ImportacaoDeQuestoes>(`/api/leis/${encodeURIComponent(slug)}/questoes`, {
+			method: 'POST',
+			body: JSON.stringify(arquivo)
+		}),
 
 	lerLei: (slug: string) => request<LeituraDeLei>(`/api/leis/${encodeURIComponent(slug)}`),
 

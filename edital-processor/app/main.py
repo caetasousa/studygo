@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
 
+from app.api.leis import router as router_leis
 from app.api.routes import install_error_handler, router, store_em_uso
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
     app.include_router(router)
+    app.include_router(router_leis)
     install_error_handler(app)
     return app
 

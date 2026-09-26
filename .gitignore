@@ -21,8 +21,8 @@ backend/cover.html
 e2e/node_modules/
 e2e/relatorio/
 
-# Leis: o original baixado fica só na máquina de quem captura (o sha256 dele
-# está no captura.md), e o pacote é gerado por `make leis-pacote`.
+# Leis: sobras da captura pela linha de comando, que saiu em 26/09/2026 — o
+# original baixado e os pacotes. Hoje a captura é pela tela.
 conteudo/leis/*/original.*
 conteudo/leis/pacotes/
 

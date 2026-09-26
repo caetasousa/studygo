@@ -9,4 +9,3 @@ tests/
 .git/
 *.md
 .env
-app/leis/

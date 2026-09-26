@@ -18,10 +18,15 @@ type LeiRepository interface {
 	// lei ainda não existe.
 	QuestoesGravadas(ctx context.Context, slug string) ([]lei.QuestaoGravada, error)
 
-	// Importar grava o pacote numa transação: a lei, a versão (se nova, vira a
-	// ativa; se já existe, só volta a ser a ativa) e o plano das questões.
-	// Devolve se a versão era nova.
-	Importar(ctx context.Context, p lei.Pacote, plano lei.PlanoDeImportacao) (bool, error)
+	// GravarTexto grava a lei e a versão numa transação: se nova, vira a
+	// ativa; se já existe, só volta a ser a ativa. As unidades do pacote
+	// substituem as da versão; as questões não são tocadas. Devolve se a
+	// versão era nova.
+	GravarTexto(ctx context.Context, p lei.Pacote) (bool, error)
+
+	// GravarQuestoes troca as unidades da versão e aplica o plano das
+	// questões, numa transação.
+	GravarQuestoes(ctx context.Context, leiID uuid.UUID, versao string, unidades []lei.Unidade, plano lei.PlanoDeImportacao) error
 
 	TextoAtivo(ctx context.Context, leiID uuid.UUID) (lei.Texto, error)
 	QuestoesAtivas(ctx context.Context, leiID, usuarioID uuid.UUID) ([]lei.QuestaoComResposta, error)
@@ -32,4 +37,12 @@ type LeiRepository interface {
 	Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]uuid.UUID, error)
 	Vincular(ctx context.Context, disciplinaID, leiID uuid.UUID) error
 	Desvincular(ctx context.Context, disciplinaID, leiID uuid.UUID) error
+}
+
+// CapturadorDeLeis baixa a lei da fonte oficial e a organiza em dispositivos,
+// em segundo plano: a Constituição leva mais tempo do que uma requisição pode
+// ficar aberta. O dono é quem pediu, e só ele consulta.
+type CapturadorDeLeis interface {
+	IniciarCaptura(ctx context.Context, dono, link string) (string, error)
+	Captura(ctx context.Context, dono, id string) (lei.Captura, error)
 }

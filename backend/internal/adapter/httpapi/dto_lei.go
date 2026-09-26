@@ -1,34 +1,15 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"time"
 
 	"studygo/internal/domain/lei"
 	"studygo/internal/service"
 )
 
-// O pacote de lei ("studygo.lei/1") é contrato em duas pontas: a captura do
-// edital-processor e o cmd/leis escrevem, a importação lê. Os tipos ficam aqui
-// porque aqui ficam as tags JSON; o cmd/leis usa LerPacoteLei e companhia em
-// vez de repetir o formato.
-
-type pacoteLeiDTO struct {
-	Formato string       `json:"formato"`
-	Lei     leiPacoteDTO `json:"lei"`
-	Versao  string       `json:"versao"`
-	// Captura é o relatório de onde o texto veio (hash do original, se o
-	// Gemini conferiu). Informativo: a importação não o usa.
-	Captura      json.RawMessage    `json:"captura,omitempty"`
-	Dispositivos []dispositivoDTO   `json:"dispositivos"`
-	Unidades     []unidadeDTO       `json:"unidades"`
-	Questoes     []questaoPacoteDTO `json:"questoes"`
-}
-
-type leiPacoteDTO struct {
+// leiDTO é a lei no leitor e no resultado da publicação.
+type leiDTO struct {
 	Slug       string   `json:"slug"`
 	Nome       string   `json:"nome"`
 	Curto      string   `json:"curto"`
@@ -52,10 +33,11 @@ type unidadeDTO struct {
 	Ref          string   `json:"ref"`
 	Titulo       string   `json:"titulo"`
 	Dispositivos []string `json:"dispositivos"`
-	Hash         string   `json:"hash"`
+	// Vazio numa unidade nova: a importação preenche com o do texto ativo.
+	Hash string `json:"hash"`
 }
 
-type questaoPacoteDTO struct {
+type questaoDoArquivoDTO struct {
 	ID           string   `json:"id"`
 	Unidade      string   `json:"unidade"`
 	Enunciado    string   `json:"enunciado"`
@@ -67,39 +49,10 @@ type questaoPacoteDTO struct {
 }
 
 // questoesDeLeiDTO é o arquivo que quem escreve as questões mantém
-// (conteudo/leis/<slug>/questoes.json): as unidades e as questões, sem a lei.
+// (conteudo/leis/<slug>/questoes.json) e importa na página da lei.
 type questoesDeLeiDTO struct {
-	Unidades []unidadeDTO       `json:"unidades"`
-	Questoes []questaoPacoteDTO `json:"questoes"`
-}
-
-func (d pacoteLeiDTO) paraDominio() lei.Pacote {
-	p := lei.Pacote{
-		Formato: d.Formato,
-		Lei: lei.Lei{
-			Slug: d.Lei.Slug, Nome: d.Lei.Nome, Curto: d.Lei.Curto,
-			Fonte: d.Lei.Fonte, Reconhecer: d.Lei.Reconhecer,
-		},
-		Versao: d.Versao,
-	}
-	for _, x := range d.Dispositivos {
-		p.Dispositivos = append(p.Dispositivos, dispositivoDoDTO(x))
-	}
-	p.Unidades, p.Questoes = questoesDoDTO(questoesDeLeiDTO{Unidades: d.Unidades, Questoes: d.Questoes})
-
-	return p
-}
-
-func dispositivoDoDTO(x dispositivoDTO) lei.Dispositivo {
-	pai := ""
-	if x.Pai != nil {
-		pai = *x.Pai
-	}
-
-	return lei.Dispositivo{
-		Ref: x.Ref, Pai: pai, Tipo: x.Tipo, Rotulo: x.Rotulo, Nome: x.Nome, Texto: x.Texto,
-		Notas: x.Notas, Anteriores: x.Anteriores, Revogado: x.Revogado,
-	}
+	Unidades []unidadeDTO          `json:"unidades"`
+	Questoes []questaoDoArquivoDTO `json:"questoes"`
 }
 
 func dispositivoParaDTO(d lei.Dispositivo) dispositivoDTO {
@@ -144,91 +97,145 @@ func naoNula(s []string) []string {
 	return s
 }
 
-func decodificarEstrito(r io.Reader, v any) error {
-	dec := json.NewDecoder(r)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return fmt.Errorf("lendo JSON: %w", err)
-	}
+// ---------------------------------------------------------------- captura
 
-	return nil
+type capturaRequest struct {
+	Link string `json:"link"`
 }
 
-// LerPacoteLei lê um pacote (ou o lei.json da captura, que é um pacote sem
-// questões).
-func LerPacoteLei(r io.Reader) (lei.Pacote, error) {
-	var d pacoteLeiDTO
-	if err := decodificarEstrito(r, &d); err != nil {
-		return lei.Pacote{}, err
-	}
-
-	return d.paraDominio(), nil
+type avisoDTO struct {
+	ID     string `json:"id"`
+	Texto  string `json:"texto"`
+	Trecho string `json:"trecho"`
 }
 
-// LerQuestoesLei lê o questoes.json de uma lei.
-func LerQuestoesLei(r io.Reader) ([]lei.Unidade, []lei.Questao, error) {
-	var d questoesDeLeiDTO
-	if err := decodificarEstrito(r, &d); err != nil {
-		return nil, nil, err
-	}
-	us, qs := questoesDoDTO(d)
-
-	return us, qs, nil
+type sumarioDTO struct {
+	Ref    string `json:"ref"`
+	Tipo   string `json:"tipo"`
+	Rotulo string `json:"rotulo"`
+	Nome   string `json:"nome"`
 }
 
-// EscreverQuestoesLei grava o questoes.json de volta (o cmd/leis preenche os
-// hashes das unidades novas).
-func EscreverQuestoesLei(w io.Writer, us []lei.Unidade, qs []lei.Questao) error {
-	d := questoesDeLeiDTO{Unidades: []unidadeDTO{}, Questoes: []questaoPacoteDTO{}}
-	for _, u := range us {
-		d.Unidades = append(d.Unidades, unidadeParaDTO(u))
-	}
-	for _, q := range qs {
-		d.Questoes = append(d.Questoes, questaoParaPacote(q))
-	}
-
-	return escreverJSON(w, d)
+type resumoCapturaDTO struct {
+	Vigentes    int            `json:"vigentes"`
+	Anteriores  int            `json:"anteriores"`
+	Notas       int            `json:"notas"`
+	Revogados   int            `json:"revogados"`
+	Tipos       map[string]int `json:"tipos"`
+	Descartados []string       `json:"descartados"`
+	Riscados    []string       `json:"riscados"`
+	Juncoes     []string       `json:"juncoes"`
 }
 
-func questaoParaPacote(q lei.Questao) questaoPacoteDTO {
-	return questaoPacoteDTO{
-		ID: q.Chave, Unidade: q.Unidade, Enunciado: q.Enunciado, Alternativas: naoNula(q.Alternativas),
-		Gabarito: q.Gabarito, Comentario: q.Comentario, Dispositivos: naoNula(q.Dispositivos), Trecho: q.Trecho,
-	}
+// resultadoCapturaDTO é a prévia: o que revisar e a estrutura da lei. O texto
+// inteiro não vai ao navegador — quem publica o busca de novo no processador.
+type resultadoCapturaDTO struct {
+	Fonte        string           `json:"fonte"`
+	Gemini       bool             `json:"gemini"`
+	Versao       string           `json:"versao"`
+	Publicavel   bool             `json:"publicavel"`
+	Bloqueios    []string         `json:"bloqueios"`
+	Avisos       []avisoDTO       `json:"avisos"`
+	Resumo       resumoCapturaDTO `json:"resumo"`
+	Sumario      []sumarioDTO     `json:"sumario"`
+	Artigos      int              `json:"artigos"`
+	Dispositivos int              `json:"dispositivos"`
 }
 
-// EscreverPacoteLei grava o pacote que se importa em Legislação.
-func EscreverPacoteLei(w io.Writer, p lei.Pacote) error {
-	d := pacoteLeiDTO{
-		Formato: p.Formato,
-		Lei: leiPacoteDTO{
-			Slug: p.Lei.Slug, Nome: p.Lei.Nome, Curto: p.Lei.Curto,
-			Reconhecer: naoNula(p.Lei.Reconhecer), Fonte: p.Lei.Fonte,
+type capturaDTO struct {
+	ID        string `json:"id"`
+	Estado    string `json:"estado"`
+	Etapa     string `json:"etapa"`
+	Progresso struct {
+		Feitos int `json:"feitos"`
+		Total  int `json:"total"`
+	} `json:"progresso"`
+	Erro      string               `json:"erro,omitempty"`
+	Resultado *resultadoCapturaDTO `json:"resultado"`
+}
+
+// Os agrupamentos que formam o sumário da prévia.
+var agrupamentos = map[string]bool{
+	"parte": true, "livro": true, "titulo": true, "capitulo": true, "secao": true, "subsecao": true,
+}
+
+func capturaParaDTO(c lei.Captura) capturaDTO {
+	d := capturaDTO{ID: c.ID, Estado: c.Estado, Etapa: c.Etapa, Erro: c.Erro}
+	d.Progresso.Feitos, d.Progresso.Total = c.Feitos, c.Total
+	r := c.Resultado
+	if r == nil {
+		return d
+	}
+
+	res := &resultadoCapturaDTO{
+		Fonte: r.Fonte, Gemini: r.Gemini, Versao: r.Versao,
+		Publicavel: len(r.Bloqueios) == 0 && len(r.Dispositivos) > 0,
+		Bloqueios:  naoNula(r.Bloqueios), Avisos: []avisoDTO{}, Sumario: []sumarioDTO{},
+		Dispositivos: len(r.Dispositivos),
+		Resumo: resumoCapturaDTO{
+			Vigentes: r.Resumo.Vigentes, Anteriores: r.Resumo.Anteriores, Notas: r.Resumo.Notas,
+			Revogados: r.Resumo.Revogados, Tipos: r.Resumo.Tipos,
+			Descartados: naoNula(r.Resumo.Descartados), Riscados: naoNula(r.Resumo.Riscados),
+			Juncoes: naoNula(r.Resumo.Juncoes),
 		},
-		Versao:       p.Versao,
-		Dispositivos: []dispositivoDTO{},
-		Unidades:     []unidadeDTO{},
-		Questoes:     []questaoPacoteDTO{},
 	}
-	for _, x := range p.Dispositivos {
-		d.Dispositivos = append(d.Dispositivos, dispositivoParaDTO(x))
+	if res.Resumo.Tipos == nil {
+		res.Resumo.Tipos = map[string]int{}
 	}
-	for _, u := range p.Unidades {
-		d.Unidades = append(d.Unidades, unidadeParaDTO(u))
+	for _, a := range r.Avisos {
+		res.Avisos = append(res.Avisos, avisoDTO{ID: a.ID, Texto: a.Texto, Trecho: a.Trecho})
 	}
-	for _, q := range p.Questoes {
-		d.Questoes = append(d.Questoes, questaoParaPacote(q))
+	for _, x := range r.Dispositivos {
+		switch {
+		case agrupamentos[x.Tipo]:
+			res.Sumario = append(res.Sumario, sumarioDTO{Ref: x.Ref, Tipo: x.Tipo, Rotulo: x.Rotulo, Nome: x.Nome})
+		case x.Tipo == "artigo":
+			res.Artigos++
+		}
 	}
+	d.Resultado = res
 
-	return escreverJSON(w, d)
+	return d
 }
 
-func escreverJSON(w io.Writer, v any) error {
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", " ")
+type publicacaoRequest struct {
+	// Slug vazio publica uma lei nova; preenchido, atualiza o texto daquela.
+	Slug       string   `json:"slug"`
+	Nome       string   `json:"nome"`
+	Curto      string   `json:"curto"`
+	Reconhecer []string `json:"reconhecer"`
+	// Aceitos são os ids dos avisos que a pessoa marcou como revisados.
+	Aceitos []string `json:"aceitos"`
+}
 
-	return enc.Encode(v)
+type publicacaoDTO struct {
+	Slug                   string `json:"slug"`
+	Curto                  string `json:"curto"`
+	Versao                 string `json:"versao"`
+	NovaVersao             bool   `json:"novaVersao"`
+	UnidadesDesatualizadas int    `json:"unidadesDesatualizadas"`
+}
+
+func publicacaoParaDTO(r service.ResultadoDaPublicacao) publicacaoDTO {
+	return publicacaoDTO{
+		Slug: r.Slug, Curto: r.Curto, Versao: r.Versao, NovaVersao: r.NovaVersao,
+		UnidadesDesatualizadas: r.UnidadesDesatualizadas,
+	}
+}
+
+type importacaoQuestoesDTO struct {
+	Curto       string `json:"curto"`
+	Novas       int    `json:"novas"`
+	Atualizadas int    `json:"atualizadas"`
+	Desativadas int    `json:"desativadas"`
+	Mantidas    int    `json:"mantidas"`
+}
+
+func importacaoQuestoesParaDTO(r service.ResultadoDaImportacaoDeQuestoes) importacaoQuestoesDTO {
+	return importacaoQuestoesDTO{
+		Curto: r.Curto, Novas: r.Novas, Atualizadas: r.Atualizadas,
+		Desativadas: r.Desativadas, Mantidas: r.Mantidas,
+	}
 }
 
 // ---------------------------------------------------------------- respostas
@@ -248,29 +255,6 @@ func resumoLeiParaDTO(r lei.Resumo) leiResumoDTO {
 		Slug: r.Lei.Slug, Nome: r.Lei.Nome, Curto: r.Lei.Curto, Fonte: r.Lei.Fonte,
 		Versao: r.Versao, Questoes: r.Questoes, ImportadaEm: r.ImportadaEm,
 	}
-}
-
-type importacaoLeiDTO struct {
-	Slug       string `json:"slug"`
-	Curto      string `json:"curto"`
-	Versao     string `json:"versao"`
-	NovaVersao bool   `json:"novaVersao"`
-	Questoes   struct {
-		Novas       int `json:"novas"`
-		Atualizadas int `json:"atualizadas"`
-		Desativadas int `json:"desativadas"`
-		Mantidas    int `json:"mantidas"`
-	} `json:"questoes"`
-}
-
-func importacaoLeiParaDTO(r service.ResultadoDaImportacaoDeLei) importacaoLeiDTO {
-	d := importacaoLeiDTO{Slug: r.Slug, Curto: r.Curto, Versao: r.Versao, NovaVersao: r.NovaVersao}
-	d.Questoes.Novas = r.Novas
-	d.Questoes.Atualizadas = r.Atualizadas
-	d.Questoes.Desativadas = r.Desativadas
-	d.Questoes.Mantidas = r.Mantidas
-
-	return d
 }
 
 type correcaoDTO struct {
@@ -299,7 +283,7 @@ type questaoLeitorDTO struct {
 }
 
 type leituraLeiDTO struct {
-	Lei          leiPacoteDTO       `json:"lei"`
+	Lei          leiDTO             `json:"lei"`
 	Versao       string             `json:"versao"`
 	Dispositivos []dispositivoDTO   `json:"dispositivos"`
 	Unidades     []unidadeDTO       `json:"unidades"`
@@ -308,7 +292,7 @@ type leituraLeiDTO struct {
 
 func leituraParaDTO(l service.LeituraDaLei) leituraLeiDTO {
 	d := leituraLeiDTO{
-		Lei: leiPacoteDTO{
+		Lei: leiDTO{
 			Slug: l.Lei.Slug, Nome: l.Lei.Nome, Curto: l.Lei.Curto,
 			Reconhecer: naoNula(l.Lei.Reconhecer), Fonte: l.Lei.Fonte,
 		},
@@ -361,4 +345,4 @@ func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 	return d
 }
 
-var errPacoteIlegivel = errors.New("o arquivo não é um pacote de lei (studygo.lei/1)")
+var errQuestoesIlegiveis = errors.New("o arquivo não é um questoes.json de lei: esperava {\"unidades\": [...], \"questoes\": [...]}")

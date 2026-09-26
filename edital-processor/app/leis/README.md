@@ -1,20 +1,28 @@
 # Captura de leis
 
-Ferramenta de linha de comando, só local: baixa a lei da fonte pública, separa
-o texto vigente da redação anterior e das notas, organiza em dispositivos
-(título, capítulo, artigo, parágrafo, inciso, alínea) e grava
-`conteudo/leis/<slug>/lei.json` e `captura.md`. Não tem rota HTTP e não entra
-na imagem de produção (`.dockerignore`).
+Baixa a lei da fonte oficial, separa o texto vigente da redação anterior e das
+notas, e organiza em dispositivos (título, capítulo, artigo, parágrafo, inciso,
+alínea). Roda dentro do processador, chamada pelo backend quando alguém cola o
+link em **Legislação → Adicionar lei**:
 
 ```
-uv run python -m app.leis capturar <slug> [--sem-gemini]
-uv run python -m app.leis capturar --prioridade A
+POST /internal/leis/capturas        {"link": "https://www.planalto.gov.br/…"}  → {"id": …}
+GET  /internal/leis/capturas/{id}   → estado, etapa e, pronta, a lei e o que revisar
 ```
 
-A norma vem de `conteudo/leis/normas.toml`. O texto de cada dispositivo sai do
-original, nunca da IA: o Gemini só diz o **tipo** de cada parágrafo numerado
-(`p0001`…), e onde a regra determinística tem certeza e ele discorda, a
-captura para.
+A captura demora (a Constituição leva uns quatro minutos com o Gemini), por
+isso é assíncrona: o backend consulta até ela ficar pronta. O processador **nunca
+grava** a lei: devolve a prévia, e quem publica é o backend, depois que a
+pessoa revisou.
+
+O texto de cada dispositivo sai do original, nunca da IA: o Gemini só diz o
+**tipo** de cada parágrafo numerado (`p0001`…). O que sai da captura:
+
+- **bloqueios** — o texto não confere com o original, a árvore é inválida:
+  a lei não pode ser publicada;
+- **avisos** — o Gemini discordou da regra onde ela tem certeza, a numeração
+  salta, a classificação não foi conferida pelo Gemini: a regra prevaleceu, e a
+  pessoa marca na prévia que revisou cada um antes de publicar.
 
 ## Como a captura pode errar
 
@@ -60,8 +68,8 @@ que cobre; um item sem teste é lacuna declarada.
 | K16b | um id pulado uma vez pelo Gemini derruba a captura inteira da CF | captura que só passa na sorte |
 | K17 | o Gemini discorda da regra onde a regra tem certeza ("Art. 71." é artigo) | dispositivo com tipo errado gravado em silêncio |
 | K17c | todo palpite diferente do Gemini bloqueia, inclusive o impossível ("título" para um texto sem rótulo de título) e o que não muda a árvore (descartar × solto) — e o Gemini muda de palpite a cada execução | a captura da CF nunca termina; ou se aceita tudo às cegas |
-| K17b | a divergência já revisada (a regra estava certa) volta a bloquear a cada captura, ou uma divergência nova passa por ter sido "aceita" outra | ninguém consegue capturar, ou o aceite vira cheque em branco |
-| K18 | sem chave do Gemini a captura grava como se ele tivesse conferido | captura "verificada" que ninguém verificou |
+| K17b | a divergência revisada (a regra estava certa) não tem como ser aceita, ou aceitar uma aceita outra | ninguém consegue publicar, ou o aceite vira cheque em branco |
+| K18 | sem chave do Gemini a captura sai como se ele tivesse conferido | captura "verificada" que ninguém verificou |
 
 ### Montar e verificar
 
@@ -74,14 +82,32 @@ que cobre; um item sem teste é lacuna declarada.
 | K23 | redação anterior sem dispositivo vigente correspondente some | o artigo revogado desaparece em vez de aparecer como revogado |
 | K23b | um bloco de redações antigas vem antes do bloco vigente (IV e V antigos, depois IV e V novos) e só o primeiro casa | o V antigo vira dispositivo revogado e colide com o V vigente |
 | K23c | artigo incluído por medida provisória e depois revogado aparece riscado fora da ordem (55-K antes do 55-A) | a verificação de sequência acusa salto onde não há |
-| K24 | o `recorte` do `normas.toml` cita um dispositivo que não existe | questões feitas sobre um recorte fantasma |
 
-### Gravar
+### Captura pela aplicação
 
 | id | Como erra | O que sai errado |
 |---|---|---|
-| K25 | grava `lei.json` quando alguma verificação falhou | lei quebrada pronta para o pacote |
+| K29 | aceita um link fora das fontes oficiais (qualquer host, `http://`, IP, `localhost`) | o servidor baixa o que alguém mandar, inclusive da rede interna |
+| K30 | a fonte oficial redireciona para fora dela e o redirecionamento é seguido | o mesmo que K29, por tabela |
+| K31 | uma conta consulta a captura de outra pelo id | a prévia de outra pessoa vaza |
+| K32 | uma exceção no meio da captura deixa o estado em "rodando" para sempre | a tela espera sem fim |
+| K33 | capturas simultâneas sem limite (cada Constituição segura memória e o Gemini) | o processador cai para todo mundo |
+| K34 | uma captura com bloqueio sai como publicável (o antigo K25: gravar quando a verificação falhou) | lei quebrada publicada |
+| K35 | um aviso (divergência, salto de numeração) vira bloqueio sem saída, ou some da prévia | a Constituição nunca publica, ou publica sem ninguém ver |
+| K36 | sem chave do Gemini a captura sai como se tivesse sido conferida | captura "verificada" que ninguém verificou (o K18, na tela) |
+| K37 | captura pronta nunca expira | a memória do processador cresce com cada lei capturada |
+
+### Versão
+
+| id | Como erra | O que sai errado |
+|---|---|---|
 | K26 | capturar de novo a mesma fonte muda a versão (a data entra no hash) | toda recaptura vira "versão nova" e mexe nas questões |
+
+Limite conhecido do K26: onde a regra não tem certeza e o tipo não é
+estrutural (o título "PREÂMBULO", um fecho), vale o palpite do Gemini, que muda
+entre execuções. A versão da Constituição pode mudar de uma captura para outra
+com os artigos idênticos; as unidades das questões, que só olham o texto dos
+dispositivos citados, não mudam (conferido em 26/09/2026).
 
 ### PDF (link genérico)
 
@@ -91,5 +117,5 @@ que cobre; um item sem teste é lacuna declarada.
 | K28 | cabeçalho e rodapé de página repetidos entram no meio do texto | "Página 3 de 20" dentro do art. 12 |
 
 Limite conhecido: juntar a hifenização de fim de linha desfaz também um hífen
-legítimo que caia exatamente na quebra ("bem-/estar" vira "bemestar"). O
-`captura.md` lista cada junção feita, para revisão.
+legítimo que caia exatamente na quebra ("bem-/estar" vira "bemestar"). A
+prévia lista cada junção feita, para revisão.

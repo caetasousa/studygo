@@ -1,21 +1,24 @@
 ---
 name: questoes-de-lei
-description: Escreve as questões de lei seca (estilo FCC, A–E) de uma norma já capturada em conteudo/leis/<slug>/lei.json, unidade por unidade do recorte do edital, e as deixa validadas para o pacote. Use quando pedirem questões de uma lei do catálogo, ou para revisar as de uma unidade que mudou.
+description: Escreve as questões de lei seca (estilo FCC, A–E) de uma norma já publicada no app, unidade por unidade do recorte do edital, em conteudo/leis/<slug>/questoes.json, validadas pela importação. Use quando pedirem questões de uma lei do catálogo, ou para revisar as de uma unidade que mudou.
 ---
 
 # Questões de lei seca
 
-As questões são escritas aqui, na máquina de quem estuda, e vão para produção
-dentro do pacote da lei. O app não gera questão nenhuma. Quem confere cada uma
-é o mesmo código da importação (`make leis-validar`); o que passa lá, passa lá
-em cima.
+As questões são escritas aqui, fora do app, e entram nele pela página da lei
+(**Manter esta lei → Importar questões**, ou `POST /api/leis/<slug>/questoes`
+com o conteúdo do `questoes.json`). O app não gera questão nenhuma. Quem
+confere cada uma é a importação; o que passa na stack local, passa no
+servidor.
 
 ## Antes de escrever
 
-1. A lei tem de estar capturada: `conteudo/leis/<slug>/lei.json`. Sem ele,
-   `make leis-capturar slug=<slug>`.
-2. Leia o `recorte` da norma em `conteudo/leis/normas.toml`. Questão só sai do
-   recorte. `questoes = false` → não escreva nada.
+1. A lei tem de estar publicada no app (**Legislação → Adicionar lei**), e o
+   texto dela em `conteudo/leis/<slug>/lei.json`. Sem ele, ou se a lei mudou,
+   salve o que o app publicou: `GET /api/leis/<slug>` na stack local (`make
+   up`), logado — o campo `dispositivos` tem o mesmo formato.
+2. Leia o recorte da norma em `conteudo/leis/README.md`. Questão só sai do
+   recorte; norma de prioridade B ou C → não escreva nada.
 3. Leia o texto do recorte **em `lei.json`**, nunca de memória nem de outra
    fonte: a redação vigente é a da captura. Redação anterior (`anteriores`) e
    notas não são matéria de questão.
@@ -31,7 +34,10 @@ art. 37 da CF, sozinho, vira duas).
   contábil, financeira e orçamentária").
 - `dispositivos`: as refs das raízes da unidade (os artigos, ou a seção). Tudo
   que está abaixo delas é da unidade.
-- `hash`: deixe vazio; `make leis-validar atualizar=1 slug=<slug>` preenche.
+- `hash`: vazio numa unidade nova — a importação dá a ela o hash do texto
+  publicado. Depois da primeira importação, copie para o arquivo o hash que o
+  app gravou (`GET /api/leis/<slug>` → `unidades`): é ele que barra a
+  importação quando a lei mudar e as questões não forem revistas.
 
 Quantidade: uma questão a cada ~120 palavras da unidade, no mínimo 5 e no
 máximo 20.
@@ -79,12 +85,12 @@ Estilo FCC, a banca do edital de referência (TCE-GO):
 
 ## Fechar
 
-```
-make leis-validar atualizar=1 slug=<slug>   # preenche hash, confere tudo
-make leis-pacote slug=<slug>                # conteudo/leis/pacotes/<slug>.json
-```
+1. Importe o `questoes.json` na stack local (a lei publicada nela também): a
+   importação lista todos os problemas de uma vez — trecho que não está na
+   lei, dispositivo fora da unidade, alternativa repetida.
+2. Grave no arquivo o hash das unidades novas (ver **Unidades**).
+3. Quem estuda importa o mesmo arquivo no servidor, pela página da lei.
 
-Se a validação acusar "unidade desatualizada", a lei mudou depois das
-questões: releia a unidade no `lei.json` novo, corrija as questões afetadas,
-apague o `hash` da unidade e valide de novo com `atualizar=1`. Nunca apague o
-hash sem reler.
+Se a importação acusar "unidade desatualizada", a lei mudou depois das
+questões: releia a unidade no texto novo, corrija as questões afetadas, apague
+o `hash` da unidade e importe de novo. Nunca apague o hash sem reler.

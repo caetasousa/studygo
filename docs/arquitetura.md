@@ -182,10 +182,12 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   para todo mundo. Restringir quem publica (havia uma lista de curadores) saiu
   em 25/09/2026, enquanto o app é de teste; volta quando a autenticação estiver
   completa.
-- **A lei não nasce no app.** Ela é capturada fora (`edital-processor/app/leis`,
-  sem rota HTTP), as questões são escritas localmente, e o app importa o
-  pacote pronto (`studygo.lei/1`) já validado pelo mesmo `lei.Pacote.Validar`
-  que roda no `make leis-validar`.
+- **A lei é capturada pela tela; as questões, não.** O link vai para o
+  `edital-processor` (`app/leis`), que baixa, organiza e devolve uma prévia
+  com bloqueios e avisos — sem gravar nada. Quem publica é o backend, buscando
+  o texto de novo no processador (nunca do navegador), depois que a pessoa
+  marcou cada aviso como revisado. As questões são escritas fora do app e
+  importadas contra a versão ativa, validadas por `lei.Pacote.Validar`.
 - **Exceção consciente à identidade por id:** entre versões, o dispositivo é
   identificado pela `ref` jurídica (`art71.inc2`) — é assim que a lei é citada,
   e é a âncora do link direto. As questões guardam as refs que citam

@@ -22,7 +22,10 @@ import (
 	"studygo/internal/port"
 )
 
-var _ port.EditalProcessor = (*Client)(nil)
+var (
+	_ port.EditalProcessor  = (*Client)(nil)
+	_ port.CapturadorDeLeis = (*Client)(nil)
+)
 
 // Client fala com o edital-processor pela rede do compose.
 type Client struct {
@@ -315,8 +318,20 @@ func mapError(status int, payload []byte) error {
 	case we.Transient || status >= 500 || status == http.StatusTooManyRequests:
 		return fmt.Errorf("%w: %s (%s)", port.ErrProvedorIndisponivel, msg, we.Code)
 	default:
-		return fmt.Errorf("processador rejeitou o edital: %s (%s)", msg, we.Code)
+		return recusa{Codigo: we.Code, Mensagem: msg}
 	}
+}
+
+// recusa é a resposta saudável do processador que diz não: o edital ilegível,
+// o link de lei fora das fontes oficiais. O código permite traduzir a recusa
+// num erro de domínio.
+type recusa struct {
+	Codigo   string
+	Mensagem string
+}
+
+func (r recusa) Error() string {
+	return fmt.Sprintf("processador rejeitou o pedido: %s (%s)", r.Mensagem, r.Codigo)
 }
 
 func multipartUpload(up port.EditalUpload) (io.Reader, string, error) {

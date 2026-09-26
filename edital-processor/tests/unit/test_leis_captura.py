@@ -7,35 +7,28 @@ por `<strike>` e por estilo, notas como link.
 
 from __future__ import annotations
 
+import asyncio
 import json
-from pathlib import Path
 
 import pytest
 
-from app.leis.captura import capturar
-from app.leis.catalogo import Norma
+from app.leis.captura import Captura, capturar
 from app.leis.classificar import Classe, combinar, por_gemini, por_regras
-from app.leis.fontes import FonteInvalida, Resposta, baixar, decodificar_html
+from app.leis.fontes import Fonte, FonteInvalida, Resposta, baixar, decodificar_html, fonte_do_link
 from app.leis.limpeza import paragrafos_de_html, paragrafos_de_pdf, texto_visivel
 from app.leis.montar import montar
 from app.leis.verificar import verificar
 
+PLANALTO = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
+GOIAS = "https://legisla.casacivil.go.gov.br/pesquisa_legislacao/{id}"
 
-def _norma(**extra: object) -> Norma:
-    base: dict[str, object] = {
-        "slug": "lei-teste",
-        "nome": "Lei de Teste",
-        "curto": "Lei Teste",
-        "disciplina": "LEG",
-        "prioridade": "A",
-        "fonte": "planalto",
-        "link": "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm",
-        "reconhecer": [],
-        "recorte": [],
-        "questoes": False,
-    }
-    base.update(extra)
-    return Norma.model_validate(base)
+
+def _fonte(link: str = PLANALTO) -> Fonte:
+    return fonte_do_link(link)
+
+
+def _capturar(http: object, provider: object = None) -> Captura:
+    return asyncio.run(capturar(_fonte(), http, provider))  # type: ignore[arg-type]
 
 
 def _html(corpo: str) -> str:
@@ -78,9 +71,8 @@ LEI_PEQUENA = """
 
 
 def test_k1_recusa_link_fora_do_dominio_da_fonte() -> None:
-    norma = _norma(link="https://www.exemplo.com/lei.htm")
-    with pytest.raises(FonteInvalida, match=r"planalto\.gov\.br"):
-        baixar(norma, lambda url: Resposta(200, "text/html", b""))
+    with pytest.raises(FonteInvalida, match="fonte oficial"):
+        _fonte("https://www.exemplo.com/lei.htm")
 
 
 def test_k1_casacivil_go_so_consulta_a_api_do_estado() -> None:
@@ -91,11 +83,11 @@ def test_k1_casacivil_go_so_consulta_a_api_do_estado() -> None:
         corpo = json.dumps({"conteudo": "<p>Art. 1º Texto.</p>"}).encode()
         return Resposta(200, "application/json", corpo)
 
-    original = baixar(_norma(fonte="casacivil-go", link="86708"), http)
+    original = baixar(_fonte(GOIAS.format(id="86708")), http)
     assert chamadas == ["https://legisla.casacivil.go.gov.br/api/v2/pesquisa/legislacoes/86708"]
     assert original.html == "<p>Art. 1º Texto.</p>"
     with pytest.raises(FonteInvalida):
-        baixar(_norma(fonte="casacivil-go", link="../86708"), http)
+        _fonte(GOIAS.format(id="../86708"))
 
 
 @pytest.mark.parametrize(
@@ -107,21 +99,21 @@ def test_k1_casacivil_go_so_consulta_a_api_do_estado() -> None:
 )
 def test_k2_recusa_resposta_que_nao_e_a_lei(resposta: Resposta, motivo: str) -> None:
     with pytest.raises(FonteInvalida, match=motivo):
-        baixar(_norma(), lambda url: resposta)
+        baixar(_fonte(), lambda url: resposta)
 
 
 def test_k2_json_sem_conteudo_e_recusado() -> None:
     corpo = json.dumps({"ementa": "x"}).encode()
     with pytest.raises(FonteInvalida, match="conteudo"):
         baixar(
-            _norma(fonte="casacivil-go", link="1"),
+            _fonte(GOIAS.format(id="1")),
             lambda url: Resposta(200, "application/json", corpo),
         )
 
 
 def test_k2_original_guarda_o_hash_dos_bytes_baixados() -> None:
     corpo = "<p>Art. 1º Função.</p>".encode("cp1252")
-    original = baixar(_norma(), lambda url: Resposta(200, "text/html", corpo))
+    original = baixar(_fonte(), lambda url: Resposta(200, "text/html", corpo))
     import hashlib
 
     assert original.sha256 == hashlib.sha256(corpo).hexdigest()
@@ -553,56 +545,45 @@ def test_k17c_palpite_impossivel_ou_sem_efeito_na_arvore_nao_bloqueia() -> None:
     assert [c.tipo for c in finais] == [c.tipo for c in regras]
 
 
-def test_k17b_divergencia_aceita_so_vale_para_ela(tmp_path: Path) -> None:
+def test_k17b_divergencia_vira_aviso_com_id_so_da_regra() -> None:
     corpo = _html(LEI_PEQUENA).encode("cp1252")
+    paragrafos = paragrafos_de_html(_html(LEI_PEQUENA))
+    regras = {p.id: c.tipo for p, c in zip(paragrafos, por_regras(paragrafos), strict=True)}
+    pid = next(p.id for p in paragrafos if p.texto.startswith("Art. 2º"))
 
-    class _Discorda(_ProviderFalso):
-        async def extract_structured(self, request: object) -> dict[str, object]:
-            itens = []
-            for chunk in request.chunks:  # type: ignore[attr-defined]
-                pid, texto = chunk.split(": ", 1)
-                tipo = "solto" if texto.startswith("Art. 2º") else None
-                itens.append({"id": pid, "tipo": tipo})
-            regras = {p.id: c.tipo for p, c in zip(PARAGRAFOS, por_regras(PARAGRAFOS), strict=True)}
-            for item in itens:
-                item["tipo"] = item["tipo"] or regras[str(item["id"])]
-            return {"itens": itens}
+    def discorda(palpite: str) -> _ProviderFalso:
+        class _Discorda(_ProviderFalso):
+            async def extract_structured(self, request: object) -> dict[str, object]:
+                itens = []
+                for chunk in request.chunks:  # type: ignore[attr-defined]
+                    id_, texto = chunk.split(": ", 1)
+                    tipo = palpite if texto.startswith("Art. 2º") else regras[id_]
+                    itens.append({"id": id_, "tipo": tipo})
+                return {"itens": itens}
 
-    PARAGRAFOS = paragrafos_de_html(_html(LEI_PEQUENA))
-    pid = next(p.id for p in PARAGRAFOS if p.texto.startswith("Art. 2º"))
-    divergencia = f"{pid}: a regra diz artigo, o Gemini diz solto"
+        return _Discorda([])
 
     def http(url: str) -> Resposta:
         return Resposta(200, "text/html", corpo)
 
-    barrada = capturar(_norma(), tmp_path, http, _Discorda([]))
-    assert barrada.problemas == [divergencia]
-    assert "Art. 2º Compete ao órgão:" in (tmp_path / "lei-teste" / "captura.md").read_text()
-
-    aceita = capturar(_norma(aceitar=[divergencia]), tmp_path, http, _Discorda([]))
-    assert aceita.gravado
-    # O Gemini muda de palpite entre execuções: o aceite é do parágrafo e do
-    # tipo que a regra deu, qualquer que seja o palpite dele.
-    so_a_regra = divergencia.split(", o Gemini")[0]
-    assert capturar(_norma(aceitar=[so_a_regra]), tmp_path, http, _Discorda([])).gravado
-
-    outra = capturar(_norma(aceitar=["p9999: a regra diz artigo, o Gemini diz solto"]),
-                     tmp_path, http, _Discorda([]))  # fmt: skip
-    assert not outra.gravado
+    solto = _capturar(http, discorda("solto"))
+    assert solto.bloqueios == []
+    [aviso] = solto.avisos
+    assert aviso.id == f"{pid}: a regra diz artigo"
+    assert aviso.texto == f"{pid}: a regra diz artigo, o Gemini diz solto"
+    assert aviso.trecho.startswith("Art. 2º Compete ao órgão:")
+    # O Gemini muda de palpite entre execuções: o aviso que a pessoa revisou é
+    # do parágrafo e do tipo que a regra deu, qualquer que seja o palpite.
+    assert [a.id for a in _capturar(http, discorda("nome")).avisos] == [aviso.id]
 
 
-def test_k18_sem_gemini_a_captura_diz_que_nao_foi_conferida(tmp_path: Path) -> None:
-    resultado = capturar(
-        _norma(),
-        tmp_path,
-        lambda url: Resposta(200, "text/html", _html(LEI_PEQUENA).encode("cp1252")),
-        provider=None,
+def test_k18_sem_gemini_a_captura_diz_que_nao_foi_conferida() -> None:
+    resultado = _capturar(
+        lambda url: Resposta(200, "text/html", _html(LEI_PEQUENA).encode("cp1252"))
     )
-    assert resultado.gravado
-    relatorio = (tmp_path / "lei-teste" / "captura.md").read_text()
-    assert "sem conferência do Gemini" in relatorio
-    lei = json.loads((tmp_path / "lei-teste" / "lei.json").read_text())
-    assert lei["captura"]["gemini"] is False
+    assert resultado.publicavel
+    assert resultado.gemini is False
+    assert [a.id for a in resultado.avisos] == ["sem-gemini"]
 
 
 # ---------------------------------------------------------------- montar e verificar
@@ -617,21 +598,14 @@ def test_k19_paragrafo_ou_inciso_sem_artigo_e_problema() -> None:
 def test_k20_artigo_fora_de_sequencia_e_problema() -> None:
     paragrafos = paragrafos_de_html(_html("<p>Art. 1º A.</p><p>Art. 3º C.</p>"))
     montagem = montar(paragrafos, por_regras(paragrafos))
-    problemas = verificar(_html("<p>Art. 1º A.</p><p>Art. 3º C.</p>"), paragrafos, montagem, [])
+    problemas = verificar(_html("<p>Art. 1º A.</p><p>Art. 3º C.</p>"), paragrafos, montagem)
     assert any("art1 → art3" in p for p in problemas)
 
 
 def test_k20_sequencia_com_letra_e_aceita() -> None:
     corpo = "<p>Art. 1º A.</p><p>Art. 1º-A. B.</p><p>Art. 1º-B. B.</p><p>Art. 2º C.</p>"
     paragrafos = paragrafos_de_html(_html(corpo))
-    assert verificar(_html(corpo), paragrafos, montar(paragrafos, por_regras(paragrafos)), []) == []
-
-
-def test_k20_aceitar_declarado_libera_o_salto() -> None:
-    corpo = "<p>Art. 1º A.</p><p>Art. 3º C.</p>"
-    paragrafos = paragrafos_de_html(_html(corpo))
-    montagem = montar(paragrafos, por_regras(paragrafos))
-    assert verificar(_html(corpo), paragrafos, montagem, [], aceitar=["art1 → art3"]) == []
+    assert verificar(_html(corpo), paragrafos, montar(paragrafos, por_regras(paragrafos))) == []
 
 
 def test_k21_ref_repetida_e_problema() -> None:
@@ -646,7 +620,7 @@ def test_k22_texto_que_nao_esta_no_original_e_problema() -> None:
     paragrafos = paragrafos_de_html(_html(corpo))
     montagem = montar(paragrafos, por_regras(paragrafos))
     montagem.dispositivos[0].texto = "Art. 1º O prazo é de noventa dias."
-    problemas = verificar(_html(corpo), paragrafos, montagem, [])
+    problemas = verificar(_html(corpo), paragrafos, montagem)
     assert any("remontado" in p for p in problemas)
 
 
@@ -658,7 +632,7 @@ def test_k22_redacao_anterior_com_nota_no_meio_confere_com_o_original() -> None:
     )
     paragrafos = paragrafos_de_html(_html(corpo))
     montagem = montar(paragrafos, por_regras(paragrafos))
-    assert verificar(_html(corpo), paragrafos, montagem, []) == []
+    assert verificar(_html(corpo), paragrafos, montagem) == []
 
 
 def test_k22_texto_visivel_ignora_tags_e_entidades() -> None:
@@ -721,76 +695,45 @@ def test_k23c_artigo_revogado_fora_de_ordem_nao_e_salto() -> None:
     paragrafos = paragrafos_de_html(_html(corpo))
     montagem = montar(paragrafos, por_regras(paragrafos))
     assert montagem.problemas == []
-    assert verificar(_html(corpo), paragrafos, montagem, []) == []
+    assert verificar(_html(corpo), paragrafos, montagem) == []
 
 
 def test_k20_salto_coberto_por_revogado_nao_e_problema() -> None:
     corpo = "<p>Art. 1º A.</p><p>Art. 3º C.</p><p><strike>Art. 2º Revogado.</strike></p>"
     paragrafos = paragrafos_de_html(_html(corpo))
     montagem = montar(paragrafos, por_regras(paragrafos))
-    assert verificar(_html(corpo), paragrafos, montagem, []) == []
+    assert verificar(_html(corpo), paragrafos, montagem) == []
 
 
-def test_k24_recorte_com_dispositivo_inexistente_e_problema() -> None:
-    corpo = "<p>Art. 1º A.</p><p>Art. 2º B.</p>"
-    paragrafos = paragrafos_de_html(_html(corpo))
-    montagem = montar(paragrafos, por_regras(paragrafos))
-    assert verificar(_html(corpo), paragrafos, montagem, ["art1-art2"]) == []
-    assert any("art9" in p for p in verificar(_html(corpo), paragrafos, montagem, ["art1-art9"]))
+# ---------------------------------------------------------------- versão
 
 
-# ---------------------------------------------------------------- gravar
+def test_k34_verificacao_falhou_nao_devolve_a_lei() -> None:
+    # Um dispositivo sem artigo: a árvore não monta, e a prévia não traz lei.
+    corpo = _html("<p>CAPÍTULO I</p><p>§ 1º Solto.</p>").encode()
+    resultado = _capturar(lambda url: Resposta(200, "text/html", corpo))
+    assert resultado.bloqueios
+    assert resultado.dispositivos is None and resultado.versao is None
+    assert not resultado.publicavel
 
 
-def test_k25_verificacao_falhou_nao_grava_lei_json(tmp_path: Path) -> None:
-    corpo = _html("<p>Art. 1º A.</p><p>Art. 3º C.</p>").encode()
-    resultado = capturar(_norma(), tmp_path, lambda url: Resposta(200, "text/html", corpo), None)
-    assert not resultado.gravado
-    assert not (tmp_path / "lei-teste" / "lei.json").exists()
-    assert "art1 → art3" in (tmp_path / "lei-teste" / "captura.md").read_text()
-
-
-def test_k25_falha_nao_apaga_a_captura_boa_anterior(tmp_path: Path) -> None:
-    boa = _html(LEI_PEQUENA).encode("cp1252")
-    ruim = _html("<p>Art. 1º A.</p><p>Art. 3º C.</p>").encode()
-    capturar(_norma(), tmp_path, lambda url: Resposta(200, "text/html", boa), None)
-    antes = (tmp_path / "lei-teste" / "lei.json").read_text()
-    capturar(_norma(), tmp_path, lambda url: Resposta(200, "text/html", ruim), None)
-    assert (tmp_path / "lei-teste" / "lei.json").read_text() == antes
-
-
-def test_k26_recapturar_a_mesma_fonte_mantem_a_versao(tmp_path: Path) -> None:
+def test_k26_recapturar_a_mesma_fonte_mantem_a_versao() -> None:
     corpo = _html(LEI_PEQUENA).encode("cp1252")
 
     def http(url: str) -> Resposta:
         return Resposta(200, "text/html", corpo)
 
-    capturar(_norma(), tmp_path, http, None)
-    primeira = json.loads((tmp_path / "lei-teste" / "lei.json").read_text())
-    capturar(_norma(), tmp_path, http, None)
-    segunda = json.loads((tmp_path / "lei-teste" / "lei.json").read_text())
-    assert primeira["versao"] == segunda["versao"]
-    assert primeira["dispositivos"] == segunda["dispositivos"]
+    primeira, segunda = _capturar(http), _capturar(http)
+    assert primeira.versao == segunda.versao
+    assert primeira.dispositivos == segunda.dispositivos
 
 
-def test_lei_json_tem_o_formato_do_pacote(tmp_path: Path) -> None:
+def test_dispositivos_tem_o_formato_do_pacote() -> None:
     corpo = _html(LEI_PEQUENA).encode("cp1252")
-    capturar(
-        _norma(reconhecer=["nº 1/2020"]),
-        tmp_path,
-        lambda url: Resposta(200, "text/html", corpo),
-        None,
-    )
-    lei = json.loads((tmp_path / "lei-teste" / "lei.json").read_text())
-    assert lei["formato"] == "studygo.lei/1"
-    assert lei["lei"] == {
-        "slug": "lei-teste",
-        "nome": "Lei de Teste",
-        "curto": "Lei Teste",
-        "reconhecer": ["nº 1/2020"],
-        "fonte": "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm",
-    }
-    refs = [d["ref"] for d in lei["dispositivos"]]
+    lei = _capturar(lambda url: Resposta(200, "text/html", corpo))
+    assert lei.fonte == PLANALTO
+    assert lei.dispositivos is not None
+    refs = [d["ref"] for d in lei.dispositivos]
     assert refs == [
         "preambulo1",
         "preambulo2",
@@ -806,7 +749,7 @@ def test_lei_json_tem_o_formato_do_pacote(tmp_path: Path) -> None:
         "art2.par2",
         "fecho1",
     ]
-    assert set(lei["dispositivos"][0]) == {
+    assert set(lei.dispositivos[0]) == {
         "ref",
         "pai",
         "tipo",

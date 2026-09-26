@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { api } from '$lib/api';
+	import CapturaDeLei from '$lib/components/CapturaDeLei.svelte';
 	import IconButton from '$lib/components/IconButton.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
-	import type { ImportacaoDeLei, LeiResumo, LeisDaMateria } from '$lib/types';
+	import type { LeiResumo, LeisDaMateria, PublicacaoDeLei } from '$lib/types';
 
 	/**
 	 * As leis do concurso, matéria por matéria.
@@ -14,9 +15,9 @@
 	 * sozinho: um número que aparece de passagem num tópico não faz da lei
 	 * matéria da prova.
 	 *
-	 * A importação fica aberta a qualquer conta enquanto o app é de teste
+	 * A captura fica aberta a qualquer conta enquanto o app é de teste
 	 * (decisão de 25/09/2026): o catálogo é o mesmo para todo mundo, então
-	 * importar aqui publica a lei para todos.
+	 * publicar aqui publica a lei para todos.
 	 */
 	const slug = $derived(concursoStore.ativoSlug);
 
@@ -24,9 +25,7 @@
 	let catalogo = $state<LeiResumo[]>([]);
 	let erro = $state<string | null>(null);
 	let carregado = $state(false);
-	let importando = $state(false);
-	let resultado = $state<string | null>(null);
-	let erroImportacao = $state<string | null>(null);
+	let publicada = $state<PublicacaoDeLei | null>(null);
 
 	async function carregar(s: string) {
 		erro = null;
@@ -55,38 +54,9 @@
 		}
 	}
 
-	function descrever(r: ImportacaoDeLei): string {
-		const q = r.questoes;
-		const partes = [
-			r.novaVersao ? 'versão nova' : 'mesma versão, nada duplicado',
-			`${q.novas} questões novas`,
-			q.atualizadas ? `${q.atualizadas} atualizadas` : '',
-			q.desativadas ? `${q.desativadas} desativadas` : ''
-		].filter(Boolean);
-		return `${r.curto} importada — ${partes.join(', ')}.`;
-	}
-
-	async function importar(e: Event & { currentTarget: HTMLInputElement }) {
-		const arquivo = e.currentTarget.files?.[0];
-		e.currentTarget.value = '';
-		if (!arquivo) return;
-		importando = true;
-		resultado = null;
-		erroImportacao = null;
-		try {
-			let pacote: unknown;
-			try {
-				pacote = JSON.parse(await arquivo.text());
-			} catch {
-				throw new Error('o arquivo não é JSON — use o pacote de `make leis-pacote`');
-			}
-			resultado = descrever(await api.importarLei(pacote));
-			if (slug) await carregar(slug);
-		} catch (err) {
-			erroImportacao = err instanceof Error ? err.message : 'A importação falhou';
-		} finally {
-			importando = false;
-		}
+	async function aoPublicar(r: PublicacaoDeLei) {
+		publicada = r;
+		if (slug) await carregar(slug);
 	}
 
 	const livres = (m: LeisDaMateria) =>
@@ -103,21 +73,20 @@
 <div class="page">
 	{#if erro}<div class="form-error" role="alert">{erro}</div>{/if}
 
-	<div class="card importar">
+	<div class="card adicionar">
 		<div class="card-body">
-			<h2 class="sec" style="margin-top:0">Importar lei</h2>
+			<h2 class="sec" style="margin-top:0">Adicionar lei</h2>
 			<p class="page-sub" style="margin-top:0">
-				O pacote sai de <code>make leis-pacote</code> (em <code>conteudo/leis/pacotes/</code>). Importar a
-				mesma versão de novo não duplica nada; uma versão nova preserva as respostas das questões que
-				continuam.
+				Cole o link da lei na fonte oficial. O texto é baixado e organizado em artigos, incisos e alíneas
+				sem que a IA toque em uma palavra; você revisa a prévia e publica.
 			</p>
-			<label class="arquivo">
-				<span>Pacote da lei (.json)</span>
-				<input type="file" accept=".json,application/json" disabled={importando} onchange={importar} />
-			</label>
-			{#if importando}<p class="page-sub">Importando…</p>{/if}
-			{#if resultado}<p class="ok" role="status">{resultado}</p>{/if}
-			{#if erroImportacao}<div class="form-error" role="alert">{erroImportacao}</div>{/if}
+			<CapturaDeLei {aoPublicar} />
+			{#if publicada}
+				<p class="ok" role="status">
+					{publicada.curto} publicada{publicada.novaVersao ? '' : ' — mesma versão, nada duplicado'}.
+					<a href="/leis/{publicada.slug}">Abrir a lei</a>
+				</p>
+			{/if}
 		</div>
 	</div>
 
@@ -191,14 +160,8 @@
 </div>
 
 <style>
-	.importar {
+	.adicionar {
 		margin-bottom: 20px;
-	}
-	.arquivo {
-		display: inline-flex;
-		flex-direction: column;
-		gap: 6px;
-		font-size: 13px;
 	}
 	.ok {
 		color: var(--good);

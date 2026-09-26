@@ -11,6 +11,8 @@
 // o plano o que a leitura trouxe.
 
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 const TOKEN = process.env.EP_SERVICE_TOKEN ?? '';
 
@@ -71,6 +73,51 @@ function estrutura(codigo) {
 	};
 }
 
+// A captura de leis: o link diz qual lei da fixture devolver, e as marcas no
+// caminho produzem os casos que a tela precisa mostrar. A fonte é "do
+// Planalto" para passar pela mesma regra de fonte oficial do processador real.
+const LEIS = {
+	v1: JSON.parse(readFileSync(new URL('./fixtures/lei-exemplo.json', import.meta.url), 'utf8')),
+	v2: JSON.parse(readFileSync(new URL('./fixtures/lei-exemplo-v2.json', import.meta.url), 'utf8'))
+};
+const capturas = new Map();
+
+function oficial(link) {
+	try {
+		const u = new URL(link);
+		return u.protocol === 'https:' && /\.(gov|leg|jus)\.br$/.test(u.hostname) && !u.port && !u.username;
+	} catch {
+		return false;
+	}
+}
+
+function resultado(link) {
+	const caminho = new URL(link).pathname;
+	const lei = caminho.includes('lei-exemplo-v2') ? LEIS.v2 : LEIS.v1;
+	const base = {
+		fonte: link,
+		gemini: true,
+		versao: lei.versao,
+		originalSha256: 'e2e',
+		paragrafos: lei.dispositivos.length,
+		publicavel: true,
+		dispositivos: lei.dispositivos,
+		bloqueios: [],
+		avisos: [],
+		resumo: { vigentes: lei.dispositivos.length, anteriores: 0, notas: 0, revogados: 0, tipos: {}, descartados: [], riscados: [], juncoes: [] }
+	};
+	if (caminho.includes('bloqueio')) {
+		return { ...base, publicavel: false, dispositivos: null, versao: null, bloqueios: ['o texto remontado da árvore difere do texto dos parágrafos (sha256 diferente)'] };
+	}
+	if (caminho.includes('aviso')) {
+		return {
+			...base,
+			avisos: [{ id: 'p0003: a regra diz artigo', texto: 'p0003: a regra diz artigo, o Gemini diz solto', trecho: lei.dispositivos[2].texto }]
+		};
+	}
+	return base;
+}
+
 function responder(res, status, corpo) {
 	res.writeHead(status, { 'Content-Type': 'application/json' });
 	res.end(JSON.stringify(corpo));
@@ -120,6 +167,31 @@ createServer((req, res) => {
 				itens: disciplinas.map((d) => ({ disciplina: d, itens: TEMAS[d] ?? [] })),
 				alerts: []
 			});
+		}
+
+		if (req.method === 'POST' && req.url === '/internal/leis/capturas') {
+			const { link = '' } = JSON.parse(corpo || '{}');
+			if (!oficial(link)) {
+				return recusar(res, 422, 'fonte_invalida', 'não é uma fonte oficial: use o link do Planalto, da Casa Civil de Goiás ou de outro site .gov.br, .leg.br ou .jus.br');
+			}
+			const id = randomUUID();
+			// A primeira consulta ainda encontra a captura rodando: a tela tem de
+			// saber esperar (L16).
+			capturas.set(id, { dono: req.headers['x-owner-ref'], link, consultas: 0 });
+			return responder(res, 202, { id });
+		}
+
+		const consulta = req.method === 'GET' && req.url.match(/^\/internal\/leis\/capturas\/([\w-]+)$/);
+		if (consulta) {
+			const c = capturas.get(consulta[1]);
+			if (!c || c.dono !== req.headers['x-owner-ref']) {
+				return recusar(res, 404, 'captura_nao_encontrada', 'captura não encontrada ou expirada');
+			}
+			c.consultas += 1;
+			if (c.consultas === 1) {
+				return responder(res, 200, { id: consulta[1], estado: 'rodando', etapa: 'classificando', progresso: { feitos: 1, total: 2 } });
+			}
+			return responder(res, 200, { id: consulta[1], estado: 'pronta', etapa: 'verificando', progresso: { feitos: 2, total: 2 }, resultado: resultado(c.link) });
 		}
 
 		recusar(res, 404, 'not_found', `${req.method} ${req.url}`);

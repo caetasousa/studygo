@@ -3,10 +3,14 @@ package editalproc
 import (
 	"context"
 
+	"studygo/internal/domain/lei"
 	"studygo/internal/port"
 )
 
-var _ port.EditalProcessor = Indisponivel{}
+var (
+	_ port.EditalProcessor  = Indisponivel{}
+	_ port.CapturadorDeLeis = Indisponivel{}
+)
 
 // Indisponivel is the no-op EditalProcessor used when EDITAL_PROCESSOR_URL is
 // unset. Every call reports the importer is unavailable; the rest of the API is
@@ -27,4 +31,12 @@ func (Indisponivel) Conteudo(
 	context.Context, string, string, string, []string, port.EditalUpload,
 ) (port.EditalConteudo, error) {
 	return port.EditalConteudo{}, port.ErrImportacaoIndisponivel
+}
+
+func (Indisponivel) IniciarCaptura(context.Context, string, string) (string, error) {
+	return "", lei.ErrCapturaIndisponivel
+}
+
+func (Indisponivel) Captura(context.Context, string, string) (lei.Captura, error) {
+	return lei.Captura{}, lei.ErrCapturaIndisponivel
 }

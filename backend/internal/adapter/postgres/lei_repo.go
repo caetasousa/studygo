@@ -94,7 +94,7 @@ func (r *LeiRepo) QuestoesGravadas(ctx context.Context, slug string) ([]lei.Ques
 	return out, rows.Err()
 }
 
-func (r *LeiRepo) Importar(ctx context.Context, p lei.Pacote, plano lei.PlanoDeImportacao) (bool, error) {
+func (r *LeiRepo) GravarTexto(ctx context.Context, p lei.Pacote) (bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return false, fmt.Errorf("begin: %w", err)
@@ -139,7 +139,7 @@ func (r *LeiRepo) Importar(ctx context.Context, p lei.Pacote, plano lei.PlanoDeI
 		return false, fmt.Errorf("reativando versão: %w", err)
 	}
 
-	if err := aplicarQuestoes(ctx, tx, leiID, plano); err != nil {
+	if err := trocarUnidades(ctx, tx, versaoID, p.Unidades); err != nil {
 		return false, err
 	}
 
@@ -148,6 +148,44 @@ func (r *LeiRepo) Importar(ctx context.Context, p lei.Pacote, plano lei.PlanoDeI
 	}
 
 	return nova, nil
+}
+
+func (r *LeiRepo) GravarQuestoes(
+	ctx context.Context,
+	leiID uuid.UUID,
+	versao string,
+	unidades []lei.Unidade,
+	plano lei.PlanoDeImportacao,
+) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	var versaoID uuid.UUID
+	if err := tx.QueryRow(
+		ctx, `SELECT id FROM leis_versoes WHERE lei_id = $1 AND versao = $2`, leiID, versao,
+	).Scan(&versaoID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return lei.ErrNaoEncontrada
+		}
+
+		return fmt.Errorf("buscando versão: %w", err)
+	}
+
+	if err := trocarUnidades(ctx, tx, versaoID, unidades); err != nil {
+		return err
+	}
+	if err := aplicarQuestoes(ctx, tx, leiID, plano); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
 }
 
 func (r *LeiRepo) gravarVersao(ctx context.Context, tx pgx.Tx, leiID uuid.UUID, p lei.Pacote) (uuid.UUID, error) {
@@ -182,21 +220,25 @@ func (r *LeiRepo) gravarVersao(ctx context.Context, tx pgx.Tx, leiID uuid.UUID, 
 		return uuid.Nil, fmt.Errorf("gravando dispositivos: %w", err)
 	}
 
+	return versaoID, nil
+}
+
+// trocarUnidades substitui as unidades da versão pelas dadas.
+func trocarUnidades(ctx context.Context, tx pgx.Tx, versaoID uuid.UUID, unidades []lei.Unidade) error {
 	lote := &pgx.Batch{}
-	for i, u := range p.Unidades {
+	lote.Queue(`DELETE FROM leis_unidades WHERE versao_id = $1`, versaoID)
+	for i, u := range unidades {
 		lote.Queue(
 			`INSERT INTO leis_unidades (versao_id, ordem, ref, titulo, dispositivos, hash)
 			 VALUES ($1,$2,$3,$4,$5,$6)`,
 			versaoID, i, u.Ref, u.Titulo, naoNulo(u.Dispositivos), u.Hash,
 		)
 	}
-	if lote.Len() > 0 {
-		if err := tx.SendBatch(ctx, lote).Close(); err != nil {
-			return uuid.Nil, fmt.Errorf("gravando unidades: %w", err)
-		}
+	if err := tx.SendBatch(ctx, lote).Close(); err != nil {
+		return fmt.Errorf("gravando unidades: %w", err)
 	}
 
-	return versaoID, nil
+	return nil
 }
 
 func aplicarQuestoes(ctx context.Context, tx pgx.Tx, leiID uuid.UUID, plano lei.PlanoDeImportacao) error {

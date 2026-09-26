@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"studygo/internal/domain/concurso"
@@ -12,52 +14,199 @@ import (
 	"github.com/google/uuid"
 )
 
-// LeiService publica leis no catálogo, serve a leitura com as questões e
-// guarda as respostas e os vínculos entre lei e matéria.
+// LeiService captura e publica leis no catálogo, importa as questões, serve a
+// leitura e guarda as respostas e os vínculos entre lei e matéria.
 type LeiService struct {
-	leis      port.LeiRepository
-	concursos port.ConcursoRepository
+	leis       port.LeiRepository
+	concursos  port.ConcursoRepository
+	capturador port.CapturadorDeLeis
 }
 
-func NewLeiService(leis port.LeiRepository, concursos port.ConcursoRepository) *LeiService {
-	return &LeiService{leis: leis, concursos: concursos}
+func NewLeiService(leis port.LeiRepository, concursos port.ConcursoRepository, capturador port.CapturadorDeLeis) *LeiService {
+	return &LeiService{leis: leis, concursos: concursos, capturador: capturador}
 }
 
-// ResultadoDaImportacaoDeLei conta o que a importação fez.
-type ResultadoDaImportacaoDeLei struct {
-	Slug        string
+// Capturar pede ao processador a lei do link. Qualquer conta logada captura
+// e publica (decisão de 25/09/2026, enquanto o app é de teste); a rota já
+// exige sessão.
+func (s *LeiService) Capturar(ctx context.Context, usuarioID uuid.UUID, link string) (string, error) {
+	link = strings.TrimSpace(link)
+	if link == "" {
+		return "", erroDeValidacao("cole o link da lei na fonte oficial")
+	}
+
+	return s.capturador.IniciarCaptura(ctx, usuarioID.String(), link)
+}
+
+func (s *LeiService) Captura(ctx context.Context, usuarioID uuid.UUID, id string) (lei.Captura, error) {
+	return s.capturador.Captura(ctx, usuarioID.String(), id)
+}
+
+// PedidoDePublicacao é o que a pessoa conferiu na prévia. Sem Slug, é uma lei
+// nova; com Slug, a atualização do texto daquela lei.
+type PedidoDePublicacao struct {
+	Slug       string
+	Nome       string
+	Curto      string
+	Reconhecer []string
+	Aceitos    []string
+}
+
+// ResultadoDaPublicacao conta o que a publicação fez. Unidades desatualizadas
+// são as que têm questões escritas para outra redação.
+type ResultadoDaPublicacao struct {
+	Slug                   string
+	Curto                  string
+	Versao                 string
+	NovaVersao             bool
+	UnidadesDesatualizadas int
+}
+
+// Publicar grava o texto da captura como a versão ativa da lei. O texto vem do
+// processador, nunca de quem publica: o navegador só diz o nome e o que
+// revisou. As questões não mudam; as unidades passam para a versão nova.
+func (s *LeiService) Publicar(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	capturaID string,
+	pedido PedidoDePublicacao,
+) (ResultadoDaPublicacao, error) {
+	nome, curto := strings.TrimSpace(pedido.Nome), strings.TrimSpace(pedido.Curto)
+	if nome == "" || curto == "" {
+		return ResultadoDaPublicacao{}, erroDeValidacao("informe o nome da lei e o nome curto")
+	}
+
+	c, err := s.capturador.Captura(ctx, usuarioID.String(), capturaID)
+	if err != nil {
+		return ResultadoDaPublicacao{}, err
+	}
+	if err := c.ConferirPublicacao(pedido.Aceitos); err != nil {
+		return ResultadoDaPublicacao{}, err
+	}
+	r := c.Resultado
+
+	slug := pedido.Slug
+	var unidades []lei.Unidade
+	if slug == "" {
+		slug = lei.SlugDe(curto)
+		if slug == "" {
+			return ResultadoDaPublicacao{}, erroDeValidacao("o nome curto precisa de letras ou números")
+		}
+		// Lei nova com o slug de outra: publicar sobrescreveria a outra (L14).
+		switch _, err := s.leis.PorSlug(ctx, slug); {
+		case err == nil:
+			return ResultadoDaPublicacao{}, lei.ErrLeiJaExiste
+		case !errors.Is(err, lei.ErrNaoEncontrada):
+			return ResultadoDaPublicacao{}, err
+		}
+	} else {
+		atual, err := s.leis.PorSlug(ctx, slug)
+		if err != nil {
+			return ResultadoDaPublicacao{}, err
+		}
+		texto, err := s.leis.TextoAtivo(ctx, atual.ID)
+		if err != nil && !errors.Is(err, lei.ErrNaoEncontrada) {
+			return ResultadoDaPublicacao{}, err
+		}
+		unidades = texto.Unidades
+	}
+
+	reconhecer := limparLista(pedido.Reconhecer)
+	if len(reconhecer) == 0 {
+		reconhecer = lei.ReconhecerPadrao(nome)
+	}
+
+	p := lei.Pacote{
+		Formato: lei.Formato,
+		Lei: lei.Lei{
+			Slug: slug, Nome: nome, Curto: curto, Fonte: r.Fonte, Reconhecer: reconhecer,
+		},
+		Versao:       r.Versao,
+		Dispositivos: r.Dispositivos,
+		Unidades:     unidades,
+	}
+	if err := p.ValidarTexto(); err != nil {
+		return ResultadoDaPublicacao{}, err
+	}
+
+	nova, err := s.leis.GravarTexto(ctx, p)
+	if err != nil {
+		return ResultadoDaPublicacao{}, err
+	}
+
+	res := ResultadoDaPublicacao{Slug: slug, Curto: curto, Versao: r.Versao, NovaVersao: nova}
+	for _, u := range unidades {
+		if u.Hash != lei.HashUnidade(r.Dispositivos, u.Dispositivos) {
+			res.UnidadesDesatualizadas++
+		}
+	}
+
+	return res, nil
+}
+
+func limparLista(xs []string) []string {
+	var out []string
+	for _, x := range xs {
+		if x = strings.TrimSpace(x); x != "" && !slices.Contains(out, x) {
+			out = append(out, x)
+		}
+	}
+
+	return out
+}
+
+// ResultadoDaImportacaoDeQuestoes conta o que a importação fez.
+type ResultadoDaImportacaoDeQuestoes struct {
 	Curto       string
-	Versao      string
-	NovaVersao  bool
 	Novas       int
 	Atualizadas int
 	Desativadas int
 	Mantidas    int
 }
 
-// Importar publica a lei no catálogo. Qualquer conta logada importa (decisão
-// de 25/09/2026, enquanto o app é de teste); a rota já exige sessão.
-func (s *LeiService) Importar(ctx context.Context, p lei.Pacote) (ResultadoDaImportacaoDeLei, error) {
+// ImportarQuestoes grava as unidades e as questões escritas para a versão
+// ativa da lei. A unidade sem hash foi escrita agora, para este texto, e
+// recebe o dele; a que traz hash de outra redação é recusada até alguém
+// revisar as questões dela.
+func (s *LeiService) ImportarQuestoes(
+	ctx context.Context,
+	slug string,
+	unidades []lei.Unidade,
+	questoes []lei.Questao,
+) (ResultadoDaImportacaoDeQuestoes, error) {
+	l, err := s.leis.PorSlug(ctx, slug)
+	if err != nil {
+		return ResultadoDaImportacaoDeQuestoes{}, err
+	}
+	texto, err := s.leis.TextoAtivo(ctx, l.ID)
+	if err != nil {
+		return ResultadoDaImportacaoDeQuestoes{}, err
+	}
+
+	for i := range unidades {
+		if unidades[i].Hash == "" {
+			unidades[i].Hash = lei.HashUnidade(texto.Dispositivos, unidades[i].Dispositivos)
+		}
+	}
+	p := lei.Pacote{
+		Formato: lei.Formato, Lei: l, Versao: texto.Versao,
+		Dispositivos: texto.Dispositivos, Unidades: unidades, Questoes: questoes,
+	}
 	if err := p.Validar(); err != nil {
-		return ResultadoDaImportacaoDeLei{}, err
+		return ResultadoDaImportacaoDeQuestoes{}, err
 	}
 
-	gravadas, err := s.leis.QuestoesGravadas(ctx, p.Lei.Slug)
+	gravadas, err := s.leis.QuestoesGravadas(ctx, slug)
 	if err != nil {
-		return ResultadoDaImportacaoDeLei{}, err
+		return ResultadoDaImportacaoDeQuestoes{}, err
 	}
-	plano := lei.PlanejarImportacao(gravadas, p.Questoes)
-
-	nova, err := s.leis.Importar(ctx, p, plano)
-	if err != nil {
-		return ResultadoDaImportacaoDeLei{}, err
+	plano := lei.PlanejarImportacao(gravadas, questoes)
+	if err := s.leis.GravarQuestoes(ctx, l.ID, texto.Versao, unidades, plano); err != nil {
+		return ResultadoDaImportacaoDeQuestoes{}, err
 	}
 
-	return ResultadoDaImportacaoDeLei{
-		Slug:        p.Lei.Slug,
-		Curto:       p.Lei.Curto,
-		Versao:      p.Versao,
-		NovaVersao:  nova,
+	return ResultadoDaImportacaoDeQuestoes{
+		Curto:       l.Curto,
 		Novas:       len(plano.Novas),
 		Atualizadas: len(plano.Atualizadas),
 		Desativadas: len(plano.Desativar),

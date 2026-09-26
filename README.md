@@ -143,13 +143,8 @@ ele discordarem, vale o Makefile.
 | `make cobertura` | cobertura dos testes do backend, incluindo os de integração. Exige Docker |
 | `make seguranca` | procura vulnerabilidades conhecidas nas dependências dos três serviços (govulncheck, npm audit, pip-audit); depende da rede |
 
-### Legislação
-
-| Comando | O que faz |
-|---|---|
-| `make leis-capturar slug=cf88` | baixa a lei da fonte oficial, separa texto vigente, redação anterior e notas, e organiza em artigos e incisos em `conteudo/leis/<slug>/`. `prioridade=A` captura todas as normas A de `normas.toml`; `sem_gemini=1` dispensa a conferência do Gemini |
-| `make leis-validar` | confere as questões escritas sobre as leis exatamente como a importação vai conferir; `atualizar=1` preenche o hash das unidades novas |
-| `make leis-pacote` | monta em `conteudo/leis/pacotes/` o arquivo que se importa em **Legislação → Importar lei**; `slug=…` para uma lei só |
+A legislação não tem comando: a lei é capturada pela tela (**Legislação →
+Adicionar lei**) e as questões entram pela página dela (**Manter esta lei**).
 
 ### Git e publicação
 

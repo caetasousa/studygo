@@ -64,14 +64,19 @@ func run(logger *slog.Logger) error {
 	cronogramaRepo := postgres.NewCronogramaRepo(pool)
 	cadernoRepo := postgres.NewCadernoRepo(pool)
 
-	var editalProc port.EditalProcessor = editalproc.Indisponivel{}
+	// O mesmo processador lê editais e captura leis.
+	var (
+		editalProc port.EditalProcessor  = editalproc.Indisponivel{}
+		capturador port.CapturadorDeLeis = editalproc.Indisponivel{}
+	)
 	if cfg.EditalProcessorURL != "" {
-		editalProc = editalproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken)
+		cliente := editalproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken)
+		editalProc, capturador = cliente, cliente
 		logger.Info("edital import enabled", slog.String("processor", cfg.EditalProcessorURL))
 	}
 
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
-	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo)
+	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo, capturador)
 
 	// Os seis casos de uso do plano compartilham as mesmas dependências.
 	deps := service.Dependencias{

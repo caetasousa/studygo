@@ -660,10 +660,65 @@ export interface LeisDaMateria {
 	sugeridas: LeiResumo[];
 }
 
-export interface ImportacaoDeLei {
+/** Uma coisa que a captura resolveu sozinha e alguém precisa conferir. */
+export interface AvisoDaCaptura {
+	id: string;
+	texto: string;
+	trecho: string;
+}
+
+export interface ResultadoDaCaptura {
+	fonte: string;
+	gemini: boolean;
+	versao: string;
+	publicavel: boolean;
+	bloqueios: string[];
+	avisos: AvisoDaCaptura[];
+	resumo: {
+		vigentes: number;
+		anteriores: number;
+		notas: number;
+		revogados: number;
+		tipos: Record<string, number>;
+		descartados: string[];
+		riscados: string[];
+		juncoes: string[];
+	};
+	sumario: { ref: string; tipo: string; rotulo: string; nome: string }[];
+	artigos: number;
+	dispositivos: number;
+}
+
+export interface CapturaDeLei {
+	id: string;
+	estado: 'rodando' | 'pronta' | 'falhou';
+	etapa: string;
+	progresso: { feitos: number; total: number };
+	erro?: string;
+	resultado: ResultadoDaCaptura | null;
+}
+
+export interface PedidoDePublicacao {
+	/** Vazio: lei nova. Preenchido: atualiza o texto daquela lei. */
+	slug?: string;
+	nome: string;
+	curto: string;
+	reconhecer: string[];
+	aceitos: string[];
+}
+
+export interface PublicacaoDeLei {
 	slug: string;
 	curto: string;
 	versao: string;
 	novaVersao: boolean;
-	questoes: { novas: number; atualizadas: number; desativadas: number; mantidas: number };
+	unidadesDesatualizadas: number;
+}
+
+export interface ImportacaoDeQuestoes {
+	curto: string;
+	novas: number;
+	atualizadas: number;
+	desativadas: number;
+	mantidas: number;
 }

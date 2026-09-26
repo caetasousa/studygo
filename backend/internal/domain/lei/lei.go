@@ -1,9 +1,10 @@
 // Package lei é a lei seca interativa: o texto organizado em dispositivos, as
-// questões feitas sobre ele e as regras de quem pode publicá-lo.
+// questões feitas sobre ele e as regras para publicá-los.
 //
-// A lei chega pronta, num pacote montado fora do app (a captura do
-// edital-processor mais as questões escritas localmente); aqui ela é validada,
-// versionada e lida. Nada neste pacote baixa, reescreve ou gera texto de lei.
+// O texto chega da captura do edital-processor, revisado na tela; as questões,
+// escritas fora do app, chegam depois e valem contra o texto publicado. Aqui
+// eles são validados, versionados e lidos. Nada neste pacote baixa, reescreve
+// ou gera texto de lei.
 package lei
 
 import (
@@ -20,7 +21,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Formato é a versão do pacote que este código entende.
+// Formato é a versão do formato da lei com as questões que este código entende.
 const Formato = "studygo.lei/1"
 
 var (
@@ -96,7 +97,8 @@ type Questao struct {
 	Trecho       string
 }
 
-// Pacote é o que se importa: uma versão da lei e as questões dela.
+// Pacote é uma versão da lei com as unidades e as questões dela: o que se
+// valida antes de gravar.
 type Pacote struct {
 	Formato      string
 	Lei          Lei
@@ -117,8 +119,8 @@ var (
 )
 
 // HashUnidade resume o texto dos dispositivos da unidade e de todos os seus
-// descendentes, na ordem da lei. É o mesmo cálculo do lado de quem escreve as
-// questões (cmd/leis), para que as duas pontas concordem sobre "mudou".
+// descendentes, na ordem da lei. Guardado com a unidade, é o que diz se o
+// texto mudou desde que as questões foram escritas.
 func HashUnidade(ds []Dispositivo, raizes []string) string {
 	h := sha256.New()
 	pais := paisDe(ds)
@@ -151,43 +153,23 @@ func descende(pais map[string]string, ref string, raizes []string) bool {
 	return false
 }
 
+// ValidarTexto confere a lei e os dispositivos, sem olhar as questões: é o
+// que se publica a partir de uma captura.
+func (p Pacote) ValidarTexto() error {
+	var ps []string
+	p.validarTexto(func(f string, a ...any) { ps = append(ps, fmt.Sprintf(f, a...)) })
+	if len(ps) > 0 {
+		return ErrPacoteInvalido{Problemas: ps}
+	}
+
+	return nil
+}
+
 // Validar confere o pacote inteiro e devolve todos os problemas juntos.
 func (p Pacote) Validar() error {
 	var ps []string
 	add := func(f string, a ...any) { ps = append(ps, fmt.Sprintf(f, a...)) }
-
-	if p.Formato != Formato {
-		add("formato %q não é %s", p.Formato, Formato)
-	}
-	if !slugValido.MatchString(p.Lei.Slug) {
-		add("slug %q fora do padrão (minúsculas, números e hífen)", p.Lei.Slug)
-	}
-	if strings.TrimSpace(p.Lei.Nome) == "" || strings.TrimSpace(p.Lei.Curto) == "" {
-		add("a lei precisa de nome e de nome curto")
-	}
-	if strings.TrimSpace(p.Versao) == "" {
-		add("sem versão")
-	}
-	if len(p.Dispositivos) == 0 {
-		add("nenhum dispositivo")
-	}
-
-	vistos := map[string]bool{}
-	for i, d := range p.Dispositivos {
-		switch {
-		case d.Ref == "":
-			add("dispositivo %d com ref vazia", i+1)
-		case vistos[d.Ref]:
-			add("ref repetida: %s", d.Ref)
-		}
-		if d.Pai != "" && !vistos[d.Pai] {
-			add("%s: o pai %s não existe antes dele", d.Ref, d.Pai)
-		}
-		if !slices.Contains(tipos, d.Tipo) {
-			add("%s: tipo desconhecido %q", d.Ref, d.Tipo)
-		}
-		vistos[d.Ref] = true
-	}
+	vistos := p.validarTexto(add)
 
 	pais := paisDe(p.Dispositivos)
 	unidades := map[string]Unidade{}
@@ -232,6 +214,44 @@ func (p Pacote) Validar() error {
 	}
 
 	return nil
+}
+
+// validarTexto confere a lei e a árvore e devolve as refs que existem.
+func (p Pacote) validarTexto(add func(string, ...any)) map[string]bool {
+	if p.Formato != Formato {
+		add("formato %q não é %s", p.Formato, Formato)
+	}
+	if !slugValido.MatchString(p.Lei.Slug) {
+		add("slug %q fora do padrão (minúsculas, números e hífen)", p.Lei.Slug)
+	}
+	if strings.TrimSpace(p.Lei.Nome) == "" || strings.TrimSpace(p.Lei.Curto) == "" {
+		add("a lei precisa de nome e de nome curto")
+	}
+	if strings.TrimSpace(p.Versao) == "" {
+		add("sem versão")
+	}
+	if len(p.Dispositivos) == 0 {
+		add("nenhum dispositivo")
+	}
+
+	vistos := map[string]bool{}
+	for i, d := range p.Dispositivos {
+		switch {
+		case d.Ref == "":
+			add("dispositivo %d com ref vazia", i+1)
+		case vistos[d.Ref]:
+			add("ref repetida: %s", d.Ref)
+		}
+		if d.Pai != "" && !vistos[d.Pai] {
+			add("%s: o pai %s não existe antes dele", d.Ref, d.Pai)
+		}
+		if !slices.Contains(tipos, d.Tipo) {
+			add("%s: tipo desconhecido %q", d.Ref, d.Tipo)
+		}
+		vistos[d.Ref] = true
+	}
+
+	return vistos
 }
 
 func (q Questao) problemas(

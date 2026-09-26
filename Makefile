@@ -39,7 +39,7 @@ DOCKER_SRV   := DOCKER_HOST=unix:///run/user/$$(id -u)/docker.sock docker compos
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
         check check-backend check-frontend check-processor check-db e2e fmt lint \
-        leis-capturar leis-validar leis-pacote servidor-endereco \
+        servidor-endereco \
         status commit push deploy provision servidor-status servidor-logs servidor-health
 
 help: ## Lista os alvos disponíveis
@@ -112,23 +112,6 @@ check-db: ## Testes de integração com PostgreSQL efêmero (exige Docker)
 # Fora do `check` pelo mesmo motivo do check-db: exige Docker e leva minutos.
 e2e: ## Testes E2E do app inteiro num stack isolado (exige Docker)
 	./e2e/rodar.sh
-
-# ----------------------------------------------------------------- legislação
-#
-# A lei é baixada e organizada AQUI, na máquina de quem estuda; produção só
-# importa o pacote pronto (ver PLANO-LEGISLACAO.md e edital-processor/app/leis).
-# A chave do Gemini vem do .env da raiz, sem passar pelo terminal.
-
-leis-capturar: ## Baixa e organiza leis de normas.toml (slug=cf88 | prioridade=A; sem_gemini=1)
-	@cd edital-processor && set -a && { [ ! -f ../.env ] || . ../.env; } && set +a && \
-		EP_GEMINI_API_KEY="$${GEMINI_API_KEY:-}" uv run python -m app.leis capturar \
-		$(if $(slug),$(slug),--prioridade $(or $(prioridade),A)) $(if $(sem_gemini),--sem-gemini)
-
-leis-validar: ## Confere as questões de lei como a importação confere (atualizar=1: hash de unidade nova)
-	cd backend && go run ./cmd/leis validar $(if $(atualizar),-atualizar) $(slug)
-
-leis-pacote: ## Monta em conteudo/leis/pacotes/ o que se importa em Legislação (slug=… ou todas)
-	cd backend && go run ./cmd/leis pacote $(slug)
 
 # ------------------------------------------------------------------- servidor
 

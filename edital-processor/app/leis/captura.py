@@ -1,4 +1,9 @@
-"""Baixar → limpar → classificar → montar → verificar → gravar."""
+"""Baixar → limpar → classificar → montar → verificar: a prévia da lei.
+
+Nada aqui grava. O resultado vai para a tela, e quem publica é o backend,
+depois que a pessoa revisou: um bloqueio impede a publicação; um aviso só
+precisa ser marcado como revisado.
+"""
 
 from __future__ import annotations
 
@@ -6,25 +11,44 @@ import asyncio
 import hashlib
 import json
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 
-from app.leis.catalogo import Norma
 from app.leis.classificar import combinar, por_gemini, por_regras
-from app.leis.fontes import FonteInvalida, Http, Original, baixar
+from app.leis.fontes import Fonte, FonteInvalida, Http, Original, baixar
 from app.leis.limpeza import Paragrafo, paragrafos_de_html, paragrafos_de_pdf
 from app.leis.montar import Montagem, montar
-from app.leis.verificar import verificar
+from app.leis.verificar import SALTO, verificar
 from app.providers.base import LLMProvider
 
-FORMATO = "studygo.lei/1"
+# (etapa, feitos, total): para a tela dizer em que pé a captura está.
+Progresso = Callable[[str, int, int], None]
+
+
+@dataclass(frozen=True)
+class Aviso:
+    # Estável entre capturas da mesma fonte: é o que a pessoa marca como
+    # revisado, e o que o backend confere antes de publicar.
+    id: str
+    texto: str
+    trecho: str = ""
 
 
 @dataclass
-class Resultado:
-    slug: str
-    gravado: bool
-    problemas: list[str] = field(default_factory=list)
+class Captura:
+    fonte: str
+    gemini: bool
+    versao: str | None = None
+    original_sha256: str | None = None
+    paragrafos: int = 0
+    dispositivos: list[dict[str, object]] | None = None
+    bloqueios: list[str] = field(default_factory=list)
+    avisos: list[Aviso] = field(default_factory=list)
+    resumo: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def publicavel(self) -> bool:
+        return not self.bloqueios and self.dispositivos is not None
 
 
 def _paginas_do_pdf(bruto: bytes) -> list[str]:
@@ -48,157 +72,97 @@ def _versao(dispositivos: list[dict[str, object]]) -> str:
     return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
 
 
-def _relatorio(
-    norma: Norma,
-    original: Original | None,
-    paragrafos: list[Paragrafo],
-    montagem: Montagem | None,
-    gemini: bool,
-    problemas: list[str],
-    gravado: bool,
-) -> str:
-    linhas = [f"# Captura — {norma.curto}", "", f"- Norma: {norma.nome}"]
-    if original is not None:
-        linhas += [
-            f"- Fonte: {original.url_publica}",
-            f"- sha256 do original: `{original.sha256}` ({len(original.bruto):,} bytes)",
-        ]
-    linhas.append(
-        "- Classificação: regras + Gemini"
-        if gemini
-        else "- Classificação: só regras — **sem conferência do Gemini**"
-    )
+def _resumo(paragrafos: list[Paragrafo], montagem: Montagem | None) -> dict[str, object]:
     vigentes = [p for p in paragrafos if not p.anterior]
-    linhas += [
-        f"- Parágrafos: {len(paragrafos)} ({len(vigentes)} vigentes, "
-        f"{len(paragrafos) - len(vigentes)} de redação anterior)",
-        f"- Notas de redação: {sum(len(p.notas) for p in paragrafos)}",
-    ]
+    resumo: dict[str, object] = {
+        "vigentes": len(vigentes),
+        "anteriores": len(paragrafos) - len(vigentes),
+        "notas": sum(len(p.notas) for p in paragrafos),
+        "riscados": [f"{p.id}: {r}" for p in paragrafos for r in p.riscado],
+        "juncoes": [f"{p.id}: {j}" for p in paragrafos for j in p.juncoes],
+    }
     if montagem is not None:
-        tipos = Counter(d.tipo for d in montagem.dispositivos)
-        linhas.append(
-            "- Dispositivos: "
-            + ", ".join(f"{n} {t}" for t, n in sorted(tipos.items(), key=lambda x: -x[1]))
-        )
-        revogados = sum(1 for d in montagem.dispositivos if d.revogado)
-        linhas.append(f"- Revogados: {revogados}")
-    linhas += ["", "## Resultado", ""]
-    linhas.append(
-        "Gravado em `lei.json`." if gravado else "**NÃO gravado**: corrija os problemas abaixo."
-    )
-    if problemas:
-        linhas += ["", "## Problemas", ""]
-        linhas += [f"- {p}" for p in problemas]
-    if montagem is not None and montagem.descartados:
-        linhas += ["", "## Descartado (cabeçalho do site)", ""]
-        linhas += [f"- {t}" for t in montagem.descartados]
-    parciais = [(p.id, r) for p in paragrafos for r in p.riscado]
-    if parciais:
-        linhas += ["", "## Riscado dentro de parágrafo vigente", ""]
-        linhas += [f"- {pid}: {r}" for pid, r in parciais]
-    juncoes = [(p.id, j) for p in paragrafos for j in p.juncoes]
-    if juncoes:
-        linhas += ["", "## Hifenização desfeita (PDF) — confira", ""]
-        linhas += [f"- {pid}: {j}" for pid, j in juncoes]
-    return "\n".join(linhas) + "\n"
+        resumo["tipos"] = dict(Counter(d.tipo for d in montagem.dispositivos))
+        resumo["revogados"] = sum(1 for d in montagem.dispositivos if d.revogado)
+        resumo["descartados"] = list(montagem.descartados)
+    return resumo
 
 
-def _aceita(divergencia: str, aceitas: list[str]) -> bool:
-    """ "p0328: a regra diz nome" aceita esse parágrafo, seja qual for o palpite."""
-    return any(divergencia == a or divergencia.startswith(f"{a},") for a in aceitas)
+def _aviso_de_divergencia(divergencia: str, textos: dict[str, str]) -> Aviso:
+    """ "p0328: a regra diz nome, o Gemini diz solto" → aviso de p0328.
+
+    O id deixa o palpite do Gemini de fora: ele muda de palpite a cada
+    execução, e a revisão é do parágrafo e do tipo que a regra deu (K17b).
+    """
+    pid = divergencia.split(":", 1)[0]
+    return Aviso(divergencia.split(", o Gemini", 1)[0], divergencia, textos.get(pid, "")[:240])
 
 
-def _divergencias(divergencias: list[str], paragrafos: list[Paragrafo], aceitas: list[str]) -> str:
-    if not divergencias:
-        return ""
-    textos = {p.id: p.texto for p in paragrafos}
-    linhas = [
-        "",
-        "## Onde o Gemini discordou da regra",
-        "",
-        "A regra prevaleceu. Se ela estiver certa, declare em `aceitar` no normas.toml "
-        'o parágrafo e o tipo da regra ("p0328: a regra diz nome"); se não, corrija a regra.',
-        "",
-    ]
-    for d in divergencias:
-        pid = d.split(":", 1)[0]
-        marca = "aceita" if _aceita(d, aceitas) else "pendente"
-        linhas.append(f"- [{marca}] `{d}` — {textos.get(pid, '')[:120]!r}")
-    return "\n".join(linhas) + "\n"
-
-
-def capturar(
-    norma: Norma,
-    raiz: Path,
+async def capturar(
+    fonte: Fonte,
     http: Http,
     provider: LLMProvider | None,
-) -> Resultado:
-    pasta = raiz / norma.slug
-    pasta.mkdir(parents=True, exist_ok=True)
-    relatorio = pasta / "captura.md"
-    original: Original | None = None
+    progresso: Progresso | None = None,
+) -> Captura:
+    """A prévia da lei. Falha da fonte vira bloqueio; o resto sobe como exceção."""
+
+    def etapa(nome: str, feitos: int = 0, total: int = 0) -> None:
+        if progresso is not None:
+            progresso(nome, feitos, total)
+
+    captura = Captura(fonte=fonte.url_publica, gemini=provider is not None)
     paragrafos: list[Paragrafo] = []
     montagem: Montagem | None = None
-    problemas: list[str] = []
-    revisar: list[str] = []
-
     try:
-        original = baixar(norma, http)
-        (pasta / f"original.{original.extensao}").write_bytes(original.bruto)
+        etapa("baixando")
+        original: Original = await asyncio.to_thread(baixar, fonte, http)
+        captura.original_sha256 = original.sha256
+        etapa("organizando")
         if original.pdf:
-            paragrafos = paragrafos_de_pdf(_paginas_do_pdf(original.bruto))
+            paginas = await asyncio.to_thread(_paginas_do_pdf, original.bruto)
+            paragrafos = paragrafos_de_pdf(paginas)
         else:
             assert original.html is not None
-            paragrafos = paragrafos_de_html(original.html)
+            paragrafos = await asyncio.to_thread(paragrafos_de_html, original.html)
+        captura.paragrafos = len(paragrafos)
         classes = por_regras(paragrafos)
+        textos = {p.id: p.texto for p in paragrafos}
         if provider is not None:
-            deles = asyncio.run(por_gemini(paragrafos, provider))
-            classes, divergencias = combinar(classes, deles, paragrafos)
-            # A divergência revisada (a regra estava certa) é declarada, uma a
-            # uma, em `aceitar`; a mensagem traz o id, então não serve para outra.
-            problemas.extend(d for d in divergencias if not _aceita(d, norma.aceitar))
-            revisar = divergencias
-        montagem = montar(paragrafos, classes)
-        problemas.extend(
-            verificar(
-                original.html,
-                paragrafos,
-                montagem,
-                norma.recorte,
-                norma.aceitar,
+            etapa("classificando", 0, 1)
+            deles = await por_gemini(
+                paragrafos, provider, ao_lote=lambda f, t: etapa("classificando", f, t)
             )
-        )
+            classes, divergencias = combinar(classes, deles, paragrafos)
+            captura.avisos.extend(_aviso_de_divergencia(d, textos) for d in divergencias)
+        else:
+            captura.avisos.append(
+                Aviso(
+                    "sem-gemini",
+                    "A classificação não foi conferida pelo Gemini (o processador está sem "
+                    "chave): só as regras organizaram os dispositivos.",
+                )
+            )
+        etapa("verificando")
+        montagem = await asyncio.to_thread(montar, paragrafos, classes)
+        for problema in await asyncio.to_thread(verificar, original.html, paragrafos, montagem):
+            if problema.startswith(SALTO):
+                salto = problema.removeprefix(SALTO)
+                captura.avisos.append(
+                    Aviso(
+                        f"salto: {salto}",
+                        f"A numeração dos artigos salta ({salto}). Confira na fonte se "
+                        "o artigo que falta existe: se existir, a captura o perdeu.",
+                    )
+                )
+            else:
+                captura.bloqueios.append(problema)
     except (FonteInvalida, ValueError) as exc:
-        problemas.append(str(exc))
+        # ValueError é a recusa com motivo: um lote que o Gemini devolveu
+        # torto duas vezes, uma árvore que não monta.
+        captura.bloqueios.append(str(exc))
 
-    gravado = not problemas and montagem is not None and original is not None
-    if gravado:
-        assert montagem is not None and original is not None
-        dispositivos = [d.model_dump() for d in montagem.dispositivos]
-        lei = {
-            "formato": FORMATO,
-            "lei": {
-                "slug": norma.slug,
-                "nome": norma.nome,
-                "curto": norma.curto,
-                "reconhecer": norma.reconhecer,
-                "fonte": original.url_publica,
-            },
-            "versao": _versao(dispositivos),
-            "captura": {
-                "original_sha256": original.sha256,
-                "gemini": provider is not None,
-                "paragrafos": len(paragrafos),
-            },
-            "dispositivos": dispositivos,
-        }
-        temporario = pasta / "lei.json.tmp"
-        temporario.write_text(json.dumps(lei, ensure_ascii=False, indent=1) + "\n", "utf-8")
-        temporario.replace(pasta / "lei.json")
-
-    relatorio.write_text(
-        _relatorio(norma, original, paragrafos, montagem, provider is not None, problemas, gravado)
-        + _divergencias(revisar, paragrafos, norma.aceitar),
-        "utf-8",
-    )
-    return Resultado(norma.slug, gravado, problemas)
+    captura.resumo = _resumo(paragrafos, montagem)
+    if montagem is not None and not captura.bloqueios:
+        captura.dispositivos = [d.model_dump() for d in montagem.dispositivos]
+        captura.versao = _versao(captura.dispositivos)
+    return captura

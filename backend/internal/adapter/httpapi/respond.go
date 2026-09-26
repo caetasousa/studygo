@@ -62,10 +62,21 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, validacao.Msg
 	}
 
-	// O pacote de lei lista os problemas: quem importa corrige todos de uma vez.
+	// A lei com as questões lista os problemas: quem importa corrige todos de
+	// uma vez.
 	var pacote lei.ErrPacoteInvalido
 	if errors.As(err, &pacote) {
 		return http.StatusUnprocessableEntity, pacote.Error()
+	}
+
+	var link lei.ErrLinkInvalido
+	if errors.As(err, &link) {
+		return http.StatusUnprocessableEntity, link.Error()
+	}
+
+	var pendentes lei.ErrAvisosPendentes
+	if errors.As(err, &pendentes) {
+		return http.StatusUnprocessableEntity, pendentes.Error()
 	}
 
 	// A tag repetida nomeia a tag, então é um tipo e não um sentinela.
@@ -108,12 +119,24 @@ func classificar(err error) (int, string) {
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrNaoEncontrada),
-		errors.Is(err, lei.ErrQuestaoNaoEncontrada):
+		errors.Is(err, lei.ErrQuestaoNaoEncontrada),
+		errors.Is(err, lei.ErrCapturaNaoEncontrada):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),
-		errors.Is(err, errPacoteIlegivel):
+		errors.Is(err, lei.ErrCapturaBloqueada),
+		errors.Is(err, lei.ErrCapturaFalhou),
+		errors.Is(err, errQuestoesIlegiveis):
 		return http.StatusUnprocessableEntity, err.Error()
+
+	case errors.Is(err, lei.ErrCapturaEmAndamento),
+		errors.Is(err, lei.ErrLeiJaExiste):
+		return http.StatusConflict, err.Error()
+
+	// Antes do ErrProvedorIndisponivel, que ele embrulha: a mensagem genérica
+	// fala do cadastro de concurso.
+	case errors.Is(err, lei.ErrCapturaIndisponivel):
+		return http.StatusServiceUnavailable, lei.ErrCapturaIndisponivel.Error()
 
 	case errors.Is(err, errRequisicaoInvalida):
 		return http.StatusBadRequest, err.Error()

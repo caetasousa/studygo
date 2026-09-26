@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// LeiHandler serve o catálogo de leis, o leitor, as respostas e os vínculos
-// entre lei e matéria.
+// LeiHandler serve o catálogo de leis, a captura e a publicação, a importação
+// das questões, o leitor, as respostas e os vínculos entre lei e matéria.
 type LeiHandler struct {
 	leis   *service.LeiService
 	logger *slog.Logger
@@ -21,9 +21,10 @@ func NewLeiHandler(leis *service.LeiService, logger *slog.Logger) *LeiHandler {
 	return &LeiHandler{leis: leis, logger: logger}
 }
 
-// maxCorpoPacoteLei cobre a Constituição inteira com as questões: o texto dela
-// sozinho passa de 1 MiB, que é o teto das rotas comuns.
-const maxCorpoPacoteLei = 32 << 20 // 32 MiB
+// maxCorpoQuestoesLei cobre o questoes.json de uma lei grande: o da Lei
+// Orgânica do TCE-GO, com 133 questões, passa de 1 MiB, o teto das rotas
+// comuns.
+const maxCorpoQuestoesLei = 16 << 20 // 16 MiB
 
 func (h *LeiHandler) Catalogo(w http.ResponseWriter, r *http.Request) {
 	rs, err := h.leis.Catalogo(r.Context())
@@ -39,17 +40,58 @@ func (h *LeiHandler) Catalogo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, h.logger, http.StatusOK, map[string]any{"leis": out})
 }
 
-func (h *LeiHandler) Importar(w http.ResponseWriter, r *http.Request) {
-	var d pacoteLeiDTO
-	if err := decodeLimitado(w, r, &d, maxCorpoPacoteLei); err != nil {
-		if errors.Is(err, errRequisicaoInvalida) {
-			err = errPacoteIlegivel
-		}
+func (h *LeiHandler) Capturar(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var req capturaRequest
+	if err := decode(w, r, &req); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 
-	res, err := h.leis.Importar(r.Context(), d.paraDominio())
+	captura, err := h.leis.Capturar(r.Context(), id, req.Link)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusAccepted, map[string]string{"id": captura})
+}
+
+func (h *LeiHandler) Captura(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	c, err := h.leis.Captura(r.Context(), id, r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusOK, capturaParaDTO(c))
+}
+
+func (h *LeiHandler) Publicar(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var req publicacaoRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	res, err := h.leis.Publicar(r.Context(), id, r.PathValue("id"), service.PedidoDePublicacao{
+		Slug: req.Slug, Nome: req.Nome, Curto: req.Curto, Reconhecer: req.Reconhecer, Aceitos: req.Aceitos,
+	})
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -59,7 +101,26 @@ func (h *LeiHandler) Importar(w http.ResponseWriter, r *http.Request) {
 	if res.NovaVersao {
 		status = http.StatusCreated
 	}
-	writeJSON(w, h.logger, status, importacaoLeiParaDTO(res))
+	writeJSON(w, h.logger, status, publicacaoParaDTO(res))
+}
+
+func (h *LeiHandler) ImportarQuestoes(w http.ResponseWriter, r *http.Request) {
+	var d questoesDeLeiDTO
+	if err := decodeLimitado(w, r, &d, maxCorpoQuestoesLei); err != nil {
+		if errors.Is(err, errRequisicaoInvalida) {
+			err = errQuestoesIlegiveis
+		}
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	us, qs := questoesDoDTO(d)
+	res, err := h.leis.ImportarQuestoes(r.Context(), r.PathValue("slug"), us, qs)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusOK, importacaoQuestoesParaDTO(res))
 }
 
 func (h *LeiHandler) Ler(w http.ResponseWriter, r *http.Request) {

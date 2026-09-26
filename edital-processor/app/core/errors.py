@@ -133,3 +133,26 @@ class InvalidProviderResponse(ProcessorError):
 class Unauthorized(ProcessorError):
     code = "unauthorized"
     http_status = status.HTTP_401_UNAUTHORIZED
+
+
+# --- captura de leis -------------------------------------------------------------
+
+
+class LinkDeLeiInvalido(ProcessorError):
+    """O link não é de fonte oficial: a mensagem diz qual usar."""
+
+    code = "fonte_invalida"
+    http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+class CapturaNaoEncontrada(ProcessorError):
+    """Não existe, expirou ou é de outra conta — as três respondem igual."""
+
+    code = "captura_nao_encontrada"
+    http_status = status.HTTP_404_NOT_FOUND
+
+
+class CapturasDemais(ProcessorError):
+    code = "capturas_demais"
+    http_status = status.HTTP_429_TOO_MANY_REQUESTS
+    transient = True

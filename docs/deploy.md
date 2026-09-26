@@ -153,17 +153,19 @@ que o deploy usa? `ansible-vault edit`, cole o conteúdo cifrado na variável
 
 ## ⚖️ Publicar uma lei
 
-A lei não passa pela pipeline como código: ela é **dado**, importado pela
-tela depois que a versão do app que a lê já está no ar. Enquanto o app é de
-teste, qualquer conta logada importa.
+A lei não passa pela pipeline como código: ela é **dado**, capturado pela
+tela do servidor depois que a versão do app que a lê já está no ar. Enquanto o
+app é de teste, qualquer conta logada captura e importa.
 
-1. Na sua máquina: `make leis-validar` e `make leis-pacote`.
-2. No app: **Legislação → Importar lei**, um pacote de
-   `conteudo/leis/pacotes/` por vez. Abra a lei, confira um artigo com
-   questões e o link direto (`/leis/cf88#art71`).
+1. **Legislação → Adicionar lei**: cole o link (lista em
+   `conteudo/leis/README.md`), revise a prévia, publique.
+2. Na página da lei, **Manter esta lei → Importar questões** com o
+   `conteudo/leis/<slug>/questoes.json`. Confira um artigo com questões e o
+   link direto (`/leis/<slug>#art71`).
 
-Importar de novo o mesmo pacote não duplica nada; uma versão nova da lei
-preserva as respostas das questões que continuam.
+O servidor baixa a lei pela saída normal de internet da `ubuntu-server`; só
+fontes oficiais (.gov.br, .leg.br, .jus.br) são aceitas. Publicar e importar
+de novo não duplica nada; o texto novo preserva as questões e as respostas.
 
 ---
 

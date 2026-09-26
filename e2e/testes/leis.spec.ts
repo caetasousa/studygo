@@ -3,9 +3,10 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { request as novoRequest, type APIRequestContext, type Page } from '@playwright/test';
 import { test, expect, Api, cadastrar, emailUnico } from './base';
 
-// O catálogo de leis é global: dois testes importando "lei-e2e" ao mesmo tempo
-// disputariam a mesma lei. Cada teste importa uma cópia com slug, número e
-// reconhecimento próprios.
+// O catálogo de leis é global: dois testes publicando a mesma lei ao mesmo
+// tempo disputariam o mesmo slug. Cada teste publica uma cópia com nome curto
+// (e portanto slug), número e reconhecimento próprios. O texto vem do dublê do
+// processador, que devolve a lei da fixture para links do Planalto em /e2e/.
 
 interface Dispositivo {
 	ref: string;
@@ -17,6 +18,7 @@ interface Dispositivo {
 interface Pacote {
 	lei: { slug: string; nome: string; curto: string; reconhecer: string[] };
 	dispositivos: Dispositivo[];
+	unidades: { ref: string; titulo: string; dispositivos: string[]; hash: string }[];
 	questoes: { id: string; gabarito: string; comentario: string; trecho: string; dispositivos: string[] }[];
 }
 
@@ -26,13 +28,18 @@ function pacote(arquivo = 'lei-exemplo.json'): Pacote {
 	return JSON.parse(readFileSync(new URL(arquivo, FIXTURES), 'utf-8')) as Pacote;
 }
 
-/** Uma cópia só deste teste: slug e "nº" únicos, o resto igual à fixture. */
+/** Uma cópia só deste teste: nome curto e "nº" únicos, o resto igual à fixture. */
 function copia(p: Pacote, id: string, numero: string): Pacote {
 	const c = structuredClone(p);
 	c.lei.slug = `lei-e2e-${id}`;
 	c.lei.curto = `Lei E2E ${id}`;
 	c.lei.reconhecer = [numero];
 	return c;
+}
+
+/** O link que o dublê reconhece; `marca` produz aviso ou bloqueio na captura. */
+function linkDaLei(arquivo = 'lei-exemplo', marca = '') {
+	return `https://www.planalto.gov.br/e2e/${arquivo}${marca ? `-${marca}` : ''}.htm`;
 }
 
 function idUnico() {
@@ -43,24 +50,61 @@ function numeroUnico() {
 	return `${randomInt(10, 99)}.${randomInt(100, 999)}`;
 }
 
-// Quem importa é uma conta à parte da do teste — como na vida real, quem
-// publica a lei não é quem a estuda. Qualquer conta importa (L4).
+// Quem publica é uma conta à parte da do teste — como na vida real, quem
+// publica a lei não é quem a estuda. Qualquer conta publica (L4).
 async function outraSessao(baseURL: string): Promise<{ request: APIRequestContext; token: string }> {
 	const request = await novoRequest.newContext({
 		baseURL,
 		extraHTTPHeaders: { 'X-Forwarded-For': `10.200.${randomInt(1, 255)}.${randomInt(1, 255)}` }
 	});
-	const { token } = await cadastrar(request, emailUnico('importa'));
+	const { token } = await cadastrar(request, emailUnico('publica'));
 	return { request, token };
 }
 
-async function importar(baseURL: string, p: Pacote) {
+/** Captura o link e espera a prévia, como a tela faz. */
+async function capturar(request: APIRequestContext, token: string, link: string) {
+	const headers = { Authorization: `Bearer ${token}` };
+	const inicio = await request.post('/api/leis/capturas', { data: { link }, headers });
+	expect(inicio.status(), await inicio.text()).toBe(202);
+	const { id } = await inicio.json();
+	for (let i = 0; i < 40; i++) {
+		const c = await (await request.get(`/api/leis/capturas/${id}`, { headers })).json();
+		if (c.estado !== 'rodando') return c;
+		await new Promise((r) => setTimeout(r, 100));
+	}
+	throw new Error('a captura não terminou');
+}
+
+/**
+ * Publica a lei da fixture e importa as questões dela, pela API. Com
+ * `atualizar`, é o texto novo da lei que já existe.
+ */
+async function importar(baseURL: string, p: Pacote, { arquivo = 'lei-exemplo', atualizar = false } = {}) {
 	const { request, token } = await outraSessao(baseURL);
-	const res = await request.post('/api/leis', { data: p, headers: { Authorization: `Bearer ${token}` } });
-	expect(res.ok(), await res.text()).toBeTruthy();
-	const corpo = await res.json();
+	const headers = { Authorization: `Bearer ${token}` };
+	const c = await capturar(request, token, linkDaLei(arquivo));
+	const pub = await request.post(`/api/leis/capturas/${c.id}/publicacao`, {
+		headers,
+		data: {
+			slug: atualizar ? p.lei.slug : undefined,
+			nome: p.lei.nome,
+			curto: p.lei.curto,
+			reconhecer: p.lei.reconhecer,
+			aceitos: c.resultado.avisos.map((a: { id: string }) => a.id)
+		}
+	});
+	expect(pub.ok(), await pub.text()).toBeTruthy();
+	const publicacao = await pub.json();
+	expect(publicacao.slug).toBe(p.lei.slug);
+
+	const q = await request.post(`/api/leis/${p.lei.slug}/questoes`, {
+		headers,
+		data: { unidades: p.unidades, questoes: p.questoes }
+	});
+	expect(q.ok(), await q.text()).toBeTruthy();
+	const questoes = await q.json();
 	await request.dispose();
-	return corpo;
+	return { publicacao, questoes };
 }
 
 async function abrirLei(page: Page, slug: string) {
@@ -93,37 +137,53 @@ const ENUNCIADO_3 = 'Sobre a organização do Tribunal de Contas, é correto afi
 const ENUNCIADO_4 = 'A Lei nº 99.999 entra em vigor:';
 
 test.describe('legislação', () => {
-	test('[L1] o pacote importado vira uma lei legível, com o texto igual ao do pacote', async ({ browser, baseURL }) => {
+	test('[L1][L16] a lei capturada pela tela vira uma lei legível, com o texto que o processador leu', async ({ browser, baseURL }) => {
 		const p = copia(pacote(), idUnico(), numeroUnico());
-		const arquivo = test.info().outputPath(`${p.lei.slug}.json`);
-		writeFileSync(arquivo, JSON.stringify(p));
+		const arquivo = test.info().outputPath(`${p.lei.slug}-questoes.json`);
+		writeFileSync(arquivo, JSON.stringify({ unidades: p.unidades, questoes: p.questoes }));
 
-		// A importação pela tela, como em produção.
 		const { request, token } = await outraSessao(baseURL!);
-		await new Api(request, token).concurso('Importação E2E');
+		await new Api(request, token).concurso('Captura E2E');
 		const contexto = await browser.newContext({ storageState: await request.storageState() });
 		const page = await contexto.newPage();
 		await page.goto('/legislacao');
 		await expect(page.getByRole('heading', { name: 'Legislação', level: 1 })).toBeVisible();
-		await page.getByLabel('Pacote da lei (.json)').setInputFiles(arquivo);
-		await expect(page.getByRole('status')).toContainText(`${p.lei.curto} importada`);
 
-		await page.getByRole('link', { name: p.lei.curto }).first().click();
+		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei());
+		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
+		// A captura ainda rodando aparece como andamento, e a tela espera (L16).
+		await expect(page.getByRole('status')).toContainText('Capturando');
+		await expect(page.getByRole('heading', { name: 'Prévia da captura' })).toBeVisible();
+		await expect(page.getByText(`3 artigos, ${p.dispositivos.length} dispositivos`)).toBeVisible();
+
+		await page.getByLabel('Nome da lei').fill(p.lei.nome);
+		await page.getByLabel('Nome curto').fill(p.lei.curto);
+		await page.getByRole('button', { name: 'Publicar lei' }).click();
+		await expect(page.getByRole('status')).toContainText(`${p.lei.curto} publicada`);
+
+		await page.getByRole('link', { name: 'Abrir a lei' }).click();
 		await expect(page.getByRole('heading', { name: p.lei.curto, level: 1 })).toBeVisible();
 		for (const d of p.dispositivos) {
 			await expect(dispositivo(page, d.ref).locator('.texto')).toHaveText(d.texto);
 		}
+
+		// As questões, escritas fora do app, entram pela página da lei.
+		await page.getByText('Manter esta lei').click();
+		await page.getByLabel('Questões da lei (questoes.json)').setInputFiles(arquivo);
+		await expect(page.getByRole('status')).toContainText('Questões importadas: 4 novas');
+		await expect(page.getByRole('button', { name: 'Questões do Art. 1º', exact: true })).toBeVisible();
 		await contexto.close();
 		await request.dispose();
 	});
 
-	test('[L2] importar o mesmo pacote de novo não duplica nada', async ({ api, page, conta, baseURL }) => {
+	test('[L2] publicar e importar de novo a mesma versão não duplica nada', async ({ api, page, conta, baseURL }) => {
 		const p = copia(pacote(), idUnico(), numeroUnico());
 		const primeira = await importar(baseURL!, p);
-		expect(primeira.novaVersao).toBe(true);
-		const segunda = await importar(baseURL!, p);
-		expect(segunda.novaVersao).toBe(false);
+		expect(primeira.publicacao.novaVersao).toBe(true);
+		const segunda = await importar(baseURL!, p, { atualizar: true });
+		expect(segunda.publicacao.novaVersao).toBe(false);
 		expect(segunda.questoes.novas).toBe(0);
+		expect(segunda.questoes.mantidas).toBe(4);
 
 		const catalogo = await page.request.get('/api/leis', { headers: { Authorization: `Bearer ${conta.token}` } });
 		const { leis } = await catalogo.json();
@@ -136,7 +196,7 @@ test.describe('legislação', () => {
 		await expect(painel.getByRole('group')).toHaveCount(2);
 	});
 
-	test('[L3] a versão nova preserva as respostas das questões que continuam', async ({ api, page, baseURL }) => {
+	test('[L3] o texto novo e as questões novas preservam as respostas das que continuam', async ({ api, page, baseURL }) => {
 		const id = idUnico();
 		const numero = numeroUnico();
 		await importar(baseURL!, copia(pacote(), id, numero));
@@ -145,8 +205,11 @@ test.describe('legislação', () => {
 		const painel = await abrirQuestoes(page, 'Art. 1º');
 		await responder(painel, ENUNCIADO_1, 'B');
 
-		const v2 = await importar(baseURL!, copia(pacote('lei-exemplo-v2.json'), id, numero));
-		expect(v2.novaVersao).toBe(true);
+		const v2 = await importar(baseURL!, copia(pacote('lei-exemplo-v2.json'), id, numero), {
+			arquivo: 'lei-exemplo-v2',
+			atualizar: true
+		});
+		expect(v2.publicacao.novaVersao).toBe(true);
 		expect(v2.questoes.desativadas).toBe(1);
 
 		await page.reload();
@@ -156,23 +219,125 @@ test.describe('legislação', () => {
 		const depois = await abrirQuestoes(page, 'Art. 1º');
 		await expect(depois.getByRole('group', { name: ENUNCIADO_1 }).getByText('Certo')).toBeVisible();
 		await page.keyboard.press('Escape');
-		// A questão que saiu do pacote some da tela; a resposta dela fica no banco.
+		// A questão que saiu do arquivo some da tela; a resposta dela fica no banco.
 		await expect(page.getByRole('button', { name: 'Questões do Art. 2º', exact: true })).toHaveCount(0);
 	});
 
-	test('[L4] qualquer conta logada importa, pela tela ou pela API', async ({ page, api, conta }) => {
-		const p = copia(pacote(), idUnico(), numeroUnico());
-		const res = await page.request.post('/api/leis', {
-			data: p,
-			headers: { Authorization: `Bearer ${conta.token}` }
-		});
-		expect(res.status(), await res.text()).toBe(201);
+	test('[L4] qualquer conta logada captura, pela tela ou pela API', async ({ page, api, conta }) => {
+		const c = await capturar(page.request, conta.token, linkDaLei());
+		expect(c.estado).toBe('pronta');
+		expect(c.resultado.publicavel).toBe(true);
 
 		await api.concurso('Conta comum E2E');
 		await page.goto('/legislacao');
-		await expect(page.getByRole('heading', { name: 'Legislação', level: 1 })).toBeVisible();
-		await expect(page.getByLabel('Pacote da lei (.json)')).toBeVisible();
-		await expect(page.getByRole('link', { name: p.lei.curto })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Adicionar lei' })).toBeVisible();
+		await expect(page.getByLabel('Link da lei na fonte oficial')).toBeEditable();
+	});
+
+	test('[L11] a captura com bloqueio não pode ser publicada', async ({ page, api, conta }) => {
+		await api.concurso('Bloqueio E2E');
+		await page.goto('/legislacao');
+		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'bloqueio'));
+		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
+		await expect(page.getByRole('alert')).toContainText('Esta captura não pode ser publicada');
+		await expect(page.getByRole('alert')).toContainText('sha256 diferente');
+		await expect(page.getByRole('button', { name: 'Publicar lei' })).toHaveCount(0);
+
+		// A tela esconde o botão; quem recusa de verdade é o servidor.
+		const c = await capturar(page.request, conta.token, linkDaLei('lei-exemplo', 'bloqueio'));
+		const res = await page.request.post(`/api/leis/capturas/${c.id}/publicacao`, {
+			headers: { Authorization: `Bearer ${conta.token}` },
+			data: { nome: 'Lei quebrada', curto: `Quebrada ${idUnico()}`, reconhecer: [], aceitos: [] }
+		});
+		expect(res.status()).toBe(422);
+		expect((await res.json()).erro).toContain('impedem a publicação');
+	});
+
+	test('[L12] o aviso da captura aparece e só sai marcado como revisado', async ({ page, api, conta }) => {
+		const curto = `Lei Aviso ${idUnico()}`;
+		const c = await capturar(page.request, conta.token, linkDaLei('lei-exemplo', 'aviso'));
+		const headers = { Authorization: `Bearer ${conta.token}` };
+		const semRevisar = await page.request.post(`/api/leis/capturas/${c.id}/publicacao`, {
+			headers,
+			data: { nome: 'Lei com aviso', curto, reconhecer: [], aceitos: ['outro aviso qualquer'] }
+		});
+		expect(semRevisar.status()).toBe(422);
+		expect((await semRevisar.json()).erro).toContain('marque como revisado');
+
+		await api.concurso('Aviso E2E');
+		await page.goto('/legislacao');
+		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'aviso'));
+		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
+		const aviso = page.getByRole('checkbox', { name: /Revisei: p0003: a regra diz artigo, o Gemini diz solto/ });
+		await expect(aviso).toBeVisible();
+		await page.getByLabel('Nome da lei').fill('Lei com aviso');
+		await page.getByLabel('Nome curto').fill(curto);
+		const publicar = page.getByRole('button', { name: 'Publicar lei' });
+		await expect(publicar).toBeDisabled();
+		await aviso.check();
+		await publicar.click();
+		await expect(page.getByRole('status')).toContainText(`${curto} publicada`);
+	});
+
+	test('[L13] link fora das fontes oficiais é recusado com o motivo', async ({ page, api }) => {
+		await api.concurso('Fonte E2E');
+		await page.goto('/legislacao');
+		await page.getByLabel('Link da lei na fonte oficial').fill('https://www.exemplo.com/lei.htm');
+		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
+		await expect(page.getByRole('alert')).toContainText('não é uma fonte oficial');
+		await expect(page.getByRole('heading', { name: 'Prévia da captura' })).toHaveCount(0);
+	});
+
+	test('[L14] lei nova com o nome curto de outra não a sobrescreve', async ({ page, conta, baseURL }) => {
+		const p = copia(pacote(), idUnico(), numeroUnico());
+		await importar(baseURL!, p);
+
+		const c = await capturar(page.request, conta.token, linkDaLei('lei-exemplo-v2'));
+		const res = await page.request.post(`/api/leis/capturas/${c.id}/publicacao`, {
+			headers: { Authorization: `Bearer ${conta.token}` },
+			data: { nome: 'Outra lei', curto: p.lei.curto, reconhecer: [], aceitos: [] }
+		});
+		expect(res.status()).toBe(409);
+		expect((await res.json()).erro).toContain('Atualizar texto');
+
+		const leitura = await (
+			await page.request.get(`/api/leis/${p.lei.slug}`, { headers: { Authorization: `Bearer ${conta.token}` } })
+		).json();
+		expect(leitura.lei.nome).toBe(p.lei.nome);
+		expect(leitura.versao).toBe('e2e-v1');
+	});
+
+	test('[L15] questão sem apoio literal na lei, ou escrita para outra redação, é recusada', async ({ page, conta, baseURL }) => {
+		const p = copia(pacote(), idUnico(), numeroUnico());
+		await importar(baseURL!, p);
+		const headers = { Authorization: `Bearer ${conta.token}` };
+
+		const inventada = structuredClone(p);
+		inventada.questoes[0].trecho = 'um trecho que a lei não tem';
+		const r1 = await page.request.post(`/api/leis/${p.lei.slug}/questoes`, {
+			headers,
+			data: { unidades: inventada.unidades, questoes: inventada.questoes }
+		});
+		expect(r1.status()).toBe(422);
+		expect((await r1.json()).erro).toContain('não está, literalmente');
+
+		// As unidades da v2 trazem o hash do texto da v2; a lei publicada é a v1.
+		const v2 = pacote('lei-exemplo-v2.json');
+		const r2 = await page.request.post(`/api/leis/${p.lei.slug}/questoes`, {
+			headers,
+			data: { unidades: v2.unidades, questoes: v2.questoes }
+		});
+		expect(r2.status()).toBe(422);
+		expect((await r2.json()).erro).toContain('desatualizada');
+
+		// Sem hash, a unidade é escrita para o texto publicado, e passa.
+		const semHash = p.unidades.map((u) => ({ ...u, hash: '' }));
+		const r3 = await page.request.post(`/api/leis/${p.lei.slug}/questoes`, {
+			headers,
+			data: { unidades: semHash, questoes: p.questoes }
+		});
+		expect(r3.ok(), await r3.text()).toBeTruthy();
+		expect((await r3.json()).mantidas).toBe(4);
 	});
 
 	test('[L5] clicar no artigo traz as questões que o citam, e só elas', async ({ api, page, baseURL }) => {

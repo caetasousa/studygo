@@ -223,26 +223,25 @@ túnel) está em [deploy.md](deploy.md) e [cloudflare-tunnel.md](cloudflare-tunn
 
 ## ⚖️ Legislação: capturar, escrever questões, publicar
 
-A lei é organizada na sua máquina; o servidor só importa o pacote pronto.
+Tudo pela tela, sem comando:
 
-```bash
-# 1. baixar e organizar (normas de conteudo/leis/normas.toml; a chave do
-#    Gemini vem do .env da raiz)
-make leis-capturar slug=cf88        # ou prioridade=A; sem_gemini=1 só com as regras
+1. **Capturar.** Em **Legislação → Adicionar lei**, cole o link da fonte
+   oficial (os links das normas do edital estão em `conteudo/leis/README.md`).
+   A Constituição leva uns quatro minutos.
+2. **Revisar e publicar.** A prévia mostra os bloqueios (impedem publicar) e
+   os avisos — onde o Gemini discordou da regra, onde a numeração salta. Marque
+   cada aviso como revisado, dê o nome e o nome curto, e publique.
+3. **Questões.** Peça ao Claude Code para seguir
+   `.claude/skills/questoes-de-lei`; elas ficam em
+   `conteudo/leis/<slug>/questoes.json` e entram pela página da lei, em
+   **Manter esta lei → Importar questões**. A importação confere cada uma
+   (trecho literal, dispositivos da unidade) e diz tudo o que está errado de
+   uma vez.
+4. **Lei mudou?** **Manter esta lei → Atualizar texto** captura de novo. As
+   questões continuam; as das unidades cujo texto mudou ficam para revisar.
 
-# 2. conferir conteudo/leis/<slug>/captura.md — divergência regra × Gemini
-#    revisada vai para `aceitar` no normas.toml, com o motivo
-
-# 3. questões: peça ao Claude Code para seguir .claude/skills/questoes-de-lei;
-#    elas ficam em conteudo/leis/<slug>/questoes.json
-make leis-validar atualizar=1       # a mesma validação da importação
-
-# 4. o que se importa em Legislação → Importar lei
-make leis-pacote                    # conteudo/leis/pacotes/<slug>.json
-```
-
-Como a captura pode errar, e o que ela confere antes de gravar, está em
-`edital-processor/app/leis/README.md`. O original baixado e os pacotes não vão
+Como a captura pode errar, e o que ela confere antes de liberar a
+publicação, está em `edital-processor/app/leis/README.md`. O original baixado e os pacotes não vão
 para o Git (o sha256 do original fica no `captura.md`).
 
 ## 📖 Resumo dos alvos
@@ -255,7 +254,6 @@ para o Git (o sha256 do original fica no `captura.md`).
 | `make check` (+ `-backend` `-frontend` `-processor`) | qualidade |
 | `make check-db` · `make e2e` | banco real · o app inteiro pelo navegador (exigem Docker) |
 | `make fmt` | formatação |
-| `make leis-capturar` `leis-validar` `leis-pacote` | legislação: capturar, conferir questões, montar pacote |
 | `make status` `commit` | git |
 | `make push` | publicar (a pipeline testa e implanta) |
 | `make provision` | mexer na infra do servidor |

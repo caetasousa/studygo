@@ -1,0 +1,45 @@
+{
+  "estado": "string",
+  "etapa": "string",
+  "id": "string",
+  "progresso": {
+    "feitos": "number",
+    "total": "number"
+  },
+  "resultado": {
+    "artigos": "number",
+    "avisos": [
+      {
+        "id": "string",
+        "texto": "string",
+        "trecho": "string"
+      }
+    ],
+    "bloqueios": [],
+    "dispositivos": "number",
+    "fonte": "string",
+    "gemini": "bool",
+    "publicavel": "bool",
+    "resumo": {
+      "anteriores": "number",
+      "descartados": [],
+      "juncoes": [],
+      "notas": "number",
+      "revogados": "number",
+      "riscados": [],
+      "tipos": {
+        "artigo": "number"
+      },
+      "vigentes": "number"
+    },
+    "sumario": [
+      {
+        "nome": "string",
+        "ref": "string",
+        "rotulo": "string",
+        "tipo": "string"
+      }
+    ],
+    "versao": "string"
+  }
+}

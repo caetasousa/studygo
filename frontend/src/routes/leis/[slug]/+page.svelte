@@ -2,10 +2,18 @@
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import { api } from '$lib/api';
+	import CapturaDeLei from '$lib/components/CapturaDeLei.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import QuestoesDaLei from '$lib/components/QuestoesDaLei.svelte';
 	import { AGRUPAMENTOS, comRotulo, placar, questoesPorArtigo, recuo } from '$lib/leis';
-	import type { CorrecaoDeQuestao, Dispositivo, LeituraDeLei, QuestaoDeLei } from '$lib/types';
+	import type {
+		CorrecaoDeQuestao,
+		Dispositivo,
+		ImportacaoDeQuestoes,
+		LeituraDeLei,
+		PublicacaoDeLei,
+		QuestaoDeLei
+	} from '$lib/types';
 
 	/**
 	 * A lei seca, dispositivo a dispositivo.
@@ -70,6 +78,53 @@
 
 	function abrirUnidade(ref: string, titulo: string) {
 		aberto = { titulo, questoes: (leitura?.questoes ?? []).filter((q) => q.unidade === ref) };
+	}
+
+	// Manter a lei: as questões chegam pelo questoes.json escrito fora do app,
+	// e o texto novo, por uma captura nova da mesma fonte.
+	let importando = $state(false);
+	let manutencao = $state<string | null>(null);
+	let erroManutencao = $state<string | null>(null);
+
+	function descreverImportacao(r: ImportacaoDeQuestoes): string {
+		const partes = [
+			`${r.novas} novas`,
+			r.atualizadas ? `${r.atualizadas} atualizadas` : '',
+			r.desativadas ? `${r.desativadas} desativadas` : '',
+			r.mantidas ? `${r.mantidas} sem mudança` : ''
+		].filter(Boolean);
+		return `Questões importadas: ${partes.join(', ')}.`;
+	}
+
+	async function importarQuestoes(e: Event & { currentTarget: HTMLInputElement }) {
+		const arquivo = e.currentTarget.files?.[0];
+		e.currentTarget.value = '';
+		if (!arquivo) return;
+		importando = true;
+		manutencao = null;
+		erroManutencao = null;
+		try {
+			let conteudo: unknown;
+			try {
+				conteudo = JSON.parse(await arquivo.text());
+			} catch {
+				throw new Error('o arquivo não é JSON — use o questoes.json da lei');
+			}
+			manutencao = descreverImportacao(await api.importarQuestoes(slug, conteudo));
+			await carregar(slug);
+		} catch (err) {
+			erroManutencao = err instanceof Error ? err.message : 'A importação falhou';
+		} finally {
+			importando = false;
+		}
+	}
+
+	async function textoPublicado(r: PublicacaoDeLei) {
+		erroManutencao = null;
+		manutencao = r.novaVersao
+			? `Texto novo publicado.${r.unidadesDesatualizadas ? ` ${r.unidadesDesatualizadas} unidade(s) têm questões escritas para a redação anterior: reveja-as e importe de novo.` : ''}`
+			: 'O texto na fonte é o mesmo já publicado: nada mudou.';
+		await carregar(slug);
 	}
 
 	function selo(questoes: QuestaoDeLei[]): string {
@@ -182,6 +237,38 @@
 		</article>
 	</div>
 
+	<details class="manter">
+		<summary>Manter esta lei</summary>
+		{#if manutencao}<p class="ok" role="status">{manutencao}</p>{/if}
+		{#if erroManutencao}<div class="form-error" role="alert">{erroManutencao}</div>{/if}
+
+		<h2 class="sec">Importar questões</h2>
+		<p class="page-sub">
+			O <code>questoes.json</code> da lei, escrito para o texto publicado. Importar de novo não duplica nada, e as
+			respostas das questões que continuam ficam.
+		</p>
+		<label class="arquivo">
+			<span>Questões da lei (questoes.json)</span>
+			<input type="file" accept=".json,application/json" disabled={importando} onchange={importarQuestoes} />
+		</label>
+		{#if importando}<p class="page-sub">Importando…</p>{/if}
+
+		<h2 class="sec">Atualizar texto</h2>
+		<p class="page-sub">
+			Captura a lei de novo na fonte. As questões continuam; as de trechos que mudaram ficam marcadas para revisão.
+		</p>
+		<CapturaDeLei
+			atual={{
+				slug: leitura.lei.slug,
+				nome: leitura.lei.nome,
+				curto: leitura.lei.curto,
+				fonte: leitura.lei.fonte,
+				reconhecer: leitura.lei.reconhecer
+			}}
+			aoPublicar={textoPublicado}
+		/>
+	</details>
+
 	{#if aberto}
 		<QuestoesDaLei
 			titulo={aberto.titulo}
@@ -194,6 +281,26 @@
 {/if}
 
 <style>
+	.manter {
+		margin: 28px 0 40px;
+		border-top: 1px solid var(--border);
+		padding-top: 12px;
+	}
+	.manter > summary {
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 13px;
+	}
+	.arquivo {
+		display: inline-flex;
+		flex-direction: column;
+		gap: 6px;
+		font-size: 13px;
+	}
+	.ok {
+		color: var(--good);
+		font-size: 13px;
+	}
 	.crumb a {
 		color: inherit;
 	}

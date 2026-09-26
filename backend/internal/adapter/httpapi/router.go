@@ -142,7 +142,10 @@ func NewRouter(
 	// Legislação: o catálogo é global e, por ora, qualquer conta logada importa
 	// uma lei — decisão de 25/09/2026, enquanto o app é de teste.
 	protegida("GET /api/leis", h.Lei.Catalogo)
-	protegida("POST /api/leis", h.Lei.Importar)
+	protegida("POST /api/leis/capturas", h.Lei.Capturar)
+	protegida("GET /api/leis/capturas/{id}", h.Lei.Captura)
+	protegida("POST /api/leis/capturas/{id}/publicacao", h.Lei.Publicar)
+	protegida("POST /api/leis/{slug}/questoes", h.Lei.ImportarQuestoes)
 	protegida("GET /api/leis/{slug}", h.Lei.Ler)
 	protegida("POST /api/leis/questoes/{id}/respostas", h.Lei.Responder)
 	protegida("GET /api/concursos/{slug}/leis", h.Lei.DoConcurso)
