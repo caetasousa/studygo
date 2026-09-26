@@ -35,7 +35,7 @@ REMOTE_APP_DIR := /opt/annygo
 
 .PHONY: help up down restart logs ps rebuild reset prod-local \
         check check-backend check-frontend check-processor check-db e2e fmt lint \
-        leis-capturar leis-validar leis-pacote \
+        leis-capturar leis-validar leis-pacote servidor-endereco \
         status commit push release deploy provision deploy-status deploy-logs health
 
 help: ## Lista os alvos disponíveis
@@ -125,6 +125,15 @@ leis-validar: ## Confere as questões de lei como a importação confere (atuali
 
 leis-pacote: ## Monta em conteudo/leis/pacotes/ o que se importa em Legislação (slug=… ou todas)
 	cd backend && go run ./cmd/leis pacote $(slug)
+
+# ------------------------------------------------------------------- servidor
+
+# O endereço público do servidor no WSL (Quick Tunnel da Cloudflare). Muda a
+# cada reinício do serviço cloudflared-rapido; o log guarda o da vez.
+servidor-endereco: ## Mostra o endereço público atual (*.trycloudflare.com) do servidor no WSL
+	@ssh -i ~/.ssh/annygo_deploy -p 2222 annyGo@127.0.0.1 \
+		"sudo journalctl -u cloudflared-rapido --no-pager -o cat | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1" \
+		|| echo "servidor fora do ar? confira: wsl.exe -l -v"
 
 # Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um
 # template externo fixado por tag. Acrescentar aqui uma ferramenta que o runner

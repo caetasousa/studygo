@@ -1,0 +1,77 @@
+---
+# Docker sem root, do usuário de deploy. É o que permite um servidor dentro do
+# WSL: todas as distros do WSL2 dividem a mesma rede, e um segundo Docker
+# comum brigaria com o da distro de desenvolvimento pelo docker0 e pelo
+# iptables. O rootless roda numa rede própria (slirp4netns) e só publica as
+# portas pedidas, em localhost.
+#
+# Pacotes do próprio Ubuntu: o repositório do docker.com demora a chegar a uma
+# versão nova do Ubuntu (em 26.04 ainda não havia).
+- name: Instalar o Docker e o que o modo rootless precisa
+  apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+      - rootlesskit
+      - uidmap
+      - slirp4netns
+      - dbus-user-session
+      # O módulo community.docker.docker_image do deploy fala com o daemon
+      # por esta biblioteca.
+      - python3-docker
+    state: present
+    update_cache: true
+
+- name: Desligar o Docker de sistema (o daemon é o do usuário)
+  systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: [docker.socket, docker.service]
+
+- name: Manter os serviços do usuário de deploy de pé sem sessão aberta
+  command: loginctl enable-linger {{ deploy_user }}
+  args:
+    creates: "/var/lib/systemd/linger/{{ deploy_user }}"
+
+- name: Descobrir o uid do usuário de deploy
+  command: id -u {{ deploy_user }}
+  register: uid_deploy
+  changed_when: false
+
+- name: Instalar o daemon rootless
+  become: true
+  become_user: "{{ deploy_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ uid_deploy.stdout }}"
+    PATH: "/usr/share/docker.io/contrib:/usr/bin:/bin"
+  # --skip-iptables: o daemon não mexe em iptables nenhum; a rede dele é a do
+  # slirp4netns. O instalador termina chamando um `docker version` num caminho
+  # que o pacote do Ubuntu não tem — o serviço já está criado quando isso falha.
+  shell: dockerd-rootless-setuptool.sh install --skip-iptables || true
+  args:
+    creates: "/home/{{ deploy_user }}/.config/systemd/user/docker.service"
+
+- name: Ligar o daemon rootless
+  become: true
+  become_user: "{{ deploy_user }}"
+  # Sem sessão aberta do usuário (o caso do Ansible), o systemctl --user só
+  # acha o gerenciador dele pelo barramento explícito.
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ uid_deploy.stdout }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ uid_deploy.stdout }}/bus"
+  systemd:
+    name: docker
+    scope: user
+    enabled: true
+    state: started
+
+# O deploy roda como o usuário de deploy (sem root), então o diretório da
+# aplicação é dele.
+- name: Diretório da aplicação
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: '0750'

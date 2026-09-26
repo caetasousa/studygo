@@ -1,0 +1,78 @@
+---
+# A borda do servidor do WSL: o cloudflared abre uma conexão de SAÍDA para a
+# Cloudflare, que entrega o tráfego do domínio ao nginx em localhost. Nenhuma
+# porta aberta para fora, e o HTTPS fica com a Cloudflare.
+#
+# O túnel é criado no painel da Cloudflare (Zero Trust → Networks → Tunnels),
+# que dá o token e onde se aponta o domínio para http://{{ nginx_listen }}.
+# O token fica em cloudflared_token, no secrets.yml do ambiente (Vault).
+- name: Chave do repositório da Cloudflare
+  get_url:
+    url: https://pkg.cloudflare.com/cloudflare-main.gpg
+    dest: /usr/share/keyrings/cloudflare-main.gpg
+    mode: '0644'
+
+- name: Repositório da Cloudflare
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main"
+    filename: cloudflared
+    state: present
+
+- name: Instalar o cloudflared
+  apt:
+    name: cloudflared
+    state: present
+    update_cache: true
+
+- name: Avisar que falta o token do túnel
+  when: cloudflared_token | default('') | length == 0
+  debug:
+    msg: >-
+      cloudflared instalado, mas sem túnel: defina cloudflared_token no
+      secrets.yml do ambiente e rode este playbook de novo com --tags cloudflared.
+
+- name: Registrar o túnel como serviço
+  when: cloudflared_token | default('') | length > 0
+  command: cloudflared service install {{ cloudflared_token }}
+  args:
+    creates: /etc/systemd/system/cloudflared.service
+  no_log: true
+
+- name: Manter o túnel de pé
+  when: cloudflared_token | default('') | length > 0
+  systemd:
+    name: cloudflared
+    enabled: true
+    state: started
+
+# Endereço temporário grátis (Quick Tunnel): um *.trycloudflare.com aleatório,
+# sem conta nem domínio. Muda a cada reinício do serviço e não tem garantia de
+# disponibilidade — é o que há enquanto o projeto não tem domínio próprio.
+# O endereço da vez sai no log: `make servidor-endereco`.
+- name: Serviço do endereço temporário (trycloudflare)
+  when: cloudflared_rapido | default(false)
+  copy:
+    dest: /etc/systemd/system/cloudflared-rapido.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Quick Tunnel da Cloudflare para o nginx do studygo
+      After=network-online.target nginx.service
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://{{ nginx_listen }}
+      Restart=on-failure
+      RestartSec=5s
+
+      [Install]
+      WantedBy=multi-user.target
+  register: unidade_rapido
+
+- name: Manter o endereço temporário de pé
+  when: cloudflared_rapido | default(false)
+  systemd:
+    name: cloudflared-rapido
+    enabled: true
+    state: "{{ 'restarted' if unidade_rapido.changed else 'started' }}"
+    daemon_reload: true

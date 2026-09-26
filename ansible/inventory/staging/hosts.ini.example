@@ -1,5 +1,9 @@
 [app]
-studygo-staging ansible_host=SEU_IP_AQUI
+# Servidor no WSL (distro ubuntu-server). O job de deploy roda num container
+# do runner desta mesma máquina e chega ao sshd pela bridge do Docker; de uma
+# shell da distro de desenvolvimento, use 127.0.0.1. SSH na 2222 porque a rede
+# é compartilhada com a distro de desenvolvimento.
+studygo-staging ansible_host=SEU_IP_AQUI ansible_port=2222
 
 [app:vars]
 ansible_user=annyGo

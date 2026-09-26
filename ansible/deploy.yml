@@ -10,8 +10,11 @@
 #     -e ...
 - name: Deploy studygo (backend + worker + frontend)
   hosts: app
-  become: true
+  # No servidor do WSL o Docker é o do usuário de deploy (rootless): o deploy
+  # roda como ele, sem root, falando com o daemon dele.
+  become: "{{ not (docker_rootless | default(false)) }}"
   gather_facts: false
+  environment: "{{ docker_env | default({}) }}"
 
   vars:
     # Diretório da stack em execução na VPS. Ainda /opt/annygo em produção, do
@@ -26,6 +29,14 @@
     # build, porque a mesma imagem sobe como publicações diferentes. Um rollback
     # reexecuta o job da versão antiga, e com ele volta a tag antiga.
     app_versao: "{{ lookup('env', 'CI_COMMIT_TAG') or lookup('env', 'CI_COMMIT_SHORT_SHA') or 'desconhecida' }}"
+
+    # Onde conferir se a aplicação subiu. Na VPS, pelo domínio, do runner: é o
+    # caminho do usuário, com TLS e nginx. Atrás do túnel, no próprio servidor,
+    # pelo nginx em localhost — o mesmo que o cloudflared usa —, para o deploy
+    # não depender de DNS nem do painel da Cloudflare.
+    via_cloudflare: "{{ (borda | default('letsencrypt')) == 'cloudflare' }}"
+    health_url: "{{ ('http://' ~ nginx_listen) if via_cloudflare | bool else ('https://' ~ app_domain) }}/health"
+    health_delegate: "{{ inventory_hostname if via_cloudflare | bool else 'localhost' }}"
 
   pre_tasks:
     # Digest, não tag. Uma tag pode ser reapontada; o digest identifica bytes.
@@ -51,6 +62,18 @@
 
     - name: Verificar conectividade antes de mudar qualquer coisa
       ansible.builtin.ping:
+
+    - name: Descobrir o daemon Docker do usuário de deploy (rootless)
+      when: docker_rootless | default(false)
+      ansible.builtin.command: id -u
+      register: uid_deploy
+      changed_when: false
+
+    - name: Apontar o Docker para o daemon rootless
+      when: docker_rootless | default(false)
+      ansible.builtin.set_fact:
+        docker_env:
+          DOCKER_HOST: "unix:///run/user/{{ uid_deploy.stdout }}/docker.sock"
 
     - name: Verificar espaço em disco
       ansible.builtin.shell: df --output=avail -BM / | tail -1 | tr -dc '0-9'
@@ -185,13 +208,13 @@
         # e dispara o rescue. Em post_tasks o rollback nunca aconteceria.
         - name: Exigir que a aplicação responda
           ansible.builtin.uri:
-            url: "https://{{ app_domain }}/health"
+            url: "{{ health_url }}"
             status_code: 200
           retries: 10
           delay: 5
           register: health
           until: health.status == 200
-          delegate_to: localhost
+          delegate_to: "{{ health_delegate }}"
           become: false
 
         - name: Confirmar a versão implantada
@@ -237,7 +260,7 @@
 
         - name: Conferir se a versão anterior respondeu
           ansible.builtin.uri:
-            url: "https://{{ app_domain }}/health"
+            url: "{{ health_url }}"
             status_code: 200
           retries: 10
           delay: 5
@@ -245,7 +268,7 @@
           until: health_rollback.status == 200
           when: anterior.stat.exists
           failed_when: false
-          delegate_to: localhost
+          delegate_to: "{{ health_delegate }}"
           become: false
 
         - name: Encerrar a sessão do Registry

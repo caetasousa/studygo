@@ -7,18 +7,35 @@
   # Cada role carrega sua tag: este playbook mexe numa VPS que roda produção,
   # e `common` faz upgrade de pacotes. Poder rodar só `--tags certbot` evita
   # que emitir um certificado arraste um upgrade do sistema junto.
+  #
+  # Dois tipos de servidor, escolhidos no inventário do ambiente:
+  #  - VPS com IP público (padrão): Docker de sistema, firewall, nginx com
+  #    certificado do Let's Encrypt;
+  #  - servidor no WSL (borda: cloudflare, docker_rootless: true): Docker do
+  #    usuário de deploy e o cloudflared como borda, sem porta aberta para fora.
   roles:
     - role: common
       tags: [common]
     - role: docker
       tags: [docker]
+      when: not (docker_rootless | default(false))
+    - role: docker_rootless
+      tags: [docker]
+      when: docker_rootless | default(false)
     - role: nginx
       tags: [nginx]
     - role: certbot
       tags: [certbot]
+      when: (borda | default('letsencrypt')) != 'cloudflare'
+    - role: cloudflared
+      tags: [cloudflared]
+      when: (borda | default('letsencrypt')) == 'cloudflare'
 
   post_tasks:
+    # Atrás do túnel, o endereço público depende do DNS e do túnel no painel
+    # da Cloudflare — o deploy é que confere, pelo mesmo /health.
     - name: Verify nginx/TLS is responding
+      when: (borda | default('letsencrypt')) != 'cloudflare'
       uri:
         url: "https://{{ app_domain }}/health"
         status_code: 200

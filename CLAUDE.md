@@ -176,6 +176,13 @@ qual campo mudou e por quê — o frontend depende disso.
 
 ## 🚢 Deploy
 
+> [!IMPORTANT]
+> **Desde 25/09/2026 só existe o ambiente da esteira (`staging`).** A VPS foi
+> suspensa; o servidor é a distro `ubuntu-server` do WSL desta máquina,
+> publicada por um túnel da Cloudflare (ver `docs/deploy.md`). "Mandar para
+> produção" hoje é `make push` na `main`. Não rode `make release` nem crie tag
+> sem pedido explícito — não há `deploy_production` para onde ela vá.
+
 **Todo deploy passa pela pipeline do GitLab, sempre nesta ordem: staging
 primeiro, produção depois. Nunca direto.**
 

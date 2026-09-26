@@ -6,7 +6,11 @@
   vive no contexto http, que é compartilhado pelos dois ambientes, e dois
   arquivos declarando `auth` fariam o nginx recusar a recarga inteira com
   "limit_req_zone auth is already bound".
+
+  borda: cloudflare (servidor no WSL) — o nginx escuta só em localhost e quem
+  entrega o tráfego é o cloudflared; o TLS termina na Cloudflare.
 #}
+{% set via_cloudflare = (borda | default('letsencrypt')) == 'cloudflare' %}
 {% set zona = vhost_file | regex_replace('\.conf$', '') | regex_replace('[^a-zA-Z0-9]', '_') %}
 {% macro comum() %}
     # 429 e não o 503 padrão: a semântica é "você excedeu", não "eu caí", e o
@@ -72,7 +76,9 @@
         # primeiro da lista e trocaria de identidade a cada requisição —
         # justamente a identidade que o limitador do backend usa para contar.
         proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        # Atrás do túnel a conexão até aqui é http; o protocolo do visitante é o
+        # que a Cloudflare informa.
+        proxy_set_header X-Forwarded-Proto {{ '$http_x_forwarded_proto' if via_cloudflare else '$scheme' }};
 {% endmacro %}
 {% macro rotas() %}
     # Autenticação é onde a força bruta bate, e o único lugar em que uma rajada
@@ -99,6 +105,26 @@
 limit_req_zone $binary_remote_addr zone=geral_{{ zona }}:10m rate=240r/m;
 limit_req_zone $binary_remote_addr zone=auth_{{ zona }}:5m rate=20r/m;
 
+{% if via_cloudflare %}
+server {
+    # Aceita qualquer nome: só o cloudflared chega aqui, e quem decide que
+    # domínio aponta para o túnel é o painel da Cloudflare.
+    listen {{ nginx_listen }} default_server;
+    server_name _;
+
+    # Toda conexão chega do cloudflared, em localhost. Sem isto o limitador
+    # contaria a internet inteira como um visitante só (127.0.0.1), e o
+    # X-Forwarded-For que o backend usa seria o mesmo para todos. O IP do
+    # visitante vem no cabeçalho que a Cloudflare põe — e só é aceito de
+    # localhost, onde só o túnel chega.
+    set_real_ip_from 127.0.0.1;
+    set_real_ip_from ::1;
+    real_ip_header CF-Connecting-IP;
+{{ comum() }}
+{{ cabecalhos_tls() }}
+{{ rotas() }}
+}
+{% else %}
 server {
     listen 80;
     listen [::]:80;
@@ -129,4 +155,5 @@ server {
 {{ comum() }}
 {{ rotas() }}
 }
+{% endif %}
 {% endif %}

@@ -36,7 +36,68 @@ GitLab.com                                    VPS
 
 Tudo mora em `ansible/`: um playbook por tarefa (`bootstrap`, `lockdown`,
 `site`, `deploy`) e uma role por peça da infra (`common`, `docker`, `nginx`,
-`certbot`).
+`certbot`, e, para o servidor no WSL, `docker_rootless` e `cloudflared`).
+
+---
+
+## 🖥️ Servidor no WSL (atual, desde 25/09/2026)
+
+A VPS foi suspensa. O ambiente da esteira roda na distro **`ubuntu-server`**
+do WSL da própria máquina de desenvolvimento, publicado por um **túnel da
+Cloudflare**:
+
+```
+navegador ─► Cloudflare (HTTPS) ─► cloudflared ─► nginx 127.0.0.1:8480
+                                   (ubuntu-server)   └─► frontend ─► backend ─► postgres
+```
+
+Por que é diferente da VPS — **todas as distros do WSL2 dividem a mesma
+rede** (mesmo IP, mesmas portas, mesmo iptables):
+
+- **Docker rootless**, do usuário `annyGo`: um segundo Docker comum brigaria
+  com o da distro de desenvolvimento pelo `docker0` e pelo iptables. O
+  rootless tem rede própria e só publica as portas pedidas, em localhost.
+- **Sem ufw nem fail2ban** (`firewall_local: false`): um "deny by default"
+  fecharia a rede do desenvolvimento e do runner. Nenhuma porta precisa abrir:
+  o cloudflared só faz conexão de saída.
+- **SSH na 2222.** O job de deploy roda num container do runner desta mesma
+  máquina e chega ao servidor por `172.17.0.1:2222`.
+- **O nginx lê o IP do visitante em `CF-Connecting-IP`** (aceito só de
+  localhost); sem isso todo mundo contaria como 127.0.0.1 no limite de taxa.
+- **Só no ar com o PC ligado** e a distro de pé.
+- **Endereço temporário.** Sem domínio próprio, o público entra por um Quick
+  Tunnel (`*.trycloudflare.com`, serviço `cloudflared-rapido`), que muda a
+  cada reinício — `make servidor-endereco` mostra o da vez. O túnel com token
+  (`cloudflared_token`) já está conectado e espera um domínio na Cloudflare
+  apontado para `localhost:8480`.
+- **O deploy confere o `/health` no próprio servidor** (nginx em localhost),
+  não pelo domínio: não depende de DNS nem do painel da Cloudflare.
+
+Tudo isso está no inventário (`inventory/staging/group_vars/app/main.yml`:
+`docker_rootless`, `borda: cloudflare`, `firewall_local`, `nginx_listen`) e o
+`site.yml` escolhe os papéis por ele.
+
+### Montar do zero
+
+```bash
+# 1. uma vez, como root na distro (sshd na 2222 e o usuário de deploy):
+#    wsl.exe -d ubuntu-server -u root   → openssh-server, usuário annyGo com
+#    sudo sem senha, ~/.ssh/annygo_deploy.pub e ~/.ssh/studygo_ci.pub em
+#    authorized_keys, sshd só por chave e ssh.socket na 2222 (0.0.0.0 e [::])
+
+# 2. provisionar, desta distro
+cd ansible
+ssh-keyscan -p 2222 127.0.0.1 >> ~/.ssh/known_hosts
+ansible-playbook site.yml -i inventory/staging/hosts.ini   # hosts.ini: 127.0.0.1, porta 2222
+
+# 3. túnel: token do painel da Cloudflare em cloudflared_token (secrets.yml, Vault)
+ansible-vault edit inventory/staging/group_vars/app/secrets.yml
+ansible-playbook site.yml -i inventory/staging/hosts.ini --tags cloudflared
+```
+
+No GitLab (Settings → CI/CD → Variables, ambiente `staging`),
+`SSH_KNOWN_HOSTS` recebe a saída de `ssh-keyscan -p 2222 172.17.0.1`: é dela
+que o job tira o host.
 
 ---
 

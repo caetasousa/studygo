@@ -18,7 +18,10 @@
 # Recusa qualquer Host sem vhost próprio. Sem isto o nginx entrega o primeiro
 # vhost que encontra, e um subdomínio novo apontado para o IP cai na aplicação
 # real — foi o que aconteceu com staging.cronograma antes de ser provisionado.
+# Só com IP público: atrás do túnel só o cloudflared chega ao nginx, e este
+# vhost precisa de um certificado que ali não existe.
 - name: Deploy default vhost that refuses unknown hosts
+  when: (borda | default('letsencrypt')) != 'cloudflare'
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/default-deny.conf.j2"
     dest: /etc/nginx/sites-available/000-default-deny.conf
@@ -28,6 +31,7 @@
   notify: reload nginx
 
 - name: Enable default deny vhost
+  when: (borda | default('letsencrypt')) != 'cloudflare'
   ansible.builtin.file:
     src: /etc/nginx/sites-available/000-default-deny.conf
     dest: /etc/nginx/sites-enabled/000-default-deny.conf
