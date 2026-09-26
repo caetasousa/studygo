@@ -243,3 +243,141 @@ def test_k44_aviso_de_fora_do_recorte_nao_aparece() -> None:
     assert not [a for a in fora.avisos if a.id.startswith("salto")]
     inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
     assert [a for a in inteira.avisos if a.id.startswith("salto")]
+
+
+# ---------------------------------------------------------------- K45, K46
+
+RESOLUCAO_COM_ANEXO = """<html><body>
+<p>RESOLUÇÃO Nº 22, DE 4 DE SETEMBRO DE 2008</p>
+<p>O TRIBUNAL DE CONTAS, no uso de suas atribuições, RESOLVE</p>
+<p>Art. 1º Aprovar o Regimento Interno, cujo teor consta do anexo.</p>
+<p>Art. 2º Esta Resolução entra em vigor na data de sua publicação.</p>
+<p>REGIMENTO INTERNO</p>
+<p>TÍTULO I<br>DA NATUREZA</p>
+<p>Art. 1º O Tribunal de Contas é órgão de controle externo.</p>
+<p>Art. 2º O controle externo é exercido com o auxílio do Tribunal.</p>
+<p>TÍTULO II<br>DA ORGANIZAÇÃO</p>
+<p>Art. 3º O Tribunal tem sede na Capital.</p>
+</body></html>"""
+
+
+def test_k45_anexo_que_recomeca_a_numeracao_tem_refs_proprias() -> None:
+    link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/1"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: RESOLUCAO_COM_ANEXO}), None))
+    assert c.bloqueios == []
+    refs = [d["ref"] for d in c.dispositivos or []]
+    # O regimento é o texto que se estuda: fica com as refs limpas (art1…);
+    # os artigos da resolução que o aprova ganham o prefixo.
+    assert "resolucao.art1" in refs and "resolucao.art2" in refs
+    assert "tit1" in refs and "art1" in refs and "art3" in refs
+    assert refs.index("resolucao.art2") < refs.index("art1")
+
+
+def test_k46_problema_fora_do_recorte_nao_bloqueia() -> None:
+    # Uma alínea sem inciso no capítulo III é problema — mas só o capítulo II
+    # foi pedido.
+    lei = LEI.replace(
+        "<p>Art. 4º Esta Lei entra em vigor na data de sua publicação.</p>",
+        "<p>Art. 4º Esta Lei entra em vigor.</p><p>a) na data da publicação.</p>",
+    )
+    link = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
+    fora = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap2"]))
+    assert fora.bloqueios == [], fora.bloqueios
+    assert fora.publicavel
+    inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    assert inteira.bloqueios
+    dentro = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap3"]))
+    assert dentro.bloqueios
+
+
+RESOLUCAO_COM_DOIS_ANEXOS = """<html><body>
+<p>RESOLUÇÃO ADMINISTRATIVA Nº 1/2014</p>
+<p>Art. 1º Ficam aprovados os Códigos de Ética dos anexos I e II.</p>
+<p>Art. 2º Esta Resolução entra em vigor na data de sua publicação.</p>
+<p>ANEXO I</p>
+<p>CAPÍTULO I<br>DOS MEMBROS</p>
+<p>Art. 1º Este Código se aplica aos Conselheiros.</p>
+<p>ANEXO II</p>
+<p>CAPÍTULO I<br>DOS SERVIDORES</p>
+<p>Art. 1º Este Código se aplica aos servidores.</p>
+<p>Art. 2º O servidor zela pela ética.</p>
+</body></html>"""
+
+
+def test_k45b_dois_anexos_tem_refs_proprias() -> None:
+    link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/2"
+    http = _http({link: RESOLUCAO_COM_DOIS_ANEXOS})
+    c = asyncio.run(capturar(fonte_do_link(link), http, None))
+    assert c.bloqueios == [], c.bloqueios
+    refs = [d["ref"] for d in c.dispositivos or []]
+    assert {"resolucao.art1", "anexo1.cap1", "anexo1.art1", "anexo2.cap1", "anexo2.art1"} <= set(
+        refs
+    )
+    # O Anexo II sozinho, como o edital pede.
+    so = asyncio.run(capturar(fonte_do_link(link), http, None, recorte=["anexo2.cap1"]))
+    assert [d["ref"] for d in so.dispositivos or []] == [
+        "preambulo1",
+        "anexo2.cap1",
+        "anexo2.art1",
+        "anexo2.art2",
+    ]
+
+
+def test_k47_descartado_com_o_mesmo_texto_de_um_paragrafo_do_corpo() -> None:
+    # O portal do TCE-GO anota a publicação no cabeçalho e no corpo com o
+    # mesmo texto; só a do cabeçalho é descartada.
+    vide = (
+        '<p><a href="https://gnoi.tce.go.gov.br/atoNormativo/Publicado/9">-Vide Portaria 830</a>,'
+        ' <a href="https://dec.tce.go.gov.br/d">DEC 2-12-2024.</a></p>'
+    )
+    ato = """<html><body>
+<p>RESOLUÇÃO ADMINISTRATIVA Nº 3/2024</p>
+{VIDE}
+<p>CAPÍTULO I<br>DAS DISPOSIÇÕES GERAIS</p>
+<p>Art. 1º Esta Resolução institui a política.</p>
+{VIDE}
+<p>Art. 2º Esta Resolução entra em vigor na data de sua publicação.</p>
+</body></html>""".replace("{VIDE}", vide)
+    link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/3"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None))
+    assert c.bloqueios == [], c.bloqueios
+
+
+def test_k48_rotulo_repetido_na_fonte_vira_aviso_e_ref_propria() -> None:
+    lei = LEI.replace(
+        "<p>CAPÍTULO II<br>DO CONTROLE</p>",
+        "<p>CAPÍTULO II<br>DO CONTROLE</p><p>Seção I<br>Da jornada</p>",
+    ).replace(
+        "<p>Art. 3º O controle é externo.</p>",
+        "<p>Seção I<br>Da frequência</p><p>Art. 3º O controle é externo.</p>",
+    )
+    link = "https://www.planalto.gov.br/ccivil_03/leis/l0002.htm"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    assert c.bloqueios == [], c.bloqueios
+    por_ref = {d["ref"]: d for d in c.dispositivos or []}
+    assert por_ref["cap2.sec1"]["nome"] == "Da jornada"
+    assert por_ref["cap2.sec1-2"]["nome"] == "Da frequência"
+    assert por_ref["art3"]["pai"] == "cap2.sec1-2"
+    # A pessoa confere: pode ser erro da fonte, pode ser um sumário lido como corpo.
+    assert "repetido: cap2.sec1" in [a.id for a in c.avisos]
+
+
+def test_k49_alineas_sob_o_caput_que_as_anuncia() -> None:
+    lei = LEI.replace(
+        "<p>Art. 3º O controle é externo.</p>",
+        "<p>Art. 3º Ao servidor são assegurados os seguintes direitos:</p>"
+        "<p>a) de ser representado;</p><p>b) de se associar.</p>",
+    )
+    link = "https://www.planalto.gov.br/ccivil_03/leis/l0003.htm"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    assert c.bloqueios == [], c.bloqueios
+    por_ref = {d["ref"]: d for d in c.dispositivos or []}
+    assert por_ref["art3.alia"]["pai"] == "art3" and por_ref["art3.alib"]["pai"] == "art3"
+    assert [a.id for a in c.avisos if a.id.startswith("alinea")] == ["alinea-no-caput: art3"]
+    # Sem os dois-pontos que anunciam a lista, alínea sob artigo continua errada.
+    torta = LEI.replace(
+        "<p>Art. 3º O controle é externo.</p>",
+        "<p>Art. 3º O controle é externo.</p><p>a) de ser representado.</p>",
+    )
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: torta}), None))
+    assert c.bloqueios

@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 from app.leis.classificar import combinar, por_gemini, por_regras
 from app.leis.fontes import Fonte, FonteInvalida, Http, Original, baixar
 from app.leis.limpeza import Paragrafo, paragrafos_de_html, paragrafos_de_pdf
-from app.leis.montar import Montagem, montar
-from app.leis.verificar import SALTO, verificar
+from app.leis.montar import REPETIDO, SOB_O_CAPUT, Montagem, montar
+from app.leis.verificar import SALTO, sequencia, verificar
 from app.providers.base import LLMProvider
 
 # (etapa, feitos, total): para a tela dizer em que pé a captura está.
@@ -133,6 +133,61 @@ def _visiveis(montagem: Montagem, raizes: list[str]) -> set[str]:
     return guardar
 
 
+def _verificar_o_recorte(
+    html: str | None, paragrafos: list[Paragrafo], montagem: Montagem, raizes: list[str]
+) -> list[str]:
+    """A verificação só na região do recorte (K46): o que está fora dele — o
+    ADCT, o texto que o site anexa ao fim — não é importado e não bloqueia.
+
+    A região de cada raiz vai do primeiro ao último parágrafo de onde saiu algo
+    dela; um parágrafo perdido no meio (que nem virou dispositivo) está dentro.
+    """
+    posicao = {p.id: i for i, p in enumerate(paragrafos)}
+    dono = {pid: ref for ref, pids in montagem.origem.items() for pid in pids}
+    faixas = []
+    for raiz in raizes:
+        subarvore = _sob(montagem, [raiz])
+        indices = [
+            posicao[pid]
+            for ref in subarvore
+            for pid in montagem.origem.get(ref, [])
+            if pid in posicao
+        ]
+        if not indices:
+            continue
+        # A faixa vai até antes do próximo parágrafo que é de outra parte da
+        # lei: o que se perdeu no fim dela (nem virou dispositivo) está dentro.
+        fim = max(indices)
+        while fim + 1 < len(paragrafos) and dono.get(paragrafos[fim + 1].id) in (None, *subarvore):
+            fim += 1
+        faixas.append((min(indices), fim))
+
+    def dentro(pid: str) -> bool:
+        i = posicao.get(pid)
+        return i is not None and any(a <= i <= b for a, b in faixas)
+
+    sob = _sob(montagem, raizes)
+    parte = Montagem(
+        dispositivos=[d for d in montagem.dispositivos if d.ref in sob],
+        problemas=[],
+        descartados=montagem.descartados,
+        origem={},
+    )
+    # A numeração se confere na lei inteira: isolado, todo recorte "começa do
+    # nada". O filtro do que interessa (K44) vem depois, em _salto_no_recorte.
+    problemas = [
+        p
+        for p in verificar(html, [p for p in paragrafos if dentro(p.id)], parte)
+        if not p.startswith(SALTO)
+    ]
+    problemas.extend(sequencia(montagem))
+    for problema in montagem.problemas:
+        pid = problema.split(":", 1)[0].split(" ", 1)[0]
+        if not pid.startswith("p") or dentro(pid):
+            problemas.append(problema)
+    return problemas
+
+
 def _salto_no_recorte(salto: str, visiveis: set[str] | None) -> bool:
     """ "art3 → art4": o aviso só interessa se o artigo de chegada foi guardado (K44)."""
     return visiveis is None or salto.rsplit("→", 1)[-1].strip() in visiveis
@@ -214,7 +269,13 @@ async def capturar(
         montagem = await asyncio.to_thread(montar, paragrafos, classes)
         if recorte:
             visiveis = _visiveis(montagem, recorte)
-        for problema in await asyncio.to_thread(verificar, original.html, paragrafos, montagem):
+        if recorte:
+            problemas = await asyncio.to_thread(
+                _verificar_o_recorte, original.html, paragrafos, montagem, recorte
+            )
+        else:
+            problemas = await asyncio.to_thread(verificar, original.html, paragrafos, montagem)
+        for problema in problemas:
             if problema.startswith(SALTO):
                 salto = problema.removeprefix(SALTO)
                 if not _salto_no_recorte(salto, visiveis):
@@ -224,6 +285,31 @@ async def capturar(
                         f"salto: {salto}",
                         f"A numeração dos artigos salta ({salto}). Confira na fonte se "
                         "o artigo que falta existe: se existir, a captura o perdeu.",
+                    )
+                )
+            elif problema.startswith(REPETIDO):
+                primeira, nova = problema.removeprefix(REPETIDO).split(" → ")
+                if visiveis is not None and nova not in visiveis:
+                    continue
+                captura.avisos.append(
+                    Aviso(
+                        f"repetido: {primeira}",
+                        f"A fonte repete o rótulo de {primeira}; a segunda divisão ficou "
+                        f"como {nova}. Confira na fonte se são mesmo duas divisões.",
+                    )
+                )
+            elif problema.startswith(SOB_O_CAPUT):
+                artigo = problema.removeprefix(SOB_O_CAPUT)
+                aviso = f"alinea-no-caput: {artigo}"
+                if (visiveis is not None and artigo not in visiveis) or aviso in {
+                    a.id for a in captura.avisos
+                }:
+                    continue
+                captura.avisos.append(
+                    Aviso(
+                        aviso,
+                        f"O caput de {artigo} anuncia alíneas sem inciso entre eles. Confira "
+                        "na fonte se é assim mesmo ou se a captura perdeu um inciso.",
                     )
                 )
             else:

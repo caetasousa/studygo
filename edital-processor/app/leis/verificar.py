@@ -29,10 +29,10 @@ def texto_remontado(montagem: Montagem) -> str:
 
 
 def texto_dos_paragrafos(paragrafos: list[Paragrafo], montagem: Montagem) -> str:
-    descartados = set(montagem.descartados)
+    descartados = set(montagem.ids_descartados)
     return normalizar(
         " ".join(
-            p.texto for p in paragrafos if not p.anterior and p.texto and p.texto not in descartados
+            p.texto for p in paragrafos if not p.anterior and p.texto and p.id not in descartados
         )
     )
 
@@ -55,7 +55,7 @@ def _na_ordem(html: str, paragrafos: list[Paragrafo]) -> list[str]:
     return problemas
 
 
-def _sequencia(montagem: Montagem) -> list[str]:
+def sequencia(montagem: Montagem) -> list[str]:
     """Os artigos vigentes crescem de um em um (5, 5-A, 6); um salto só passa
     calado se o artigo que falta existe como revogado.
 
@@ -100,5 +100,5 @@ def verificar(
         )
     if html is not None:
         problemas.extend(_na_ordem(html, paragrafos))
-    problemas.extend(_sequencia(montagem))
+    problemas.extend(sequencia(montagem))
     return problemas

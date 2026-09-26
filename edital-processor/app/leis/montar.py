@@ -32,6 +32,9 @@ class Montagem(BaseModel):
     dispositivos: list[Dispositivo]
     problemas: list[str]
     descartados: list[str]
+    # Por id, e não pelo texto: o site repete no corpo a anotação que ele
+    # descarta no cabeçalho (", DEC 2-12-2024."), e o do corpo fica.
+    ids_descartados: list[str] = []
     # ref → ids dos parágrafos vigentes de onde o dispositivo saiu.
     origem: dict[str, list[str]]
 
@@ -56,6 +59,11 @@ _PAIS = {
     "alinea": ("inciso", "paragrafo"),
     "item": ("alinea", "inciso"),
 }
+# A fonte que repete o rótulo de uma divisão no mesmo pai (duas "Seção I" num
+# capítulo da Lei 20.756) não bloqueia: a segunda ganha ref própria e a
+# pessoa confere — pode ser erro da fonte, pode ser sumário lido como corpo.
+REPETIDO = "rótulo repetido na fonte: "
+SOB_O_CAPUT = "alínea sob o caput: "
 _NOME_DO_TIPO = {"paragrafo": "parágrafo", "inciso": "inciso", "alinea": "alínea", "item": "item"}
 
 
@@ -70,11 +78,16 @@ class _Estado:
     dispositivos: list[Dispositivo] = field(default_factory=list)
     problemas: list[str] = field(default_factory=list)
     descartados: list[str] = field(default_factory=list)
+    ids_descartados: list[str] = field(default_factory=list)
     origem: dict[str, list[str]] = field(default_factory=dict)
     pilha: list[Dispositivo] = field(default_factory=list)
     refs: set[str] = field(default_factory=set)
     contadores: dict[str, int] = field(default_factory=dict)
     no_adct: bool = False
+    # Onde a numeração recomeça (resolução + anexos, K45): índice de início de
+    # cada bloco e o prefixo das refs dele.
+    blocos: list[tuple[int, str]] = field(default_factory=list)
+    prefixo: str = ""
     notas_pendentes: list[str] = field(default_factory=list)
     # Redação anterior à espera do dispositivo vigente que vem depois dela.
     anteriores_pendentes: dict[str, list[str]] = field(default_factory=dict)
@@ -108,17 +121,27 @@ def _novo(e: _Estado, p: Paragrafo, tipo: str, texto: str, revogado: bool) -> Di
             e.no_adct = True
             e.pilha.clear()
         pai = e.pilha[-1] if e.pilha else None
-        ref = f"{pai.ref}.{lido.chave}" if pai else lido.chave
+        ref = f"{pai.ref}.{lido.chave}" if pai else e.prefixo + lido.chave
     elif tipo == "artigo":
         while e.pilha and _NIVEL[e.pilha[-1].tipo] >= nivel:
             e.pilha.pop()
         pai = e.pilha[-1] if e.pilha else None
-        ref = ("adct." if e.no_adct else "") + lido.chave
+        ref = ("adct." if e.no_adct else e.prefixo) + lido.chave
     else:
         while e.pilha and _NIVEL[e.pilha[-1].tipo] >= nivel:
             e.pilha.pop()
         pai = e.pilha[-1] if e.pilha else None
-        if pai is None or pai.tipo not in _PAIS[tipo]:
+        if (
+            tipo == "alinea"
+            and pai is not None
+            and pai.tipo == "artigo"
+            and pai.texto.rstrip().endswith(":")
+        ):
+            # O caput que anuncia a lista ("…os seguintes direitos:") e segue
+            # direto para as alíneas foge da técnica, mas é o texto da lei.
+            # Também é o que sobra de um inciso perdido: a pessoa confere.
+            e.problemas.append(f"{SOB_O_CAPUT}{pai.ref}")
+        elif pai is None or pai.tipo not in _PAIS[tipo]:
             onde = f"{pai.tipo} {pai.ref}" if pai else "nada"
             e.problemas.append(
                 f"{p.id} ({lido.rotulo}): {_NOME_DO_TIPO[tipo]} sob {onde}, "
@@ -127,7 +150,13 @@ def _novo(e: _Estado, p: Paragrafo, tipo: str, texto: str, revogado: bool) -> Di
             return None
         ref = f"{pai.ref}.{lido.chave}"
 
-    if ref in e.refs:
+    if ref in e.refs and tipo in AGRUPAMENTOS:
+        n = 2
+        while f"{ref}-{n}" in e.refs:
+            n += 1
+        e.problemas.append(f"{REPETIDO}{ref} → {ref}-{n}")
+        ref = f"{ref}-{n}"
+    elif ref in e.refs:
         e.problemas.append(f"{p.id}: ref repetida {ref} ({lido.rotulo})")
         return None
     nome = lido.resto if tipo in AGRUPAMENTOS else ""
@@ -215,15 +244,65 @@ def _irmao_a_frente(
     return None
 
 
+_DE_ARTIGO = ("artigo", "paragrafo", "inciso", "alinea", "item")
+
+
+def _blocos(paragrafos: list[Paragrafo], classes: list[Classe]) -> list[tuple[int, str]]:
+    """Onde a numeração recomeça do art. 1º, e o prefixo de cada parte.
+
+    Uma resolução que aprova um regimento tem os artigos dela e, em anexo, o
+    regimento, que recomeça do art. 1º (K45): a resolução vira "resolucao." e
+    o regimento, o texto que se estuda, fica com as refs limpas. Com mais de um
+    anexo (K45b), cada um é "anexoN.". O ADCT, que também recomeça, é à parte.
+    """
+    inicios: list[int] = []
+    for i, (p, c) in enumerate(zip(paragrafos, classes, strict=True)):
+        if p.anterior or c.tipo not in ("artigo", *AGRUPAMENTOS):
+            continue
+        lido = rotulos.ler(p.texto)
+        if lido is None:
+            continue
+        if lido.chave == "adct":
+            return []
+        if c.tipo == "artigo" and lido.chave == "art1":
+            inicios.append(i)
+    if len(inicios) < 2:
+        return []
+    # O bloco começa no cabeçalho que antecede o art. 1º ("ANEXO II",
+    # "CAPÍTULO I"): recua enquanto o parágrafo anterior não for artigo.
+    comecos = []
+    for i in inicios[1:]:
+        j = i
+        while j > 0 and classes[j - 1].tipo not in (
+            "artigo",
+            "paragrafo",
+            "inciso",
+            "alinea",
+            "item",
+        ):
+            j -= 1
+        comecos.append(j)
+    if len(comecos) == 1:
+        return [(0, "resolucao."), (comecos[0], "")]
+    return [(0, "resolucao."), *((c, f"anexo{n}.") for n, c in enumerate(comecos, start=1))]
+
+
 def montar(paragrafos: list[Paragrafo], classes: list[Classe]) -> Montagem:
     e = _Estado()
+    e.blocos = _blocos(paragrafos, classes)
+    inicios = dict(e.blocos)
 
     for i, (p, classe) in enumerate(zip(paragrafos, classes, strict=True)):
+        if i in inicios:
+            # Outra parte do documento: nada do bloco anterior é pai aqui.
+            e.prefixo = inicios[i]
+            e.pilha.clear()
         if p.anterior:
             _encaixar_anterior(e, paragrafos, classes, i)
             continue
         if classe.tipo == "descartar":
             e.descartados.append(p.texto)
+            e.ids_descartados.append(p.id)
             continue
         if not p.texto:
             # Só nota ("Vide…"): vai para o dispositivo de antes, ou o próximo.
@@ -263,6 +342,7 @@ def montar(paragrafos: list[Paragrafo], classes: list[Classe]) -> Montagem:
         dispositivos=e.dispositivos,
         problemas=e.problemas,
         descartados=e.descartados,
+        ids_descartados=e.ids_descartados,
         origem=e.origem,
     )
 

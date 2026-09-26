@@ -118,6 +118,12 @@ captura depois confere com o Gemini só o recorte e guarda só ele.
 | K42 | ref do recorte que a lei não tem é ignorada em silêncio | "arts. 74 e 999" importa só o 74 sem avisar |
 | K43 | o Gemini confere a lei inteira mesmo com recorte (lento), ou não confere o recorte | a Constituição continua levando 4 minutos; ou o recorte sai sem conferência |
 | K44 | aviso de fora do recorte (salto de numeração no ADCT) bloqueia ou pede revisão | a pessoa revisa o que não vai importar |
+| K45 | a resolução que aprova um regimento (arts. 1º a 4º) seguida do anexo que recomeça do art. 1º colide as refs | o Regimento Interno do TCE-GO nunca entra |
+| K45b | resolução com dois anexos que recomeçam a numeração (Código de Ética: Anexo I dos membros, Anexo II dos servidores) colide o segundo com o primeiro | o Código de Ética dos servidores nunca entra |
+| K46 | problema fora do recorte (o ADCT, o texto que o site anexa ao fim) bloqueia a captura do recorte | a Constituição de Goiás não entra por causa do que ninguém pediu |
+| K47 | parágrafo descartado (a anotação ", DEC 2-12-2024." no cabeçalho do site) tem o mesmo texto de um do corpo, e a conferência apaga os dois | o sha diverge e a RA 14/2024 nunca entra |
+| K48 | a fonte repete o rótulo de uma divisão no mesmo capítulo (duas "Seção I" na Lei 20.756) e a captura bloqueia, ou funde as duas | o estatuto dos servidores de Goiás nunca entra; ou a segunda seção some dentro da primeira |
+| K49 | alíneas logo depois de um caput que as anuncia ("…os seguintes direitos:" a), b), c)), sem inciso, bloqueiam a captura | a lei que fugiu da técnica legislativa não entra |
 
 ### Versão
 
