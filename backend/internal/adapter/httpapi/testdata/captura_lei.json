@@ -1,4 +1,25 @@
 {
+  "edital": [
+    {
+      "disciplinaId": "string",
+      "materia": "string",
+      "recorte": [
+        "string"
+      ],
+      "temas": [
+        "string"
+      ],
+      "trechos": [
+        {
+          "artigos": "string",
+          "nome": "string",
+          "ref": "string",
+          "rotulo": "string"
+        }
+      ]
+    }
+  ],
+  "epigrafe": "string",
   "estado": "string",
   "etapa": "string",
   "id": "string",

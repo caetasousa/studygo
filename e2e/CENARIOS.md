@@ -93,6 +93,11 @@ Planalto terminados em `e2e/…`.
 | L14 | a publicação de uma lei nova com o nome curto de outra sobrescreve a existente | a Constituição some debaixo de uma lei homônima |
 | L15 | importar questões aceita uma questão cujo trecho não está na lei, ou uma unidade escrita para outra redação | questão que a lei não sustenta |
 | L16 | a captura que ainda está rodando trava a tela, ou some se a pessoa esperar | ninguém sabe se terminou |
+| L17 | a prévia da captura não mostra o que o edital do concurso pede daquela lei, ou mostra o recorte de outro tópico | estuda a Constituição inteira sem saber o que cai |
+| L18 | vincular a matéria (pela prévia ou pela sugestão do tópico) não grava o recorte do edital, ou grava o de outra matéria | o recorte some ao recarregar |
+| L19 | aberta no concurso, a lei mostra tudo em vez do recorte, ou esconde o recorte sem caminho para a lei inteira | lê o que não cai; ou não acha o resto da lei |
+| L20 | ajustar o recorte à mão não fica gravado | a correção se perde, e o recorte automático volta |
+| L21 | o link direto para um dispositivo fora do recorte não abre o dispositivo | o link do caderno não leva a lugar nenhum |
 
 ## Fora da suíte, de propósito
 

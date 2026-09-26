@@ -634,12 +634,29 @@ export interface LeiIdentidade {
 	fonte: string;
 }
 
+/** Uma raiz do recorte do edital: "Seção IX — DA FISCALIZAÇÃO… (arts. 70 a 75)". */
+export interface TrechoDoRecorte {
+	ref: string;
+	rotulo: string;
+	nome: string;
+	artigos: string;
+}
+
+/** O que o concurso cobra da lei. `refs` vazias: a lei inteira. */
+export interface RecorteNoConcurso {
+	refs: string[];
+	trechos: TrechoDoRecorte[];
+	materias: { disciplinaId: string; nome: string }[];
+}
+
 export interface LeituraDeLei {
 	lei: LeiIdentidade;
 	versao: string;
 	dispositivos: Dispositivo[];
 	unidades: UnidadeDeLei[];
 	questoes: QuestaoDeLei[];
+	/** null: nenhuma matéria do concurso ativo cobra esta lei. */
+	recorte: RecorteNoConcurso | null;
 }
 
 export interface LeiResumo {
@@ -652,12 +669,17 @@ export interface LeiResumo {
 	importadaEm: string;
 }
 
+/** A lei vista da matéria: o recorte que ela cobra, ou que o tópico pede. Vazio: a lei inteira. */
+export interface LeiNaMateria extends LeiResumo {
+	recorte: TrechoDoRecorte[];
+}
+
 export interface LeisDaMateria {
 	disciplinaId: string;
 	codigo: string;
 	nome: string;
-	vinculadas: LeiResumo[];
-	sugeridas: LeiResumo[];
+	vinculadas: LeiNaMateria[];
+	sugeridas: LeiNaMateria[];
 }
 
 /** Uma coisa que a captura resolveu sozinha e alguém precisa conferir. */
@@ -689,8 +711,21 @@ export interface ResultadoDaCaptura {
 	dispositivos: number;
 }
 
+/** Uma matéria do concurso cujo tópico cita a lei capturada, e o que ele pede. */
+export interface SugestaoDoEdital {
+	disciplinaId: string;
+	materia: string;
+	temas: string[];
+	/** Vazio: o tópico pede a lei inteira. */
+	recorte: string[];
+	trechos: TrechoDoRecorte[];
+}
+
 export interface CapturaDeLei {
 	id: string;
+	/** A primeira linha da lei ("LEI Nº 13.709, DE…"), para sugerir o nome. */
+	epigrafe: string;
+	edital: SugestaoDoEdital[];
 	estado: 'rodando' | 'pronta' | 'falhou';
 	etapa: string;
 	progresso: { feitos: number; total: number };

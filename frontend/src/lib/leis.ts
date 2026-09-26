@@ -84,3 +84,61 @@ export function partirNoTrecho(texto: string, trecho: string): [string, string, 
 	if (i < 0) return null;
 	return [texto.slice(0, i), trecho, texto.slice(i + trecho.length)];
 }
+
+/**
+ * Os dispositivos que aparecem no recorte: os que estão dentro de uma raiz e
+ * as divisões acima delas, para o leitor saber onde está ("Título III ›
+ * Capítulo VII"). Recorte vazio é a lei inteira — devolve null.
+ */
+export function visiveisNoRecorte(ds: Dispositivo[], raizes: string[]): Set<string> | null {
+	if (raizes.length === 0) return null;
+	const porRef = new Map(ds.map((d) => [d.ref, d]));
+	const dentro = new Set<string>();
+	const acima = new Set<string>();
+	const alvo = new Set(raizes);
+	for (const d of ds) {
+		let atual: Dispositivo | undefined = d;
+		for (let passos = 0; atual && passos < 64; passos++) {
+			if (alvo.has(atual.ref)) {
+				dentro.add(d.ref);
+				break;
+			}
+			atual = atual.pai ? porRef.get(atual.pai) : undefined;
+		}
+	}
+	for (const r of raizes) {
+		let pai = porRef.get(r)?.pai;
+		for (let passos = 0; pai && passos < 64; passos++) {
+			acima.add(pai);
+			pai = porRef.get(pai)?.pai;
+		}
+	}
+	return new Set([...dentro, ...acima]);
+}
+
+const MIUDAS = new Set(['a', 'o', 'as', 'os', 'e', 'de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'ao', 'aos', 'à', 'às', 'para', 'por', 'com']);
+
+/**
+ * O nome de uma divisão para ler: "DA ADMINISTRAÇÃO PÚBLICA" vira "Da
+ * Administração Pública". Só o que vem todo em maiúsculas; números romanos e
+ * siglas curtas ficam. É apresentação — o texto da lei não muda.
+ */
+export function nomeLegivel(nome: string): string {
+	if (!nome || nome !== nome.toUpperCase()) return nome;
+	return nome
+		.toLowerCase()
+		.split(/(\s+)/)
+		.map((p, i) => {
+			const cima = p.toUpperCase();
+			if (/^[IVXLCDM]+$/.test(cima) && p.length > 1) return cima;
+			if (i > 0 && MIUDAS.has(p)) return p;
+			return p.charAt(0).toUpperCase() + p.slice(1);
+		})
+		.join('');
+}
+
+/** "arts. 37 a 43" de cada trecho, ou "a lei inteira". */
+export function descreverRecorte(trechos: { rotulo: string; nome: string; artigos: string }[]): string {
+	if (trechos.length === 0) return 'a lei inteira';
+	return trechos.map((t) => t.artigos || t.rotulo).join(' · ');
+}

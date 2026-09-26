@@ -68,7 +68,7 @@ func (h *LeiHandler) Captura(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.leis.Captura(r.Context(), id, r.PathValue("id"))
+	c, err := h.leis.Captura(r.Context(), id, r.PathValue("id"), r.URL.Query().Get("concurso"))
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -130,7 +130,7 @@ func (h *LeiHandler) Ler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l, err := h.leis.Ler(r.Context(), id, r.PathValue("slug"))
+	l, err := h.leis.Ler(r.Context(), id, r.PathValue("slug"), r.URL.Query().Get("concurso"))
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
@@ -208,7 +208,15 @@ func (h *LeiHandler) vincular(w http.ResponseWriter, r *http.Request, ligar bool
 		return
 	}
 
-	if err := h.leis.Vincular(r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("lei"), ligar); err != nil {
+	var req vinculoRequest
+	if ligar && r.ContentLength != 0 {
+		if err := decode(w, r, &req); err != nil {
+			writeError(w, r, h.logger, err)
+			return
+		}
+	}
+
+	if err := h.leis.Vincular(r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("lei"), ligar, req.Recorte); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}

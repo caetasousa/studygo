@@ -142,7 +142,7 @@ migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
 sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
-legislação) e **a próxima migration é a 000009**: uma 000004 nova seria dada
+legislação) e segue dali (a próxima é a **000010**): uma 000004 nova seria dada
 como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:
@@ -169,7 +169,7 @@ Regras que o schema carrega:
   renumera o dia inteiro dentro de uma transação, passando por estados
   intermediários que colidiriam.
 
-### Legislação (000008)
+### Legislação (000008, recorte na 000009)
 
 ```
 leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai, tipo, texto, notas, anteriores)
@@ -192,6 +192,13 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   identificado pela `ref` jurídica (`art71.inc2`) — é assim que a lei é citada,
   e é a âncora do link direto. As questões guardam as refs que citam
   (`text[]`), resolvidas contra a versão ativa.
+- **O recorte do edital fica no vínculo, não na lei.** A lei é guardada
+  inteira (o catálogo é de todos, e outra matéria pode cobrar outra parte); o
+  vínculo matéria ↔ lei guarda as refs das raízes que o edital cobra
+  (`disciplinas_leis.recorte`, vazio = a lei inteira). Ele sai de casar o
+  assunto do tópico com o título das divisões da lei ("Administração
+  Pública" → Capítulo VII) e com os artigos citados (`lei.RecorteDoEdital`);
+  o que não casa não delimita. Quem estuda ajusta à mão no leitor.
 - **Versão repetida não duplica; versão nova não apaga.** A versão é o hash dos
   dispositivos; reimportá-la só reativa. As questões casam pela chave do pacote:
   a que mudou mantém o id (e as respostas), a que saiu é desativada, nunca

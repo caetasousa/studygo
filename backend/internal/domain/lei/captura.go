@@ -126,16 +126,40 @@ func SlugDe(curto string) string {
 	return strings.Trim(naoSlug.ReplaceAllString(dobrar(curto), "-"), "-")
 }
 
+// Epigrafe é a primeira linha da lei ("LEI Nº 13.709, DE 14 DE AGOSTO DE
+// 2018", "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988"): o nome dela
+// antes de alguém dar um.
+func Epigrafe(ds []Dispositivo) string {
+	for _, d := range ds {
+		if d.Tipo == "preambulo" && strings.TrimSpace(d.Texto) != "" {
+			return strings.TrimRight(strings.TrimSpace(d.Texto), ".")
+		}
+	}
+
+	return ""
+}
+
 // ReconhecerPadrao é o que sugere a lei para uma matéria quando ninguém disse
-// nada: o número dela no nome ("Lei nº 13.709/2018" → "13.709"). É o que os
-// editais citam.
-func ReconhecerPadrao(nome string) []string {
+// nada: o número dela ("Lei nº 13.709/2018" → "13.709"), que é o que os
+// editais citam, tirado do nome ou da epígrafe. Sem número — a Constituição —,
+// a própria epígrafe.
+func ReconhecerPadrao(nome string, ds []Dispositivo) []string {
+	epigrafe := Epigrafe(ds)
 	var out []string
-	for _, n := range numeroLei.FindAllString(nome, -1) {
+	for _, n := range numeroLei.FindAllString(nome+" "+epigrafe, -1) {
 		if !slices.Contains(out, n) {
 			out = append(out, n)
 		}
 	}
+	if len(out) == 0 && epigrafe != "" {
+		out = append(out, epigrafe)
+	}
 
 	return out
+}
+
+// Provisoria é a lei que a captura trouxe, antes de ter nome: basta para achar
+// os tópicos do edital que a citam.
+func Provisoria(ds []Dispositivo) Lei {
+	return Lei{Nome: Epigrafe(ds), Reconhecer: ReconhecerPadrao("", ds)}
 }

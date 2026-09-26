@@ -274,6 +274,11 @@ func TestContratoHTTP_LeituraDaLei(t *testing.T) {
 			{ID: uuid.New(), Unidade: "u1", Dispositivos: []string{"art71"}, Enunciado: "e2",
 				Alternativas: []string{"a", "b", "c", "d", "e"}},
 		},
+		Recorte: &service.RecorteNoConcurso{
+			Refs:     []string{"art71"},
+			Trechos:  []lei.TrechoDoRecorte{{Ref: "art71", Rotulo: "Art. 71", Artigos: "art. 71"}},
+			Materias: []service.MateriaDoRecorte{{DisciplinaID: uuid.New(), Nome: "Legislação"}},
+		},
 	}
 
 	compararComGolden(t, "leitura_lei.json", forma(t, leituraParaDTO(l)))
@@ -295,5 +300,13 @@ func TestContratoHTTP_CapturaDaLei(t *testing.T) {
 		},
 	}
 
-	compararComGolden(t, "captura_lei.json", forma(t, capturaParaDTO(c)))
+	ce := service.CapturaComEdital{
+		Captura: c, Epigrafe: "LEI Nº 1, DE 2026",
+		Edital: []service.SugestaoDoEdital{{
+			DisciplinaID: uuid.New(), Materia: "Legislação", Temas: []string{"Lei nº 1: controle"},
+			Recorte: []string{"cap1"}, Trechos: []lei.TrechoDoRecorte{{Ref: "cap1", Rotulo: "CAPÍTULO I", Nome: "DO CONTROLE", Artigos: "art. 1º"}},
+		}},
+	}
+
+	compararComGolden(t, "captura_lei.json", forma(t, capturaParaDTO(ce)))
 }

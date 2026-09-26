@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { api } from '$lib/api';
+	import { nomeLegivel } from '$lib/leis';
 	import type { CapturaDeLei, PublicacaoDeLei } from '$lib/types';
 
 	/**
@@ -14,13 +15,18 @@
 	 *
 	 * Com `atual`, é a atualização do texto daquela lei: o link e os nomes vêm
 	 * preenchidos, e as questões dela continuam.
+	 *
+	 * Com `concurso`, a prévia lê o edital: as matérias cujo tópico cita a lei e
+	 * a parte dela que cada uma cobra. Publicar já vincula as marcadas, com esse
+	 * recorte.
 	 */
 	interface Props {
 		atual?: { slug: string; nome: string; curto: string; fonte: string; reconhecer: string[] };
+		concurso?: string | null;
 		aoPublicar: (r: PublicacaoDeLei) => void;
 	}
 
-	let { atual, aoPublicar }: Props = $props();
+	let { atual, concurso = null, aoPublicar }: Props = $props();
 
 	const ETAPAS: Record<string, string> = {
 		'na fila': 'Na fila',
@@ -41,6 +47,7 @@
 
 	let captura = $state<CapturaDeLei | null>(null);
 	let aceitos = $state<string[]>([]);
+	let vincular = $state<string[]>([]);
 	let erro = $state<string | null>(null);
 	let enviando = $state(false);
 	let espera: ReturnType<typeof setTimeout> | undefined;
@@ -55,8 +62,13 @@
 
 	async function consultar(id: string) {
 		try {
-			captura = await api.capturaDeLei(id);
-			if (captura.estado === 'rodando') espera = setTimeout(() => consultar(id), 1500);
+			captura = await api.capturaDeLei(id, atual ? null : concurso);
+			if (captura.estado === 'rodando') {
+				espera = setTimeout(() => consultar(id), 1500);
+			} else if (captura.estado === 'pronta') {
+				if (!nome.trim() && captura.epigrafe) nome = nomeLegivel(captura.epigrafe);
+				vincular = captura.edital.map((e) => e.disciplinaId);
+			}
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível consultar a captura';
 			captura = null;
@@ -95,6 +107,12 @@
 					.filter(Boolean),
 				aceitos
 			});
+			// O edital já disse o que cada matéria cobra: vincula as marcadas.
+			if (concurso) {
+				for (const e of captura.edital.filter((x) => vincular.includes(x.disciplinaId))) {
+					await api.vincularLei(concurso, e.disciplinaId, r.slug, true, e.recorte);
+				}
+			}
 			captura = null;
 			if (!atual) {
 				link = nome = curto = reconhecer = '';
@@ -177,6 +195,41 @@
 							</span>
 						</label>
 					{/each}
+				</fieldset>
+			{/if}
+
+			{#if captura && captura.edital.length > 0}
+				<fieldset class="edital">
+					<legend>O que o edital pede desta lei</legend>
+					{#each captura.edital as e (e.disciplinaId)}
+						<label class="materia-edital">
+							<input
+								type="checkbox"
+								checked={vincular.includes(e.disciplinaId)}
+								onchange={(ev) =>
+									(vincular = ev.currentTarget.checked
+										? [...vincular, e.disciplinaId]
+										: vincular.filter((x) => x !== e.disciplinaId))}
+							/>
+							<span>
+								Vincular a <b>{e.materia}</b>:
+								{#if e.trechos.length === 0}
+									a lei inteira
+								{:else}
+									<span class="trechos-edital">
+										{#each e.trechos as t (t.ref)}
+											<span class="trecho">{t.rotulo}{t.nome ? ` — ${nomeLegivel(t.nome)}` : ''}{t.artigos ? ` (${t.artigos})` : ''}</span>
+										{/each}
+									</span>
+								{/if}
+								{#each e.temas as t (t)}<q class="tema">{t}</q>{/each}
+							</span>
+						</label>
+					{/each}
+					<p class="dica-edital">
+						Só essa parte aparece no estudo; a lei inteira continua a um clique. Dá para ajustar depois, na
+						página da lei.
+					</p>
 				</fieldset>
 			{/if}
 
@@ -315,6 +368,43 @@
 	}
 	.largo input {
 		width: 100%;
+	}
+	.edital {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 8px 12px 10px;
+		margin: 12px 0;
+		background: var(--bg-soft);
+	}
+	.edital legend {
+		font-size: 12px;
+		font-weight: 600;
+		padding: 0 4px;
+	}
+	.materia-edital {
+		display: flex;
+		gap: 8px;
+		align-items: flex-start;
+		font-size: 13px;
+		padding: 4px 0;
+	}
+	.trechos-edital {
+		display: inline;
+	}
+	.trecho + .trecho::before {
+		content: ' · ';
+		color: var(--text-faint);
+	}
+	.tema {
+		display: block;
+		margin-top: 3px;
+		color: var(--text-faint);
+		font-size: 12px;
+	}
+	.dica-edital {
+		margin: 6px 0 0;
+		font-size: 12px;
+		color: var(--text-muted);
 	}
 	.form-error ul {
 		margin: 6px 0 0;

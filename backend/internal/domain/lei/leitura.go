@@ -45,3 +45,10 @@ type QuestaoComResposta struct {
 	QuestaoPublicada
 	Ultima *Resposta
 }
+
+// Vinculo é a lei que uma matéria cobra, com o recorte do edital. Recorte
+// vazio é a lei inteira.
+type Vinculo struct {
+	LeiID   uuid.UUID
+	Recorte []string
+}

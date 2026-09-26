@@ -415,10 +415,36 @@ func (r *LeiRepo) Responder(ctx context.Context, resp lei.Resposta) (lei.Respost
 	return resp, nil
 }
 
-func (r *LeiRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+func (r *LeiRepo) Estrutura(ctx context.Context, leiID uuid.UUID) ([]lei.Dispositivo, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT dl.disciplina_id, dl.lei_id
+		`SELECT d.ref, coalesce(d.pai, ''), d.tipo, d.rotulo, d.nome
+		   FROM leis_dispositivos d JOIN leis_versoes v ON v.id = d.versao_id
+		  WHERE v.lei_id = $1 AND v.ativa
+		    AND d.tipo IN ('parte', 'livro', 'titulo', 'capitulo', 'secao', 'subsecao', 'artigo', 'preambulo')
+		  ORDER BY d.ordem`, leiID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listando a estrutura: %w", err)
+	}
+	defer rows.Close()
+
+	var out []lei.Dispositivo
+	for rows.Next() {
+		var d lei.Dispositivo
+		if err := rows.Scan(&d.Ref, &d.Pai, &d.Tipo, &d.Rotulo, &d.Nome); err != nil {
+			return nil, fmt.Errorf("lendo a estrutura: %w", err)
+		}
+		out = append(out, d)
+	}
+
+	return out, rows.Err()
+}
+
+func (r *LeiRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]lei.Vinculo, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT dl.disciplina_id, dl.lei_id, dl.recorte
 		   FROM disciplinas_leis dl JOIN disciplinas d ON d.id = dl.disciplina_id
 		  WHERE d.concurso_id = $1`, concursoID,
 	)
@@ -427,23 +453,27 @@ func (r *LeiRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.
 	}
 	defer rows.Close()
 
-	out := map[uuid.UUID][]uuid.UUID{}
+	out := map[uuid.UUID][]lei.Vinculo{}
 	for rows.Next() {
-		var disciplina, l uuid.UUID
-		if err := rows.Scan(&disciplina, &l); err != nil {
+		var (
+			disciplina uuid.UUID
+			v          lei.Vinculo
+		)
+		if err := rows.Scan(&disciplina, &v.LeiID, &v.Recorte); err != nil {
 			return nil, fmt.Errorf("lendo vínculo: %w", err)
 		}
-		out[disciplina] = append(out[disciplina], l)
+		out[disciplina] = append(out[disciplina], v)
 	}
 
 	return out, rows.Err()
 }
 
-func (r *LeiRepo) Vincular(ctx context.Context, disciplinaID, leiID uuid.UUID) error {
+func (r *LeiRepo) Vincular(ctx context.Context, disciplinaID, leiID uuid.UUID, recorte []string) error {
 	if _, err := r.pool.Exec(
 		ctx,
-		`INSERT INTO disciplinas_leis (disciplina_id, lei_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-		disciplinaID, leiID,
+		`INSERT INTO disciplinas_leis (disciplina_id, lei_id, recorte) VALUES ($1,$2,$3)
+		 ON CONFLICT (disciplina_id, lei_id) DO UPDATE SET recorte = EXCLUDED.recorte`,
+		disciplinaID, leiID, naoNulo(recorte),
 	); err != nil {
 		return fmt.Errorf("vinculando lei: %w", err)
 	}

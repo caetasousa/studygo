@@ -165,7 +165,11 @@ export const api = {
 	capturarLei: (link: string) =>
 		request<{ id: string }>('/api/leis/capturas', { method: 'POST', body: JSON.stringify({ link }) }),
 
-	capturaDeLei: (id: string) => request<CapturaDeLei>(`/api/leis/capturas/${encodeURIComponent(id)}`),
+	/** Com o concurso, a prévia traz o que o edital dele pede da lei. */
+	capturaDeLei: (id: string, concurso?: string | null) =>
+		request<CapturaDeLei>(
+			`/api/leis/capturas/${encodeURIComponent(id)}${concurso ? `?concurso=${encodeURIComponent(concurso)}` : ''}`
+		),
 
 	publicarLei: (id: string, pedido: PedidoDePublicacao) =>
 		request<PublicacaoDeLei>(`/api/leis/capturas/${encodeURIComponent(id)}/publicacao`, {
@@ -180,7 +184,11 @@ export const api = {
 			body: JSON.stringify(arquivo)
 		}),
 
-	lerLei: (slug: string) => request<LeituraDeLei>(`/api/leis/${encodeURIComponent(slug)}`),
+	/** Com o concurso, a leitura traz o recorte que as matérias dele cobram. */
+	lerLei: (slug: string, concurso?: string | null) =>
+		request<LeituraDeLei>(
+			`/api/leis/${encodeURIComponent(slug)}${concurso ? `?concurso=${encodeURIComponent(concurso)}` : ''}`
+		),
 
 	responderQuestao: (id: string, alternativa: string) =>
 		request<CorrecaoDeQuestao>(`/api/leis/questoes/${encodeURIComponent(id)}/respostas`, {
@@ -191,10 +199,16 @@ export const api = {
 	leisDoConcurso: (slug: string) =>
 		request<{ disciplinas: LeisDaMateria[] }>(`/api/concursos/${encodeURIComponent(slug)}/leis`),
 
-	vincularLei: (slug: string, disciplinaId: string, lei: string, ligar: boolean) =>
+	/**
+	 * Liga (ou desliga) a lei à matéria. Sem `recorte`, o servidor o tira dos
+	 * tópicos da matéria; com ele, grava o ajuste de quem estuda ([] = a lei inteira).
+	 */
+	vincularLei: (slug: string, disciplinaId: string, lei: string, ligar: boolean, recorte?: string[]) =>
 		request<void>(
 			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/leis/${encodeURIComponent(lei)}`,
-			{ method: ligar ? 'PUT' : 'DELETE' }
+			ligar
+				? { method: 'PUT', ...(recorte ? { body: JSON.stringify({ recorte }) } : {}) }
+				: { method: 'DELETE' }
 		),
 
 	// ---- concursos ----

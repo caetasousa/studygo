@@ -42,6 +42,25 @@
       "unidade": "string"
     }
   ],
+  "recorte": {
+    "materias": [
+      {
+        "disciplinaId": "string",
+        "nome": "string"
+      }
+    ],
+    "refs": [
+      "string"
+    ],
+    "trechos": [
+      {
+        "artigos": "string",
+        "nome": "string",
+        "ref": "string",
+        "rotulo": "string"
+      }
+    ]
+  },
   "unidades": [
     {
       "dispositivos": [

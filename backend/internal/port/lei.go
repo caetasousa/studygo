@@ -33,9 +33,14 @@ type LeiRepository interface {
 	Questao(ctx context.Context, id uuid.UUID) (lei.QuestaoPublicada, error)
 	Responder(ctx context.Context, r lei.Resposta) (lei.Resposta, error)
 
+	// Estrutura é a versão ativa só com as divisões e os artigos: o que o
+	// recorte do edital precisa, sem carregar a lei inteira.
+	Estrutura(ctx context.Context, leiID uuid.UUID) ([]lei.Dispositivo, error)
+
 	// Vinculos devolve, por disciplina do concurso, as leis vinculadas a ela.
-	Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]uuid.UUID, error)
-	Vincular(ctx context.Context, disciplinaID, leiID uuid.UUID) error
+	Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]lei.Vinculo, error)
+	// Vincular grava o vínculo, ou troca o recorte do que já existe.
+	Vincular(ctx context.Context, disciplinaID, leiID uuid.UUID, recorte []string) error
 	Desvincular(ctx context.Context, disciplinaID, leiID uuid.UUID) error
 }
 

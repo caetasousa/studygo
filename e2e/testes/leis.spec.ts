@@ -107,6 +107,13 @@ async function importar(baseURL: string, p: Pacote, { arquivo = 'lei-exemplo', a
 	return { publicacao, questoes };
 }
 
+/** "Adicionar lei" fica recolhido quando o catálogo já tem leis. */
+async function abrirAdicionar(page: Page) {
+	const campo = page.getByLabel('Link da lei na fonte oficial');
+	if (!(await campo.isVisible())) await page.getByText('Adicionar lei', { exact: true }).click();
+	await expect(campo).toBeVisible();
+}
+
 async function abrirLei(page: Page, slug: string) {
 	await page.goto(`/leis/${slug}`);
 	await expect(page.getByRole('navigation', { name: 'Sumário' })).toBeVisible();
@@ -149,6 +156,7 @@ test.describe('legislação', () => {
 		await page.goto('/legislacao');
 		await expect(page.getByRole('heading', { name: 'Legislação', level: 1 })).toBeVisible();
 
+		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei());
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
 		// A captura ainda rodando aparece como andamento, e a tela espera (L16).
@@ -230,13 +238,14 @@ test.describe('legislação', () => {
 
 		await api.concurso('Conta comum E2E');
 		await page.goto('/legislacao');
-		await expect(page.getByRole('heading', { name: 'Adicionar lei' })).toBeVisible();
+		await abrirAdicionar(page);
 		await expect(page.getByLabel('Link da lei na fonte oficial')).toBeEditable();
 	});
 
 	test('[L11] a captura com bloqueio não pode ser publicada', async ({ page, api, conta }) => {
 		await api.concurso('Bloqueio E2E');
 		await page.goto('/legislacao');
+		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'bloqueio'));
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
 		await expect(page.getByRole('alert')).toContainText('Esta captura não pode ser publicada');
@@ -266,6 +275,7 @@ test.describe('legislação', () => {
 
 		await api.concurso('Aviso E2E');
 		await page.goto('/legislacao');
+		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'aviso'));
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
 		const aviso = page.getByRole('checkbox', { name: /Revisei: p0003: a regra diz artigo, o Gemini diz solto/ });
@@ -282,6 +292,7 @@ test.describe('legislação', () => {
 	test('[L13] link fora das fontes oficiais é recusado com o motivo', async ({ page, api }) => {
 		await api.concurso('Fonte E2E');
 		await page.goto('/legislacao');
+		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill('https://www.exemplo.com/lei.htm');
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
 		await expect(page.getByRole('alert')).toContainText('não é uma fonte oficial');
@@ -453,5 +464,96 @@ test.describe('legislação', () => {
 		await bloco.getByText('Redação anterior').click();
 		await expect(bloco.getByText(par.anteriores[0])).toBeVisible();
 		await expect(bloco.locator('.texto')).toHaveText(par.texto);
+	});
+
+	test('[L17][L18] a prévia mostra o que o edital pede, e publicar vincula a matéria com esse recorte', async ({ page, api }) => {
+		const curto = `Lei Recorte ${idUnico()}`;
+		// O dublê devolve a lei da fixture, cuja epígrafe é a Lei nº 99.999.
+		await api.concurso('Recorte E2E', [
+			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas: ['Lei nº 99.999/2026: controle externo'] },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
+		]);
+		await page.goto('/legislacao');
+		await abrirAdicionar(page);
+		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei());
+		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
+
+		const edital = page.getByRole('group', { name: 'O que o edital pede desta lei' });
+		await expect(edital).toContainText('Legislação E2E');
+		await expect(edital).toContainText('CAPÍTULO I — Do Controle Externo (arts. 1º a 2º)');
+		await expect(edital).not.toContainText('Língua Portuguesa');
+		await expect(edital.getByRole('checkbox')).toBeChecked();
+		// O nome vem da epígrafe; o curto é de quem publica.
+		await expect(page.getByLabel('Nome da lei')).toHaveValue(/99\.999/);
+		await page.getByLabel('Nome curto').fill(curto);
+		await page.getByRole('button', { name: 'Publicar lei' }).click();
+		await expect(page.getByRole('status')).toContainText(`${curto} publicada`);
+
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+		await expect(materia.getByRole('link', { name: curto })).toBeVisible();
+		await expect(materia.getByRole('listitem').filter({ hasText: curto })).toContainText('arts. 1º a 2º');
+		await page.reload();
+		await expect(
+			page.getByRole('region', { name: 'Legislação E2E' }).getByRole('listitem').filter({ hasText: curto })
+		).toContainText('arts. 1º a 2º');
+	});
+
+	/** Publica a lei (outra conta) e a vincula à matéria deste teste pela API, sem recorte: o servidor o lê do tópico. */
+	async function leiNoConcurso(api: Api, page: Page, token: string, baseURL: string) {
+		const numero = numeroUnico();
+		const p = copia(pacote(), idUnico(), numero);
+		await importar(baseURL, p);
+		const slug = await api.concurso('Leitor com recorte E2E', [
+			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas: [`Lei nº ${numero}/2026: controle externo`] }
+		]);
+		const headers = { Authorization: `Bearer ${token}` };
+		const { disciplinas } = await (await page.request.get(`/api/concursos/${slug}/leis`, { headers })).json();
+		const res = await page.request.put(`/api/concursos/${slug}/disciplinas/${disciplinas[0].disciplinaId}/leis/${p.lei.slug}`, { headers });
+		expect(res.status(), await res.text()).toBe(204);
+		return p;
+	}
+
+	test('[L19] aberta no concurso, a lei mostra só o recorte, e a lei inteira a um clique', async ({ api, page, conta, baseURL }) => {
+		const p = await leiNoConcurso(api, page, conta.token, baseURL!);
+		await abrirLei(page, p.lei.slug);
+
+		const callout = page.getByRole('complementary', { name: 'Recorte do edital' });
+		await expect(callout).toContainText('O edital cobra esta parte da lei');
+		await expect(callout).toContainText('CAPÍTULO I — Do Controle Externo');
+		await expect(dispositivo(page, 'art1')).toBeVisible();
+		await expect(dispositivo(page, 'art3')).toHaveCount(0);
+
+		await callout.getByRole('button', { name: 'Lei inteira' }).click();
+		await expect(dispositivo(page, 'art3')).toBeVisible();
+		await callout.getByRole('button', { name: 'Só o que cai' }).click();
+		await expect(dispositivo(page, 'art3')).toHaveCount(0);
+		await page.getByRole('button', { name: 'Ler a lei inteira' }).click();
+		await expect(dispositivo(page, 'art3')).toBeVisible();
+	});
+
+	test('[L20] o recorte ajustado à mão fica gravado', async ({ api, page, conta, baseURL }) => {
+		const p = await leiNoConcurso(api, page, conta.token, baseURL!);
+		await abrirLei(page, p.lei.slug);
+
+		await page.getByRole('button', { name: 'Ajustar recorte' }).click();
+		// Dentro do capítulo marcado, o art. 1º já vem junto e não se desmarca sozinho.
+		await expect(page.getByRole('checkbox', { name: 'No recorte: Art. 1º' })).toBeDisabled();
+		await page.getByRole('checkbox', { name: 'No recorte: Art. 3º' }).check();
+		await page.getByRole('button', { name: 'Salvar recorte' }).click();
+
+		const callout = page.getByRole('complementary', { name: 'Recorte do edital' });
+		await expect(callout).toContainText('O edital cobra estas partes da lei');
+		await expect(dispositivo(page, 'art3')).toBeVisible();
+		await page.reload();
+		await expect(page.getByRole('complementary', { name: 'Recorte do edital' })).toContainText('Art. 3º');
+		await expect(dispositivo(page, 'art3')).toBeVisible();
+	});
+
+	test('[L21] o link direto para fora do recorte abre o dispositivo', async ({ api, page, conta, baseURL }) => {
+		const p = await leiNoConcurso(api, page, conta.token, baseURL!);
+		await page.goto(`/leis/${p.lei.slug}#art3`);
+		await expect(dispositivo(page, 'art3')).toBeInViewport();
+		await expect(dispositivo(page, 'art3')).toHaveAttribute('aria-current', 'location');
+		await expect(page.getByRole('button', { name: 'Lei inteira' })).toHaveAttribute('aria-pressed', 'true');
 	});
 });

@@ -142,10 +142,23 @@ type resultadoCapturaDTO struct {
 	Dispositivos int              `json:"dispositivos"`
 }
 
+type sugestaoDoEditalDTO struct {
+	DisciplinaID string      `json:"disciplinaId"`
+	Materia      string      `json:"materia"`
+	Temas        []string    `json:"temas"`
+	Recorte      []string    `json:"recorte"`
+	Trechos      []trechoDTO `json:"trechos"`
+}
+
 type capturaDTO struct {
-	ID        string `json:"id"`
-	Estado    string `json:"estado"`
-	Etapa     string `json:"etapa"`
+	ID string `json:"id"`
+	// Epigrafe é a primeira linha da lei, para sugerir o nome.
+	Epigrafe string `json:"epigrafe"`
+	// Edital: as matérias do concurso ativo cujo tópico cita a lei, e o que
+	// cada uma pede dela.
+	Edital    []sugestaoDoEditalDTO `json:"edital"`
+	Estado    string                `json:"estado"`
+	Etapa     string                `json:"etapa"`
 	Progresso struct {
 		Feitos int `json:"feitos"`
 		Total  int `json:"total"`
@@ -159,8 +172,15 @@ var agrupamentos = map[string]bool{
 	"parte": true, "livro": true, "titulo": true, "capitulo": true, "secao": true, "subsecao": true,
 }
 
-func capturaParaDTO(c lei.Captura) capturaDTO {
-	d := capturaDTO{ID: c.ID, Estado: c.Estado, Etapa: c.Etapa, Erro: c.Erro}
+func capturaParaDTO(ce service.CapturaComEdital) capturaDTO {
+	c := ce.Captura
+	d := capturaDTO{ID: c.ID, Epigrafe: ce.Epigrafe, Edital: []sugestaoDoEditalDTO{}, Estado: c.Estado, Etapa: c.Etapa, Erro: c.Erro}
+	for _, s := range ce.Edital {
+		d.Edital = append(d.Edital, sugestaoDoEditalDTO{
+			DisciplinaID: s.DisciplinaID.String(), Materia: s.Materia, Temas: s.Temas,
+			Recorte: naoNula(s.Recorte), Trechos: trechosParaDTO(s.Trechos),
+		})
+	}
 	d.Progresso.Feitos, d.Progresso.Total = c.Feitos, c.Total
 	r := c.Resultado
 	if r == nil {
@@ -282,12 +302,26 @@ type questaoLeitorDTO struct {
 	Resposta     *correcaoDTO `json:"resposta"`
 }
 
+type materiaDoRecorteDTO struct {
+	DisciplinaID string `json:"disciplinaId"`
+	Nome         string `json:"nome"`
+}
+
+// recorteNoConcursoDTO: refs vazias são a lei inteira.
+type recorteNoConcursoDTO struct {
+	Refs     []string              `json:"refs"`
+	Trechos  []trechoDTO           `json:"trechos"`
+	Materias []materiaDoRecorteDTO `json:"materias"`
+}
+
 type leituraLeiDTO struct {
 	Lei          leiDTO             `json:"lei"`
 	Versao       string             `json:"versao"`
 	Dispositivos []dispositivoDTO   `json:"dispositivos"`
 	Unidades     []unidadeDTO       `json:"unidades"`
 	Questoes     []questaoLeitorDTO `json:"questoes"`
+	// Recorte do concurso ativo; null quando nenhuma matéria dele cobra a lei.
+	Recorte *recorteNoConcursoDTO `json:"recorte"`
 }
 
 func leituraParaDTO(l service.LeituraDaLei) leituraLeiDTO {
@@ -319,30 +353,65 @@ func leituraParaDTO(l service.LeituraDaLei) leituraLeiDTO {
 		d.Questoes = append(d.Questoes, x)
 	}
 
+	if r := l.Recorte; r != nil {
+		d.Recorte = &recorteNoConcursoDTO{Refs: naoNula(r.Refs), Trechos: trechosParaDTO(r.Trechos), Materias: []materiaDoRecorteDTO{}}
+		for _, m := range r.Materias {
+			d.Recorte.Materias = append(d.Recorte.Materias, materiaDoRecorteDTO{DisciplinaID: m.DisciplinaID.String(), Nome: m.Nome})
+		}
+	}
+
 	return d
 }
 
+// trechoDTO é uma raiz do recorte do edital: "Seção IX — DA FISCALIZAÇÃO…
+// (arts. 70 a 75)". Lista vazia de trechos é a lei inteira.
+type trechoDTO struct {
+	Ref     string `json:"ref"`
+	Rotulo  string `json:"rotulo"`
+	Nome    string `json:"nome"`
+	Artigos string `json:"artigos"`
+}
+
+func trechosParaDTO(ts []lei.TrechoDoRecorte) []trechoDTO {
+	out := make([]trechoDTO, 0, len(ts))
+	for _, t := range ts {
+		out = append(out, trechoDTO{Ref: t.Ref, Rotulo: t.Rotulo, Nome: t.Nome, Artigos: t.Artigos})
+	}
+
+	return out
+}
+
+type leiNaMateriaDTO struct {
+	leiResumoDTO
+	Recorte []trechoDTO `json:"recorte"`
+}
+
 type leisDaMateriaDTO struct {
-	DisciplinaID string         `json:"disciplinaId"`
-	Codigo       string         `json:"codigo"`
-	Nome         string         `json:"nome"`
-	Vinculadas   []leiResumoDTO `json:"vinculadas"`
-	Sugeridas    []leiResumoDTO `json:"sugeridas"`
+	DisciplinaID string            `json:"disciplinaId"`
+	Codigo       string            `json:"codigo"`
+	Nome         string            `json:"nome"`
+	Vinculadas   []leiNaMateriaDTO `json:"vinculadas"`
+	Sugeridas    []leiNaMateriaDTO `json:"sugeridas"`
 }
 
 func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 	d := leisDaMateriaDTO{
 		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome,
-		Vinculadas: []leiResumoDTO{}, Sugeridas: []leiResumoDTO{},
+		Vinculadas: []leiNaMateriaDTO{}, Sugeridas: []leiNaMateriaDTO{},
 	}
 	for _, r := range m.Vinculadas {
-		d.Vinculadas = append(d.Vinculadas, resumoLeiParaDTO(r))
+		d.Vinculadas = append(d.Vinculadas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})
 	}
 	for _, r := range m.Sugeridas {
-		d.Sugeridas = append(d.Sugeridas, resumoLeiParaDTO(r))
+		d.Sugeridas = append(d.Sugeridas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})
 	}
 
 	return d
+}
+
+// vinculoRequest é opcional: sem corpo, o recorte sai dos tópicos da matéria.
+type vinculoRequest struct {
+	Recorte *[]string `json:"recorte"`
 }
 
 var errQuestoesIlegiveis = errors.New("o arquivo não é um questoes.json de lei: esperava {\"unidades\": [...], \"questoes\": [...]}")
