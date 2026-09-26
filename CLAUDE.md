@@ -157,6 +157,25 @@ O `Makefile` é a interface principal. Rode `make` para listar os alvos.
 Durante a implementação, rode primeiro os testes relacionados. Antes de entregar
 uma mudança transversal, rode `make check`, `make check-db` e `make e2e`.
 
+> [!IMPORTANT]
+> **Nada de container ou processo perdido na distro de desenvolvimento.** A
+> `Ubuntu-24.04` tem de ficar o mais enxuta possível: ela divide a VM do WSL
+> (4 GB) com o servidor e com o runner da esteira, e o que sobra rodando
+> rouba memória do Windows e de tudo o mais.
+>
+> - **Antes** de subir qualquer teste com Docker (`make up`, `make check-db`,
+>   `make e2e`, `make prod-local`, um compose avulso), libere as portas dele:
+>   `5173`, `8080`, `5432` (stack local) e `25173`, `28080`, `25432` (E2E).
+>   Veja quem ocupa com `docker ps` e `ss -ltnp`; derrube o container que
+>   sobrou (`docker compose -p <projeto> down`, `docker rm -f`) e encerre o
+>   processo solto (vite, `go run`, uvicorn) antes de subir o seu.
+> - **Depois** dos testes, encerre todos os containers — os que eles subiram,
+>   a stack local levantada para ver uma tela, o que o `MANTER=1` deixou de pé
+>   — e confira com `docker ps` que nada ficou para trás.
+> - **Exceções:** o `registry-local` (a esteira constrói por ele) e os
+>   containers `runner-*` de um job em andamento. O servidor (`ubuntu-server`)
+>   roda em outro daemon, o Docker rootless do `studygo`, e não aparece aqui.
+
 `make check` não precisa de Docker. `make check-db` sobe containers efêmeros
 (Testcontainers) e **nunca** toca no banco local — não há `TEST_DATABASE_URL`,
 URL montada à mão nem porta fixa. Teste que precisa de banco leva a build tag

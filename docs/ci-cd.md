@@ -239,6 +239,16 @@ dividem): SSH na 2222, nginx na 8480.
 Se o WSL estiver desligado, as pipelines ficam na fila e rodam quando ele voltar.
 Nada se perde.
 
+Os jobs trocam as imagens por um registry na distro de desenvolvimento, o
+`registry-local` (porta 5000, dados no volume `registry-data`). Parado, os
+builds falham com "o registry local não respondeu": `docker start
+registry-local`. Se o container sumiu, recrie-o com o mesmo volume:
+
+```bash
+docker run -d --name registry-local --restart unless-stopped \
+  -p 5000:5000 -v registry-data:/var/lib/registry registry:2
+```
+
 ## Variáveis exigidas
 
 Settings → CI/CD → Variables, todas **protegidas** e (exceto `SSH_KNOWN_HOSTS`)
