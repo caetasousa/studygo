@@ -26,16 +26,173 @@ func NewLeiService(leis port.LeiRepository, concursos port.ConcursoRepository, c
 	return &LeiService{leis: leis, concursos: concursos, capturador: capturador}
 }
 
+// PedidoDeCaptura é o que capturar: o link da fonte e, se houver, o recorte
+// (raízes que a pesquisa achou, mais os artigos que a pessoa digitou). Com
+// Slug, é a lei que já existe: o recorte novo se soma ao que ela já guarda.
+type PedidoDeCaptura struct {
+	Link    string
+	Recorte []string
+	Artigos string
+	Slug    string
+	// Inteira pede a lei toda, mesmo que a guardada seja só parte.
+	Inteira bool
+}
+
 // Capturar pede ao processador a lei do link. Qualquer conta logada captura
 // e publica (decisão de 25/09/2026, enquanto o app é de teste); a rota já
 // exige sessão.
-func (s *LeiService) Capturar(ctx context.Context, usuarioID uuid.UUID, link string) (string, error) {
-	link = strings.TrimSpace(link)
+func (s *LeiService) Capturar(ctx context.Context, usuarioID uuid.UUID, pedido PedidoDeCaptura) (string, error) {
+	link := strings.TrimSpace(pedido.Link)
+	recorte := append(slices.Clone(pedido.Recorte), lei.ArtigosCitados(pedido.Artigos)...)
+
+	if pedido.Slug != "" {
+		atual, err := s.leis.PorSlug(ctx, pedido.Slug)
+		if err != nil {
+			return "", err
+		}
+		if link == "" {
+			link = atual.Fonte
+		}
+		texto, err := s.leis.TextoAtivo(ctx, atual.ID)
+		switch {
+		case errors.Is(err, lei.ErrNaoEncontrada):
+		case err != nil:
+			return "", err
+		case len(texto.Recorte) == 0:
+			// A versão guardada é a lei inteira: ampliar é recapturá-la inteira.
+			recorte = nil
+		default:
+			recorte = append(texto.Recorte, recorte...)
+		}
+	}
 	if link == "" {
 		return "", erroDeValidacao("cole o link da lei na fonte oficial")
 	}
 
-	return s.capturador.IniciarCaptura(ctx, usuarioID.String(), link)
+	if pedido.Inteira {
+		recorte = nil
+	}
+
+	return s.capturador.IniciarCaptura(ctx, usuarioID.String(), link, limparLista(recorte))
+}
+
+// AssuntoDoTema é um pedaço do tópico e o que ele pede da lei, já descrito.
+type AssuntoDoTema struct {
+	Texto   string
+	Refs    []string
+	Trechos []lei.TrechoDoRecorte
+}
+
+// PesquisaDoTema é o que a tela mostra antes de importar: a fonte, o que cada
+// assunto do tópico pede, o recorte somado e, se a lei já está no catálogo, o
+// que ainda falta nela.
+type PesquisaDoTema struct {
+	lei.Pesquisa
+	Nome     string
+	Curto    string
+	Assuntos []AssuntoDoTema
+	Recorte  []string
+	Trechos  []lei.TrechoDoRecorte
+	// Existente é a lei do catálogo com a mesma fonte.
+	Existente *lei.Lei
+	// Acao diz o que importar significa aqui: AcaoImportar (lei nova),
+	// AcaoVincular (a versão guardada já cobre o tópico) ou AcaoAmpliar (falta
+	// parte do que o tópico pede).
+	Acao string
+}
+
+const (
+	AcaoImportar = "importar"
+	AcaoVincular = "vincular"
+	AcaoAmpliar  = "ampliar"
+)
+
+// PesquisarTema acha a lei que o tópico do edital cita e lê o que ele pede
+// dela, antes de importar qualquer coisa.
+func (s *LeiService) PesquisarTema(ctx context.Context, usuarioID uuid.UUID, tema, link string) (PesquisaDoTema, error) {
+	tema = strings.TrimSpace(tema)
+	if tema == "" {
+		return PesquisaDoTema{}, erroDeValidacao("diga o tópico do edital a pesquisar")
+	}
+	pq, err := s.capturador.Pesquisar(ctx, usuarioID.String(), tema, strings.TrimSpace(link))
+	if err != nil {
+		return PesquisaDoTema{}, err
+	}
+
+	ds := pq.Estrutura
+	assuntos, recorte := lei.LerTema(tema, ds)
+	out := PesquisaDoTema{
+		Pesquisa: pq, Nome: pq.Epigrafe, Curto: lei.CurtoDe(pq.Epigrafe),
+		Recorte: recorte, Trechos: lei.DescreverRecorte(ds, recorte),
+	}
+	for _, a := range assuntos {
+		out.Assuntos = append(out.Assuntos, AssuntoDoTema{
+			Texto: a.Texto, Refs: a.Refs, Trechos: lei.DescreverRecorte(ds, lei.RaizesNaOrdem(ds, a.Refs)),
+		})
+	}
+
+	out.Acao = AcaoImportar
+	existente, err := s.leis.PorFonte(ctx, pq.Fonte)
+	switch {
+	case errors.Is(err, lei.ErrNaoEncontrada):
+		return out, nil
+	case err != nil:
+		return PesquisaDoTema{}, err
+	}
+	out.Existente, out.Nome, out.Curto = &existente, existente.Nome, existente.Curto
+	texto, err := s.leis.TextoAtivo(ctx, existente.ID)
+	if err != nil && !errors.Is(err, lei.ErrNaoEncontrada) {
+		return PesquisaDoTema{}, err
+	}
+
+	out.Acao = AcaoVincular
+	if err != nil || len(texto.Recorte) == 0 {
+		return out, nil // sem versão, ou a guardada é a lei inteira
+	}
+	if len(recorte) == 0 {
+		out.Acao = AcaoAmpliar // o tópico pede a lei inteira; a guardada é parte
+
+		return out, nil
+	}
+	for _, ref := range recorte {
+		if !lei.NoRecorte(ds, texto.Recorte, ref) {
+			out.Acao = AcaoAmpliar
+		}
+	}
+
+	return out, nil
+}
+
+// ResumoDaExclusao é o que a exclusão da lei leva junto, para a tela avisar.
+type ResumoDaExclusao struct {
+	Curto     string
+	Questoes  int
+	Respostas int
+}
+
+func (s *LeiService) ResumirExclusao(ctx context.Context, slug string) (ResumoDaExclusao, error) {
+	l, err := s.leis.PorSlug(ctx, slug)
+	if err != nil {
+		return ResumoDaExclusao{}, err
+	}
+	q, r, err := s.leis.ContarParaExcluir(ctx, l.ID)
+	if err != nil {
+		return ResumoDaExclusao{}, err
+	}
+
+	return ResumoDaExclusao{Curto: l.Curto, Questoes: q, Respostas: r}, nil
+}
+
+// Excluir apaga a lei do catálogo, com as versões, as questões e as respostas
+// a elas (decisão de 26/09/2026: uma importação errada não pode ficar para
+// sempre). A tela confirma antes, com o que vai junto.
+func (s *LeiService) Excluir(ctx context.Context, slug string) error {
+	l, err := s.leis.PorSlug(ctx, slug)
+	if err != nil {
+		return err
+	}
+
+	return s.leis.Excluir(ctx, l.ID)
 }
 
 // CapturaComEdital é a prévia com o que o concurso ativo pede desta lei.
@@ -181,6 +338,7 @@ func (s *LeiService) Publicar(
 		Versao:       r.Versao,
 		Dispositivos: r.Dispositivos,
 		Unidades:     unidades,
+		Recorte:      r.Recorte,
 	}
 	if err := p.ValidarTexto(); err != nil {
 		return ResultadoDaPublicacao{}, err
@@ -199,6 +357,14 @@ func (s *LeiService) Publicar(
 	}
 
 	return res, nil
+}
+
+func derefOuVazio(xs *[]string) []string {
+	if xs == nil {
+		return nil
+	}
+
+	return *xs
 }
 
 func limparLista(xs []string) []string {
@@ -304,6 +470,8 @@ type LeituraDaLei struct {
 	// Recorte é o que o concurso pede desta lei; nil quando nenhuma matéria
 	// dele a cobra (ou a lei foi aberta fora de um concurso).
 	Recorte *RecorteNoConcurso
+	// Guardado descreve o que a versão guarda quando é só parte da lei.
+	Guardado []lei.TrechoDoRecorte
 }
 
 // RecorteNoConcurso junta os recortes das matérias do concurso que cobram a
@@ -333,7 +501,10 @@ func (s *LeiService) Ler(ctx context.Context, usuarioID uuid.UUID, slug, concurs
 		return LeituraDaLei{}, err
 	}
 
-	out := LeituraDaLei{Lei: l, Texto: texto, Questoes: make([]QuestaoParaLeitor, 0, len(qs))}
+	out := LeituraDaLei{
+		Lei: l, Texto: texto, Questoes: make([]QuestaoParaLeitor, 0, len(qs)),
+		Guardado: lei.DescreverRecorte(texto.Dispositivos, texto.Recorte),
+	}
 	for _, q := range qs {
 		p := QuestaoParaLeitor{
 			ID:           q.ID,
@@ -450,6 +621,17 @@ type LeisDaMateria struct {
 	Nome         string
 	Vinculadas   []LeiNaMateria
 	Sugeridas    []LeiNaMateria
+	// Temas são os tópicos da matéria e as leis vinculadas que cobrem cada um:
+	// é por eles que a importação começa.
+	Temas []TemaDaMateria
+}
+
+// TemaDaMateria é um tópico do edital e os slugs das leis vinculadas que
+// cobrem o que ele pede — não basta citar a lei: "Lei nº X, art. 3º" não está
+// coberto por um vínculo que só tem o capítulo I.
+type TemaDaMateria struct {
+	Texto string
+	Leis  []string
 }
 
 func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug string) ([]LeisDaMateria, error) {
@@ -498,16 +680,53 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 				m.Sugeridas = append(m.Sugeridas, LeiNaMateria{r, lei.DescreverRecorte(ds, recorte)})
 			}
 		}
+		for _, t := range d.Temas {
+			tema := TemaDaMateria{Texto: t}
+			for _, v := range vinculos[d.ID] {
+				i := slices.IndexFunc(m.Vinculadas, func(x LeiNaMateria) bool { return x.Lei.ID == v.LeiID })
+				if i < 0 || !m.Vinculadas[i].Lei.CitadaEm([]string{t}) {
+					continue
+				}
+				ds, err := estrutura(v.LeiID)
+				if err != nil {
+					return nil, err
+				}
+				if cobre(ds, v.Recorte, lei.RecorteDoEdital(m.Vinculadas[i].Lei, []string{t}, ds)) {
+					tema.Leis = append(tema.Leis, m.Vinculadas[i].Lei.Slug)
+				}
+			}
+			m.Temas = append(m.Temas, tema)
+		}
 		out = append(out, m)
 	}
 
 	return out, nil
 }
 
+// cobre diz se o recorte do vínculo tem o que o tópico pede. Pedido vazio é a
+// lei inteira (ou artigos que a versão guardada nem tem): só o vínculo com a
+// lei inteira cobre.
+func cobre(ds []lei.Dispositivo, vinculo, pedido []string) bool {
+	if len(vinculo) == 0 {
+		return true
+	}
+	if len(pedido) == 0 {
+		return false
+	}
+	for _, ref := range pedido {
+		if !lei.NoRecorte(ds, vinculo, ref) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Vincular liga (ou desliga) a lei à matéria do concurso do estudante. Sem
 // recorte informado, ele sai dos tópicos da matéria — o que o edital pede;
 // informado, é o ajuste de quem estuda, e só vale com refs de divisões e
-// artigos da lei.
+// artigos da lei. Os artigos digitados ("74, 75") se somam a ele; com somar,
+// tudo se soma ao recorte que a matéria já tinha desta lei.
 func (s *LeiService) Vincular(
 	ctx context.Context,
 	usuarioID uuid.UUID,
@@ -516,7 +735,14 @@ func (s *LeiService) Vincular(
 	leiSlug string,
 	ligar bool,
 	recorte *[]string,
+	artigos string,
+	somar bool,
 ) error {
+	if extra := lei.ArtigosCitados(artigos); len(extra) > 0 {
+		todos := append(slices.Clone(derefOuVazio(recorte)), extra...)
+		recorte = &todos
+	}
+
 	c, err := s.concursoDoDono(ctx, usuarioID, slug)
 	if err != nil {
 		return err
@@ -552,6 +778,22 @@ func (s *LeiService) Vincular(
 			}
 		}
 		refs = lei.RaizesNaOrdem(ds, *recorte)
+	}
+	// Pedir a lei inteira (refs vazias) já cobre o que a matéria tinha.
+	if somar && len(refs) > 0 {
+		vinculos, err := s.leis.Vinculos(ctx, c.ID)
+		if err != nil {
+			return err
+		}
+		for _, v := range vinculos[disciplinaID] {
+			switch {
+			case v.LeiID != l.ID:
+			case len(v.Recorte) == 0:
+				refs = nil // a matéria já cobra a lei inteira
+			default:
+				refs = lei.RaizesNaOrdem(ds, append(v.Recorte, refs...))
+			}
+		}
 	}
 
 	return s.leis.Vincular(ctx, disciplinaID, l.ID, refs)

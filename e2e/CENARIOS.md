@@ -98,6 +98,11 @@ Planalto terminados em `e2e/…`.
 | L19 | aberta no concurso, a lei mostra tudo em vez do recorte, ou esconde o recorte sem caminho para a lei inteira | lê o que não cai; ou não acha o resto da lei |
 | L20 | ajustar o recorte à mão não fica gravado | a correção se perde, e o recorte automático volta |
 | L21 | o link direto para um dispositivo fora do recorte não abre o dispositivo | o link do caderno não leva a lugar nenhum |
+| L22 | pesquisar o tópico do edital não mostra a fonte e o que cada assunto pede, ou mostra divisões que o assunto não cita | importa sem saber o que está importando |
+| L23 | importar a partir do tópico guarda a lei inteira, ou deixa de fora parte do que o tópico pede | a lei vem maior que o edital, ou falta artigo |
+| L24 | outro tópico que pede mais artigos da mesma lei cria uma lei repetida, ou apaga o que já tinha | duas "Constituição Federal" no catálogo; ou artigos somem |
+| L25 | excluir a lei não avisa quanto vai junto, apaga sem confirmar, ou deixa questão e resposta órfãs | importação errada para sempre; ou estudo perdido sem aviso |
+| L26 | tópico de norma sem fonte conhecida trava a importação em vez de pedir o link | a Constituição de Goiás nunca entra |
 
 ## Fora da suíte, de propósito
 

@@ -2,14 +2,20 @@
 	import { api } from '$lib/api';
 	import CapturaDeLei from '$lib/components/CapturaDeLei.svelte';
 	import IconButton from '$lib/components/IconButton.svelte';
+	import ImportarDoTema from '$lib/components/ImportarDoTema.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { descreverRecorte } from '$lib/leis';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
-	import type { LeiResumo, LeisDaMateria, PublicacaoDeLei } from '$lib/types';
+	import type { LeiResumo, LeisDaMateria, PublicacaoDeLei, ResumoDaExclusao } from '$lib/types';
 
 	/**
 	 * As leis do concurso, matéria por matéria.
+	 *
+	 * A importação começa pelo tópico do edital: "Pesquisar e importar" acha a
+	 * fonte, mostra o que cada assunto pede da lei, e só o que ficou marcado
+	 * entra (ver ImportarDoTema). O link colado à mão fica para a norma que a
+	 * pesquisa não acha.
 	 *
 	 * O vínculo lei ↔ matéria é SUGERIDO pelo tópico ("Lei nº 16.168" num tópico
 	 * da matéria sugere a Lei 16.168) e confirmado por quem estuda — nunca feito
@@ -29,6 +35,10 @@
 	let erro = $state<string | null>(null);
 	let carregado = $state(false);
 	let publicada = $state<PublicacaoDeLei | null>(null);
+	let mensagem = $state<string | null>(null);
+	// O tópico com a importação aberta, por matéria: "disciplinaId|texto".
+	let abertoEm = $state<string | null>(null);
+	let excluindo = $state<(ResumoDaExclusao & { slug: string }) | null>(null);
 
 	async function carregar(s: string) {
 		erro = null;
@@ -62,8 +72,44 @@
 		if (slug) await carregar(slug);
 	}
 
-	const comLei = $derived(materias.filter((m) => m.vinculadas.length + m.sugeridas.length > 0));
-	const semLei = $derived(materias.filter((m) => m.vinculadas.length + m.sugeridas.length === 0));
+	// O que parece nome de norma num tópico: é onde cabe "Pesquisar e importar".
+	const NORMA =
+		/\b(lei|constitui[çc][ãa]o|resolu[çc][ãa]o|decreto|c[óo]digo|regimento|portaria|instru[çc][ãa]o normativa|medida provis[óo]ria|emenda constitucional)\b|n[º°o]\s*\d/i;
+	const normas = (m: LeisDaMateria) => m.temas.filter((t) => NORMA.test(t.texto));
+
+	const comLei = $derived(
+		materias.filter((m) => m.vinculadas.length + m.sugeridas.length > 0 || normas(m).length > 0)
+	);
+	const semLei = $derived(materias.filter((m) => !comLei.includes(m)));
+
+	async function importado(texto: string) {
+		abertoEm = null;
+		mensagem = texto;
+		if (slug) await carregar(slug);
+	}
+
+	async function pedirExclusao(lei: string) {
+		erro = null;
+		try {
+			excluindo = { ...(await api.resumirExclusao(lei)), slug: lei };
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'Não foi possível preparar a exclusão';
+		}
+	}
+
+	async function excluir() {
+		if (!excluindo) return;
+		const { slug: lei, curto } = excluindo;
+		erro = null;
+		try {
+			await api.excluirLei(lei);
+			excluindo = null;
+			mensagem = `${curto} excluída.`;
+			if (slug) await carregar(slug);
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'A exclusão falhou';
+		}
+	}
 
 	const livres = (m: LeisDaMateria) =>
 		catalogo.filter((l) => !m.vinculadas.some((v) => v.slug === l.slug) && !m.sugeridas.some((s) => s.slug === l.slug));
@@ -78,6 +124,20 @@
 
 <div class="page">
 	{#if erro}<div class="form-error" role="alert">{erro}</div>{/if}
+	{#if mensagem}<p class="ok" role="status">{mensagem}</p>{/if}
+	{#if excluindo}
+		<div class="confirmar" role="alertdialog" aria-label="Excluir {excluindo.curto}">
+			<p>
+				Excluir <b>{excluindo.curto}</b> do catálogo? Vão junto
+				{excluindo.questoes}
+				{excluindo.questoes === 1 ? 'questão' : 'questões'} e {excluindo.respostas}
+				{excluindo.respostas === 1 ? 'resposta' : 'respostas'}, de quem quer que as tenha respondido. Não dá para
+				desfazer.
+			</p>
+			<button class="btn danger" type="button" onclick={excluir}>Excluir de vez</button>
+			<button class="btn" type="button" onclick={() => (excluindo = null)}>Cancelar</button>
+		</div>
+	{/if}
 
 	{#if carregado}
 		{#each comLei as m (m.disciplinaId)}
@@ -86,8 +146,7 @@
 
 		{#if comLei.length === 0}
 			<p class="vazia">
-				Nenhuma matéria do concurso tem lei ainda. Adicione abaixo as leis que o edital cita: a matéria cujo
-				tópico cita a lei aparece aqui, com a parte que ela cobra.
+				Nenhum tópico do edital cita uma norma. Se faltar alguma, adicione-a pelo link, abaixo.
 			</p>
 		{/if}
 
@@ -101,10 +160,10 @@
 		{/if}
 
 		<details class="toggle adicionar" open={catalogo.length === 0}>
-			<summary>Adicionar lei</summary>
+			<summary>Adicionar lei pelo link</summary>
 			<p class="page-sub">
-				Cole o link da lei na fonte oficial. O texto é baixado e organizado em artigos, incisos e alíneas sem que a
-				IA toque em uma palavra; a prévia mostra o que o edital pede dela, e você publica.
+				Para a norma que a pesquisa pelo tópico não acha. O texto é baixado e organizado em artigos, incisos e
+				alíneas sem que a IA toque em uma palavra; a prévia mostra o que o edital pede dela, e você publica.
 			</p>
 			<CapturaDeLei concurso={slug} {aoPublicar} />
 		</details>
@@ -123,6 +182,7 @@
 						<li>
 							<a href="/leis/{l.slug}">{l.curto}</a>
 							<span class="meta">{l.nome}</span>
+							<button class="discreto" type="button" onclick={() => pedirExclusao(l.slug)}>Excluir</button>
 						</li>
 					{/each}
 				</ul>
@@ -136,6 +196,36 @@
 {#snippet materia(m: LeisDaMateria)}
 	<section class="materia" aria-labelledby="mat-{m.disciplinaId}">
 		<h2 class="sec" id="mat-{m.disciplinaId}">{m.nome}</h2>
+
+		{#if normas(m).length > 0}
+			<ul class="temas" aria-label="Tópicos do edital que citam normas">
+				{#each normas(m) as t (t.texto)}
+					{@const chave = `${m.disciplinaId}|${t.texto}`}
+					<li class="tema">
+						<span class="texto-tema">{t.texto}</span>
+						{#if t.leis.length > 0}
+							<span class="ja">
+								✓ {#each t.leis as s, i (s)}<a href="/leis/{s}">{m.vinculadas.find((v) => v.slug === s)?.curto ?? s}</a>{#if i < t.leis.length - 1}, {/if}{/each}
+							</span>
+						{:else if abertoEm !== chave}
+							<button
+								class="pesquisar"
+								type="button"
+								onclick={() => {
+									abertoEm = chave;
+									mensagem = null;
+								}}
+							>
+								Pesquisar e importar
+							</button>
+						{/if}
+					</li>
+					{#if abertoEm === chave && slug}
+						<ImportarDoTema tema={t.texto} concurso={slug} disciplinaId={m.disciplinaId} aoTerminar={importado} />
+					{/if}
+				{/each}
+			</ul>
+		{/if}
 
 		{#if m.vinculadas.length === 0 && m.sugeridas.length === 0}
 			<p class="vazia">Nenhuma lei vinculada.</p>
@@ -152,6 +242,9 @@
 						</span>
 					</div>
 					<span class="meta">{l.questoes} {l.questoes === 1 ? 'questão' : 'questões'}</span>
+					<button class="discreto" type="button" aria-label="Excluir {l.curto}" onclick={() => pedirExclusao(l.slug)}>
+						Excluir
+					</button>
 					<IconButton icon="fechar" label="Desvincular {l.curto}" onclick={() => vincular(m, l.slug, false)} />
 				</li>
 			{/each}
@@ -255,6 +348,75 @@
 		color: var(--text-faint);
 		font-size: 12px;
 		white-space: nowrap;
+	}
+	.temas {
+		list-style: none;
+		margin: 0 0 12px;
+		padding: 0;
+	}
+	.tema {
+		display: flex;
+		gap: 12px;
+		align-items: baseline;
+		padding: 6px 0;
+		border-bottom: 1px solid var(--border);
+		font-size: 13.5px;
+	}
+	.texto-tema {
+		flex: 1;
+		min-width: 0;
+		color: var(--text-muted);
+	}
+	.ja {
+		color: var(--good);
+		font-size: 12.5px;
+		white-space: nowrap;
+	}
+	.ja a {
+		color: var(--good);
+	}
+	.pesquisar {
+		flex: none;
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 600;
+		padding: 3px 10px;
+		border-radius: 6px;
+		border: 1px solid var(--border-strong);
+		background: var(--bg-card);
+		color: var(--text);
+		cursor: pointer;
+	}
+	.pesquisar:hover {
+		background: var(--bg-hover);
+	}
+	.discreto {
+		font: inherit;
+		font-size: 12px;
+		background: none;
+		border: 0;
+		padding: 2px 4px;
+		color: var(--text-faint);
+		cursor: pointer;
+	}
+	.discreto:hover {
+		color: var(--danger);
+	}
+	.confirmar {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		flex-wrap: wrap;
+		padding: 12px 14px;
+		margin: 0 0 18px;
+		border-radius: 8px;
+		border: 1px solid var(--danger);
+		background: var(--danger-soft);
+		font-size: 13.5px;
+	}
+	.confirmar p {
+		flex: 1 1 100%;
+		margin: 0;
 	}
 	.vincular {
 		font: inherit;

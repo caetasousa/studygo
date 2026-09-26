@@ -14,6 +14,7 @@ var (
 	ErrCapturaFalhou        = errors.New("a captura falhou — capture de novo")
 	ErrCapturaBloqueada     = errors.New("a captura tem problemas que impedem a publicação")
 	ErrCapturaIndisponivel  = errors.New("o processador de leis está ocupado ou fora do ar — tente de novo em um minuto")
+	ErrFonteNaoEncontrada   = errors.New("não achei a fonte oficial desta norma pelo tópico: cole o link dela")
 	ErrLeiJaExiste          = errors.New("já existe uma lei com esse nome curto — para trocar o texto dela, use \"Atualizar texto\" na página da lei")
 )
 
@@ -69,6 +70,17 @@ type ResultadoDaCaptura struct {
 	Bloqueios    []string
 	Avisos       []Aviso
 	Resumo       ResumoDaCaptura
+	// Recorte são as raízes do que foi guardado; vazio é a lei inteira.
+	Recorte []string
+}
+
+// Pesquisa é a lei que o tópico do edital cita, como a pesquisa a leu: a fonte
+// e a estrutura (divisões, artigos e epígrafe), sem o texto inteiro.
+type Pesquisa struct {
+	Fonte     string
+	Link      string
+	Epigrafe  string
+	Estrutura []Dispositivo
 }
 
 // Captura é o andamento de uma captura e, pronta, o resultado.
@@ -156,6 +168,27 @@ func ReconhecerPadrao(nome string, ds []Dispositivo) []string {
 	}
 
 	return out
+}
+
+var leiNumerada = regexp.MustCompile(`(?i)^lei\s+(complementar\s+)?n[º°o.]*\s*([\d.]+).*?(\d{4})\s*$`)
+
+// CurtoDe sugere o nome curto pela epígrafe: "Constituição Federal", "Lei nº
+// 13.709/2018", "LC nº 205/2025". Sem padrão conhecido, a própria epígrafe.
+func CurtoDe(epigrafe string) string {
+	e := strings.TrimSpace(epigrafe)
+	if strings.HasPrefix(dobrar(e), "constituicao da republica federativa do brasil") {
+		return "Constituição Federal"
+	}
+	if m := leiNumerada.FindStringSubmatch(e); m != nil {
+		tipo := "Lei"
+		if m[1] != "" {
+			tipo = "LC"
+		}
+
+		return tipo + " nº " + m[2] + "/" + m[3]
+	}
+
+	return e
 }
 
 // Provisoria é a lei que a captura trouxe, antes de ter nome: basta para achar

@@ -142,7 +142,7 @@ migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
 sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
-legislação) e segue dali (a próxima é a **000010**): uma 000004 nova seria dada
+legislação) e segue dali (a próxima é a **000011**): uma 000004 nova seria dada
 como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:
@@ -192,13 +192,17 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   identificado pela `ref` jurídica (`art71.inc2`) — é assim que a lei é citada,
   e é a âncora do link direto. As questões guardam as refs que citam
   (`text[]`), resolvidas contra a versão ativa.
-- **O recorte do edital fica no vínculo, não na lei.** A lei é guardada
-  inteira (o catálogo é de todos, e outra matéria pode cobrar outra parte); o
-  vínculo matéria ↔ lei guarda as refs das raízes que o edital cobra
-  (`disciplinas_leis.recorte`, vazio = a lei inteira). Ele sai de casar o
-  assunto do tópico com o título das divisões da lei ("Administração
-  Pública" → Capítulo VII) e com os artigos citados (`lei.RecorteDoEdital`);
-  o que não casa não delimita. Quem estuda ajusta à mão no leitor.
+- **A importação começa pelo tópico do edital e guarda só o que ele pede**
+  (decisão de 26/09/2026). A pesquisa acha a fonte oficial pelo tópico e lê a
+  estrutura da lei (sem Gemini, segundos); `lei.LerTema` casa cada assunto
+  com o título das divisões ("Administração Pública" → Capítulo VII) e com os
+  artigos citados. A versão guarda só essas raízes, as divisões acima e a
+  epígrafe (`leis_versoes.recorte`, vazio = a lei inteira), e o Gemini confere
+  só elas: a Constituição cai de ~4 min para ~15 s. Outro tópico que peça mais
+  da mesma lei (mesma fonte) amplia a versão com a união — nunca uma segunda
+  lei. O vínculo matéria ↔ lei guarda o recorte daquela matéria
+  (`disciplinas_leis.recorte`), que o tópico seguinte da mesma matéria soma.
+  Excluir a lei apaga versões, questões e respostas, com confirmação.
 - **Versão repetida não duplica; versão nova não apaga.** A versão é o hash dos
   dispositivos; reimportá-la só reativa. As questões casam pela chave do pacote:
   a que mudou mantém o id (e as respostas), a que saiu é desativada, nunca

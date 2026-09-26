@@ -1,0 +1,49 @@
+{
+  "acao": "string",
+  "assuntos": [
+    {
+      "refs": [
+        "string"
+      ],
+      "texto": "string",
+      "trechos": [
+        {
+          "artigos": "string",
+          "nome": "string",
+          "ref": "string",
+          "rotulo": "string"
+        }
+      ]
+    }
+  ],
+  "curto": "string",
+  "epigrafe": "string",
+  "estrutura": [
+    {
+      "nome": "string",
+      "pai": null,
+      "ref": "string",
+      "rotulo": "string",
+      "texto": "string",
+      "tipo": "string"
+    }
+  ],
+  "existente": {
+    "curto": "string",
+    "slug": "string"
+  },
+  "fonte": "string",
+  "link": "string",
+  "nome": "string",
+  "recorte": [
+    "string"
+  ],
+  "trechos": [
+    {
+      "artigos": "string",
+      "nome": "string",
+      "ref": "string",
+      "rotulo": "string"
+    }
+  ]
+}

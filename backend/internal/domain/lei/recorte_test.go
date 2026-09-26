@@ -97,3 +97,76 @@ func TestDescreverRecorte(t *testing.T) {
 		t.Fatalf("descrição %+v, queria %+v", got, quer)
 	}
 }
+
+// Como a leitura do tópico, assunto por assunto, pode errar — escrito antes do
+// código. É o que a pesquisa mostra antes de importar.
+//
+//	T1  o pedaço que só nomeia a lei aparece como assunto sem divisão (ruído)
+//	T2  assunto que não casa some da lista, e a pessoa não vê que ficou de fora
+//	T3  artigo citado no pedaço que nomeia a lei ("Constituição Federal, arts. 37 a 43") é perdido
+//	T4  o recorte final repete divisões ou traz uma dentro da outra
+func TestLerTema(t *testing.T) {
+	_, ds := leiDeRecorte()
+	ds = append([]Dispositivo{{Ref: "preambulo1", Tipo: "preambulo", Texto: "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988"}}, ds...)
+	tema := "Constituição da República Federativa do Brasil de 1988: Administração Pública; " +
+		"fiscalização contábil, financeira, orçamentária, operacional e patrimonial; controle interno e controle externo"
+
+	assuntos, recorte := LerTema(tema, ds)
+	quer := []Assunto{
+		{Texto: "Administração Pública", Refs: []string{"tit3.cap7"}},
+		{Texto: "fiscalização contábil, financeira, orçamentária, operacional e patrimonial", Refs: []string{"tit4.cap1.sec9"}},
+		{Texto: "controle interno e controle externo"}, // T2: fica, sem divisão
+	}
+	if len(assuntos) != len(quer) {
+		t.Fatalf("assuntos %+v, queria %+v", assuntos, quer)
+	}
+	for i := range quer {
+		if assuntos[i].Texto != quer[i].Texto || !slices.Equal(assuntos[i].Refs, quer[i].Refs) {
+			t.Errorf("assunto %d: %+v, queria %+v", i, assuntos[i], quer[i])
+		}
+	}
+	if !slices.Equal(recorte, []string{"tit3.cap7", "tit4.cap1.sec9"}) {
+		t.Errorf("recorte %v", recorte)
+	}
+
+	// T3 e T4: artigos no pedaço que nomeia a lei, e um deles dentro de divisão já pedida.
+	assuntos, recorte = LerTema("Constituição da República Federativa do Brasil de 1988, arts. 37 e 70: Administração Pública", ds)
+	if len(assuntos) != 2 || !slices.Equal(assuntos[0].Refs, []string{"art37", "art70"}) {
+		t.Errorf("artigos do pedaço que nomeia a lei: %+v", assuntos)
+	}
+	if !slices.Equal(recorte, []string{"tit3.cap7", "art70"}) {
+		t.Errorf("recorte sem repetir o que está dentro: %v", recorte)
+	}
+
+	// T1: tópico que só nomeia a lei não tem assunto — é a lei inteira.
+	if assuntos, recorte = LerTema("Constituição da República Federativa do Brasil de 1988", ds); len(assuntos) != 0 || recorte != nil {
+		t.Errorf("só o nome da lei: %+v %v", assuntos, recorte)
+	}
+}
+
+func TestCurtoDe(t *testing.T) {
+	for epigrafe, quer := range map[string]string{
+		"CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988": "Constituição Federal",
+		"LEI Nº 13.709, DE 14 DE AGOSTO DE 2018":                 "Lei nº 13.709/2018",
+		"LEI COMPLEMENTAR Nº 205, DE 19 DE MAIO DE 2025":         "LC nº 205/2025",
+		"RESOLUÇÃO Nº 22":                                        "RESOLUÇÃO Nº 22",
+	} {
+		if got := CurtoDe(epigrafe); got != quer {
+			t.Errorf("CurtoDe(%q) = %q, queria %q", epigrafe, got, quer)
+		}
+	}
+}
+
+func TestArtigosCitados(t *testing.T) {
+	for texto, quer := range map[string][]string{
+		"arts. 74 e 75":       {"art74", "art75"},
+		"37 a 39":             {"art37", "art38", "art39"},
+		"art. 5º, 7º":         {"art5", "art7"},
+		"":                    nil,
+		"nada de artigo aqui": nil,
+	} {
+		if got := ArtigosCitados(texto); !slices.Equal(got, quer) {
+			t.Errorf("ArtigosCitados(%q) = %v, queria %v", texto, got, quer)
+		}
+	}
+}

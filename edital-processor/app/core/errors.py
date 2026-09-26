@@ -152,6 +152,13 @@ class CapturaNaoEncontrada(ProcessorError):
     http_status = status.HTTP_404_NOT_FOUND
 
 
+class FonteDoTemaNaoEncontrada(ProcessorError):
+    """O tópico não diz, com certeza, que norma é: quem estuda cola o link."""
+
+    code = "fonte_nao_encontrada"
+    http_status = status.HTTP_404_NOT_FOUND
+
+
 class CapturasDemais(ProcessorError):
     code = "capturas_demais"
     http_status = status.HTTP_429_TOO_MANY_REQUESTS

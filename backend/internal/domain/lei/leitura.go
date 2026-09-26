@@ -19,6 +19,8 @@ type Texto struct {
 	Versao       string
 	Dispositivos []Dispositivo
 	Unidades     []Unidade
+	// Recorte são as raízes do que a versão guarda; vazio é a lei inteira.
+	Recorte []string
 }
 
 // QuestaoPublicada é a questão como está gravada: com id, que é o que prende

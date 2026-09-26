@@ -12,6 +12,14 @@
       "tipo": "string"
     }
   ],
+  "guardado": [
+    {
+      "artigos": "string",
+      "nome": "string",
+      "ref": "string",
+      "rotulo": "string"
+    }
+  ],
   "lei": {
     "curto": "string",
     "fonte": "string",

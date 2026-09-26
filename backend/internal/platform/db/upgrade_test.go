@@ -39,8 +39,8 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 		t.Fatalf("rebobinando schema_migrations: %v", err)
 	}
 
-	if _, err := pool.Exec(ctx, `ALTER TABLE disciplinas_leis DROP COLUMN recorte`); err != nil {
-		t.Fatalf("rebobinando o recorte da legislação: %v", err)
+	if _, err := pool.Exec(ctx, `ALTER TABLE leis_versoes DROP COLUMN recorte`); err != nil {
+		t.Fatalf("rebobinando o recorte da versão: %v", err)
 	}
 
 	// O runner precisa aplicar só o que falta, sem tropeçar no que já existe.
@@ -61,7 +61,7 @@ func TestMigrate_AplicaSomenteAsPendentes(t *testing.T) {
 	if err := pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.columns
-			 WHERE table_name = 'disciplinas_leis' AND column_name = 'recorte'
+			 WHERE table_name = 'leis_versoes' AND column_name = 'recorte'
 		)`).Scan(&existe); err != nil {
 		t.Fatalf("conferindo a coluna: %v", err)
 	}

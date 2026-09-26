@@ -45,6 +45,8 @@ class Captura:
     bloqueios: list[str] = field(default_factory=list)
     avisos: list[Aviso] = field(default_factory=list)
     resumo: dict[str, object] = field(default_factory=dict)
+    # As raízes do que foi guardado ("tit3.cap7", "art37"); vazio é a lei inteira.
+    recorte: list[str] = field(default_factory=list)
 
     @property
     def publicavel(self) -> bool:
@@ -98,21 +100,68 @@ def _aviso_de_divergencia(divergencia: str, textos: dict[str, str]) -> Aviso:
     return Aviso(divergencia.split(", o Gemini", 1)[0], divergencia, textos.get(pid, "")[:240])
 
 
+def _sob(montagem: Montagem, raizes: list[str]) -> set[str]:
+    """As refs dentro das raízes (elas incluídas)."""
+    pais = {d.ref: d.pai for d in montagem.dispositivos}
+    alvo = set(raizes)
+    dentro: set[str] = set()
+    for d in montagem.dispositivos:
+        ref: str | None = d.ref
+        for _ in range(64):
+            if ref is None:
+                break
+            if ref in alvo:
+                dentro.add(d.ref)
+                break
+            ref = pais.get(ref)
+    return dentro
+
+
+def _visiveis(montagem: Montagem, raizes: list[str]) -> set[str]:
+    """O que o recorte guarda: o que está sob as raízes, as divisões acima delas
+    (o leitor precisa saber onde está) e a epígrafe (o nome da lei) — K40."""
+    pais = {d.ref: d.pai for d in montagem.dispositivos}
+    guardar = _sob(montagem, raizes)
+    for r in raizes:
+        pai = pais.get(r)
+        while pai:
+            guardar.add(pai)
+            pai = pais.get(pai)
+    epigrafe = next((d.ref for d in montagem.dispositivos if d.tipo == "preambulo"), None)
+    if epigrafe:
+        guardar.add(epigrafe)
+    return guardar
+
+
+def _salto_no_recorte(salto: str, visiveis: set[str] | None) -> bool:
+    """ "art3 → art4": o aviso só interessa se o artigo de chegada foi guardado (K44)."""
+    return visiveis is None or salto.rsplit("→", 1)[-1].strip() in visiveis
+
+
 async def capturar(
     fonte: Fonte,
     http: Http,
     provider: LLMProvider | None,
     progresso: Progresso | None = None,
+    recorte: list[str] | None = None,
 ) -> Captura:
-    """A prévia da lei. Falha da fonte vira bloqueio; o resto sobe como exceção."""
+    """A prévia da lei. Falha da fonte vira bloqueio; o resto sobe como exceção.
+
+    Com recorte, guarda só o que está sob as raízes dele, e o Gemini confere só
+    esses parágrafos: a Constituição inteira leva minutos, os arts. 37 a 43,
+    segundos (K43).
+    """
 
     def etapa(nome: str, feitos: int = 0, total: int = 0) -> None:
         if progresso is not None:
             progresso(nome, feitos, total)
 
-    captura = Captura(fonte=fonte.url_publica, gemini=provider is not None)
+    captura = Captura(
+        fonte=fonte.url_publica, gemini=provider is not None, recorte=list(recorte or [])
+    )
     paragrafos: list[Paragrafo] = []
     montagem: Montagem | None = None
+    visiveis: set[str] | None = None
     try:
         etapa("baixando")
         original: Original = await asyncio.to_thread(baixar, fonte, http)
@@ -127,12 +176,31 @@ async def capturar(
         captura.paragrafos = len(paragrafos)
         classes = por_regras(paragrafos)
         textos = {p.id: p.texto for p in paragrafos}
+
+        conferir = paragrafos
+        if recorte:
+            # A árvore pelas regras diz que parágrafos formam o recorte.
+            pelas_regras = await asyncio.to_thread(montar, paragrafos, classes)
+            existe = {d.ref for d in pelas_regras.dispositivos}
+            faltam = [r for r in recorte if r not in existe]
+            if faltam:
+                raise ValueError(f"o recorte cita {', '.join(faltam)}, que a lei não tem (K42)")
+            ids = {
+                pid
+                for ref in _sob(pelas_regras, recorte)
+                for pid in pelas_regras.origem.get(ref, [])
+            }
+            conferir = [p for p in paragrafos if p.id in ids]
+
         if provider is not None:
             etapa("classificando", 0, 1)
             deles = await por_gemini(
-                paragrafos, provider, ao_lote=lambda f, t: etapa("classificando", f, t)
+                conferir, provider, ao_lote=lambda f, t: etapa("classificando", f, t)
             )
-            classes, divergencias = combinar(classes, deles, paragrafos)
+            por_id = {p.id: c for p, c in zip(conferir, deles, strict=True)}
+            classes, divergencias = combinar(
+                classes, [por_id.get(p.id) for p in paragrafos], paragrafos
+            )
             captura.avisos.extend(_aviso_de_divergencia(d, textos) for d in divergencias)
         else:
             captura.avisos.append(
@@ -144,9 +212,13 @@ async def capturar(
             )
         etapa("verificando")
         montagem = await asyncio.to_thread(montar, paragrafos, classes)
+        if recorte:
+            visiveis = _visiveis(montagem, recorte)
         for problema in await asyncio.to_thread(verificar, original.html, paragrafos, montagem):
             if problema.startswith(SALTO):
                 salto = problema.removeprefix(SALTO)
+                if not _salto_no_recorte(salto, visiveis):
+                    continue
                 captura.avisos.append(
                     Aviso(
                         f"salto: {salto}",
@@ -158,11 +230,13 @@ async def capturar(
                 captura.bloqueios.append(problema)
     except (FonteInvalida, ValueError) as exc:
         # ValueError é a recusa com motivo: um lote que o Gemini devolveu
-        # torto duas vezes, uma árvore que não monta.
+        # torto duas vezes, uma árvore que não monta, um recorte sem par.
         captura.bloqueios.append(str(exc))
 
     captura.resumo = _resumo(paragrafos, montagem)
     if montagem is not None and not captura.bloqueios:
-        captura.dispositivos = [d.model_dump() for d in montagem.dispositivos]
+        captura.dispositivos = [
+            d.model_dump() for d in montagem.dispositivos if visiveis is None or d.ref in visiveis
+        ]
         captura.versao = _versao(captura.dispositivos)
     return captura

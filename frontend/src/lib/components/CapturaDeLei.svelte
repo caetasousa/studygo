@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { nomeLegivel } from '$lib/leis';
-	import type { CapturaDeLei, PublicacaoDeLei } from '$lib/types';
+	import type { CapturaDeLei, PedidoDeCaptura, PublicacaoDeLei } from '$lib/types';
 
 	/**
 	 * Captura de uma lei pela fonte oficial: o link vai para o processador, a
@@ -19,14 +19,22 @@
 	 * Com `concurso`, a prévia lê o edital: as matérias cujo tópico cita a lei e
 	 * a parte dela que cada uma cobra. Publicar já vincula as marcadas, com esse
 	 * recorte.
+	 *
+	 * Com `inicio`, a captura já vem decidida (a importação pelo tópico: o link e
+	 * o recorte saíram da pesquisa) e começa sozinha, sem o campo do link.
+	 * `vincularA` liga a lei à matéria do tópico ao publicar; `autoPublicar`
+	 * publica sem clique quando não há nada a revisar.
 	 */
 	interface Props {
 		atual?: { slug: string; nome: string; curto: string; fonte: string; reconhecer: string[] };
 		concurso?: string | null;
+		inicio?: PedidoDeCaptura & { nome?: string; curto?: string };
+		vincularA?: { concurso: string; disciplinaId: string; recorte: string[]; artigos?: string; somar?: boolean };
+		autoPublicar?: boolean;
 		aoPublicar: (r: PublicacaoDeLei) => void;
 	}
 
-	let { atual, concurso = null, aoPublicar }: Props = $props();
+	let { atual, concurso = null, inicio, vincularA, autoPublicar = false, aoPublicar }: Props = $props();
 
 	const ETAPAS: Record<string, string> = {
 		'na fila': 'Na fila',
@@ -37,11 +45,11 @@
 	};
 
 	// svelte-ignore state_referenced_locally
-	let link = $state(atual?.fonte ?? '');
+	let link = $state(inicio?.link ?? atual?.fonte ?? '');
 	// svelte-ignore state_referenced_locally
-	let nome = $state(atual?.nome ?? '');
+	let nome = $state(inicio?.nome ?? atual?.nome ?? '');
 	// svelte-ignore state_referenced_locally
-	let curto = $state(atual?.curto ?? '');
+	let curto = $state(inicio?.curto ?? atual?.curto ?? '');
 	// svelte-ignore state_referenced_locally
 	let reconhecer = $state((atual?.reconhecer ?? []).join(', '));
 
@@ -62,12 +70,13 @@
 
 	async function consultar(id: string) {
 		try {
-			captura = await api.capturaDeLei(id, atual ? null : concurso);
+			captura = await api.capturaDeLei(id, atual || inicio ? null : concurso);
 			if (captura.estado === 'rodando') {
 				espera = setTimeout(() => consultar(id), 1500);
 			} else if (captura.estado === 'pronta') {
 				if (!nome.trim() && captura.epigrafe) nome = nomeLegivel(captura.epigrafe);
 				vincular = captura.edital.map((e) => e.disciplinaId);
+				if (autoPublicar && podePublicar) await publicar();
 			}
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível consultar a captura';
@@ -75,15 +84,27 @@
 		}
 	}
 
-	async function capturar(e: SubmitEvent) {
+	onMount(() => {
+		// Só o pedido vai ao servidor: nome e curto são da publicação.
+		if (inicio) {
+			const { link, recorte, artigos, slug, inteira } = inicio;
+			void iniciar({ link, recorte, artigos, slug, inteira });
+		}
+	});
+
+	function capturar(e: SubmitEvent) {
 		e.preventDefault();
+		void iniciar({ link: link.trim(), slug: atual?.slug });
+	}
+
+	async function iniciar(pedido: PedidoDeCaptura) {
 		clearTimeout(espera);
 		erro = null;
 		captura = null;
 		aceitos = [];
 		enviando = true;
 		try {
-			const { id } = await api.capturarLei(link.trim());
+			const { id } = await api.capturarLei(pedido);
 			await consultar(id);
 		} catch (err) {
 			erro = err instanceof Error ? err.message : 'Não foi possível capturar a lei';
@@ -98,7 +119,7 @@
 		enviando = true;
 		try {
 			const r = await api.publicarLei(captura.id, {
-				slug: atual?.slug,
+				slug: inicio?.slug ?? atual?.slug,
 				nome: nome.trim(),
 				curto: curto.trim(),
 				reconhecer: reconhecer
@@ -107,8 +128,19 @@
 					.filter(Boolean),
 				aceitos
 			});
+			if (vincularA) {
+				await api.vincularLei(
+					vincularA.concurso,
+					vincularA.disciplinaId,
+					r.slug,
+					true,
+					vincularA.recorte,
+					vincularA.artigos,
+					vincularA.somar
+				);
+			}
 			// O edital já disse o que cada matéria cobra: vincula as marcadas.
-			if (concurso) {
+			if (concurso && !inicio) {
 				for (const e of captura.edital.filter((x) => vincular.includes(x.disciplinaId))) {
 					await api.vincularLei(concurso, e.disciplinaId, r.slug, true, e.recorte);
 				}
@@ -130,6 +162,7 @@
 	}
 </script>
 
+{#if !inicio}
 <form class="captura" onsubmit={capturar}>
 	<div class="field link">
 		<label for="link-lei">Link da lei na fonte oficial</label>
@@ -149,6 +182,7 @@
 <p class="dica">
 	Planalto, Casa Civil de Goiás (o link da página da lei) ou outro site .gov.br, .leg.br ou .jus.br.
 </p>
+{/if}
 
 {#if erro}<div class="form-error" role="alert">{erro}</div>{/if}
 

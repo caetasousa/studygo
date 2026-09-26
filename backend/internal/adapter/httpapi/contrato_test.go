@@ -274,6 +274,7 @@ func TestContratoHTTP_LeituraDaLei(t *testing.T) {
 			{ID: uuid.New(), Unidade: "u1", Dispositivos: []string{"art71"}, Enunciado: "e2",
 				Alternativas: []string{"a", "b", "c", "d", "e"}},
 		},
+		Guardado: []lei.TrechoDoRecorte{{Ref: "art71", Rotulo: "Art. 71", Artigos: "art. 71"}},
 		Recorte: &service.RecorteNoConcurso{
 			Refs:     []string{"art71"},
 			Trechos:  []lei.TrechoDoRecorte{{Ref: "art71", Rotulo: "Art. 71", Artigos: "art. 71"}},
@@ -295,8 +296,9 @@ func TestContratoHTTP_CapturaDaLei(t *testing.T) {
 				{Ref: "cap1", Tipo: "capitulo", Rotulo: "CAPÍTULO I", Nome: "DO CONTROLE", Texto: "CAPÍTULO I"},
 				{Ref: "art1", Pai: "cap1", Tipo: "artigo", Rotulo: "Art. 1º", Texto: "Art. 1º Texto."},
 			},
-			Avisos: []lei.Aviso{{ID: "p0003: a regra diz artigo", Texto: "…", Trecho: "Art. 1º Texto."}},
-			Resumo: lei.ResumoDaCaptura{Vigentes: 3, Tipos: map[string]int{"artigo": 1}},
+			Avisos:  []lei.Aviso{{ID: "p0003: a regra diz artigo", Texto: "…", Trecho: "Art. 1º Texto."}},
+			Resumo:  lei.ResumoDaCaptura{Vigentes: 3, Tipos: map[string]int{"artigo": 1}},
+			Recorte: []string{"cap1"},
 		},
 	}
 
@@ -309,4 +311,26 @@ func TestContratoHTTP_CapturaDaLei(t *testing.T) {
 	}
 
 	compararComGolden(t, "captura_lei.json", forma(t, capturaParaDTO(ce)))
+}
+
+// A pesquisa pelo tópico é o que a tela mostra antes de importar: a fonte, o
+// que cada assunto do edital pede e se a lei já está no catálogo.
+func TestContratoHTTP_PesquisaDoTema(t *testing.T) {
+	existente := lei.Lei{Slug: "cf", Curto: "CF"}
+	p := service.PesquisaDoTema{
+		Pesquisa: lei.Pesquisa{
+			Fonte: "https://www.planalto.gov.br/cf.htm", Link: "https://www.planalto.gov.br/cf.htm", Epigrafe: "CONSTITUIÇÃO",
+			Estrutura: []lei.Dispositivo{
+				{Ref: "cap7", Tipo: "capitulo", Rotulo: "CAPÍTULO VII", Nome: "DA ADMINISTRAÇÃO PÚBLICA"},
+				{Ref: "art37", Pai: "cap7", Tipo: "artigo", Rotulo: "Art. 37", Texto: "Art. 37. A administração…"},
+			},
+		},
+		Nome: "Constituição", Curto: "Constituição Federal", Acao: service.AcaoAmpliar, Existente: &existente,
+		Assuntos: []service.AssuntoDoTema{{Texto: "Administração Pública", Refs: []string{"cap7"},
+			Trechos: []lei.TrechoDoRecorte{{Ref: "cap7", Rotulo: "CAPÍTULO VII", Nome: "DA ADMINISTRAÇÃO PÚBLICA", Artigos: "art. 37"}}}},
+		Recorte: []string{"cap7"},
+		Trechos: []lei.TrechoDoRecorte{{Ref: "cap7", Rotulo: "CAPÍTULO VII", Nome: "DA ADMINISTRAÇÃO PÚBLICA", Artigos: "art. 37"}},
+	}
+
+	compararComGolden(t, "pesquisa_lei.json", forma(t, pesquisaParaDTO(p)))
 }

@@ -192,8 +192,8 @@ func (r *LeiRepo) gravarVersao(ctx context.Context, tx pgx.Tx, leiID uuid.UUID, 
 	var versaoID uuid.UUID
 	if err := tx.QueryRow(
 		ctx,
-		`INSERT INTO leis_versoes (lei_id, versao, ativa) VALUES ($1,$2,true) RETURNING id`,
-		leiID, p.Versao,
+		`INSERT INTO leis_versoes (lei_id, versao, ativa, recorte) VALUES ($1,$2,true,$3) RETURNING id`,
+		leiID, p.Versao, naoNulo(p.Recorte),
 	).Scan(&versaoID); err != nil {
 		return uuid.Nil, fmt.Errorf("gravando versão: %w", err)
 	}
@@ -282,8 +282,8 @@ func (r *LeiRepo) TextoAtivo(ctx context.Context, leiID uuid.UUID) (lei.Texto, e
 		versaoID uuid.UUID
 	)
 	err := r.pool.QueryRow(
-		ctx, `SELECT id, versao FROM leis_versoes WHERE lei_id = $1 AND ativa`, leiID,
-	).Scan(&versaoID, &t.Versao)
+		ctx, `SELECT id, versao, recorte FROM leis_versoes WHERE lei_id = $1 AND ativa`, leiID,
+	).Scan(&versaoID, &t.Versao, &t.Recorte)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return lei.Texto{}, lei.ErrNaoEncontrada
 	}
@@ -413,6 +413,62 @@ func (r *LeiRepo) Responder(ctx context.Context, resp lei.Resposta) (lei.Respost
 	}
 
 	return resp, nil
+}
+
+func (r *LeiRepo) PorFonte(ctx context.Context, fonte string) (lei.Lei, error) {
+	var l lei.Lei
+	err := r.pool.QueryRow(
+		ctx, `SELECT id, slug, nome, curto, fonte, reconhecer FROM leis WHERE fonte = $1 ORDER BY criada_em LIMIT 1`, fonte,
+	).Scan(&l.ID, &l.Slug, &l.Nome, &l.Curto, &l.Fonte, &l.Reconhecer)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return lei.Lei{}, lei.ErrNaoEncontrada
+	}
+	if err != nil {
+		return lei.Lei{}, fmt.Errorf("buscando lei pela fonte: %w", err)
+	}
+
+	return l, nil
+}
+
+func (r *LeiRepo) ContarParaExcluir(ctx context.Context, leiID uuid.UUID) (int, int, error) {
+	var questoes, respostas int
+	if err := r.pool.QueryRow(
+		ctx,
+		`SELECT (SELECT count(*) FROM leis_questoes WHERE lei_id = $1),
+		        (SELECT count(*) FROM leis_respostas lr JOIN leis_questoes q ON q.id = lr.questao_id WHERE q.lei_id = $1)`,
+		leiID,
+	).Scan(&questoes, &respostas); err != nil {
+		return 0, 0, fmt.Errorf("contando o que a exclusão leva: %w", err)
+	}
+
+	return questoes, respostas, nil
+}
+
+// Excluir apaga numa transação. As respostas vão primeiro: a FK delas para a
+// questão é RESTRICT de propósito (uma resposta é história), e só a exclusão
+// da lei, confirmada por quem estuda, passa por cima disso.
+func (r *LeiRepo) Excluir(ctx context.Context, leiID uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM leis_respostas WHERE questao_id IN (SELECT id FROM leis_questoes WHERE lei_id = $1)`, leiID,
+	); err != nil {
+		return fmt.Errorf("apagando respostas: %w", err)
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM leis WHERE id = $1`, leiID)
+	if err != nil {
+		return fmt.Errorf("apagando a lei: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return lei.ErrNaoEncontrada
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *LeiRepo) Estrutura(ctx context.Context, leiID uuid.UUID) ([]lei.Dispositivo, error) {

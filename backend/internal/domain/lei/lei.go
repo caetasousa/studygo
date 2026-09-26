@@ -106,6 +106,8 @@ type Pacote struct {
 	Dispositivos []Dispositivo
 	Unidades     []Unidade
 	Questoes     []Questao
+	// Recorte são as raízes do que a versão guarda; vazio é a lei inteira.
+	Recorte []string
 }
 
 var (

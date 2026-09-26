@@ -208,3 +208,74 @@ func DescreverRecorte(ds []Dispositivo, refs []string) []TrechoDoRecorte {
 func NoRecorte(ds []Dispositivo, recorte []string, ref string) bool {
 	return len(recorte) == 0 || descende(paisDe(ds), ref, recorte)
 }
+
+// Assunto é um pedaço do tópico do edital ("Administração Pública") e as
+// raízes da lei que ele pede. Sem refs: o assunto não é título de divisão
+// nenhuma, e a pessoa decide (fica na lista para ela ver).
+type Assunto struct {
+	Texto string
+	Refs  []string
+}
+
+// LerTema lê, assunto por assunto, o que o tópico pede da lei cuja estrutura é
+// ds, e junta o recorte. Recorte nil: o tópico só nomeia a lei — ela inteira.
+// A lei é reconhecida pela própria epígrafe: a pesquisa já sabe qual é.
+func LerTema(tema string, ds []Dispositivo) ([]Assunto, []string) {
+	l := Provisoria(ds)
+	existe := make(map[string]bool, len(ds))
+	for _, d := range ds {
+		existe[d.Ref] = true
+	}
+
+	var (
+		assuntos []Assunto
+		todas    []string
+	)
+	for _, pedaco := range strings.FieldsFunc(tema, func(r rune) bool { return r == ';' || r == ':' }) {
+		pedaco = strings.TrimSpace(pedaco)
+		if pedaco == "" {
+			continue
+		}
+		var refs []string
+		for _, ref := range artigosCitados(dobrar(pedaco)) {
+			if existe[ref] && !slices.Contains(refs, ref) {
+				refs = append(refs, ref)
+			}
+		}
+		// O pedaço que nomeia a lei só conta pelos artigos que cita (T1, T3).
+		if l.CitadaEm([]string{pedaco}) {
+			if len(refs) > 0 {
+				assuntos = append(assuntos, Assunto{Texto: pedaco, Refs: refs})
+				todas = append(todas, refs...)
+			}
+
+			continue
+		}
+		doPedaco := palavras(pedaco)
+		var titulos []string
+		for _, d := range ds {
+			if agrupamentoLei[d.Tipo] && tituloContido(d.Nome, doPedaco) {
+				titulos = append(titulos, d.Ref)
+			}
+		}
+		refs = append(titulos, refs...)
+		assuntos = append(assuntos, Assunto{Texto: pedaco, Refs: refs})
+		todas = append(todas, refs...)
+	}
+	if len(todas) == 0 {
+		return assuntos, nil
+	}
+
+	return assuntos, RaizesNaOrdem(ds, todas)
+}
+
+// ArtigosCitados lê o que a pessoa digita para acrescentar ao recorte: "arts.
+// 74 e 75", "37 a 39", "art. 5º, 7º".
+func ArtigosCitados(texto string) []string {
+	t := dobrar(texto)
+	if !strings.Contains(t, "art") {
+		t = "arts. " + t
+	}
+
+	return artigosCitados(t)
+}

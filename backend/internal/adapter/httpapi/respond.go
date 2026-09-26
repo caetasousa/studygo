@@ -120,7 +120,8 @@ func classificar(err error) (int, string) {
 
 	case errors.Is(err, lei.ErrNaoEncontrada),
 		errors.Is(err, lei.ErrQuestaoNaoEncontrada),
-		errors.Is(err, lei.ErrCapturaNaoEncontrada):
+		errors.Is(err, lei.ErrCapturaNaoEncontrada),
+		errors.Is(err, lei.ErrFonteNaoEncontrada):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),

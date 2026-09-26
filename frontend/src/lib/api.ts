@@ -23,7 +23,10 @@ import type {
 	LeiResumo,
 	LeisDaMateria,
 	LeituraDeLei,
+	PedidoDeCaptura,
 	PedidoDePublicacao,
+	PesquisaDoTema,
+	ResumoDaExclusao,
 	PublicacaoDeLei
 } from '$lib/types';
 
@@ -162,8 +165,16 @@ export const api = {
 	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),
 
 	/** Começa a captura da lei do link; a prévia vem de `capturaDeLei`. */
-	capturarLei: (link: string) =>
-		request<{ id: string }>('/api/leis/capturas', { method: 'POST', body: JSON.stringify({ link }) }),
+	capturarLei: (pedido: PedidoDeCaptura) =>
+		request<{ id: string }>('/api/leis/capturas', { method: 'POST', body: JSON.stringify(pedido) }),
+
+	/** Acha a lei que o tópico do edital cita e lê o que ele pede dela. */
+	pesquisarTema: (tema: string, link?: string) =>
+		request<PesquisaDoTema>('/api/leis/pesquisa', { method: 'POST', body: JSON.stringify({ tema, link: link ?? '' }) }),
+
+	resumirExclusao: (slug: string) => request<ResumoDaExclusao>(`/api/leis/exclusao/${encodeURIComponent(slug)}`),
+
+	excluirLei: (slug: string) => request<void>(`/api/leis/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
 
 	/** Com o concurso, a prévia traz o que o edital dele pede da lei. */
 	capturaDeLei: (id: string, concurso?: string | null) =>
@@ -203,11 +214,22 @@ export const api = {
 	 * Liga (ou desliga) a lei à matéria. Sem `recorte`, o servidor o tira dos
 	 * tópicos da matéria; com ele, grava o ajuste de quem estuda ([] = a lei inteira).
 	 */
-	vincularLei: (slug: string, disciplinaId: string, lei: string, ligar: boolean, recorte?: string[]) =>
+	vincularLei: (
+		slug: string,
+		disciplinaId: string,
+		lei: string,
+		ligar: boolean,
+		recorte?: string[],
+		artigos?: string,
+		somar = false
+	) =>
 		request<void>(
 			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/leis/${encodeURIComponent(lei)}`,
 			ligar
-				? { method: 'PUT', ...(recorte ? { body: JSON.stringify({ recorte }) } : {}) }
+				? {
+						method: 'PUT',
+						...(recorte || artigos ? { body: JSON.stringify({ recorte, artigos: artigos ?? '', somar }) } : {})
+					}
 				: { method: 'DELETE' }
 		),
 

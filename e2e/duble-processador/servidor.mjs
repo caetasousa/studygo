@@ -91,9 +91,59 @@ function oficial(link) {
 	}
 }
 
-function resultado(link) {
+const AGRUPAMENTOS = ['parte', 'livro', 'titulo', 'capitulo', 'secao', 'subsecao'];
+
+// O número da lei vem no link (lei-exemplo-12.345.htm): cada teste tem a sua,
+// e o catálogo, que é de todos, não mistura as leis de testes diferentes.
+function numeroDoLink(link) {
+	return new URL(link).pathname.match(/(\d{2}\.\d{3})/)?.[1] ?? null;
+}
+
+function comNumero(dispositivos, numero) {
+	if (!numero) return dispositivos;
+	return dispositivos.map((d) => (d.ref === 'preambulo1' ? { ...d, texto: d.texto.replace('99.999', numero) } : d));
+}
+
+/** O que o recorte guarda: sob as raízes, as divisões acima e a epígrafe. */
+function cortar(dispositivos, raizes) {
+	const pais = new Map(dispositivos.map((d) => [d.ref, d.pai]));
+	const guardar = new Set(['preambulo1']);
+	for (const d of dispositivos) {
+		for (let ref = d.ref; ref; ref = pais.get(ref)) {
+			if (raizes.includes(ref)) {
+				guardar.add(d.ref);
+				break;
+			}
+		}
+	}
+	for (const r of raizes) for (let pai = pais.get(r); pai; pai = pais.get(pai)) guardar.add(pai);
+	return dispositivos.filter((d) => guardar.has(d.ref));
+}
+
+function pesquisa(tema, link) {
+	let fonte = link;
+	if (!fonte) {
+		const numero = tema.match(/(\d{2}\.\d{3})/)?.[1];
+		if (!numero || /resolu[çc][ãa]o/i.test(tema)) return null;
+		fonte = `https://www.planalto.gov.br/e2e/lei-exemplo-${numero}.htm`;
+	}
+	const ds = comNumero(LEIS.v1.dispositivos, numeroDoLink(fonte));
+	return {
+		fonte,
+		link: fonte,
+		epigrafe: ds[0].texto,
+		estrutura: ds
+			.filter((d) => d.ref === 'preambulo1' || d.tipo === 'artigo' || AGRUPAMENTOS.includes(d.tipo))
+			.map((d) => ({ ...d, texto: d.tipo === 'preambulo' ? d.texto : d.tipo === 'artigo' ? d.texto.slice(0, 160) : '' }))
+	};
+}
+
+function resultado(link, recorte = []) {
 	const caminho = new URL(link).pathname;
 	const lei = caminho.includes('lei-exemplo-v2') ? LEIS.v2 : LEIS.v1;
+	const todos = comNumero(lei.dispositivos, numeroDoLink(link));
+	const faltam = recorte.filter((r) => !todos.some((d) => d.ref === r));
+	const dispositivos = recorte.length ? cortar(todos, recorte) : todos;
 	const base = {
 		fonte: link,
 		gemini: true,
@@ -101,11 +151,16 @@ function resultado(link) {
 		originalSha256: 'e2e',
 		paragrafos: lei.dispositivos.length,
 		publicavel: true,
-		dispositivos: lei.dispositivos,
+		dispositivos,
+		recorte,
 		bloqueios: [],
 		avisos: [],
 		resumo: { vigentes: lei.dispositivos.length, anteriores: 0, notas: 0, revogados: 0, tipos: {}, descartados: [], riscados: [], juncoes: [] }
 	};
+	if (recorte.length) base.versao = `${lei.versao}:${[...recorte].sort().join(',')}`;
+	if (faltam.length) {
+		return { ...base, publicavel: false, dispositivos: null, versao: null, bloqueios: [`o recorte cita ${faltam.join(', ')}, que a lei não tem`] };
+	}
 	if (caminho.includes('bloqueio')) {
 		return { ...base, publicavel: false, dispositivos: null, versao: null, bloqueios: ['o texto remontado da árvore difere do texto dos parágrafos (sha256 diferente)'] };
 	}
@@ -170,15 +225,25 @@ createServer((req, res) => {
 		}
 
 		if (req.method === 'POST' && req.url === '/internal/leis/capturas') {
-			const { link = '' } = JSON.parse(corpo || '{}');
+			const { link = '', recorte = null } = JSON.parse(corpo || '{}');
 			if (!oficial(link)) {
 				return recusar(res, 422, 'fonte_invalida', 'não é uma fonte oficial: use o link do Planalto, da Casa Civil de Goiás ou de outro site .gov.br, .leg.br ou .jus.br');
 			}
 			const id = randomUUID();
 			// A primeira consulta ainda encontra a captura rodando: a tela tem de
 			// saber esperar (L16).
-			capturas.set(id, { dono: req.headers['x-owner-ref'], link, consultas: 0 });
+			capturas.set(id, { dono: req.headers['x-owner-ref'], link, recorte: recorte ?? [], consultas: 0 });
 			return responder(res, 202, { id });
+		}
+
+		if (req.method === 'POST' && req.url === '/internal/leis/pesquisas') {
+			const { tema = '', link = '' } = JSON.parse(corpo || '{}');
+			if (link && !oficial(link)) {
+				return recusar(res, 422, 'fonte_invalida', 'não é uma fonte oficial');
+			}
+			const achada = pesquisa(tema, link);
+			if (!achada) return recusar(res, 404, 'fonte_nao_encontrada', 'não achei a fonte oficial desta norma pelo tópico: cole o link dela');
+			return responder(res, 200, achada);
 		}
 
 		const consulta = req.method === 'GET' && req.url.match(/^\/internal\/leis\/capturas\/([\w-]+)$/);
@@ -191,7 +256,7 @@ createServer((req, res) => {
 			if (c.consultas === 1) {
 				return responder(res, 200, { id: consulta[1], estado: 'rodando', etapa: 'classificando', progresso: { feitos: 1, total: 2 } });
 			}
-			return responder(res, 200, { id: consulta[1], estado: 'pronta', etapa: 'verificando', progresso: { feitos: 2, total: 2 }, resultado: resultado(c.link) });
+			return responder(res, 200, { id: consulta[1], estado: 'pronta', etapa: 'verificando', progresso: { feitos: 2, total: 2 }, resultado: resultado(c.link, c.recorte) });
 		}
 
 		recusar(res, 404, 'not_found', `${req.method} ${req.url}`);

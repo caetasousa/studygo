@@ -101,6 +101,83 @@ func naoNula(s []string) []string {
 
 type capturaRequest struct {
 	Link string `json:"link"`
+	// Recorte: as raízes a guardar (da pesquisa); Artigos: os que a pessoa
+	// digitou ("74, 75"). Sem os dois, a lei inteira.
+	Recorte []string `json:"recorte"`
+	Artigos string   `json:"artigos"`
+	// Slug da lei que já existe: o recorte novo se soma ao guardado.
+	Slug    string `json:"slug"`
+	Inteira bool   `json:"inteira"`
+}
+
+type pesquisaRequest struct {
+	Tema string `json:"tema"`
+	Link string `json:"link"`
+}
+
+type assuntoDTO struct {
+	Texto   string      `json:"texto"`
+	Refs    []string    `json:"refs"`
+	Trechos []trechoDTO `json:"trechos"`
+}
+
+type estruturaLeiDTO struct {
+	Ref    string  `json:"ref"`
+	Pai    *string `json:"pai"`
+	Tipo   string  `json:"tipo"`
+	Rotulo string  `json:"rotulo"`
+	Nome   string  `json:"nome"`
+	Texto  string  `json:"texto"`
+}
+
+type leiExistenteDTO struct {
+	Slug  string `json:"slug"`
+	Curto string `json:"curto"`
+}
+
+// pesquisaDTO é o que a tela mostra antes de importar a partir do tópico.
+type pesquisaDTO struct {
+	Fonte     string           `json:"fonte"`
+	Link      string           `json:"link"`
+	Epigrafe  string           `json:"epigrafe"`
+	Nome      string           `json:"nome"`
+	Curto     string           `json:"curto"`
+	Acao      string           `json:"acao"`
+	Existente *leiExistenteDTO `json:"existente"`
+	Assuntos  []assuntoDTO     `json:"assuntos"`
+	// Recorte vazio: o tópico pede a lei inteira.
+	Recorte   []string          `json:"recorte"`
+	Trechos   []trechoDTO       `json:"trechos"`
+	Estrutura []estruturaLeiDTO `json:"estrutura"`
+}
+
+func pesquisaParaDTO(p service.PesquisaDoTema) pesquisaDTO {
+	d := pesquisaDTO{
+		Fonte: p.Fonte, Link: p.Link, Epigrafe: p.Epigrafe, Nome: p.Nome, Curto: p.Curto, Acao: p.Acao,
+		Assuntos: []assuntoDTO{}, Recorte: naoNula(p.Recorte), Trechos: trechosParaDTO(p.Trechos),
+		Estrutura: []estruturaLeiDTO{},
+	}
+	if p.Existente != nil {
+		d.Existente = &leiExistenteDTO{Slug: p.Existente.Slug, Curto: p.Existente.Curto}
+	}
+	for _, a := range p.Assuntos {
+		d.Assuntos = append(d.Assuntos, assuntoDTO{Texto: a.Texto, Refs: naoNula(a.Refs), Trechos: trechosParaDTO(a.Trechos)})
+	}
+	for _, x := range p.Estrutura {
+		var pai *string
+		if x.Pai != "" {
+			pai = &x.Pai
+		}
+		d.Estrutura = append(d.Estrutura, estruturaLeiDTO{Ref: x.Ref, Pai: pai, Tipo: x.Tipo, Rotulo: x.Rotulo, Nome: x.Nome, Texto: x.Texto})
+	}
+
+	return d
+}
+
+type exclusaoDTO struct {
+	Curto     string `json:"curto"`
+	Questoes  int    `json:"questoes"`
+	Respostas int    `json:"respostas"`
 }
 
 type avisoDTO struct {
@@ -140,6 +217,8 @@ type resultadoCapturaDTO struct {
 	Sumario      []sumarioDTO     `json:"sumario"`
 	Artigos      int              `json:"artigos"`
 	Dispositivos int              `json:"dispositivos"`
+	// Recorte: as raízes guardadas; vazio é a lei inteira.
+	Recorte []string `json:"recorte"`
 }
 
 type sugestaoDoEditalDTO struct {
@@ -191,7 +270,7 @@ func capturaParaDTO(ce service.CapturaComEdital) capturaDTO {
 		Fonte: r.Fonte, Gemini: r.Gemini, Versao: r.Versao,
 		Publicavel: len(r.Bloqueios) == 0 && len(r.Dispositivos) > 0,
 		Bloqueios:  naoNula(r.Bloqueios), Avisos: []avisoDTO{}, Sumario: []sumarioDTO{},
-		Dispositivos: len(r.Dispositivos),
+		Dispositivos: len(r.Dispositivos), Recorte: naoNula(r.Recorte),
 		Resumo: resumoCapturaDTO{
 			Vigentes: r.Resumo.Vigentes, Anteriores: r.Resumo.Anteriores, Notas: r.Resumo.Notas,
 			Revogados: r.Resumo.Revogados, Tipos: r.Resumo.Tipos,
@@ -322,6 +401,8 @@ type leituraLeiDTO struct {
 	Questoes     []questaoLeitorDTO `json:"questoes"`
 	// Recorte do concurso ativo; null quando nenhuma matéria dele cobra a lei.
 	Recorte *recorteNoConcursoDTO `json:"recorte"`
+	// Guardado: o que a versão guarda quando é só parte da lei; vazio, a lei inteira.
+	Guardado []trechoDTO `json:"guardado"`
 }
 
 func leituraParaDTO(l service.LeituraDaLei) leituraLeiDTO {
@@ -353,6 +434,7 @@ func leituraParaDTO(l service.LeituraDaLei) leituraLeiDTO {
 		d.Questoes = append(d.Questoes, x)
 	}
 
+	d.Guardado = trechosParaDTO(l.Guardado)
 	if r := l.Recorte; r != nil {
 		d.Recorte = &recorteNoConcursoDTO{Refs: naoNula(r.Refs), Trechos: trechosParaDTO(r.Trechos), Materias: []materiaDoRecorteDTO{}}
 		for _, m := range r.Materias {
@@ -392,12 +474,21 @@ type leisDaMateriaDTO struct {
 	Nome         string            `json:"nome"`
 	Vinculadas   []leiNaMateriaDTO `json:"vinculadas"`
 	Sugeridas    []leiNaMateriaDTO `json:"sugeridas"`
+	Temas        []temaDTO         `json:"temas"`
+}
+
+type temaDTO struct {
+	Texto string   `json:"texto"`
+	Leis  []string `json:"leis"`
 }
 
 func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 	d := leisDaMateriaDTO{
 		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome,
-		Vinculadas: []leiNaMateriaDTO{}, Sugeridas: []leiNaMateriaDTO{},
+		Vinculadas: []leiNaMateriaDTO{}, Sugeridas: []leiNaMateriaDTO{}, Temas: []temaDTO{},
+	}
+	for _, t := range m.Temas {
+		d.Temas = append(d.Temas, temaDTO{Texto: t.Texto, Leis: naoNula(t.Leis)})
 	}
 	for _, r := range m.Vinculadas {
 		d.Vinculadas = append(d.Vinculadas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})
@@ -412,6 +503,11 @@ func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 // vinculoRequest é opcional: sem corpo, o recorte sai dos tópicos da matéria.
 type vinculoRequest struct {
 	Recorte *[]string `json:"recorte"`
+	// Artigos que a pessoa digitou ("74, 75"), somados ao recorte.
+	Artigos string `json:"artigos"`
+	// Somar junta ao recorte que a matéria já tem desta lei, em vez de
+	// trocá-lo: é o outro tópico da mesma matéria pedindo mais.
+	Somar bool `json:"somar"`
 }
 
 var errQuestoesIlegiveis = errors.New("o arquivo não é um questoes.json de lei: esperava {\"unidades\": [...], \"questoes\": [...]}")

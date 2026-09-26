@@ -100,8 +100,8 @@ rollback automático pelos `.down.sql`.
   (`TestMigrations_NaoContemLogicaDeNegocio`).
 - Trate migrations que podem ter sido aplicadas como imutáveis; corrija com uma
   migration nova.
-- A próxima migration é a **000010** (a 000008 criou a legislação, a 000009 o
-  recorte do edital). As
+- A próxima migration é a **000011** (a 000008 criou a legislação, a 000009 o
+  recorte do edital no vínculo, a 000010 o recorte guardado na versão). As
   000004–000007 (catálogo de provas, hoje no provasGo) saíram do bundle mas
   estão registradas em staging e em bancos locais: reusar um desses números
   faz a migration nova ser pulada.

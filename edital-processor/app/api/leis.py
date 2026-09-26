@@ -25,13 +25,28 @@ def get_capturas(provider: LLMProvider = Depends(get_provider)) -> Capturas:
 
 class CapturaRequest(BaseModel):
     link: str = Field(max_length=2048)
+    # As raízes do que guardar ("tit3.cap7", "art37"); sem recorte, a lei inteira.
+    recorte: list[str] | None = Field(default=None, max_length=500)
+
+
+class PesquisaRequest(BaseModel):
+    tema: str = Field(max_length=2000)
+    link: str | None = Field(default=None, max_length=2048)
 
 
 @router.post("/capturas", status_code=202)
 async def iniciar(
     request: Request, body: CapturaRequest, capturas: Capturas = Depends(get_capturas)
 ) -> dict[str, str]:
-    return {"id": capturas.iniciar(body.link, owner_ref(request))}
+    return {"id": capturas.iniciar(body.link, owner_ref(request), body.recorte)}
+
+
+@router.post("/pesquisas")
+async def pesquisar(
+    request: Request, body: PesquisaRequest, capturas: Capturas = Depends(get_capturas)
+) -> dict[str, object]:
+    owner_ref(request)
+    return await capturas.pesquisar(body.tema, body.link)
 
 
 @router.get("/capturas/{cid}")

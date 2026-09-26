@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import { api } from '$lib/api';
@@ -8,6 +9,7 @@
 	import {
 		AGRUPAMENTOS,
 		comRotulo,
+		descreverRecorte,
 		nomeLegivel,
 		placar,
 		questoesPorArtigo,
@@ -21,7 +23,8 @@
 		ImportacaoDeQuestoes,
 		LeituraDeLei,
 		PublicacaoDeLei,
-		QuestaoDeLei
+		QuestaoDeLei,
+		ResumoDaExclusao
 	} from '$lib/types';
 
 	/**
@@ -52,6 +55,8 @@
 	const porArtigo = $derived(questoesPorArtigo(leitura?.questoes ?? [], porRef));
 	const recorte = $derived(leitura?.recorte ?? null);
 	const temRecorte = $derived(!!recorte && recorte.refs.length > 0);
+	// A versão guarda só parte da lei (importada pelo tópico do edital).
+	const parcial = $derived((leitura?.guardado.length ?? 0) > 0);
 	const visiveis = $derived(
 		temRecorte && !inteira && !ajustando ? visiveisNoRecorte(leitura?.dispositivos ?? [], recorte!.refs) : null
 	);
@@ -206,6 +211,26 @@
 		await carregar(slug, concurso);
 	}
 
+	let excluindo = $state<ResumoDaExclusao | null>(null);
+
+	async function pedirExclusao() {
+		erroManutencao = null;
+		try {
+			excluindo = await api.resumirExclusao(slug);
+		} catch (e) {
+			erroManutencao = e instanceof Error ? e.message : 'Não foi possível preparar a exclusão';
+		}
+	}
+
+	async function excluir() {
+		try {
+			await api.excluirLei(slug);
+			await goto('/legislacao');
+		} catch (e) {
+			erroManutencao = e instanceof Error ? e.message : 'A exclusão falhou';
+		}
+	}
+
 	function dominio(url: string): string {
 		try {
 			return new URL(url).hostname.replace(/^www\./, '');
@@ -246,6 +271,13 @@
 					· <span class:bom={total.erradas === 0}>{total.certas} certas</span>{/if}
 			{/if}
 		</dd>
+		{#if parcial}
+			<dt>Importado</dt>
+			<dd>
+				só {descreverRecorte(leitura.guardado)}
+				{#if leitura.lei.fonte}· <a href={leitura.lei.fonte} target="_blank" rel="noopener noreferrer">lei inteira na fonte ↗</a>{/if}
+			</dd>
+		{/if}
 		{#if recorte}
 			<dt>Cobrada em</dt>
 			<dd>
@@ -278,7 +310,9 @@
 						{#if temRecorte}
 							<div class="alternar" role="group" aria-label="O que mostrar">
 								<button type="button" aria-pressed={!inteira} onclick={() => (inteira = false)}>Só o que cai</button>
-								<button type="button" aria-pressed={inteira} onclick={() => (inteira = true)}>Lei inteira</button>
+								<button type="button" aria-pressed={inteira} onclick={() => (inteira = true)}>
+									{parcial ? 'Tudo o que foi importado' : 'Lei inteira'}
+								</button>
 							</div>
 						{/if}
 						<button type="button" class="link" onclick={ajustar}>Ajustar recorte</button>
@@ -371,7 +405,9 @@
 			{/each}
 			{#if visiveis}
 				<p class="fim-recorte">
-					Fim do que o edital cobra. <button type="button" class="link" onclick={() => (inteira = true)}>Ler a lei inteira</button>
+					Fim do que o edital cobra. <button type="button" class="link" onclick={() => (inteira = true)}>
+					{parcial ? 'Ler tudo o que foi importado' : 'Ler a lei inteira'}
+				</button>
 				</p>
 			{/if}
 		</article>
@@ -421,6 +457,26 @@
 			<input type="file" accept=".json,application/json" disabled={importando} onchange={importarQuestoes} />
 		</label>
 		{#if importando}<p class="page-sub">Importando…</p>{/if}
+
+		<h2 class="sec">Excluir</h2>
+		{#if excluindo}
+			<div class="confirmar" role="alertdialog" aria-label="Excluir {excluindo.curto}">
+				<p>
+					Excluir <b>{excluindo.curto}</b> do catálogo? Vão junto {excluindo.questoes}
+					{excluindo.questoes === 1 ? 'questão' : 'questões'} e {excluindo.respostas}
+					{excluindo.respostas === 1 ? 'resposta' : 'respostas'}, de quem quer que as tenha respondido. Não dá
+					para desfazer.
+				</p>
+				<button class="btn danger" type="button" onclick={excluir}>Excluir de vez</button>
+				<button class="btn" type="button" onclick={() => (excluindo = null)}>Cancelar</button>
+			</div>
+		{:else}
+			<p class="page-sub">
+				Tira a lei do catálogo, com as questões e as respostas. Para importar de novo, use o tópico do edital
+				em Legislação.
+			</p>
+			<button class="btn danger" type="button" onclick={pedirExclusao}>Excluir esta lei</button>
+		{/if}
 
 		<h2 class="sec">Atualizar texto</h2>
 		<p class="page-sub">
@@ -912,6 +968,22 @@
 		cursor: pointer;
 		color: var(--text-muted);
 		font-size: 13px;
+	}
+	.confirmar {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		flex-wrap: wrap;
+		padding: 12px 14px;
+		margin: 0 0 12px;
+		border-radius: 8px;
+		border: 1px solid var(--danger);
+		background: var(--danger-soft);
+		font-size: 13.5px;
+	}
+	.confirmar p {
+		flex: 1 1 100%;
+		margin: 0;
 	}
 	.arquivo {
 		display: inline-flex;

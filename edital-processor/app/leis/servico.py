@@ -16,10 +16,16 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.core.errors import CapturaNaoEncontrada, CapturasDemais, LinkDeLeiInvalido
+from app.core.errors import (
+    CapturaNaoEncontrada,
+    CapturasDemais,
+    FonteDoTemaNaoEncontrada,
+    LinkDeLeiInvalido,
+)
 from app.core.logging import get_logger
 from app.leis.captura import Captura, capturar
 from app.leis.fontes import FonteInvalida, Http, fonte_do_link
+from app.leis.pesquisa import FonteNaoEncontrada, pesquisar
 from app.providers.base import LLMProvider
 
 __all__ = ["CapturaNaoEncontrada", "Capturas", "CapturasDemais"]
@@ -63,7 +69,7 @@ class Capturas:
         self._relogio = relogio
         self._andamentos: dict[str, _Andamento] = {}
 
-    def iniciar(self, link: str, dono: str) -> str:
+    def iniciar(self, link: str, dono: str, recorte: list[str] | None = None) -> str:
         self._varrer()
         try:
             fonte = fonte_do_link(link)
@@ -77,11 +83,13 @@ class Capturas:
         andamento = _Andamento(dono=dono)
         self._andamentos[cid] = andamento
         andamento.tarefa = asyncio.get_running_loop().create_task(
-            self._rodar(cid, andamento, fonte)
+            self._rodar(cid, andamento, fonte, recorte)
         )
         return cid
 
-    async def _rodar(self, cid: str, andamento: _Andamento, fonte: object) -> None:
+    async def _rodar(
+        self, cid: str, andamento: _Andamento, fonte: object, recorte: list[str] | None = None
+    ) -> None:
         def progresso(etapa: str, feitos: int, total: int) -> None:
             andamento.etapa, andamento.feitos, andamento.total = etapa, feitos, total
 
@@ -91,6 +99,7 @@ class Capturas:
                 self._http,
                 self._provider,
                 progresso,
+                recorte,
             )
             andamento.estado = "pronta"
         except Exception:
@@ -122,6 +131,17 @@ class Capturas:
             corpo["resultado"] = _resultado(andamento.captura)
         return corpo
 
+    async def pesquisar(self, tema: str, link: str | None) -> dict[str, object]:
+        """A estrutura da lei que o tópico cita, para escolher o recorte. Síncrona:
+        sem Gemini, a Constituição leva segundos."""
+        try:
+            p = await pesquisar(tema, link, self._http)
+        except FonteNaoEncontrada as exc:
+            raise FonteDoTemaNaoEncontrada(str(exc)) from exc
+        except FonteInvalida as exc:
+            raise LinkDeLeiInvalido(str(exc)) from exc
+        return {"fonte": p.fonte, "link": p.link, "epigrafe": p.epigrafe, "estrutura": p.estrutura}
+
     def _varrer(self) -> None:
         """A captura terminada vale por `validade` segundos (K37)."""
         agora = self._relogio()
@@ -146,4 +166,5 @@ def _resultado(c: Captura) -> dict[str, object]:
         "bloqueios": c.bloqueios,
         "avisos": [{"id": a.id, "texto": a.texto, "trecho": a.trecho} for a in c.avisos],
         "resumo": c.resumo,
+        "recorte": c.recorte,
     }

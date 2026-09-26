@@ -41,6 +41,9 @@
     "fonte": "string",
     "gemini": "bool",
     "publicavel": "bool",
+    "recorte": [
+      "string"
+    ],
     "resumo": {
       "anteriores": "number",
       "descartados": [],

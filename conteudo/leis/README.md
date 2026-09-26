@@ -4,7 +4,9 @@ As normas que o edital do TCE-GO (Técnico de Controle Externo – TI, FCC) cobr
 nas disciplinas LEG (Legislação Institucional) e LEGTI (Legislação Aplicada à
 TI), e o que usar em **Legislação → Adicionar lei** para cada uma.
 
-A lei é capturada pela tela: cole o link, revise a prévia e publique. As
+A lei entra pelo tópico do edital, em **Legislação → Pesquisar e importar**: o
+app acha a fonte e guarda só o que o tópico pede. Os links abaixo servem para a
+norma que a pesquisa não acha (a Constituição de Goiás, as resoluções do TCE). As
 questões são escritas fora do app (`.claude/skills/questoes-de-lei`), ficam em
 `<slug>/questoes.json` e entram pela página da lei, em **Manter esta lei →
 Importar questões**. O `<slug>/lei.json` é o texto de referência para quem

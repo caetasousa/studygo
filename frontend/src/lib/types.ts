@@ -657,6 +657,8 @@ export interface LeituraDeLei {
 	questoes: QuestaoDeLei[];
 	/** null: nenhuma matéria do concurso ativo cobra esta lei. */
 	recorte: RecorteNoConcurso | null;
+	/** O que a versão guarda quando é só parte da lei; vazio, a lei inteira. */
+	guardado: TrechoDoRecorte[];
 }
 
 export interface LeiResumo {
@@ -680,6 +682,56 @@ export interface LeisDaMateria {
 	nome: string;
 	vinculadas: LeiNaMateria[];
 	sugeridas: LeiNaMateria[];
+	/** Os tópicos da matéria e os slugs das leis vinculadas que cada um cita. */
+	temas: { texto: string; leis: string[] }[];
+}
+
+/** Um pedaço do tópico ("Administração Pública") e o que ele pede da lei. */
+export interface AssuntoDoTema {
+	texto: string;
+	refs: string[];
+	trechos: TrechoDoRecorte[];
+}
+
+export interface DivisaoDaLei {
+	ref: string;
+	pai: string | null;
+	tipo: TipoDispositivo;
+	rotulo: string;
+	nome: string;
+	/** O começo do artigo; vazio nas divisões. */
+	texto: string;
+}
+
+/** O que a pesquisa pelo tópico achou, antes de importar. */
+export interface PesquisaDoTema {
+	fonte: string;
+	link: string;
+	epigrafe: string;
+	nome: string;
+	curto: string;
+	/** importar: lei nova; vincular: a guardada já cobre; ampliar: falta parte. */
+	acao: 'importar' | 'vincular' | 'ampliar';
+	existente: { slug: string; curto: string } | null;
+	assuntos: AssuntoDoTema[];
+	/** Vazio: o tópico pede a lei inteira. */
+	recorte: string[];
+	trechos: TrechoDoRecorte[];
+	estrutura: DivisaoDaLei[];
+}
+
+export interface PedidoDeCaptura {
+	link: string;
+	recorte?: string[];
+	artigos?: string;
+	slug?: string;
+	inteira?: boolean;
+}
+
+export interface ResumoDaExclusao {
+	curto: string;
+	questoes: number;
+	respostas: number;
 }
 
 /** Uma coisa que a captura resolveu sozinha e alguém precisa conferir. */
@@ -709,6 +761,8 @@ export interface ResultadoDaCaptura {
 	sumario: { ref: string; tipo: string; rotulo: string; nome: string }[];
 	artigos: number;
 	dispositivos: number;
+	/** As raízes guardadas; vazio, a lei inteira. */
+	recorte: string[];
 }
 
 /** Uma matéria do concurso cujo tópico cita a lei capturada, e o que ele pede. */

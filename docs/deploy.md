@@ -170,8 +170,9 @@ A lei não passa pela pipeline como código: ela é **dado**, capturado pela
 tela do servidor depois que a versão do app que a lê já está no ar. Enquanto o
 app é de teste, qualquer conta logada captura e importa.
 
-1. **Legislação → Adicionar lei**: cole o link (lista em
-   `conteudo/leis/README.md`), revise a prévia, publique.
+1. **Legislação → Pesquisar e importar**, no tópico do edital: confira o que
+   cada assunto pede e importe. Norma que a pesquisa não acha entra pelo link
+   (lista em `conteudo/leis/README.md`).
 2. Na página da lei, **Manter esta lei → Importar questões** com o
    `conteudo/leis/<slug>/questoes.json`. Confira um artigo com questões e o
    link direto (`/leis/<slug>#art71`).

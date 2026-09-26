@@ -6,9 +6,15 @@ alínea). Roda dentro do processador, chamada pelo backend quando alguém cola o
 link em **Legislação → Adicionar lei**:
 
 ```
-POST /internal/leis/capturas        {"link": "https://www.planalto.gov.br/…"}  → {"id": …}
+POST /internal/leis/pesquisas       {"tema": "Constituição…: Administração Pública"}  → fonte e estrutura
+POST /internal/leis/capturas        {"link": "https://www.planalto.gov.br/…", "recorte": ["tit3.cap7"]}  → {"id": …}
 GET  /internal/leis/capturas/{id}   → estado, etapa e, pronta, a lei e o que revisar
 ```
+
+A pesquisa acha a fonte pelo tópico (Constituição Federal pelo nome; lei
+federal pelo número e ano, no Planalto; lei de Goiás pelo número, na API da
+Casa Civil) e devolve a estrutura, só pelas regras. Na dúvida, "não achei":
+nunca um palpite.
 
 A captura demora (a Constituição leva uns quatro minutos com o Gemini), por
 isso é assíncrona: o backend consulta até ela ficar pronta. O processador **nunca
@@ -96,6 +102,22 @@ que cobre; um item sem teste é lacuna declarada.
 | K35 | um aviso (divergência, salto de numeração) vira bloqueio sem saída, ou some da prévia | a Constituição nunca publica, ou publica sem ninguém ver |
 | K36 | sem chave do Gemini a captura sai como se tivesse sido conferida | captura "verificada" que ninguém verificou (o K18, na tela) |
 | K37 | captura pronta nunca expira | a memória do processador cresce com cada lei capturada |
+
+### Pesquisa pelo tópico e captura do recorte
+
+A importação começa pelo tópico do edital: a pesquisa acha a fonte oficial e
+devolve a estrutura (divisões e artigos, só pelas regras, em segundos); a
+captura depois confere com o Gemini só o recorte e guarda só ele.
+
+| id | Como erra | O que sai errado |
+|---|---|---|
+| K38 | a fonte achada é de outra norma: número parecido, lei estadual tomada por federal (ou o contrário), complementar por ordinária, outro ano | importa a lei errada com cara de certa |
+| K39 | tópico sem número nem nome conhecido (a Constituição de Goiás, uma resolução do TCE) vira um palpite em vez de "não achei" | o mesmo que K38; sem saída para colar o link |
+| K40 | o recorte corta os pais: o artigo vem sem o capítulo e o título acima, ou sem a epígrafe | o leitor perde o contexto; o nome da lei se perde |
+| K41 | o recorte deixa entrar o que está fora dele, ou corta um inciso de um artigo pedido | lei maior que o pedido, ou artigo pela metade |
+| K42 | ref do recorte que a lei não tem é ignorada em silêncio | "arts. 74 e 999" importa só o 74 sem avisar |
+| K43 | o Gemini confere a lei inteira mesmo com recorte (lento), ou não confere o recorte | a Constituição continua levando 4 minutos; ou o recorte sai sem conferência |
+| K44 | aviso de fora do recorte (salto de numeração no ADCT) bloqueia ou pede revisão | a pessoa revisa o que não vai importar |
 
 ### Versão
 

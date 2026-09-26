@@ -33,7 +33,11 @@ func (Indisponivel) Conteudo(
 	return port.EditalConteudo{}, port.ErrImportacaoIndisponivel
 }
 
-func (Indisponivel) IniciarCaptura(context.Context, string, string) (string, error) {
+func (Indisponivel) Pesquisar(context.Context, string, string, string) (lei.Pesquisa, error) {
+	return lei.Pesquisa{}, lei.ErrCapturaIndisponivel
+}
+
+func (Indisponivel) IniciarCaptura(context.Context, string, string, []string) (string, error) {
 	return "", lei.ErrCapturaIndisponivel
 }
 

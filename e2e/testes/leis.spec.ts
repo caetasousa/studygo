@@ -110,7 +110,10 @@ async function importar(baseURL: string, p: Pacote, { arquivo = 'lei-exemplo', a
 /** "Adicionar lei" fica recolhido quando o catálogo já tem leis. */
 async function abrirAdicionar(page: Page) {
 	const campo = page.getByLabel('Link da lei na fonte oficial');
-	if (!(await campo.isVisible())) await page.getByText('Adicionar lei', { exact: true }).click();
+	// Espera a página carregar: com o catálogo vazio o painel já vem aberto, e
+	// clicar nele o fecharia.
+	await page.getByText('Adicionar lei pelo link', { exact: true }).waitFor();
+	if (!(await campo.isVisible())) await page.getByText('Adicionar lei pelo link', { exact: true }).click();
 	await expect(campo).toBeVisible();
 }
 
@@ -442,11 +445,11 @@ test.describe('legislação', () => {
 		await expect(outra.getByRole('link', { name: p.lei.curto })).toHaveCount(0);
 
 		await materia.getByRole('button', { name: `Vincular ${p.lei.curto}` }).click();
-		await expect(materia.getByRole('link', { name: p.lei.curto })).toBeVisible();
+		await expect(materia.getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
 		await expect(materia.getByText('Sugerida pelo tópico')).toHaveCount(0);
 
 		await page.reload();
-		await expect(page.getByRole('region', { name: 'Legislação Institucional' }).getByRole('link', { name: p.lei.curto })).toBeVisible();
+		await expect(page.getByRole('region', { name: 'Legislação Institucional' }).getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
 	});
 
 	test('[L10] redação anterior e notas não se misturam ao texto vigente', async ({ api, page, baseURL }) => {
@@ -490,11 +493,11 @@ test.describe('legislação', () => {
 		await expect(page.getByRole('status')).toContainText(`${curto} publicada`);
 
 		const materia = page.getByRole('region', { name: 'Legislação E2E' });
-		await expect(materia.getByRole('link', { name: curto })).toBeVisible();
-		await expect(materia.getByRole('listitem').filter({ hasText: curto })).toContainText('arts. 1º a 2º');
+		await expect(materia.getByRole('link', { name: curto }).first()).toBeVisible();
+		await expect(materia.getByRole('listitem').filter({ hasText: curto }).filter({ hasText: 'questões' })).toContainText('arts. 1º a 2º');
 		await page.reload();
 		await expect(
-			page.getByRole('region', { name: 'Legislação E2E' }).getByRole('listitem').filter({ hasText: curto })
+			page.getByRole('region', { name: 'Legislação E2E' }).getByRole('listitem').filter({ hasText: curto }).filter({ hasText: 'questões' })
 		).toContainText('arts. 1º a 2º');
 	});
 
@@ -556,4 +559,111 @@ test.describe('legislação', () => {
 		await expect(dispositivo(page, 'art3')).toHaveAttribute('aria-current', 'location');
 		await expect(page.getByRole('button', { name: 'Lei inteira' })).toHaveAttribute('aria-pressed', 'true');
 	});
+
+	/** A matéria com o tópico que cita a lei deste teste (o número é dele). */
+	async function concursoComTopico(api: Api, numero: string, temas: string[]) {
+		await api.concurso('Tópico E2E', [
+			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
+		]);
+	}
+
+	test('[L22][L23] pesquisar o tópico mostra o que ele pede, e importar guarda só isso', async ({ page, api, conta }) => {
+		const numero = numeroUnico();
+		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026: controle externo`, 'Certificação digital']);
+		await page.goto('/legislacao');
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+		// Só o tópico que cita norma tem pesquisa.
+		await expect(materia.getByRole('button', { name: 'Pesquisar e importar' })).toHaveCount(1);
+		await materia.getByRole('button', { name: 'Pesquisar e importar' }).click();
+
+		const importar = page.getByRole('region', { name: 'Importar do tópico' });
+		const trecho = importar.getByRole('checkbox', { name: 'CAPÍTULO I — Do Controle Externo (arts. 1º a 2º)' });
+		await expect(trecho).toBeChecked();
+		await expect(importar.getByText('controle externo', { exact: true })).toBeVisible();
+		// O pedaço que só nomeia a lei não vira assunto.
+		await expect(importar.locator('q')).toHaveCount(1);
+		await expect(importar.getByRole('link', { name: 'fonte oficial ↗' })).toBeVisible();
+		await expect(importar.getByLabel('Nome curto')).toHaveValue(`Lei nº ${numero}/2026`);
+		await importar.getByRole('button', { name: 'Importar só isso' }).click();
+
+		await expect(page.getByRole('status')).toContainText(`Lei nº ${numero}/2026 importada e vinculada a esta matéria`);
+		await expect(materia.getByRole('link', { name: `Lei nº ${numero}/2026` }).first()).toBeVisible();
+
+		// Guardou só o capítulo I (e a epígrafe): o art. 3º não veio.
+		const slug = `lei-n-${numero.replace('.', '-')}-2026`;
+		const leitura = await (
+			await page.request.get(`/api/leis/${slug}`, { headers: { Authorization: `Bearer ${conta.token}` } })
+		).json();
+		expect(leitura.dispositivos.map((d: { ref: string }) => d.ref)).toEqual(
+			pacote().dispositivos.filter((d) => !['cap2', 'art3'].includes(d.ref)).map((d) => d.ref)
+		);
+		await abrirLei(page, slug);
+		await expect(page.getByText('só arts. 1º a 2º')).toBeVisible();
+		await expect(dispositivo(page, 'art3')).toHaveCount(0);
+	});
+
+	test('[L24] outro tópico que pede mais da mesma lei amplia a que existe, sem repetir', async ({ page, api, conta }) => {
+		const numero = numeroUnico();
+		const headers = { Authorization: `Bearer ${conta.token}` };
+		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026: controle externo`, `Lei nº ${numero}/2026, art. 3º`]);
+		await page.goto('/legislacao');
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+
+		await materia.getByRole('button', { name: 'Pesquisar e importar' }).first().click();
+		await page.getByRole('region', { name: 'Importar do tópico' }).getByRole('button', { name: 'Importar só isso' }).click();
+		await expect(page.getByRole('status').filter({ hasText: 'importada e vinculada' })).toBeVisible();
+
+		// O segundo tópico acha a mesma lei no catálogo e pede o que falta.
+		await materia.getByRole('button', { name: 'Pesquisar e importar' }).click();
+		const importar = page.getByRole('region', { name: 'Importar do tópico' });
+		await expect(importar).toContainText('já no catálogo');
+		await importar.getByRole('button', { name: `Ampliar Lei nº ${numero}/2026 e vincular` }).click();
+		await expect(page.getByRole('status').filter({ hasText: 'ampliada e vinculada' })).toBeVisible();
+
+		const slug = `lei-n-${numero.replace('.', '-')}-2026`;
+		const { leis } = await (await page.request.get('/api/leis', { headers })).json();
+		expect(leis.filter((l: { slug: string }) => l.slug.startsWith(slug))).toHaveLength(1);
+		const leitura = await (await page.request.get(`/api/leis/${slug}`, { headers })).json();
+		const refs = leitura.dispositivos.map((d: { ref: string }) => d.ref);
+		expect(refs).toContain('art1');
+		expect(refs).toContain('art3');
+		// A matéria soma os dois tópicos no recorte dela, não troca um pelo outro.
+		await expect(materia.getByRole('listitem').filter({ hasText: 'arts. 1º a 2º' })).toContainText('art. 3º');
+	});
+
+	test('[L25] excluir a lei avisa o que vai junto e apaga tudo', async ({ page, api, conta, baseURL }) => {
+		const p = copia(pacote(), idUnico(), numeroUnico());
+		await importar(baseURL!, p);
+		await api.concurso('Exclusão E2E');
+		await abrirLei(page, p.lei.slug);
+		const painel = await abrirQuestoes(page, 'Art. 1º');
+		await responder(painel, ENUNCIADO_1, 'B');
+		await painel.getByRole('button', { name: 'Fechar as questões' }).click();
+
+		await page.getByText('Manter esta lei').click();
+		await page.getByRole('button', { name: 'Excluir esta lei' }).click();
+		const confirmar = page.getByRole('alertdialog', { name: `Excluir ${p.lei.curto}` });
+		await expect(confirmar).toContainText('4 questões e 1 resposta');
+		await confirmar.getByRole('button', { name: 'Excluir de vez' }).click();
+		await expect(page).toHaveURL(/\/legislacao$/);
+
+		const res = await page.request.get(`/api/leis/${p.lei.slug}`, { headers: { Authorization: `Bearer ${conta.token}` } });
+		expect(res.status()).toBe(404);
+	});
+
+	test('[L26] norma sem fonte conhecida pede o link e segue', async ({ page, api }) => {
+		const numero = numeroUnico();
+		await concursoComTopico(api, numero, ['Resolução Administrativa nº 17/2024, que dispõe sobre a Política de Segurança']);
+		await page.goto('/legislacao');
+		await page.getByRole('region', { name: 'Legislação E2E' }).getByRole('button', { name: 'Pesquisar e importar' }).click();
+
+		const importar = page.getByRole('region', { name: 'Importar do tópico' });
+		await expect(importar).toContainText('Não achei a fonte oficial');
+		await importar.getByLabel('Link da norma na fonte oficial').fill(`https://www.planalto.gov.br/e2e/lei-exemplo-${numero}.htm`);
+		await importar.getByRole('button', { name: 'Pesquisar' }).click();
+		await expect(importar.getByRole('link', { name: 'fonte oficial ↗' })).toBeVisible();
+		await expect(importar.getByRole('button', { name: /^Importar/ })).toBeVisible();
+	});
 });
+

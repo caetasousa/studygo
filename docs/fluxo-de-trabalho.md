@@ -225,12 +225,16 @@ túnel) está em [deploy.md](deploy.md) e [cloudflare-tunnel.md](cloudflare-tunn
 
 Tudo pela tela, sem comando:
 
-1. **Capturar.** Em **Legislação → Adicionar lei**, cole o link da fonte
-   oficial (os links das normas do edital estão em `conteudo/leis/README.md`).
-   A Constituição leva uns quatro minutos.
-2. **Revisar e publicar.** A prévia mostra os bloqueios (impedem publicar) e
-   os avisos — onde o Gemini discordou da regra, onde a numeração salta. Marque
-   cada aviso como revisado, dê o nome e o nome curto, e publique.
+1. **Pesquisar pelo tópico.** Em **Legislação**, cada tópico do edital que
+   cita uma norma tem **Pesquisar e importar**: o app acha a fonte oficial
+   (Planalto, pelo número e ano; Casa Civil de Goiás, pelo número) e mostra o
+   que cada assunto do tópico pede da lei. Ajuste as caixas, acrescente
+   divisões ou artigos. Norma que ele não acha pede o link.
+2. **Importar.** Só o que ficou marcado entra, conferido pelo Gemini, e a
+   matéria já sai vinculada com esse recorte. Se aparecer aviso (o Gemini
+   discordou da regra, a numeração salta), marque como revisado e publique.
+   Lei já no catálogo é ampliada, não repetida. Importação errada? **Excluir**,
+   na lista ou na página da lei.
 3. **Questões.** Peça ao Claude Code para seguir
    `.claude/skills/questoes-de-lei`; elas ficam em
    `conteudo/leis/<slug>/questoes.json` e entram pela página da lei, em
@@ -240,9 +244,8 @@ Tudo pela tela, sem comando:
 4. **Lei mudou?** **Manter esta lei → Atualizar texto** captura de novo. As
    questões continuam; as das unidades cujo texto mudou ficam para revisar.
 
-Como a captura pode errar, e o que ela confere antes de liberar a
-publicação, está em `edital-processor/app/leis/README.md`. O original baixado e os pacotes não vão
-para o Git (o sha256 do original fica no `captura.md`).
+Como a pesquisa e a captura podem errar, e o que elas conferem antes de
+liberar a publicação, está em `edital-processor/app/leis/README.md`.
 
 ## 📖 Resumo dos alvos
 

@@ -43,7 +43,8 @@ type wireResultadoCaptura struct {
 		Texto  string `json:"texto"`
 		Trecho string `json:"trecho"`
 	} `json:"avisos"`
-	Resumo struct {
+	Recorte []string `json:"recorte"`
+	Resumo  struct {
 		Vigentes    int            `json:"vigentes"`
 		Anteriores  int            `json:"anteriores"`
 		Notas       int            `json:"notas"`
@@ -68,8 +69,12 @@ type wireDispositivoLei struct {
 }
 
 // IniciarCaptura pede a captura do link e devolve o id para consultar.
-func (c *Client) IniciarCaptura(ctx context.Context, dono, link string) (string, error) {
-	payload, _ := json.Marshal(map[string]string{"link": link})
+func (c *Client) IniciarCaptura(ctx context.Context, dono, link string, recorte []string) (string, error) {
+	corpo := map[string]any{"link": link}
+	if len(recorte) > 0 {
+		corpo["recorte"] = recorte
+	}
+	payload, _ := json.Marshal(corpo)
 
 	var out wireCapturaIniciada
 	if err := c.do(ctx, http.MethodPost, "/internal/leis/capturas", dono, "application/json", bytes.NewReader(payload), &out); err != nil {
@@ -92,7 +97,7 @@ func (c *Client) Captura(ctx context.Context, dono, id string) (lei.Captura, err
 	}
 	if r := out.Resultado; r != nil {
 		res := &lei.ResultadoDaCaptura{
-			Fonte: r.Fonte, Gemini: r.Gemini, Bloqueios: r.Bloqueios,
+			Fonte: r.Fonte, Gemini: r.Gemini, Bloqueios: r.Bloqueios, Recorte: r.Recorte,
 			Resumo: lei.ResumoDaCaptura{
 				Vigentes: r.Resumo.Vigentes, Anteriores: r.Resumo.Anteriores, Notas: r.Resumo.Notas,
 				Revogados: r.Resumo.Revogados, Tipos: r.Resumo.Tipos, Descartados: r.Resumo.Descartados,
@@ -121,6 +126,48 @@ func (c *Client) Captura(ctx context.Context, dono, id string) (lei.Captura, err
 	return captura, nil
 }
 
+type wirePesquisa struct {
+	Fonte     string `json:"fonte"`
+	Link      string `json:"link"`
+	Epigrafe  string `json:"epigrafe"`
+	Estrutura []struct {
+		Ref      string  `json:"ref"`
+		Pai      *string `json:"pai"`
+		Tipo     string  `json:"tipo"`
+		Rotulo   string  `json:"rotulo"`
+		Nome     string  `json:"nome"`
+		Texto    string  `json:"texto"`
+		Revogado bool    `json:"revogado"`
+	} `json:"estrutura"`
+}
+
+// Pesquisar acha a fonte da norma que o tópico cita e devolve a estrutura dela.
+func (c *Client) Pesquisar(ctx context.Context, dono, tema, link string) (lei.Pesquisa, error) {
+	corpo := map[string]string{"tema": tema}
+	if link != "" {
+		corpo["link"] = link
+	}
+	payload, _ := json.Marshal(corpo)
+
+	var out wirePesquisa
+	if err := c.do(ctx, http.MethodPost, "/internal/leis/pesquisas", dono, "application/json", bytes.NewReader(payload), &out); err != nil {
+		return lei.Pesquisa{}, erroDeCaptura(err)
+	}
+
+	p := lei.Pesquisa{Fonte: out.Fonte, Link: out.Link, Epigrafe: out.Epigrafe}
+	for _, d := range out.Estrutura {
+		pai := ""
+		if d.Pai != nil {
+			pai = *d.Pai
+		}
+		p.Estrutura = append(p.Estrutura, lei.Dispositivo{
+			Ref: d.Ref, Pai: pai, Tipo: d.Tipo, Rotulo: d.Rotulo, Nome: d.Nome, Texto: d.Texto, Revogado: d.Revogado,
+		})
+	}
+
+	return p, nil
+}
+
 // erroDeCaptura traduz a resposta do processador em erro da lei.
 func erroDeCaptura(err error) error {
 	var r recusa
@@ -129,6 +176,8 @@ func erroDeCaptura(err error) error {
 		return lei.ErrLinkInvalido{Motivo: r.Mensagem}
 	case errors.As(err, &r) && r.Codigo == "captura_nao_encontrada":
 		return lei.ErrCapturaNaoEncontrada
+	case errors.As(err, &r) && r.Codigo == "fonte_nao_encontrada":
+		return lei.ErrFonteNaoEncontrada
 	case errors.Is(err, port.ErrProvedorIndisponivel):
 		return fmt.Errorf("%w: %w", lei.ErrCapturaIndisponivel, err)
 	default:

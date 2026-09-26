@@ -53,12 +53,52 @@ func (h *LeiHandler) Capturar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	captura, err := h.leis.Capturar(r.Context(), id, req.Link)
+	captura, err := h.leis.Capturar(r.Context(), id, service.PedidoDeCaptura{
+		Link: req.Link, Recorte: req.Recorte, Artigos: req.Artigos, Slug: req.Slug, Inteira: req.Inteira,
+	})
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
 	writeJSON(w, h.logger, http.StatusAccepted, map[string]string{"id": captura})
+}
+
+func (h *LeiHandler) Pesquisar(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var req pesquisaRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	p, err := h.leis.PesquisarTema(r.Context(), id, req.Tema, req.Link)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusOK, pesquisaParaDTO(p))
+}
+
+func (h *LeiHandler) ResumirExclusao(w http.ResponseWriter, r *http.Request) {
+	res, err := h.leis.ResumirExclusao(r.Context(), r.PathValue("slug"))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusOK, exclusaoDTO{Curto: res.Curto, Questoes: res.Questoes, Respostas: res.Respostas})
+}
+
+func (h *LeiHandler) Excluir(w http.ResponseWriter, r *http.Request) {
+	if err := h.leis.Excluir(r.Context(), r.PathValue("slug")); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusNoContent, nil)
 }
 
 func (h *LeiHandler) Captura(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +256,9 @@ func (h *LeiHandler) vincular(w http.ResponseWriter, r *http.Request, ligar bool
 		}
 	}
 
-	if err := h.leis.Vincular(r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("lei"), ligar, req.Recorte); err != nil {
+	if err := h.leis.Vincular(
+		r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("lei"), ligar, req.Recorte, req.Artigos, req.Somar,
+	); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}
