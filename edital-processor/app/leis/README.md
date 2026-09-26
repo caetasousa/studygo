@@ -68,6 +68,7 @@ que cobre; um item sem teste é lacuna declarada.
 | K13 | inciso com hífen, travessão ou meia-risca ("I -", "I –", "IV-A –"), ou com letra e sem traço ("I-A o Conselho") não reconhecido | inciso vira texto solto |
 | K14 | alínea "a)" e item "1." confundidos, alínea com espaço ("a )") não reconhecida, ou alínea sem inciso aceita | hierarquia trocada |
 | K14b | artigo que altera outra lei cita o texto dela entre aspas ("“Art. 7º …", "X – …” (NR)") e a citação vira dispositivo desta lei | um inciso X fantasma no art. 60 da LGPD, que é da Lei 12.965 |
+| K14c | artigo que insere um capítulo inteiro em outra lei ("“CAPÍTULO II-B … Art. 337-E … Art. 337-P …”" na Lei 14.133) tem a citação cortada no primeiro "Art." citado | os crimes do Código Penal viram artigos da Lei de Licitações |
 | K15b | o fecho do corpo ("Brasília, 5 de outubro de 1988") vem antes do ADCT e tudo que vem depois vira fecho | alíneas do ADCT como assinatura, incisos sem artigo |
 | K15 | o ADCT reinicia a numeração e a ref colide com o corpo da Constituição | `art1` do ADCT sobrescreve o art. 1º |
 | K16 | o Gemini devolve id que não foi enviado, pula ou repete um id | parágrafo sem tipo, ou dois tipos |
@@ -113,6 +114,7 @@ captura depois confere com o Gemini só o recorte e guarda só ele.
 |---|---|---|
 | K38 | a fonte achada é de outra norma: número parecido, lei estadual tomada por federal (ou o contrário), complementar por ordinária, outro ano | importa a lei errada com cara de certa |
 | K39 | tópico sem número nem nome conhecido (a Constituição de Goiás, uma resolução do TCE) vira um palpite em vez de "não achei" | o mesmo que K38; sem saída para colar o link |
+| K39b | decreto federal citado pelo número ("Decreto nº 12.069/2024") não é achado, ou é tomado pela lei de mesmo número | a ENGD pede o link à mão; ou importa a Lei 12.069 no lugar do decreto |
 | K40 | o recorte corta os pais: o artigo vem sem o capítulo e o título acima, ou sem a epígrafe | o leitor perde o contexto; o nome da lei se perde |
 | K41 | o recorte deixa entrar o que está fora dele, ou corta um inciso de um artigo pedido | lei maior que o pedido, ou artigo pela metade |
 | K42 | ref do recorte que a lei não tem é ignorada em silêncio | "arts. 74 e 999" importa só o 74 sem avisar |
@@ -123,7 +125,10 @@ captura depois confere com o Gemini só o recorte e guarda só ele.
 | K46 | problema fora do recorte (o ADCT, o texto que o site anexa ao fim) bloqueia a captura do recorte | a Constituição de Goiás não entra por causa do que ninguém pediu |
 | K47 | parágrafo descartado (a anotação ", DEC 2-12-2024." no cabeçalho do site) tem o mesmo texto de um do corpo, e a conferência apaga os dois | o sha diverge e a RA 14/2024 nunca entra |
 | K48 | a fonte repete o rótulo de uma divisão no mesmo capítulo (duas "Seção I" na Lei 20.756) e a captura bloqueia, ou funde as duas | o estatuto dos servidores de Goiás nunca entra; ou a segunda seção some dentro da primeira |
+| K48b | a fonte repete o número de um inciso (dois "XII" no art. 64 do Regimento do TCE-GO) e a captura bloqueia; ou um artigo repetido passa calado | o Regimento não entra; ou dois artigos fundidos sem ninguém ver |
 | K49 | alíneas logo depois de um caput que as anuncia ("…os seguintes direitos:" a), b), c)), sem inciso, bloqueiam a captura | a lei que fugiu da técnica legislativa não entra |
+| K50 | a fonte separa incisos, alíneas e §§ com `<br>` dentro do mesmo `<p>` (portal do TCE-GO), e o artigo inteiro vira um parágrafo só | o Regimento e as resoluções do TCE-GO aparecem embolados, sem inciso nem parágrafo, e a questão não aponta para o inciso |
+| K50b | a quebra de linha no meio de uma frase ("…do<br>Tribunal") vira dispositivo novo | um artigo partido em dois |
 
 ### Versão
 

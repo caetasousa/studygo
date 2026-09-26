@@ -59,9 +59,11 @@ _PAIS = {
     "alinea": ("inciso", "paragrafo"),
     "item": ("alinea", "inciso"),
 }
-# A fonte que repete o rótulo de uma divisão no mesmo pai (duas "Seção I" num
-# capítulo da Lei 20.756) não bloqueia: a segunda ganha ref própria e a
-# pessoa confere — pode ser erro da fonte, pode ser sumário lido como corpo.
+# A fonte que repete o rótulo no mesmo pai (duas "Seção I" num capítulo da Lei
+# 20.756, dois incisos XII no Regimento do TCE-GO) não bloqueia: o segundo
+# ganha ref própria e a pessoa confere — pode ser erro da fonte, pode ser
+# sumário lido como corpo. Artigo repetido continua bloqueando: a numeração
+# dele é global, e repetir costuma ser captura torta, não a lei.
 REPETIDO = "rótulo repetido na fonte: "
 SOB_O_CAPUT = "alínea sob o caput: "
 _NOME_DO_TIPO = {"paragrafo": "parágrafo", "inciso": "inciso", "alinea": "alínea", "item": "item"}
@@ -150,7 +152,7 @@ def _novo(e: _Estado, p: Paragrafo, tipo: str, texto: str, revogado: bool) -> Di
             return None
         ref = f"{pai.ref}.{lido.chave}"
 
-    if ref in e.refs and tipo in AGRUPAMENTOS:
+    if ref in e.refs and tipo != "artigo":
         n = 2
         while f"{ref}-{n}" in e.refs:
             n += 1

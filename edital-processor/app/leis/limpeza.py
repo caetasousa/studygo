@@ -188,6 +188,9 @@ class _Leitor(HTMLParser):
         return self.saida
 
 
+_ABREM_LINHA = ("artigo", "paragrafo", "inciso", "alinea")
+
+
 def _dividir_cabecalho(pedacos: list[_Pedaco]) -> list[list[_Pedaco]]:
     """ "CAPÍTULO I<br>DISPOSIÇÕES PRELIMINARES" são dois parágrafos."""
     linhas: list[list[_Pedaco]] = [[]]
@@ -201,7 +204,20 @@ def _dividir_cabecalho(pedacos: list[_Pedaco]) -> list[list[_Pedaco]]:
     if len(linhas) > 1 and lido and lido.tipo in ("parte", "livro", "titulo", "capitulo",
                                                     "secao", "subsecao"):  # fmt: skip
         return [linha for linha in linhas if linha]
-    return [[p if not p.quebra else _Pedaco(" ") for p in pedacos]]
+    # O portal do TCE-GO põe o artigo inteiro num <p> e separa incisos, alíneas
+    # e §§ com <br> (K50). Só a linha que começa com rótulo abre dispositivo: a
+    # quebra no meio da frase continua sendo a mesma frase (K50b).
+    grupos: list[list[_Pedaco]] = [[]]
+    for linha in linhas:
+        texto = normalizar("".join(p.texto for p in linha if not p.nota))
+        abre = rotulos.ler(texto)
+        if grupos[-1] and abre is not None and abre.tipo in _ABREM_LINHA:
+            grupos.append(list(linha))
+        else:
+            if grupos[-1]:
+                grupos[-1].append(_Pedaco(" "))
+            grupos[-1].extend(linha)
+    return [g for g in grupos if g]
 
 
 def _marcar_notas(pedacos: list[_Pedaco]) -> None:

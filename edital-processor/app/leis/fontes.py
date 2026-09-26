@@ -204,6 +204,11 @@ _LEI = re.compile(
     r"(?:\s*/\s*(?P<ano_barra>\d{4})|[^()]*?\bde\s+(?:\d{1,2}[º°]?\s+de\s+\w+\s+de\s+|\d{1,2}/\d{1,2}/)(?P<ano_data>\d{4}))?",
     re.I,
 )
+_DECRETO = re.compile(
+    r"\bdecreto\s+(?:federal\s+)?n[º°o.]*\s*(?P<numero>\d{1,3}(?:\.\d{3})*|\d+)"
+    r"(?:\s*/\s*(?P<ano_barra>\d{4})|[^()]*?\bde\s+(?:\d{1,2}[º°]?\s+de\s+\w+\s+de\s+|\d{1,2}/\d{1,2}/)(?P<ano_data>\d{4}))?",
+    re.I,
+)
 _ESTADUAL = re.compile(r"\bestadua(l|is)\b|estado de goi[áa]s|\bgoi[áa]s\b", re.I)
 
 
@@ -227,6 +232,19 @@ def _federal(numero: int, ano: int | None, complementar: bool, http: Http) -> Fo
             return None
         candidatos = [f"{_PLANALTO}/_ato{pasta[0]}-{pasta[1]}/{ano}/lei/l{numero}.htm"]
     for url in candidatos:
+        if _existe(url, http):
+            return Fonte("planalto", url, url)
+    return None
+
+
+def _decreto_federal(numero: int, ano: int | None, http: Http) -> Fonte | None:
+    # Só a pasta por período (2004 em diante) é previsível; antes, cada ano
+    # tem a sua convenção no Planalto.
+    pasta = next((p for p in _PASTAS_DO_PLANALTO if ano and p[0] <= ano <= p[1]), None)
+    if pasta is None:
+        return None
+    base = f"{_PLANALTO}/_ato{pasta[0]}-{pasta[1]}/{ano}/decreto"
+    for url in (f"{base}/D{numero}.htm", f"{base}/d{numero}.htm"):
         if _existe(url, http):
             return Fonte("planalto", url, url)
     return None
@@ -263,6 +281,16 @@ def descobrir_fonte(tema: str, http: Http) -> Fonte | None:
     if _CONSTITUICAO_FEDERAL.search(tema):
         return Fonte("planalto", _CF, _CF) if _existe(_CF, http) else None
     m = _LEI.search(tema)
+    d = _DECRETO.search(tema)
+    # O que o tópico cita primeiro é a norma dele: "Decreto nº X, que
+    # regulamenta a Lei nº Y" é o decreto.
+    if d and (not m or d.start() < m.start()):
+        if _ESTADUAL.search(tema):
+            return None  # decreto de Goiás: a Casa Civil não é consultada por ele
+        ano_d = d["ano_barra"] or d["ano_data"]
+        return _decreto_federal(
+            int(d["numero"].replace(".", "")), int(ano_d) if ano_d else None, http
+        )
     if not m:
         return None
     numero = int(m["numero"].replace(".", ""))

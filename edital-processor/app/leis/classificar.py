@@ -43,12 +43,22 @@ _CLASSES_DE_NOME = {"filho-agrupamento", "filho-sub-agrupamento"}
 _CLASSES_GO = {"epigrafe": "preambulo", "ementa": "preambulo", "preambulo": "preambulo"}
 
 
+def _numero(artigo: re.Match[str]) -> int:
+    return int(re.sub(r"\D", "", artigo.group(1)) or 0)
+
+
+def _continua(artigo: re.Match[str], ultimo: int | None) -> bool:
+    """ "Art. 179" depois do 178, ou "Art. 178-A": a numeração desta lei."""
+    return ultimo is None or _numero(artigo) in (ultimo, ultimo + 1)
+
+
 def por_regras(paragrafos: list[Paragrafo]) -> list[Classe]:
     classes: list[Classe] = []
     viu_artigo = False
     viu_fecho = False
     cabecalho_sem_nome = False
     citando = False
+    ultimo_artigo: int | None = None
     for p in paragrafos:
         if p.anterior:
             lido = rotulos.ler(p.texto)
@@ -59,8 +69,12 @@ def por_regras(paragrafos: list[Paragrafo]) -> list[Classe]:
         if not p.texto:
             classes.append(Classe("solto"))
             continue
-        if citando and rotulos.ARTIGO.match(p.texto):
+        artigo = rotulos.ARTIGO.match(p.texto)
+        if citando and artigo and _continua(artigo, ultimo_artigo):
             # Aspas que a fonte esqueceu de fechar não engolem o resto da lei.
+            # Só o artigo que continua a numeração DESTA lei as fecha: o
+            # capítulo inteiro citado (arts. 337-E a 337-P do Código Penal,
+            # dentro do art. 178 da Lei 14.133) continua citação (K14c).
             citando = False
         if citando or p.texto.startswith(("“", '"')):
             # Texto de outra lei citado por um artigo que a altera: fica
@@ -97,6 +111,8 @@ def por_regras(paragrafos: list[Paragrafo]) -> list[Classe]:
         else:
             classe = Classe("solto")
         viu_artigo = viu_artigo or classe.tipo == "artigo"
+        if classe.tipo == "artigo" and artigo:
+            ultimo_artigo = _numero(artigo)
         # A CF fecha o corpo ("Brasília, 5 de outubro de 1988") e só depois
         # vem o ADCT: um artigo depois do fecho reabre a lei.
         viu_fecho = (viu_fecho or classe.tipo == "fecho") and classe.tipo not in (

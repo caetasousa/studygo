@@ -381,3 +381,60 @@ def test_k49_alineas_sob_o_caput_que_as_anuncia() -> None:
     )
     c = asyncio.run(capturar(fonte_do_link(link), _http({link: torta}), None))
     assert c.bloqueios
+
+
+def test_k50_incisos_separados_por_br_no_mesmo_paragrafo() -> None:
+    ato = """<html><body>
+<p>RESOLUÇÃO ADMINISTRATIVA Nº 5/2024</p>
+<p>CAPÍTULO I<br />DOS OBJETIVOS</p>
+<p><span>Art. 1º Constituem objetivos desta Resolução:</span><br />
+<span>I - instituir o Sistema de Gestão;</span><br />
+<span>II - instituir a Política:</span><br />
+<span>a) de segurança;</span><br />
+<span>b) de privacidade.</span><br />
+<span>Parágrafo único. A Política vale para todos.</span></p>
+<p>Art. 2º Esta Resolução entra em vigor na data de sua
+<br />publicação.</p>
+</body></html>"""
+    link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/5"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None))
+    assert c.bloqueios == [], c.bloqueios
+    por_ref = {d["ref"]: d for d in c.dispositivos or []}
+    assert por_ref["art1"]["texto"] == "Art. 1º Constituem objetivos desta Resolução:"
+    assert por_ref["art1.inc1"]["texto"] == "I - instituir o Sistema de Gestão;"
+    assert por_ref["art1.inc2.alib"]["texto"] == "b) de privacidade."
+    assert por_ref["art1.parunico"]["pai"] == "art1"
+    # K50b: a quebra no meio da frase continua dentro do artigo.
+    assert por_ref["art2"]["texto"] == (
+        "Art. 2º Esta Resolução entra em vigor na data de sua publicação."
+    )
+
+
+def test_k48b_inciso_repetido_na_fonte_vira_aviso_e_artigo_repetido_bloqueia() -> None:
+    lei = LEI.replace("<p>II - apreciar.</p>", "<p>II - apreciar;</p><p>II - fiscalizar.</p>")
+    link = "https://www.planalto.gov.br/ccivil_03/leis/l0004.htm"
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    assert c.bloqueios == [], c.bloqueios
+    por_ref = {d["ref"]: d for d in c.dispositivos or []}
+    assert por_ref["art2.inc2-2"]["texto"] == "II - fiscalizar."
+    assert "repetido: art2.inc2" in [a.id for a in c.avisos]
+    artigo = LEI.replace(
+        "<p>Art. 3º O controle é externo.</p>", "<p>Art. 2º O controle é externo.</p>"
+    )
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: artigo}), None))
+    assert any("ref repetida art2" in b for b in c.bloqueios), c.bloqueios
+
+
+def test_k39b_decreto_federal_pelo_numero_e_ano() -> None:
+    decreto = f"{PLANALTO}/_ato2023-2026/2024/decreto/D12069.htm"
+    lei = f"{PLANALTO}/_ato2023-2026/2024/lei/l12069.htm"
+    http = _http({decreto: ARTIGO, lei: ARTIGO})
+    tema = (
+        "Estratégia Nacional de Governo Digital – ENGD 2024–2027, instituída pelo "
+        "Decreto nº 12.069/2024, consideradas suas recomendações"
+    )
+    fonte = descobrir_fonte(tema, http)
+    assert fonte is not None and fonte.url == decreto
+    assert lei not in http.chamadas
+    # Sem o ano, a pasta é chute: não achei.
+    assert descobrir_fonte("Decreto nº 12.069", _http({decreto: ARTIGO})) is None

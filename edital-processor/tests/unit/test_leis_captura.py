@@ -397,6 +397,23 @@ def test_k14_alinea_sem_inciso_nem_paragrafo_e_problema() -> None:
     assert any("alínea" in p for p in montagem.problemas)
 
 
+def test_k14c_capitulo_inteiro_citado_nao_vira_artigos_desta_lei() -> None:
+    ds = _dispositivos(
+        "<p>Art. 178. O Código Penal passa a vigorar acrescido do seguinte Capítulo II-B:</p>"
+        "<p>“CAPÍTULO II-B</p><p>DOS CRIMES EM LICITAÇÕES</p>"
+        "<p>Art. 337-E. Admitir contratação direta ilegal:</p><p>Pena - reclusão.</p>"
+        "<p>Art. 337-F. Frustrar o caráter competitivo:</p><p>Pena - reclusão.”</p>"
+        "<p>Art. 179. Vigência.</p>"
+    )
+    assert [d["ref"] for d in ds if d["tipo"] == "artigo"] == ["art178", "art179"]
+    # Aspas esquecidas abertas ainda não engolem o artigo seguinte da lei.
+    ds = _dispositivos(
+        "<p>Art. 60. A Lei nº 12.965 passa a vigorar com a alteração:</p>"
+        "<p>“Art. 7º O acesso é essencial.</p><p>Art. 61. Vigência.</p>"
+    )
+    assert [d["ref"] for d in ds if d["tipo"] == "artigo"] == ["art60", "art61"]
+
+
 def test_k14b_texto_citado_entre_aspas_nao_e_dispositivo_desta_lei() -> None:
     ds = _dispositivos(
         "<p>Art. 60. A Lei nº 12.965 passa a vigorar com as seguintes alterações:</p>"
@@ -612,7 +629,11 @@ def test_k21_ref_repetida_e_problema() -> None:
     corpo = "<p>Art. 1º A.</p><p>I - um;</p><p>I - de novo;</p>"
     paragrafos = paragrafos_de_html(_html(corpo))
     montagem = montar(paragrafos, por_regras(paragrafos))
-    assert any("art1.inc1" in p and "repetida" in p for p in montagem.problemas)
+    # Desde o K48b o segundo ganha ref própria: nunca duas iguais, e a
+    # repetição chega à pessoa como aviso.
+    refs = [d.ref for d in montagem.dispositivos]
+    assert len(refs) == len(set(refs)) and "art1.inc1-2" in refs
+    assert any("art1.inc1" in p and "repetido" in p for p in montagem.problemas)
 
 
 def test_k22_texto_que_nao_esta_no_original_e_problema() -> None:
