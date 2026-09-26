@@ -631,7 +631,11 @@ type LeisDaMateria struct {
 // coberto por um vínculo que só tem o capítulo I.
 type TemaDaMateria struct {
 	Texto string
-	Leis  []string
+	// Leis são as vinculadas que cobrem o que o tópico pede.
+	Leis []string
+	// Sugeridas são as do catálogo que o tópico cita e a matéria ainda não
+	// vinculou: a tela as oferece no próprio tópico, em vez de importar de novo.
+	Sugeridas []string
 }
 
 func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug string) ([]LeisDaMateria, error) {
@@ -670,14 +674,14 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 				if err != nil {
 					return nil, err
 				}
-				m.Vinculadas = append(m.Vinculadas, LeiNaMateria{r, lei.DescreverRecorte(ds, vinculos[d.ID][i].Recorte)})
+				m.Vinculadas = append(m.Vinculadas, LeiNaMateria{r, descreverVinculo(r, ds, vinculos[d.ID][i].Recorte)})
 			case r.Lei.CitadaEm(d.Temas):
 				ds, err := estrutura(r.Lei.ID)
 				if err != nil {
 					return nil, err
 				}
 				recorte := lei.RecorteDoEdital(r.Lei, d.Temas, ds)
-				m.Sugeridas = append(m.Sugeridas, LeiNaMateria{r, lei.DescreverRecorte(ds, recorte)})
+				m.Sugeridas = append(m.Sugeridas, LeiNaMateria{r, descreverVinculo(r, ds, recorte)})
 			}
 		}
 		for _, t := range d.Temas {
@@ -695,12 +699,28 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 					tema.Leis = append(tema.Leis, m.Vinculadas[i].Lei.Slug)
 				}
 			}
+			for _, sug := range m.Sugeridas {
+				if sug.Lei.CitadaEm([]string{t}) {
+					tema.Sugeridas = append(tema.Sugeridas, sug.Lei.Slug)
+				}
+			}
 			m.Temas = append(m.Temas, tema)
 		}
 		out = append(out, m)
 	}
 
 	return out, nil
+}
+
+// descreverVinculo descreve o que a matéria estuda da lei. Recorte vazio é
+// tudo o que a versão ativa guarda: a lei inteira, ou só a parte importada
+// (L29) — que não pode aparecer como a lei inteira.
+func descreverVinculo(r lei.Resumo, ds []lei.Dispositivo, recorte []string) []lei.TrechoDoRecorte {
+	if len(recorte) == 0 {
+		recorte = r.Guardado
+	}
+
+	return lei.DescreverRecorte(ds, recorte)
 }
 
 // cobre diz se o recorte do vínculo tem o que o tópico pede. Pedido vazio é a

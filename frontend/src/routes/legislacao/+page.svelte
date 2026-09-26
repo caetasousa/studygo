@@ -7,7 +7,7 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import { descreverRecorte } from '$lib/leis';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
-	import type { LeiResumo, LeisDaMateria, PublicacaoDeLei, ResumoDaExclusao } from '$lib/types';
+	import type { LeiNaMateria, LeiResumo, LeisDaMateria, PublicacaoDeLei, ResumoDaExclusao } from '$lib/types';
 
 	/**
 	 * As leis do concurso, matéria por matéria.
@@ -64,6 +64,25 @@
 			await carregar(slug);
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível gravar o vínculo';
+		}
+	}
+
+	// A matéria em que "Vincular todas" está gravando.
+	let vinculando = $state<string | null>(null);
+
+	/** Uma de cada vez: cada vínculo grava o recorte que os tópicos pedem dela. */
+	async function vincularTodas(m: LeisDaMateria) {
+		if (!slug) return;
+		erro = null;
+		vinculando = m.disciplinaId;
+		try {
+			for (const l of m.sugeridas) await api.vincularLei(slug, m.disciplinaId, l.slug, true);
+			mensagem = `${m.sugeridas.length} leis vinculadas a ${m.nome}.`;
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'Não foi possível gravar os vínculos';
+		} finally {
+			vinculando = null;
+			await carregar(slug);
 		}
 	}
 
@@ -194,20 +213,32 @@
 </div>
 
 {#snippet materia(m: LeisDaMateria)}
+	{@const soltas = m.vinculadas.filter((l) => !m.temas.some((t) => t.leis.includes(l.slug)))}
 	<section class="materia" aria-labelledby="mat-{m.disciplinaId}">
-		<h2 class="sec" id="mat-{m.disciplinaId}">{m.nome}</h2>
+		<div class="mat-cabeca">
+			<h2 class="sec" id="mat-{m.disciplinaId}">{m.nome}</h2>
+			{#if m.sugeridas.length > 1}
+				<button class="vincular-todas" type="button" disabled={vinculando === m.disciplinaId} onclick={() => vincularTodas(m)}>
+					Vincular todas as sugeridas ({m.sugeridas.length})
+				</button>
+			{/if}
+		</div>
 
 		{#if normas(m).length > 0}
 			<ul class="temas" aria-label="Tópicos do edital que citam normas">
 				{#each normas(m) as t (t.texto)}
 					{@const chave = `${m.disciplinaId}|${t.texto}`}
 					<li class="tema">
-						<span class="texto-tema">{t.texto}</span>
-						{#if t.leis.length > 0}
-							<span class="ja">
-								✓ {#each t.leis as s, i (s)}<a href="/leis/{s}">{m.vinculadas.find((v) => v.slug === s)?.curto ?? s}</a>{#if i < t.leis.length - 1}, {/if}{/each}
-							</span>
-						{:else if abertoEm !== chave}
+						<p class="texto-tema">{t.texto}</p>
+						{#each t.leis as s (s)}
+							{@const l = m.vinculadas.find((v) => v.slug === s)}
+							{#if l}{@render vinculada(m, l)}{/if}
+						{/each}
+						{#each t.sugeridas as s (s)}
+							{@const l = m.sugeridas.find((v) => v.slug === s)}
+							{#if l}{@render sugerida(m, l)}{/if}
+						{/each}
+						{#if t.leis.length === 0 && t.sugeridas.length === 0 && abertoEm !== chave}
 							<button
 								class="pesquisar"
 								type="button"
@@ -219,50 +250,21 @@
 								Pesquisar e importar
 							</button>
 						{/if}
+						{#if abertoEm === chave && slug}
+							<ImportarDoTema tema={t.texto} concurso={slug} disciplinaId={m.disciplinaId} aoTerminar={importado} />
+						{/if}
 					</li>
-					{#if abertoEm === chave && slug}
-						<ImportarDoTema tema={t.texto} concurso={slug} disciplinaId={m.disciplinaId} aoTerminar={importado} />
-					{/if}
 				{/each}
 			</ul>
 		{/if}
 
-		{#if m.vinculadas.length === 0 && m.sugeridas.length === 0}
-			<p class="vazia">Nenhuma lei vinculada.</p>
+		{#if soltas.length > 0}
+			<p class="rotulo-outras">{normas(m).length > 0 ? 'Outras leis vinculadas' : 'Leis vinculadas'}</p>
+			{#each soltas as l (l.slug)}{@render vinculada(m, l)}{/each}
 		{/if}
-
-		<ul class="leis">
-			{#each m.vinculadas as l (l.slug)}
-				<li class="lei">
-					<span class="ic"><NavIcon name="lei" size="sm" /></span>
-					<div class="corpo">
-						<a class="nome" href="/leis/{l.slug}">{l.curto}</a>
-						<span class="recorte">
-							{l.recorte.length === 0 ? 'A lei inteira' : descreverRecorte(l.recorte)}
-						</span>
-					</div>
-					<span class="meta">{l.questoes} {l.questoes === 1 ? 'questão' : 'questões'}</span>
-					<button class="discreto" type="button" aria-label="Excluir {l.curto}" onclick={() => pedirExclusao(l.slug)}>
-						Excluir
-					</button>
-					<IconButton icon="fechar" label="Desvincular {l.curto}" onclick={() => vincular(m, l.slug, false)} />
-				</li>
-			{/each}
-			{#each m.sugeridas as l (l.slug)}
-				<li class="lei sugerida">
-					<span class="ic"><NavIcon name="lei" size="sm" /></span>
-					<div class="corpo">
-						<span class="nome">{l.curto}</span>
-						<span class="recorte">
-							Sugerida pelo tópico · o edital pede {l.recorte.length === 0 ? 'a lei inteira' : descreverRecorte(l.recorte)}
-						</span>
-					</div>
-					<button class="vincular" type="button" aria-label="Vincular {l.curto}" onclick={() => vincular(m, l.slug, true)}>
-						Vincular
-					</button>
-				</li>
-			{/each}
-		</ul>
+		{#if normas(m).length === 0 && m.sugeridas.length > 0}
+			{#each m.sugeridas as l (l.slug)}{@render sugerida(m, l)}{/each}
+		{/if}
 
 		{#if livres(m).length > 0}
 			<label class="outra">
@@ -282,6 +284,29 @@
 	</section>
 {/snippet}
 
+{#snippet vinculada(m: LeisDaMateria, l: LeiNaMateria)}
+	<div class="lei">
+		<span class="ic"><NavIcon name="lei" size="sm" /></span>
+		<a class="nome" href="/leis/{l.slug}">{l.curto}</a>
+		<span class="recorte">{l.recorte.length === 0 ? 'a lei inteira' : descreverRecorte(l.recorte)}</span>
+		<span class="meta">{l.questoes} {l.questoes === 1 ? 'questão' : 'questões'}</span>
+		<IconButton icon="fechar" label="Desvincular {l.curto}" onclick={() => vincular(m, l.slug, false)} />
+	</div>
+{/snippet}
+
+{#snippet sugerida(m: LeisDaMateria, l: LeiNaMateria)}
+	<div class="lei sugerida">
+		<span class="ic"><NavIcon name="lei" size="sm" /></span>
+		<span class="nome">{l.curto}</span>
+		<span class="recorte">
+			No catálogo · o edital pede {l.recorte.length === 0 ? 'a lei inteira' : descreverRecorte(l.recorte)}
+		</span>
+		<button class="vincular" type="button" aria-label="Vincular {l.curto}" onclick={() => vincular(m, l.slug, true)}>
+			Vincular
+		</button>
+	</div>
+{/snippet}
+
 <style>
 	.ok {
 		color: var(--good);
@@ -295,43 +320,64 @@
 		font-size: 13px;
 		margin: 4px 0 18px;
 	}
-	.leis {
-		list-style: none;
-		margin: 0;
-		padding: 0;
+	.mat-cabeca {
 		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.vincular-todas {
+		font: inherit;
+		font-size: 12.5px;
+		font-weight: 600;
+		padding: 4px 11px;
+		border-radius: 6px;
+		border: 1px solid var(--border-strong);
+		background: var(--bg-card);
+		color: var(--text);
+		cursor: pointer;
+	}
+	.vincular-todas:hover {
+		background: var(--bg-hover);
+	}
+	/* Um tópico do edital por linha, e embaixo dele a lei que o responde. */
+	.temas {
+		list-style: none;
+		margin: 0 0 8px;
+		padding: 0;
+	}
+	.tema {
+		padding: 10px 0 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.texto-tema {
+		margin: 0 0 6px;
+		font-size: 13.5px;
+		line-height: 1.5;
+		color: var(--text-muted);
 	}
 	.lei {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 10px 12px;
-		border-radius: 8px;
-		border: 1px solid var(--border);
-		background: var(--bg-card);
+		gap: 10px;
+		padding: 5px 8px;
+		margin-left: -8px;
+		border-radius: 6px;
 		font-size: 14px;
 	}
 	.lei:hover {
 		background: var(--bg-hover);
 	}
-	.lei.sugerida {
-		border-style: dashed;
-		background: none;
-	}
 	.lei .ic {
 		color: var(--text-muted);
 		display: inline-flex;
 	}
-	.corpo {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
+	.lei.sugerida .ic,
+	.lei.sugerida .nome {
+		color: var(--text-muted);
 	}
 	.nome {
+		flex: none;
 		color: var(--text);
 		font-weight: 600;
 		text-decoration: none;
@@ -341,39 +387,26 @@
 		text-underline-offset: 3px;
 	}
 	.recorte {
+		flex: 1;
+		min-width: 0;
 		color: var(--text-muted);
 		font-size: 12.5px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.meta {
 		color: var(--text-faint);
 		font-size: 12px;
 		white-space: nowrap;
 	}
-	.temas {
-		list-style: none;
-		margin: 0 0 12px;
-		padding: 0;
-	}
-	.tema {
-		display: flex;
-		gap: 12px;
-		align-items: baseline;
-		padding: 6px 0;
-		border-bottom: 1px solid var(--border);
-		font-size: 13.5px;
-	}
-	.texto-tema {
-		flex: 1;
-		min-width: 0;
-		color: var(--text-muted);
-	}
-	.ja {
-		color: var(--good);
-		font-size: 12.5px;
-		white-space: nowrap;
-	}
-	.ja a {
-		color: var(--good);
+	.rotulo-outras {
+		margin: 14px 0 4px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-faint);
 	}
 	.pesquisar {
 		flex: none;
@@ -420,9 +453,9 @@
 	}
 	.vincular {
 		font: inherit;
-		font-size: 13px;
+		font-size: 12.5px;
 		font-weight: 600;
-		padding: 5px 12px;
+		padding: 3px 10px;
 		border-radius: 6px;
 		border: 1px solid var(--border-strong);
 		background: var(--bg-card);

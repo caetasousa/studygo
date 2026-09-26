@@ -713,8 +713,8 @@
 	/* Texto à esquerda, sumário à direita. */
 	.leitor {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) 210px;
-		gap: 32px;
+		grid-template-columns: minmax(0, 1fr) 230px;
+		gap: 44px;
 		padding: 4px 0 40px;
 		align-items: start;
 	}

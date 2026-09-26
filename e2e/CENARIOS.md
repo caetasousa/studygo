@@ -103,6 +103,10 @@ Planalto terminados em `e2e/…`.
 | L24 | outro tópico que pede mais artigos da mesma lei cria uma lei repetida, ou apaga o que já tinha | duas "Constituição Federal" no catálogo; ou artigos somem |
 | L25 | excluir a lei não avisa quanto vai junto, apaga sem confirmar, ou deixa questão e resposta órfãs | importação errada para sempre; ou estudo perdido sem aviso |
 | L26 | tópico de norma sem fonte conhecida trava a importação em vez de pedir o link | a Constituição de Goiás nunca entra |
+| L27 | o tópico cuja lei já está no catálogo oferece importar de novo, e a sugestão aparece longe do tópico que a cita | a pessoa importa a mesma lei duas vezes, ou não sabe que lei responde a que tópico |
+| L28 | "vincular todas" vincula lei que nenhum tópico da matéria cita, ou deixa uma sugerida de fora | leis erradas na matéria; ou um clique por lei, dezoito vezes |
+| L29 | a lei importada só em parte aparece como "a lei inteira" na sugestão ou no vínculo | a pessoa acha que tem a lei toda para estudar |
+| L30 | no leitor, parágrafo, inciso e alínea saem no mesmo recuo do artigo | a lei vira um bloco embolado, sem hierarquia |
 
 ## Fora da suíte, de propósito
 

@@ -125,7 +125,8 @@
 	<div class="scrim" class:on={menuOpen} onclick={fecharMenu}></div>
 	<div class="app" class:rail-only={railOnly}>
 		<Sidebar bind:open={menuOpen} bind:railOnly />
-		<main class="main">
+		<!-- A lei seca pede coluna de leitura larga, com o sumário ao lado. -->
+		<main class="main" class:larga={page.url.pathname.startsWith('/leis/')}>
 			{#if concursoStore.erro}
 				<!-- A lista de concursos não carregou. Sem isto a tela ficava vazia
 				     sem explicação e sem nada que tentasse de novo. -->

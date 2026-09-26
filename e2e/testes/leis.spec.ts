@@ -439,14 +439,14 @@ test.describe('legislação', () => {
 
 		await page.goto('/legislacao');
 		const materia = page.getByRole('region', { name: 'Legislação Institucional' });
-		await expect(materia.getByText('Sugerida pelo tópico')).toBeVisible();
+		await expect(materia.getByText(/^No catálogo/)).toBeVisible();
 		const outra = page.getByRole('region', { name: 'Língua Portuguesa' });
-		await expect(outra.getByText('Sugerida pelo tópico')).toHaveCount(0);
+		await expect(outra.getByText(/^No catálogo/)).toHaveCount(0);
 		await expect(outra.getByRole('link', { name: p.lei.curto })).toHaveCount(0);
 
 		await materia.getByRole('button', { name: `Vincular ${p.lei.curto}` }).click();
 		await expect(materia.getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
-		await expect(materia.getByText('Sugerida pelo tópico')).toHaveCount(0);
+		await expect(materia.getByText(/^No catálogo/)).toHaveCount(0);
 
 		await page.reload();
 		await expect(page.getByRole('region', { name: 'Legislação Institucional' }).getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
@@ -629,7 +629,7 @@ test.describe('legislação', () => {
 		expect(refs).toContain('art1');
 		expect(refs).toContain('art3');
 		// A matéria soma os dois tópicos no recorte dela, não troca um pelo outro.
-		await expect(materia.getByRole('listitem').filter({ hasText: 'arts. 1º a 2º' })).toContainText('art. 3º');
+		await expect(materia.getByRole('listitem').filter({ hasText: 'arts. 1º a 2º' }).first()).toContainText('art. 3º');
 	});
 
 	test('[L25] excluir a lei avisa o que vai junto e apaga tudo', async ({ page, api, conta, baseURL }) => {
@@ -665,5 +665,95 @@ test.describe('legislação', () => {
 		await expect(importar.getByRole('link', { name: 'fonte oficial ↗' })).toBeVisible();
 		await expect(importar.getByRole('button', { name: /^Importar/ })).toBeVisible();
 	});
-});
 
+	test('[L27] o tópico mostra a lei do catálogo que o responde, e vincula ali mesmo', async ({ api, page, baseURL }) => {
+		const numero = numeroUnico();
+		const p = copia(pacote(), idUnico(), numero);
+		await importar(baseURL!, p);
+		const tema = `Lei Orgânica do Tribunal (Lei nº ${numero}/2026)`;
+		await concursoComTopico(api, numero, [tema, `Lei nº ${numeroUnico()}/2026: tema sem lei no catálogo`]);
+
+		await page.goto('/legislacao');
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+		const topico = materia.getByRole('listitem').filter({ hasText: tema });
+		// A lei que já existe é oferecida no próprio tópico; importar de novo, não.
+		await expect(topico.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true })).toBeVisible();
+		await expect(topico.getByRole('button', { name: 'Pesquisar e importar' })).toHaveCount(0);
+		// O tópico sem lei no catálogo continua com a pesquisa.
+		await expect(materia.getByRole('button', { name: 'Pesquisar e importar' })).toHaveCount(1);
+
+		await topico.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true }).click();
+		await expect(topico.getByRole('link', { name: p.lei.curto })).toBeVisible();
+		await expect(topico.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true })).toHaveCount(0);
+	});
+
+	test('[L28] vincular todas vincula as sugeridas da matéria, e só elas', async ({ api, page, baseURL }) => {
+		const [n1, n2, n3] = [numeroUnico(), numeroUnico(), numeroUnico()];
+		const [a, b, fora] = [copia(pacote(), idUnico(), n1), copia(pacote(), idUnico(), n2), copia(pacote(), idUnico(), n3)];
+		await importar(baseURL!, a);
+		await importar(baseURL!, b);
+		await importar(baseURL!, fora);
+		await api.concurso('Todas E2E', [
+			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas: [`Lei nº ${n1}/2026`, `Lei nº ${n2}/2026`] },
+			{ nome: 'Outra Legislação', bloco: 'esp', questoes: 8, temas: [`Lei nº ${n3}/2026`] }
+		]);
+
+		await page.goto('/legislacao');
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+		await materia.getByRole('button', { name: 'Vincular todas as sugeridas (2)' }).click();
+		await expect(materia.getByRole('link', { name: a.lei.curto })).toBeVisible();
+		await expect(materia.getByRole('link', { name: b.lei.curto })).toBeVisible();
+		await expect(materia.getByRole('button', { name: /^Vincular todas/ })).toHaveCount(0);
+		// A lei da outra matéria continua só sugerida lá.
+		const outra = page.getByRole('region', { name: 'Outra Legislação' });
+		await expect(outra.getByRole('button', { name: `Vincular ${fora.lei.curto}`, exact: true })).toBeVisible();
+
+		await page.reload();
+		await expect(page.getByRole('region', { name: 'Legislação E2E' }).getByRole('link', { name: b.lei.curto })).toBeVisible();
+	});
+
+	test('[L29] a lei importada só em parte não aparece como a lei inteira', async ({ api, page, baseURL }) => {
+		const numero = numeroUnico();
+		const p = copia(pacote(), idUnico(), numero);
+		const { request, token } = await outraSessao(baseURL!);
+		const headers = { Authorization: `Bearer ${token}` };
+		const inicio = await request.post('/api/leis/capturas', { data: { link: linkDaLei(), recorte: ['cap1'] }, headers });
+		expect(inicio.status(), await inicio.text()).toBe(202);
+		const { id } = await inicio.json();
+		let c = { estado: 'rodando', resultado: { avisos: [] as { id: string }[] } };
+		for (let i = 0; i < 40 && c.estado === 'rodando'; i++) {
+			c = await (await request.get(`/api/leis/capturas/${id}`, { headers })).json();
+			await new Promise((r) => setTimeout(r, 100));
+		}
+		const pub = await request.post(`/api/leis/capturas/${id}/publicacao`, {
+			headers,
+			data: { nome: p.lei.nome, curto: p.lei.curto, reconhecer: p.lei.reconhecer, aceitos: c.resultado.avisos.map((a) => a.id) }
+		});
+		expect(pub.ok(), await pub.text()).toBeTruthy();
+		await request.dispose();
+		// O tópico só nomeia a lei: pede ela inteira — mas o catálogo tem só o capítulo I.
+		const tema = `Lei nº ${numero}/2026`;
+		await concursoComTopico(api, numero, [tema]);
+
+		await page.goto('/legislacao');
+		const topico = page.getByRole('region', { name: 'Legislação E2E' }).getByRole('listitem').filter({ hasText: tema });
+		await expect(topico).toContainText('arts. 1º a 2º');
+		await expect(topico).not.toContainText('lei inteira');
+		await topico.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true }).click();
+		await expect(topico.getByRole('link', { name: p.lei.curto })).toBeVisible();
+		await expect(topico).toContainText('arts. 1º a 2º');
+		await expect(topico).not.toContainText('lei inteira');
+	});
+
+	test('[L30] parágrafo, inciso e alínea têm recuo próprio no leitor', async ({ api, page, baseURL }) => {
+		const p = copia(pacote(), idUnico(), numeroUnico());
+		await importar(baseURL!, p);
+		await api.concurso('Recuo E2E');
+		await abrirLei(page, p.lei.slug);
+		const recuo = async (ref: string) =>
+			dispositivo(page, ref).evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft));
+		const [artigo, paragrafo, inciso] = [await recuo('art1'), await recuo('art1.par1'), await recuo('art1.inc1')];
+		expect(paragrafo).toBeGreaterThan(artigo);
+		expect(inciso).toBeGreaterThan(paragrafo);
+	});
+});

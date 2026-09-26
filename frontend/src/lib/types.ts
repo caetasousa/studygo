@@ -682,8 +682,12 @@ export interface LeisDaMateria {
 	nome: string;
 	vinculadas: LeiNaMateria[];
 	sugeridas: LeiNaMateria[];
-	/** Os tópicos da matéria e os slugs das leis vinculadas que cada um cita. */
-	temas: { texto: string; leis: string[] }[];
+	/**
+	 * Os tópicos da matéria: as vinculadas que cobrem o que cada um pede
+	 * (`leis`) e as do catálogo que ele cita e ainda não foram vinculadas
+	 * (`sugeridas`).
+	 */
+	temas: { texto: string; leis: string[]; sugeridas: string[] }[];
 }
 
 /** Um pedaço do tópico ("Administração Pública") e o que ele pede da lei. */

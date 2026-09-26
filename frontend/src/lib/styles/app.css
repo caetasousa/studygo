@@ -253,6 +253,9 @@ a {
 	margin: 0 auto;
 	width: 100%;
 }
+.main.larga {
+	max-width: 1280px;
+}
 .crumb {
 	font-family: var(--font-mono);
 	font-size: 11px;

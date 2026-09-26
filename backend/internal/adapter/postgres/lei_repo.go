@@ -29,7 +29,7 @@ func (r *LeiRepo) Catalogo(ctx context.Context) ([]lei.Resumo, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT l.id, l.slug, l.nome, l.curto, l.fonte, l.reconhecer, v.versao, v.importada_em,
-		        (SELECT count(*) FROM leis_questoes q WHERE q.lei_id = l.id AND q.ativa)
+		        (SELECT count(*) FROM leis_questoes q WHERE q.lei_id = l.id AND q.ativa), v.recorte
 		   FROM leis l
 		   JOIN leis_versoes v ON v.lei_id = l.id AND v.ativa
 		  ORDER BY l.curto`,
@@ -44,7 +44,7 @@ func (r *LeiRepo) Catalogo(ctx context.Context) ([]lei.Resumo, error) {
 		var s lei.Resumo
 		if err := rows.Scan(
 			&s.Lei.ID, &s.Lei.Slug, &s.Lei.Nome, &s.Lei.Curto, &s.Lei.Fonte, &s.Lei.Reconhecer,
-			&s.Versao, &s.ImportadaEm, &s.Questoes,
+			&s.Versao, &s.ImportadaEm, &s.Questoes, &s.Guardado,
 		); err != nil {
 			return nil, fmt.Errorf("lendo lei: %w", err)
 		}

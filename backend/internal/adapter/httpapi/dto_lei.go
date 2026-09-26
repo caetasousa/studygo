@@ -478,8 +478,9 @@ type leisDaMateriaDTO struct {
 }
 
 type temaDTO struct {
-	Texto string   `json:"texto"`
-	Leis  []string `json:"leis"`
+	Texto     string   `json:"texto"`
+	Leis      []string `json:"leis"`
+	Sugeridas []string `json:"sugeridas"`
 }
 
 func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
@@ -488,7 +489,7 @@ func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 		Vinculadas: []leiNaMateriaDTO{}, Sugeridas: []leiNaMateriaDTO{}, Temas: []temaDTO{},
 	}
 	for _, t := range m.Temas {
-		d.Temas = append(d.Temas, temaDTO{Texto: t.Texto, Leis: naoNula(t.Leis)})
+		d.Temas = append(d.Temas, temaDTO{Texto: t.Texto, Leis: naoNula(t.Leis), Sugeridas: naoNula(t.Sugeridas)})
 	}
 	for _, r := range m.Vinculadas {
 		d.Vinculadas = append(d.Vinculadas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})

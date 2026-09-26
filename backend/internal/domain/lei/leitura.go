@@ -12,6 +12,9 @@ type Resumo struct {
 	Versao      string
 	Questoes    int
 	ImportadaEm time.Time
+	// Guardado são as raízes do que a versão ativa guarda; vazio é a lei
+	// inteira. Sem ele, a lei importada só em parte passaria por inteira.
+	Guardado []string
 }
 
 // Texto é a versão ativa da lei, como o leitor a mostra.
