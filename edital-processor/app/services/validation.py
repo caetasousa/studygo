@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pymupdf
-
 from app.core.config import Settings
 from app.core.errors import (
     CorruptedPDF,
@@ -48,6 +46,10 @@ def validate_upload(data: bytes, declared_mime: str | None, settings: Settings) 
         raise InvalidPDF("bytes do not start with a PDF header")
 
     try:
+        # O PyMuPDF pesa uns 50 MB e só serve quando chega um PDF: carrega aqui,
+        # não no boot do processador.
+        import pymupdf
+
         doc = pymupdf.open(stream=data, filetype="pdf")
     except Exception as exc:  # pymupdf raises a bare Exception subclass
         raise CorruptedPDF("the PDF could not be parsed") from exc

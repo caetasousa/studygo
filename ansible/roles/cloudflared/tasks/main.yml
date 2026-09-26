@@ -38,12 +38,26 @@
     creates: /etc/systemd/system/cloudflared.service
   no_log: true
 
-- name: Manter o túnel de pé
-  when: cloudflared_token | default('') | length > 0
+# Com o endereço temporário no ar, o túnel com token não tem rota nem
+# domínio: fica registrado, mas parado, para não gastar memória à toa. Tirar o
+# cloudflared_rapido (com um domínio apontado para ele) o liga.
+- name: Manter o túnel com token de pé (com domínio)
+  when:
+    - cloudflared_token | default('') | length > 0
+    - not (cloudflared_rapido | default(false))
   systemd:
     name: cloudflared
     enabled: true
     state: started
+
+- name: Parar o túnel com token enquanto o endereço é o temporário
+  when:
+    - cloudflared_token | default('') | length > 0
+    - cloudflared_rapido | default(false)
+  systemd:
+    name: cloudflared
+    enabled: false
+    state: stopped
 
 # Endereço temporário grátis (Quick Tunnel): um *.trycloudflare.com aleatório,
 # sem conta nem domínio. Muda a cada reinício do serviço e não tem garantia de

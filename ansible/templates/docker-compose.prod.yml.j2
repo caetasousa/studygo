@@ -11,6 +11,9 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+{% if mem_limit_frontend is defined %}
+    mem_limit: "{{ mem_limit_frontend }}"
+{% endif %}
     depends_on:
       - backend
     ports:
@@ -22,11 +25,16 @@ services:
     security_opt:
       - no-new-privileges:true
 {% if mem_limit_backend is defined %}
-    # Teto de memória opcional (mem_limit_* no inventário), para quando vários
-    # projetos dividirem o servidor.
+    # Teto de memória opcional (mem_limit_* no inventário): o servidor divide a
+    # VM do WSL com a distro de desenvolvimento e com outros projetos.
     mem_limit: "{{ mem_limit_backend }}"
 {% endif %}
     environment:
+{% if go_mem_limit_backend is defined %}
+      # O Go não enxerga o teto do container; sem isto ele só coleta lixo
+      # quando o heap dobra, e pode esbarrar no teto antes.
+      GOMEMLIMIT: "{{ go_mem_limit_backend }}"
+{% endif %}
       SERVER_ADDR: ":8080"
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
@@ -66,7 +74,13 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+{% if mem_limit_worker is defined %}
+    mem_limit: "{{ mem_limit_worker }}"
+{% endif %}
     environment:
+{% if go_mem_limit_worker is defined %}
+      GOMEMLIMIT: "{{ go_mem_limit_worker }}"
+{% endif %}
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
       # Sem intervalo fixo: no servidor o worker acorda na virada do dia, que
@@ -86,6 +100,12 @@ services:
       - no-new-privileges:true
 {% if mem_limit_postgres is defined %}
     mem_limit: "{{ mem_limit_postgres }}"
+{% endif %}
+{% if postgres_args is defined %}
+    # Ajuste para um banco pequeno numa máquina dividida (postgres_args no
+    # inventário): o padrão do Postgres reserva memória para um servidor
+    # dedicado.
+    command: ["postgres"{% for a in postgres_args %}, "-c", "{{ a }}"{% endfor %}]
 {% endif %}
     environment:
       POSTGRES_USER: "{{ postgres_user }}"

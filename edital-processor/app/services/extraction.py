@@ -8,13 +8,16 @@ with quality scores so ``ocr_decision`` can pick which pages need it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import pdfplumber
-import pymupdf
 
 from app.schemas.document import ExtractedTable, PageText
 from app.services.normalize import normalize_text
 from app.services.quality import score_page_text
+
+if TYPE_CHECKING:
+    import pymupdf
 
 
 @dataclass
@@ -32,6 +35,10 @@ def _printed_page_label(page: pymupdf.Page) -> str | None:
 
 def extract_native(data: bytes) -> ExtractionOutput:
     pages: list[PageText] = []
+
+    # O PyMuPDF pesa uns 50 MB e só serve quando chega um PDF: carrega aqui,
+    # não no boot do processador.
+    import pymupdf
 
     doc = pymupdf.open(stream=data, filetype="pdf")
     try:

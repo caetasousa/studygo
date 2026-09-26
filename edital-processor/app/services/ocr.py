@@ -15,8 +15,6 @@ import concurrent.futures
 import io
 from dataclasses import dataclass, field
 
-import pymupdf
-
 from app.core.config import Settings
 from app.core.errors import OCRUnavailable
 from app.core.logging import get_logger
@@ -56,6 +54,10 @@ def _import_tesseract() -> object:
 
 
 def _render_page(data: bytes, physical_page: int, dpi: int) -> bytes:
+    # O PyMuPDF pesa uns 50 MB e só serve quando chega um PDF: carrega aqui,
+    # não no boot do processador.
+    import pymupdf
+
     doc = pymupdf.open(stream=data, filetype="pdf")
     try:
         page = doc.load_page(physical_page - 1)

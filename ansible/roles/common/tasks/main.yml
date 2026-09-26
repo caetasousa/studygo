@@ -30,3 +30,68 @@
 # distros, e um ufw com "deny by default" aqui fecharia a distro de
 # desenvolvimento e o runner da esteira. Nada precisa entrar de fora — o
 # cloudflared só faz conexões de saída.
+
+# O servidor é uma distro do WSL que divide a memória da VM com a distro de
+# desenvolvimento: o que ele não usa não pode ficar de pé. Mascarado, e não só
+# desligado, para um upgrade do pacote não religar.
+- name: Descobrir os serviços instalados
+  ansible.builtin.service_facts:
+
+- name: Desligar serviços que um servidor no WSL não usa
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    # A rede é do WSL, não do networkd.
+    - networkd-dispatcher.service
+    # O journal já guarda os logs; o nginx grava os dele.
+    - rsyslog.service
+    # Agente do Ubuntu Pro para WSL e o snap: nada aqui é instalado por eles.
+    - wsl-pro.service
+    - snapd.service
+    - snapd.socket
+    - snapd.seeded.service
+    # Interface de pacotes do desktop, acordada pelo apt; o Ansible usa o apt direto.
+    - packagekit.service
+    # Só o ajudante de desligamento: as atualizações de segurança continuam,
+    # pelo timer apt-daily-upgrade.
+    - unattended-upgrades.service
+  when: item in ansible_facts.services or item.endswith('.socket')
+  failed_when: false
+
+- name: Desligar timers de manutenção de desktop
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - man-db.timer
+    - motd-news.timer
+    - e2scrub_all.timer
+    - dpkg-db-backup.timer
+  failed_when: false
+
+- name: Pasta de ajustes do journal
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: '0755'
+
+- name: Teto para o journal
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/10-servidor-wsl.conf
+    mode: '0644'
+    content: |
+      [Journal]
+      SystemMaxUse=64M
+      RuntimeMaxUse=16M
+  register: journald
+
+- name: Aplicar o teto do journal
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted
+  when: journald.changed
+
