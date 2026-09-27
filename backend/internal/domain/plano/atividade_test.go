@@ -1,6 +1,7 @@
 package plano_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -313,5 +314,65 @@ func TestReplanejar_NaoDuplicaDiaJaEstudado(t *testing.T) {
 		if !concluidas[a.ID] {
 			t.Errorf("atividade %s apareceu num dia que devia ficar intocado", a.ID)
 		}
+	}
+}
+
+// SepararTema tira um tópico de uma atividade que junta vários, para que ele
+// possa ser marcado como estudado sozinho. Como pode errar — escrito antes do
+// código:
+//
+//	S1  o tópico pedido não está na atividade e mesmo assim sai uma atividade nova
+//	S2  a atividade de um tópico só é duplicada em vez de devolvida
+//	S3  a original perde o tópico errado, ou fica com o separador sobrando
+//	S4  a nova vai para outro dia, ou as posições do dia ficam com buraco ou repetidas
+//	S5  a nova perde a matéria, a passada ou o tipo, e deixa de contar como cobertura
+func TestSepararTema(t *testing.T) {
+	t.Parallel()
+
+	d := time.Date(2026, time.September, 2, 0, 0, 0, 0, time.UTC)
+	disc := uuid.New()
+	base := []plano.Atividade{
+		{ID: uid("x"), Data: d, Posicao: 0, Disciplina: "LINPO", Tema: "Crase", Passada: 1, Tipo: plano.AtividadeConteudo},
+		{ID: uid("y"), Data: d, Posicao: 1, DisciplinaID: &disc, Disciplina: "INFRA", Tema: "AD  ·  LDAP  ·  DNS", Passada: 1, Tipo: plano.AtividadeConteudo},
+		{ID: uid("z"), Data: d, Posicao: 2, Disciplina: "INFRA", Tema: "Nuvem", Passada: 1, Tipo: plano.AtividadeConteudo},
+	}
+	novo := uid("novo")
+
+	// S1
+	if _, _, err := plano.SepararTema(base, uid("y"), "Linux", novo); !errors.Is(err, plano.ErrTemaForaDaAtividade) {
+		t.Errorf("tópico de fora: erro %v, quer ErrTemaForaDaAtividade", err)
+	}
+
+	// S2
+	out, id, err := plano.SepararTema(base, uid("z"), "Nuvem", novo)
+	if err != nil || id != uid("z") || len(out) != len(base) {
+		t.Errorf("tópico único: id %v, %d atividades, err %v; quer a mesma, sem nova", id, len(out), err)
+	}
+
+	out, id, err = plano.SepararTema(base, uid("y"), "LDAP", novo)
+	if err != nil || id != novo {
+		t.Fatalf("separar: id %v, err %v", id, err)
+	}
+
+	porID := map[uuid.UUID]plano.Atividade{}
+	for _, a := range out {
+		porID[a.ID] = a
+	}
+
+	// S3
+	if got := porID[uid("y")].Tema; got != "AD  ·  DNS" {
+		t.Errorf("a original ficou com %q, quer %q", got, "AD  ·  DNS")
+	}
+
+	// S4
+	n := porID[novo]
+	if !n.Data.Equal(d) || n.Posicao != 2 || porID[uid("z")].Posicao != 3 {
+		t.Errorf("posições: nova %v/%d, seguinte %d; quer o mesmo dia, logo depois da original", n.Data, n.Posicao, porID[uid("z")].Posicao)
+	}
+
+	// S5
+	if n.Tema != "LDAP" || n.Disciplina != "INFRA" || n.DisciplinaID == nil || *n.DisciplinaID != disc ||
+		n.Passada != 1 || n.Tipo != plano.AtividadeConteudo {
+		t.Errorf("a nova perdeu o que a original era: %+v", n)
 	}
 }

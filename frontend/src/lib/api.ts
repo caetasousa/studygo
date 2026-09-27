@@ -288,6 +288,15 @@ export const api = {
 			{ method: 'PUT', body: JSON.stringify(input) }
 		),
 
+	/** Marca UM tópico de uma atividade como estudado. Quando a atividade junta
+	 *  vários, o servidor separa o tópico numa atividade própria antes de
+	 *  concluí-la — e a traz para hoje se ela estava adiante. */
+	estudarTema: (slug: string, atividadeId: string, tema: string) =>
+		request<PlanoResposta>(`${planoBase(slug)}/atividades/${encodeURIComponent(atividadeId)}/estudado`, {
+			method: 'POST',
+			body: JSON.stringify({ tema })
+		}),
+
 	/** Grava o que pertence ao dia: a anotação livre e a cauda de revisão. */
 	registrarDia: (slug: string, data: string, input: RegistroDiaInput) =>
 		request<PlanoResposta>(`${planoBase(slug)}/dias/${data}`, {

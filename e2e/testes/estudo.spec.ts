@@ -254,4 +254,42 @@ test.describe('estudo do dia', () => {
 		const desfeito = primeiras(await api.plano(slug), tema).find((i) => i.id === alvo.id)!;
 		expect(desfeito.concluido).toBe(false);
 	});
+
+	test('[C14] marcar um tópico de um bloco que junta vários marca só ele', async ({ page, api }) => {
+		// Mais tópicos que vagas: o motor junta vários numa atividade ("A  ·  B").
+		const temas = Array.from({ length: 150 }, (_, i) => `Tópico ${String(i + 1).padStart(3, '0')}`);
+		const slug = await api.concurso('Tópico isolado E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
+		]);
+		const antes = await api.plano(slug);
+		const hoje = antes.dias[antes.hojeIndex].data;
+		const codigo = antes.concurso.disciplinas.find((d: { nome: string }) => d.nome === 'Informática').codigo;
+		type Item = { id: string; disciplina: string; tema: string; passada: number; concluido: boolean };
+		type Dia = { data: string; itens: Item[] };
+		const itens = (p: { dias: Dia[] }) =>
+			p.dias.flatMap((d) => d.itens.map((i) => ({ ...i, data: d.data }))).filter((i) => i.disciplina === codigo);
+		const partes = (t: string) => t.split('·').map((x) => x.trim()).filter(Boolean);
+		const bloco = itens(antes).find((i) => i.data > hoje && i.passada === 1 && partes(i.tema).length >= 2)!;
+		expect(bloco, 'o cenário precisa de um bloco com dois tópicos adiante').toBeTruthy();
+		const [marcado, vizinho] = partes(bloco.tema);
+
+		await abrirCronograma(page);
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const ementa = page.getByRole('dialog', { name: 'Informática' });
+		await ementa.getByRole('checkbox', { name: `Já estudei: ${marcado}` }).check();
+		await expect(ementa.getByRole('checkbox', { name: `Já estudei: ${marcado}` })).toBeChecked();
+		await expect(ementa.getByRole('checkbox', { name: `Já estudei: ${vizinho}` })).not.toBeChecked();
+
+		const depois = itens(await api.plano(slug));
+		const estudado = depois.find((i) => i.tema === marcado)!;
+		expect(estudado.concluido).toBe(true);
+		expect(estudado.data).toBe(hoje);
+		// O resto do bloco continua pendente, sem o tópico marcado.
+		const resto = depois.find((i) => i.id === bloco.id)!;
+		expect(resto.concluido).toBe(false);
+		expect(partes(resto.tema)).toContain(vizinho);
+		expect(partes(resto.tema)).not.toContain(marcado);
+		expect(depois.filter((i) => !i.concluido && partes(i.tema).includes(marcado) && i.passada === 1)).toHaveLength(0);
+	});
 });

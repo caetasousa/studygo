@@ -655,10 +655,6 @@ func coberta(a Atividade) bool {
 	return a.Disciplina != "" && a.Passada == 1
 }
 
-func chaveDe(a Atividade) chaveDeConteudo {
-	return chaveDeConteudo{disciplina: a.Disciplina, tema: a.Tema}
-}
-
 // SemConteudoJaConcluido tira das atividades recém-geradas o que o estudante já
 // concluiu.
 //
@@ -673,6 +669,11 @@ func chaveDe(a Atividade) chaveDeConteudo {
 //
 // Ao vivo o estrago passava despercebido, porque perder um dia repete um dia. É
 // importar um histórico de uma vez que o torna visível.
+//
+// O desconto é por TÓPICO, não pela atividade inteira: o motor junta tópicos
+// ("AD · LDAP") quando a matéria tem mais tópicos que vagas, e o estudante
+// pode ter estudado só um deles (SepararTema). O bloco regenerado volta sem o
+// que já foi estudado, e some quando não sobra nada.
 func SemConteudoJaConcluido(
 	novas []Atividade,
 	atuais []Atividade,
@@ -682,7 +683,9 @@ func SemConteudoJaConcluido(
 
 	for _, a := range atuais {
 		if coberta(a) && concluida(a.ID) {
-			feito[chaveDe(a)] = true
+			for _, p := range PartesDoTema(a.Tema) {
+				feito[chaveDeConteudo{disciplina: a.Disciplina, tema: p}] = true
+			}
 		}
 	}
 
@@ -693,8 +696,26 @@ func SemConteudoJaConcluido(
 	out := make([]Atividade, 0, len(novas))
 
 	for _, a := range novas {
-		if coberta(a) && feito[chaveDe(a)] {
+		if !coberta(a) {
+			out = append(out, a)
+
 			continue
+		}
+
+		partes := PartesDoTema(a.Tema)
+		resto := make([]string, 0, len(partes))
+
+		for _, p := range partes {
+			if !feito[chaveDeConteudo{disciplina: a.Disciplina, tema: p}] {
+				resto = append(resto, p)
+			}
+		}
+
+		switch {
+		case len(resto) == 0:
+			continue
+		case len(resto) < len(partes):
+			a.Tema = strings.Join(resto, separadorDeTemas)
 		}
 
 		out = append(out, a)

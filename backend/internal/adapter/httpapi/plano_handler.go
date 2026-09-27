@@ -199,6 +199,38 @@ func (h *PlanoHandler) Registrar(w http.ResponseWriter, r *http.Request) {
 	h.responderPlano(w, r, p, err)
 }
 
+type estudadoRequest struct {
+	Tema string `json:"tema"`
+}
+
+// Estudado marca um tópico de uma atividade como estudado, separando-o da
+// atividade quando ela junta vários.
+func (h *PlanoHandler) Estudado(w http.ResponseWriter, r *http.Request) {
+	id, slug, ok := h.contexto(r)
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+
+		return
+	}
+
+	atividadeID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+
+		return
+	}
+
+	var req estudadoRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+
+		return
+	}
+
+	p, err := h.registros.EstudarTema(r.Context(), id, slug, atividadeID, req.Tema)
+	h.responderPlano(w, r, p, err)
+}
+
 type registroDiaRequest struct {
 	Nota       string `json:"nota"`
 	Questoes   *int   `json:"questoes"`

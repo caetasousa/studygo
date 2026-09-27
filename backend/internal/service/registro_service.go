@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -88,6 +89,50 @@ func (s *RegistroService) Registrar(
 	}
 
 	return s.montar(ctx, c)
+}
+
+// EstudarTema marca UM tópico de uma atividade como estudado.
+//
+// Quando a matéria tem mais tópicos que vagas, o motor junta vários numa
+// atividade só, e o registro é por atividade: marcar um tópico marcaria todos.
+// O tópico sai para uma atividade própria (plano.SepararTema), e é ela que é
+// registrada como concluída — pelo mesmo Registrar, que a traz para hoje e
+// encosta o resto do cronograma quando ela estava adiante.
+func (s *RegistroService) EstudarTema(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+	atividadeID uuid.UUID,
+	tema string,
+) (PlanoMontado, error) {
+	c, err := s.carregar(ctx, usuarioID, slug)
+	if err != nil {
+		return PlanoMontado{}, err
+	}
+
+	separadas, id, err := plano.SepararTema(c.Atividades, atividadeID, tema, uuid.New())
+
+	switch {
+	case errors.Is(err, plano.ErrAtividadeNaoEncontrada):
+		return PlanoMontado{}, erroDeValidacao("atividade não encontrada")
+	case errors.Is(err, plano.ErrTemaForaDaAtividade):
+		return PlanoMontado{}, erroDeValidacao("o tópico não está nessa atividade")
+	case err != nil:
+		return PlanoMontado{}, err
+	}
+
+	cmd := RegistroCommand{AtividadeID: id, Concluido: true}
+
+	if id == atividadeID {
+		// Um tópico só: é a atividade inteira, e o que já foi lançado nela fica.
+		if reg, ok := c.Registros[id]; ok {
+			cmd.Horas, cmd.Questoes, cmd.Acertos, cmd.Nota = reg.Horas, reg.Questoes, reg.Acertos, reg.Nota
+		}
+	} else if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, separadas); err != nil {
+		return PlanoMontado{}, err
+	}
+
+	return s.Registrar(ctx, usuarioID, slug, cmd)
 }
 
 // anteciparEReorganizar traz a atividade para hoje e fecha o buraco que ela

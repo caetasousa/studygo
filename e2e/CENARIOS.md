@@ -53,6 +53,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C11 | a revisão do dia não abre com o que há para revisar, ou o resultado dela não fica gravado | o bloco de revisão vira enfeite |
 | C12 | marcar na ementa um tópico já estudado não o traz para hoje, deixa a 1ª passada dele ainda agendada adiante, ou não move o progresso | o tópico que já foi estudado reaparece na sequência, e a estatística não conta o estudo |
 | C13 | desmarcar o tópico não desfaz a conclusão | um clique errado vira estudo que não houve |
+| C14 | marcar um tópico de uma atividade que junta vários (matéria com mais tópicos que vagas) marca todos, ou o tópico volta num replanejamento | só dá para marcar de dois em dois; o estudado reaparece |
 
 ## D. Configurações e dados
 

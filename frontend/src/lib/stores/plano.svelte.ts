@@ -191,6 +191,19 @@ class PlanoStore {
 		}
 	};
 
+	/** Marca um tópico de uma atividade como estudado; devolve o erro, se houver. */
+	estudarTema = async (atividadeId: string, tema: string): Promise<string | null> => {
+		const slug = this.slug;
+
+		try {
+			this.commit(slug, await api.estudarTema(slug, atividadeId, tema));
+
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Não foi possível salvar';
+		}
+	};
+
 	/**
 	 * Moves one activity to (data, posicao). Waits on the server: the board is
 	 * one PATCH away and rearranging optimistically used to hide the exact class

@@ -414,7 +414,7 @@ func reparte(temas []string, vagas int) []reparteItem {
 		a := j * len(temas) / vagas
 		b := (j + 1) * len(temas) / vagas
 		out = append(out, reparteItem{
-			tema:    strings.Join(temas[a:b], "  ·  "),
+			tema:    strings.Join(temas[a:b], separadorDeTemas),
 			passada: 1,
 		})
 	}

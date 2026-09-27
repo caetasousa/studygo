@@ -21,7 +21,8 @@
 	 * Marcar "já estudei" registra a próxima 1ª passada do tópico como
 	 * concluída: se ela estava agendada para a frente, o servidor a traz para
 	 * hoje e encosta o resto do cronograma (antecipar compra tempo, não abre
-	 * vão). Revisão e 2ª passada ficam onde estão — estudar antes não dispensa
+	 * vão). Quando a atividade junta vários tópicos, só o marcado sai dela.
+	 * Revisão e 2ª passada ficam onde estão — estudar antes não dispensa
 	 * revisar.
 	 */
 	let {
@@ -87,13 +88,19 @@
 		if (!alvo) return;
 		salvando = chave(t);
 		erroMarca = null;
-		const erro = await planoStore.salvarAtividade(alvo.id, {
-			horas: alvo.horas,
-			questoes: alvo.questoes,
-			acertos: alvo.acertos,
-			nota: alvo.nota,
-			concluido: sim
-		});
+		// Marcar vai pelo tópico: se a atividade junta vários ("AD · LDAP"), o
+		// servidor separa só este. O texto enviado é o da atividade, não o da
+		// ementa, que pode trazer numeração.
+		const parte = partesTema(alvo.tema).find((p) => chave(p) === chave(t)) ?? alvo.tema;
+		const erro = sim
+			? await planoStore.estudarTema(alvo.id, parte)
+			: await planoStore.salvarAtividade(alvo.id, {
+					horas: alvo.horas,
+					questoes: alvo.questoes,
+					acertos: alvo.acertos,
+					nota: alvo.nota,
+					concluido: false
+				});
 		salvando = null;
 		erroMarca = erro;
 	}

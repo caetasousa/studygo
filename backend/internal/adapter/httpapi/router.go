@@ -112,6 +112,7 @@ func NewRouter(
 	// O registro é por ATIVIDADE: é a unidade de trabalho, e é dela que a
 	// conclusão do dia é derivada.
 	protegida("PUT "+base+"/atividades/{id}/registro", h.Plano.Registrar)
+	protegida("POST "+base+"/atividades/{id}/estudado", h.Plano.Estudado)
 	protegida("PATCH "+base+"/dias/{data}", h.Plano.RegistrarDia)
 	protegida("DELETE "+base+"/registros", h.Plano.LimparRegistros)
 

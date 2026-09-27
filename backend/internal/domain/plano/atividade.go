@@ -22,6 +22,8 @@ var (
 	ErrDiaConcluido = errors.New("dia já concluído")
 	// ErrAtividadeConcluida: a própria atividade já foi concluída.
 	ErrAtividadeConcluida = errors.New("atividade já concluída")
+	// ErrTemaForaDaAtividade: o tópico pedido não é um dos que a atividade junta.
+	ErrTemaForaDaAtividade = errors.New("o tópico não está nessa atividade")
 )
 
 // TipoAtividade é o que uma atividade agendada pede do estudante. É
