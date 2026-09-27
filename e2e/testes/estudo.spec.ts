@@ -1,4 +1,4 @@
-import { test, expect, abrirHoje, materiasDoDia, registrar, type Page } from './base';
+import { test, expect, abrirHoje, dataEmDias, materiasDoDia, registrar, type Page } from './base';
 
 /** As listas de matérias do cronograma, uma por dia, na ordem da tela. */
 function diasDoCronograma(page: Page) {
@@ -237,6 +237,8 @@ test.describe('estudo do dia', () => {
 		await marca.check();
 		await expect(marca).toBeChecked();
 
+		// A caixa marca na hora; o servidor grava logo depois.
+		await expect.poll(async () => primeiras(await api.plano(slug), tema).find((i) => i.id === alvo.id)?.concluido).toBe(true);
 		const depois = await api.plano(slug);
 		const movida = primeiras(depois, tema).find((i) => i.id === alvo.id)!;
 		expect(movida.data).toBe(hoje);
@@ -251,8 +253,7 @@ test.describe('estudo do dia', () => {
 		// C13: um clique errado se desfaz.
 		await page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` }).uncheck();
 		await expect(page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` })).not.toBeChecked();
-		const desfeito = primeiras(await api.plano(slug), tema).find((i) => i.id === alvo.id)!;
-		expect(desfeito.concluido).toBe(false);
+		await expect.poll(async () => primeiras(await api.plano(slug), tema).find((i) => i.id === alvo.id)?.concluido).toBe(false);
 	});
 
 	test('[C14] marcar um tópico de um bloco que junta vários marca só ele', async ({ page, api }) => {
@@ -281,6 +282,7 @@ test.describe('estudo do dia', () => {
 		await expect(ementa.getByRole('checkbox', { name: `Já estudei: ${marcado}` })).toBeChecked();
 		await expect(ementa.getByRole('checkbox', { name: `Já estudei: ${vizinho}` })).not.toBeChecked();
 
+		await expect.poll(async () => itens(await api.plano(slug)).find((i) => i.tema === marcado)?.concluido).toBe(true);
 		const depois = itens(await api.plano(slug));
 		const estudado = depois.find((i) => i.tema === marcado)!;
 		expect(estudado.concluido).toBe(true);
@@ -291,5 +293,47 @@ test.describe('estudo do dia', () => {
 		expect(partes(resto.tema)).toContain(vizinho);
 		expect(partes(resto.tema)).not.toContain(marcado);
 		expect(depois.filter((i) => !i.concluido && partes(i.tema).includes(marcado) && i.passada === 1)).toHaveLength(0);
+	});
+
+	test('[C15] marcar num dia que não é de estudo reorganiza, em vez de deixar feito lá no final', async ({ page, api, conta }) => {
+		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'];
+		const slug = await api.concurso('Domingo E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] }
+		]);
+		// Hoje fora dos dias de estudo, como um domingo num plano de segunda a sexta.
+		const hojeSemana = new Date(`${dataEmDias(0)}T12:00:00`).getDay();
+		const res = await page.request.put(`/api/concursos/${slug}/plano`, {
+			headers: { Authorization: `Bearer ${conta.token}` },
+			data: { diasEstudo: [0, 1, 2, 3, 4, 5, 6].filter((d) => d !== hojeSemana), simulados: 'nunca', discursiva: false, revisaoSemanal: false, blocosPorDia: 2 }
+		});
+		expect(res.ok(), await res.text()).toBeTruthy();
+
+		const antes = await api.plano(slug);
+		const codigo = antes.concurso.disciplinas.find((d: { nome: string }) => d.nome === 'Informática').codigo;
+		type Item = { id: string; disciplina: string; tema: string; passada: number; concluido: boolean };
+		type Dia = { data: string; itens: Item[] };
+		const itens = (p: { dias: Dia[] }) =>
+			p.dias.flatMap((d) => d.itens.map((i) => ({ ...i, data: d.data }))).filter((i) => i.disciplina === codigo && i.passada === 1);
+		const comConteudo = (p: { dias: Dia[] }) => p.dias.filter((d) => d.itens.length > 0).map((d) => d.data);
+		const primeiroDia = comConteudo(antes)[0];
+		const alvo = itens(antes).filter((i) => i.data > primeiroDia).at(-1)!;
+		expect(alvo, 'o cenário precisa de um tópico bem adiante').toBeTruthy();
+
+		await abrirCronograma(page);
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const ementa = page.getByRole('dialog', { name: 'Informática' });
+		await ementa.getByRole('checkbox', { name: `Já estudei: ${alvo.tema}` }).check();
+		await expect(ementa.getByRole('checkbox', { name: `Já estudei: ${alvo.tema}` })).toBeChecked();
+
+		await expect.poll(async () => itens(await api.plano(slug)).find((i) => i.id === alvo.id)?.concluido).toBe(true);
+		const depois = await api.plano(slug);
+		const movida = itens(depois).find((i) => i.id === alvo.id)!;
+		expect(movida.concluido).toBe(true);
+		// Não ficou na data de antes: foi para o dia de estudo mais próximo de hoje.
+		expect(movida.data).not.toBe(alvo.data);
+		expect(movida.data <= primeiroDia).toBe(true);
+		// E não sobrou repetição dele adiante.
+		expect(itens(depois).filter((i) => !i.concluido && i.tema.toLowerCase() === alvo.tema.toLowerCase())).toHaveLength(0);
 	});
 });

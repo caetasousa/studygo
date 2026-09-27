@@ -684,7 +684,7 @@ func SemConteudoJaConcluido(
 	for _, a := range atuais {
 		if coberta(a) && concluida(a.ID) {
 			for _, p := range PartesDoTema(a.Tema) {
-				feito[chaveDeConteudo{disciplina: a.Disciplina, tema: p}] = true
+				feito[chaveDeConteudo{disciplina: a.Disciplina, tema: normalizarTema(p)}] = true
 			}
 		}
 	}
@@ -706,7 +706,7 @@ func SemConteudoJaConcluido(
 		resto := make([]string, 0, len(partes))
 
 		for _, p := range partes {
-			if !feito[chaveDeConteudo{disciplina: a.Disciplina, tema: p}] {
+			if !feito[chaveDeConteudo{disciplina: a.Disciplina, tema: normalizarTema(p)}] {
 				resto = append(resto, p)
 			}
 		}

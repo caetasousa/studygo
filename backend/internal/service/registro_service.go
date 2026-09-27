@@ -51,7 +51,7 @@ func (s *RegistroService) Registrar(
 		return PlanoMontado{}, err
 	}
 
-	atividade, ok := plano.PorID(c.Atividades, cmd.AtividadeID)
+	_, ok := plano.PorID(c.Atividades, cmd.AtividadeID)
 	if !ok {
 		return PlanoMontado{}, erroDeValidacao("atividade não encontrada")
 	}
@@ -73,22 +73,55 @@ func (s *RegistroService) Registrar(
 
 	c.Registros[reg.AtividadeID] = reg
 
-	// Terminar um tema agendado para a frente traz a matéria para o dia em que
-	// ela realmente foi concluída: duas passadas de uma matéria numa sentada é
-	// uma semana real, e o cronograma deve dizer o que aconteceu em vez de
-	// continuar afirmando que o tema ainda está por vir.
-	hoje := plano.DayOf(s.relogio.Now())
-
-	if reg.Concluido && plano.DayOf(atividade.Data).After(hoje) {
-		err := s.anteciparEReorganizar(
-			ctx, &c, cmd.AtividadeID, plano.DayOf(atividade.Data), hoje,
-		)
-		if err != nil {
+	// Concluir põe o cronograma de acordo com o que foi estudado: o que foi
+	// feito antes da hora vem para hoje (ou para o último dia de estudo, num
+	// domingo), a repetição do que já foi estudado sai, e o resto encosta.
+	if reg.Concluido {
+		if err := s.arrumarEstudado(ctx, &c); err != nil {
 			return PlanoMontado{}, err
 		}
 	}
 
 	return s.montar(ctx, c)
+}
+
+// arrumarEstudado aplica plano.ArrumarEstudado e encosta o cronograma a partir
+// de hoje. Adiantar-se deve comprar tempo, não deixar o tópico estudado
+// "feito lá no final" nem repetido adiante.
+func (s *RegistroService) arrumarEstudado(ctx context.Context, c *contexto) error {
+	hoje := plano.DayOf(s.relogio.Now())
+	res := plano.Gerar(c.Plano.Config, &c.Concurso)
+
+	lancada := func(id uuid.UUID) bool {
+		_, ok := c.Registros[id]
+
+		return ok
+	}
+
+	arrumadas, mudou := plano.ArrumarEstudado(c.Atividades, res.Dias, hoje, c.Registros.Concluida, lancada)
+	if !mudou {
+		return nil
+	}
+
+	// Encosta a partir do dia SEGUINTE ao que recebeu o estudo feito (hoje, ou
+	// o dia de estudo mais próximo): compactar esse dia o reempacotaria e
+	// empurraria a atividade recém-concluída para a frente de novo.
+	c.Atividades = arrumadas
+	desde := naoAntesDe(plano.DiaDoEstudoFeito(res.Dias, hoje), hoje).AddDate(0, 0, 1)
+	arrumadas = compactarDesde(*c, arrumadas, desde)
+
+	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, arrumadas); err != nil {
+		return err
+	}
+
+	recarregadas, err := s.cronograma.Atividades(ctx, c.Plano.ID)
+	if err != nil {
+		return err
+	}
+
+	c.Atividades = recarregadas
+
+	return nil
 }
 
 // EstudarTema marca UM tópico de uma atividade como estudado.
@@ -133,44 +166,6 @@ func (s *RegistroService) EstudarTema(
 	}
 
 	return s.Registrar(ctx, usuarioID, slug, cmd)
-}
-
-// anteciparEReorganizar traz a atividade para hoje e fecha o buraco que ela
-// deixa. Adiantar-se deve comprar tempo, não abrir vãos no cronograma.
-func (s *RegistroService) anteciparEReorganizar(
-	ctx context.Context,
-	c *contexto,
-	id uuid.UUID,
-	origem, hoje time.Time,
-) error {
-	res := plano.Gerar(c.Plano.Config, &c.Concurso)
-
-	movidas, err := plano.AntecipouAtividade(
-		c.Atividades, res.Dias, id, hoje, c.DiaConcluido(),
-	)
-	if err != nil {
-		// Uma recusa aqui não é problema de quem chamou: o registro em si foi
-		// salvo. A atividade fica onde está em vez de o lançamento falhar.
-		return nil //nolint:nilerr // a recusa do remanejamento não invalida o registro
-	}
-
-	// O dia de onde a matéria saiu fica com uma vaga a menos. Encostar o que
-	// vem depois — na ordem em que está — é o que faz adiantar-se comprar tempo
-	// em vez de abrir um vão que vira dia vazio na segunda vez.
-	movidas = compactarDesde(*c, movidas, origem)
-
-	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, movidas); err != nil {
-		return err
-	}
-
-	recarregadas, err := s.cronograma.Atividades(ctx, c.Plano.ID)
-	if err != nil {
-		return err
-	}
-
-	c.Atividades = recarregadas
-
-	return nil
 }
 
 // RegistroDiaCommand é o que pertence ao dia: a anotação livre e o resultado da

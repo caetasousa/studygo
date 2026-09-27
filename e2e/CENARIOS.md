@@ -54,6 +54,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C12 | marcar na ementa um tópico já estudado não o traz para hoje, deixa a 1ª passada dele ainda agendada adiante, ou não move o progresso | o tópico que já foi estudado reaparece na sequência, e a estatística não conta o estudo |
 | C13 | desmarcar o tópico não desfaz a conclusão | um clique errado vira estudo que não houve |
 | C14 | marcar um tópico de uma atividade que junta vários (matéria com mais tópicos que vagas) marca todos, ou o tópico volta num replanejamento | só dá para marcar de dois em dois; o estudado reaparece |
+| C15 | marcar o tópico num dia que não é de estudo (domingo) deixa a atividade concluída na data futura, sem reorganizar; ou o tópico estudado volta adiante com outra grafia | o tópico fica "feito lá no final" e o cronograma não anda; ou o conteúdo se repete |
 
 ## D. Configurações e dados
 
