@@ -34,7 +34,7 @@ func (r *CronogramaRepo) Atividades(
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT a.id, a.data, a.posicao, a.disciplina_id, COALESCE(d.codigo, ''),
-		        a.tema, a.passada, a.tipo, a.duracao_min, a.movida
+		        a.tema, a.passada, a.tipo, a.duracao_min, a.movida, a.antecipada
 		   FROM atividades a
 		   LEFT JOIN disciplinas d ON d.id = a.disciplina_id
 		  WHERE a.plano_id = $1
@@ -56,7 +56,7 @@ func (r *CronogramaRepo) Atividades(
 
 		if err := rows.Scan(
 			&a.ID, &a.Data, &a.Posicao, &a.DisciplinaID, &a.Disciplina,
-			&a.Tema, &a.Passada, &tipo, &a.DuracaoMin, &a.Movida,
+			&a.Tema, &a.Passada, &tipo, &a.DuracaoMin, &a.Movida, &a.Antecipada,
 		); err != nil {
 			return nil, fmt.Errorf("lendo atividade: %w", err)
 		}
@@ -111,13 +111,14 @@ func (r *CronogramaRepo) SubstituirAtividades(
 	const gravar = `
 		INSERT INTO atividades
 			(id, plano_id, data, posicao, disciplina_id, tema, passada, tipo,
-			 duracao_min, movida)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			 duracao_min, movida, antecipada)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		ON CONFLICT (id) DO UPDATE SET
 			data = EXCLUDED.data, posicao = EXCLUDED.posicao,
 			disciplina_id = EXCLUDED.disciplina_id, tema = EXCLUDED.tema,
 			passada = EXCLUDED.passada, tipo = EXCLUDED.tipo,
 			duracao_min = EXCLUDED.duracao_min, movida = EXCLUDED.movida,
+			antecipada = EXCLUDED.antecipada,
 			atualizado_em = now()`
 
 	if len(as) > 0 {
@@ -131,7 +132,7 @@ func (r *CronogramaRepo) SubstituirAtividades(
 
 			lote.Queue(gravar,
 				id, planoID, a.Data, a.Posicao, a.DisciplinaID, a.Tema, a.Passada,
-				string(a.Tipo), a.DuracaoMin, a.Movida,
+				string(a.Tipo), a.DuracaoMin, a.Movida, a.Antecipada,
 			)
 		}
 

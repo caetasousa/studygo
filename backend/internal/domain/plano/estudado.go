@@ -20,8 +20,9 @@ func normalizarTema(tema string) string {
 //
 //   - O que foi concluído com data adiante (marcado como estudado antes da
 //     hora) vai para hoje, ou para o último dia de estudo antes de hoje quando
-//     hoje não é um: concluído no futuro é "feito lá no final", e o cronograma
-//     continuaria cobrando o dia de onde ele não saiu.
+//     hoje não é um, marcado como Antecipada: sai do cronograma sem deixar de
+//     existir. Concluído no futuro era "feito lá no final", e o cronograma
+//     continuava cobrando o dia de onde ele não saiu.
 //   - A 1ª passada pendente de um tópico já estudado sai do cronograma; no
 //     bloco que junta vários tópicos, sai só o estudado. A atividade que já
 //     tem algo lançado fica: o lançamento é história.
@@ -97,6 +98,7 @@ func ArrumarEstudado(
 
 		for _, a := range adiante {
 			origens[day(a.Data)] = true
+			a.Antecipada = true
 			a.Data = destino
 			a.Posicao = posicao
 			posicao++
@@ -149,4 +151,35 @@ func diasDe(atividades []Atividade) map[time.Time]bool {
 	}
 
 	return out
+}
+
+// TopicosEstudados conta quantos tópicos da matéria já foram estudados: os que
+// têm uma 1ª passada concluída, contados uma vez cada, na grafia que for, e um
+// por um dentro dos blocos que juntam vários. É o avanço que o balanceamento
+// mostra — a 2ª passada é repetição, não cobertura.
+func TopicosEstudados(disciplina string, temas []string, atividades []Atividade, concluida func(uuid.UUID) bool) int {
+	feitos := map[string]bool{}
+
+	for _, a := range atividades {
+		if a.Disciplina != disciplina || !coberta(a) || !concluida(a.ID) {
+			continue
+		}
+
+		for _, p := range PartesDoTema(a.Tema) {
+			feitos[normalizarTema(p)] = true
+		}
+	}
+
+	n := 0
+	contados := map[string]bool{}
+
+	for _, t := range temas {
+		k := normalizarTema(t)
+		if feitos[k] && !contados[k] {
+			contados[k] = true
+			n++
+		}
+	}
+
+	return n
 }

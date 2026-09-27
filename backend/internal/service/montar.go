@@ -39,7 +39,7 @@ func (c carregador) montar(ctx context.Context, cx contexto) (PlanoMontado, erro
 	}
 
 	stats := plano.CalcularStats(res.Dias, codigos, cx.Atividades, cx.Registros)
-	balanceamento := montarBalanceamento(cx.Concurso, cfg, res, stats)
+	balanceamento := montarBalanceamento(cx.Concurso, cfg, res, stats, cx.Atividades, cx.Registros.Concluida)
 
 	anotacoes, err := c.anotacoesDoPlano(ctx, cx)
 	if err != nil {
@@ -86,6 +86,7 @@ func (c carregador) montar(ctx context.Context, cx contexto) (PlanoMontado, erro
 				Tema:       a.Tema,
 				Passada:    a.Passada,
 				Movida:     a.Movida,
+				Antecipada: a.Antecipada,
 			}
 
 			if reg, ok := cx.Registros[a.ID]; ok {

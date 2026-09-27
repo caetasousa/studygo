@@ -336,4 +336,68 @@ test.describe('estudo do dia', () => {
 		// E não sobrou repetição dele adiante.
 		expect(itens(depois).filter((i) => !i.concluido && i.tema.toLowerCase() === alvo.tema.toLowerCase())).toHaveLength(0);
 	});
+
+	test('[C16] o tópico estudado antes da hora some do dia, e desmarcar o devolve', async ({ page, api }) => {
+		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'];
+		const slug = await api.concurso('Antecipado some E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] }
+		]);
+		const antes = await api.plano(slug);
+		const hoje = antes.dias[antes.hojeIndex].data;
+		const codigo = antes.concurso.disciplinas.find((d: { nome: string }) => d.nome === 'Informática').codigo;
+		type Item = { id: string; disciplina: string; tema: string; passada: number };
+		const tema = temas.find((t) =>
+			antes.dias.every((d: { data: string; itens: Item[] }) => d.data > hoje || !d.itens.some((i) => i.disciplina === codigo && i.tema === t))
+		)!;
+		const linha = page.getByRole('button', { name: `Informática: ${tema}. Ver o conteúdo programático da matéria` });
+
+		const fechar = () => page.getByRole('button', { name: 'Fechar o conteúdo programático' }).click();
+
+		await abrirCronograma(page);
+		// A 2ª passada repete o tópico por desenho: conta-se a diferença.
+		const linhas = await linha.count();
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const marca = page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` });
+		await marca.check();
+		await expect.poll(async () => {
+			const p = await api.plano(slug);
+			return p.dias.flatMap((d: { itens: (Item & { antecipada: boolean })[] }) => d.itens).some((i: Item & { antecipada: boolean }) => i.tema === tema && i.antecipada);
+		}).toBe(true);
+		await fechar();
+
+		// Some da lista do dia, e fica uma linha discreta.
+		await expect(linha).toHaveCount(linhas - 1);
+		await expect(page.getByText('1 tópico estudado antes da hora')).toBeVisible();
+
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		await page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` }).uncheck();
+		await expect(page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` })).toBeEnabled();
+		await fechar();
+		await expect(linha).toHaveCount(linhas);
+		await expect(page.getByText('1 tópico estudado antes da hora')).toHaveCount(0);
+	});
+
+	test('[C17] o balanceamento mostra os tópicos estudados, e anda a cada marcação', async ({ page, api }) => {
+		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'];
+		const slug = await api.concurso('Balanceamento estudado E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] }
+		]);
+		const linhaDo = () => page.getByRole('row').filter({ hasText: 'Informática' }).first();
+
+		await page.goto('/balanceamento');
+		await expect(linhaDo()).toContainText('0 de 6');
+
+		await abrirCronograma(page);
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const ementa = page.getByRole('dialog', { name: 'Informática' });
+		await ementa.getByRole('checkbox', { name: 'Já estudei: Nuvem' }).check();
+		await expect.poll(async () =>
+			(await api.plano(slug)).balanceamento.find((l: { nome: string }) => l.nome === 'Informática').temasEstudados
+		).toBe(1);
+
+		await page.goto('/balanceamento');
+		await expect(linhaDo()).toContainText('1 de 6');
+	});
 });

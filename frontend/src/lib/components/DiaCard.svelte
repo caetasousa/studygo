@@ -55,11 +55,17 @@
 		tecDe?: (codigo: string, tema: string) => string;
 	} = $props();
 
+	// O tópico marcado como estudado antes da data dele fica registrado no dia
+	// em que foi marcado, mas não é conteúdo do dia: sai da lista, da contagem e
+	// do que se pode mover, e aparece só numa linha discreta no fim.
+	const itens = $derived(dia.itens.filter((i) => !i.antecipada));
+	const antecipadas = $derived(dia.itens.filter((i) => i.antecipada));
+
 	const hoje = $derived(dia.data === hojeISO());
 	const revisao = $derived(dia.tipo === 'rev');
 	// A day the engine left empty and that is not a review is a rest day: it has
 	// nothing to log and nothing to move, so it does not earn a card.
-	const descanso = $derived(dia.itens.length === 0 && !revisao);
+	const descanso = $derived(itens.length === 0 && !revisao);
 
 	const diaNum = $derived(Number(dia.data.slice(8, 10)));
 	const mes = $derived(MESES[Number(dia.data.slice(5, 7)) - 1]);
@@ -74,7 +80,7 @@
 	 * Depois do primeiro lançamento ele é história, não cronograma.
 	 */
 	const podeAdiar = $derived(
-		dia.itens.length > 0 && !concluidoDerivado && !dia.horas
+		itens.length > 0 && !concluidoDerivado && !dia.horas
 	);
 
 	let adiando = $state(false);
@@ -242,7 +248,7 @@
 
 	// The header band says what the day holds, so the count is worth stating.
 	const resumoItens = $derived(
-		dia.itens.length === 1 ? '1 atividade' : `${dia.itens.length} atividades`
+		itens.length === 1 ? '1 atividade' : `${itens.length} atividades`
 	);
 </script>
 
@@ -253,7 +259,10 @@
 		     rearrangement has none, and used to render as a bare dashed line with
 		     nothing in it, which reads as a bug rather than as free time. -->
 		<span class="folga-tx">
-			{#if dia.tema}<TemaTexto tema={dia.tema} />{:else}nada agendado neste dia{/if}
+			{#if antecipadas.length > 0}
+				{antecipadas.length}
+				{antecipadas.length === 1 ? 'tópico estudado' : 'tópicos estudados'} antes da hora
+			{:else if dia.tema}<TemaTexto tema={dia.tema} />{:else}nada agendado neste dia{/if}
 		</span>
 	</div>
 {:else}
@@ -269,9 +278,9 @@
 		<div class="corpo">
 			<div class="faixa">
 				<span class="faixa-n">
-					dia {dia.n}{#if dia.itens.length > 0} · {resumoItens}{/if}
+					dia {dia.n}{#if itens.length > 0} · {resumoItens}{/if}
 				</span>
-				{#if dia.itens.length === 0}
+				{#if itens.length === 0}
 					<!-- Special days (simulado, revisão geral) have no subjects to split
 					     by, so the day itself stays the unit and keeps its own control. -->
 					<span class="acoes">
@@ -298,7 +307,7 @@
 			</div>
 
 			<div class="conteudo">
-				{#if dia.itens.length === 0}
+				{#if itens.length === 0}
 					<div class="especial">
 						<span class="tema-txt">
 							<TemaTexto tema={dia.tema} />{#if revisao && dia.meta > 0}<em>{dia.meta} questões</em
@@ -307,9 +316,9 @@
 					</div>
 				{:else}
 					<div class="atvs" role="list">
-						{#each dia.itens as it, i (it.id || i)}
-							{@const temAlvoAcimaNoDia = dia.itens.slice(0, i).some((x) => !atividadeFeita(x))}
-							{@const temAlvoAbaixoNoDia = dia.itens.slice(i + 1).some((x) => !atividadeFeita(x))}
+						{#each itens as it, i (it.id || i)}
+							{@const temAlvoAcimaNoDia = itens.slice(0, i).some((x) => !atividadeFeita(x))}
+							{@const temAlvoAbaixoNoDia = itens.slice(i + 1).some((x) => !atividadeFeita(x))}
 							<AtividadeItem
 								item={it}
 								data={dia.data}
@@ -406,12 +415,23 @@
 
 					</div>
 				{/if}
+				{#if antecipadas.length > 0}
+					<details class="antecipadas">
+						<summary>
+							{antecipadas.length}
+							{antecipadas.length === 1 ? 'tópico estudado' : 'tópicos estudados'} antes da hora
+						</summary>
+						<ul>
+							{#each antecipadas as a (a.id)}<li>{nomeDe(a.disciplina)} — {a.tema}</li>{/each}
+						</ul>
+					</details>
+				{/if}
 
 			</div>
 		</div>
 	</div>
 
-	{#each dia.itens as it (it.id || it.disciplina)}
+	{#each itens as it (it.id || it.disciplina)}
 		{#if editando === it.id && it.id}
 			<AtividadeForm
 				item={it}
@@ -446,6 +466,23 @@
 {/if}
 
 <style>
+	.antecipadas {
+		margin: 6px 0 2px;
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+	.antecipadas summary {
+		cursor: pointer;
+		width: fit-content;
+	}
+	.antecipadas summary:hover {
+		color: var(--text-muted);
+	}
+	.antecipadas ul {
+		margin: 4px 0 0;
+		padding-left: 18px;
+		line-height: 1.55;
+	}
 	.dia {
 		display: grid;
 		grid-template-columns: 78px minmax(0, 1fr);

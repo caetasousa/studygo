@@ -100,7 +100,7 @@ func (s *EstatisticaService) Estatisticas(
 	return Estatisticas{
 		Serie:         serie,
 		PorSemana:     semanas,
-		PorDisciplina: montarBalanceamento(c.Concurso, cfg, res, stats),
+		PorDisciplina: montarBalanceamento(c.Concurso, cfg, res, stats, c.Atividades, c.Registros.Concluida),
 		Streak: calcularStreak(
 			res.Dias, c.Atividades, c.Registros, plano.DayOf(s.relogio.Now()),
 		),

@@ -17,6 +17,8 @@ func montarBalanceamento(
 	cfg plano.Config,
 	res plano.Resultado,
 	stats plano.Stats,
+	atividades []plano.Atividade,
+	concluida func(uuid.UUID) bool,
 ) []LinhaBalanceamento {
 	intervalos := intervalosDeRevisita(res.Dias)
 	visitas := plano.VisitasPorDisciplina(res.Dias)
@@ -58,6 +60,7 @@ func montarBalanceamento(
 			BlocosConteudo: res.Slots[d.Codigo],
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
+			TemasEstudados: plano.TopicosEstudados(d.Codigo, d.Temas, atividades, concluida),
 			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
 			Visitas:        visitas[d.Codigo],
 			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),

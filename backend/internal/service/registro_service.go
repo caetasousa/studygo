@@ -51,7 +51,7 @@ func (s *RegistroService) Registrar(
 		return PlanoMontado{}, err
 	}
 
-	_, ok := plano.PorID(c.Atividades, cmd.AtividadeID)
+	atividade, ok := plano.PorID(c.Atividades, cmd.AtividadeID)
 	if !ok {
 		return PlanoMontado{}, erroDeValidacao("atividade não encontrada")
 	}
@@ -80,9 +80,32 @@ func (s *RegistroService) Registrar(
 		if err := s.arrumarEstudado(ctx, &c); err != nil {
 			return PlanoMontado{}, err
 		}
+	} else if atividade.Antecipada {
+		// Desmarcar o "já estudei": o tópico volta a ser conteúdo do dia, e a
+		// tela volta a mostrá-lo, pendente.
+		if err := s.desantecipar(ctx, &c, atividade.ID); err != nil {
+			return PlanoMontado{}, err
+		}
 	}
 
 	return s.montar(ctx, c)
+}
+
+func (s *RegistroService) desantecipar(ctx context.Context, c *contexto, id uuid.UUID) error {
+	atividades := append([]plano.Atividade(nil), c.Atividades...)
+	for i := range atividades {
+		if atividades[i].ID == id {
+			atividades[i].Antecipada = false
+		}
+	}
+
+	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, atividades); err != nil {
+		return err
+	}
+
+	c.Atividades = atividades
+
+	return nil
 }
 
 // arrumarEstudado aplica plano.ArrumarEstudado e encosta o cronograma a partir

@@ -121,13 +121,16 @@ type AtividadeDoDia struct {
 	Tema       string
 	Passada    int
 	// Movida marca a atividade que o estudante colocou ali, e não o motor.
-	Movida    bool
-	Horas     *float64
-	Questoes  *int
-	Acertos   *int
-	Erros     *int
-	Nota      string
-	Concluido bool
+	Movida bool
+	// Antecipada é o tópico estudado antes da data dele: registrado no dia em
+	// que foi marcado, mas fora da lista do dia.
+	Antecipada bool
+	Horas      *float64
+	Questoes   *int
+	Acertos    *int
+	Erros      *int
+	Nota       string
+	Concluido  bool
 }
 
 // BlocoDoDia é uma fatia de tempo da rotina do dia.
@@ -191,7 +194,10 @@ type LinhaBalanceamento struct {
 	// final. Ambas contam passadas completas pela MATÉRIA, não por tópico:
 	// "eu passo por Português 3,5 vezes antes da prova" é a pergunta que o
 	// estudante realmente faz.
-	Temas          int
+	Temas int
+	// TemasEstudados é quantos desses tópicos já foram estudados: anda a cada
+	// conclusão, inclusive do que foi marcado como estudado antes da hora.
+	TemasEstudados int
 	Passadas       float64
 	Visitas        int
 	RevisoesGerais float64

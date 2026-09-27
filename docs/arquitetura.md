@@ -142,7 +142,7 @@ migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
 sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
-legislação) e segue dali (a próxima é a **000011**): uma 000004 nova seria dada
+legislação) e segue dali (a próxima é a **000012**): uma 000004 nova seria dada
 como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:

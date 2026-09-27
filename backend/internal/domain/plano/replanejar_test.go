@@ -678,3 +678,38 @@ func TestSemAtrasadas(t *testing.T) {
 		t.Errorf("futuro = %v, quer intacto", ids)
 	}
 }
+
+// A antecipada não é conteúdo do dia: compactar não a leva para a fila nem a
+// usa para medir a carga. Como pode errar — escrito antes do código:
+//
+//	C1  a antecipada entra na fila e é levada para outro dia
+//	C2  as posições do dia com antecipada ficam repetidas (a UNIQUE do banco recusa)
+func TestCompactarAtividades_AntecipadaFicaNoDia(t *testing.T) {
+	t.Parallel()
+
+	dias := diasReplan()
+	atividades := []plano.Atividade{
+		{ID: uid("ant"), Data: dia(2026, 9, 1), Posicao: 0, Disciplina: "BD", Tema: "SQL", Antecipada: true},
+		{ID: uid("b1"), Data: dia(2026, 9, 2), Posicao: 0, Disciplina: "POR", Tema: "p2"},
+		{ID: uid("c1"), Data: dia(2026, 9, 3), Posicao: 0, Disciplina: "POR", Tema: "p3"},
+	}
+
+	out := plano.CompactarAtividades(atividades, dias, dia(2026, 9, 1), func(time.Time) bool { return false })
+
+	posicoes := map[string]bool{}
+	for _, a := range out {
+		chave := a.Data.Format("2006-01-02") + "/" + string(rune('0'+a.Posicao))
+		if posicoes[chave] {
+			t.Errorf("C2: posição repetida %s", chave)
+		}
+		posicoes[chave] = true
+
+		if a.ID == uid("ant") && !a.Data.Equal(dia(2026, 9, 1)) {
+			t.Errorf("C1: a antecipada foi levada para %v", a.Data)
+		}
+	}
+
+	if len(out) != len(atividades) {
+		t.Errorf("sobraram %d de %d atividades", len(out), len(atividades))
+	}
+}

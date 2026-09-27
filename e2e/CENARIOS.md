@@ -55,6 +55,8 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C13 | desmarcar o tópico não desfaz a conclusão | um clique errado vira estudo que não houve |
 | C14 | marcar um tópico de uma atividade que junta vários (matéria com mais tópicos que vagas) marca todos, ou o tópico volta num replanejamento | só dá para marcar de dois em dois; o estudado reaparece |
 | C15 | marcar o tópico num dia que não é de estudo (domingo) deixa a atividade concluída na data futura, sem reorganizar; ou o tópico estudado volta adiante com outra grafia | o tópico fica "feito lá no final" e o cronograma não anda; ou o conteúdo se repete |
+| C16 | o tópico marcado como estudado antes da hora aparece como mais uma linha no dia em que foi marcado, ou desmarcar não o devolve | o dia vira um depósito de tópicos; ou o clique errado não tem volta |
+| C17 | concluir ou marcar um tópico como estudado não move o balanceamento | o painel de "onde estou" não mostra o que já foi estudado |
 
 ## D. Configurações e dados
 

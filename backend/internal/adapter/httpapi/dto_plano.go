@@ -119,6 +119,7 @@ type atividadeDTO struct {
 	Tema       string    `json:"tema"`
 	Passada    int       `json:"passada"`
 	Movida     bool      `json:"movida"`
+	Antecipada bool      `json:"antecipada"`
 	Horas      *float64  `json:"horas"`
 	Questoes   *int      `json:"questoes"`
 	Acertos    *int      `json:"acertos"`
@@ -238,6 +239,7 @@ type linhaBalanceamento struct {
 	BlocosConteudo int     `json:"blocosConteudo"`
 	BlocosReta     int     `json:"blocosReta"`
 	Temas          int     `json:"temas"`
+	TemasEstudados int     `json:"temasEstudados"`
 	Passadas       float64 `json:"passadas"`
 	Visitas        int     `json:"visitas"`
 	RevisoesGerais float64 `json:"revisoesGerais"`
@@ -312,6 +314,7 @@ func planoParaDTO(p service.PlanoMontado) planoDTO {
 				Tema:       it.Tema,
 				Passada:    it.Passada,
 				Movida:     it.Movida,
+				Antecipada: it.Antecipada,
 				Horas:      it.Horas,
 				Questoes:   it.Questoes,
 				Acertos:    it.Acertos,
@@ -470,6 +473,7 @@ func balanceamentoParaDTO(linhas []service.LinhaBalanceamento) []linhaBalanceame
 			BlocosConteudo: l.BlocosConteudo,
 			BlocosReta:     l.BlocosReta,
 			Temas:          l.Temas,
+			TemasEstudados: l.TemasEstudados,
 			Passadas:       l.Passadas,
 			Visitas:        l.Visitas,
 			RevisoesGerais: l.RevisoesGerais,

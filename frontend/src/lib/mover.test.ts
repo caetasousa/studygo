@@ -9,6 +9,7 @@ function atv(id: string, concluido = false): Atividade {
 		tema: id,
 		passada: 1,
 		movida: false,
+		antecipada: false,
 		horas: null,
 		questoes: null,
 		acertos: null,

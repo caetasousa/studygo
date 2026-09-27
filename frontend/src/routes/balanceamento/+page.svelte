@@ -16,6 +16,8 @@
 	const cobertura = $derived(planoStore.plano?.balanceamento ?? []);
 
 	const totalTemas = $derived(cobertura.reduce((t, l) => t + l.temas, 0));
+	const totalEstudados = $derived(cobertura.reduce((t, l) => t + l.temasEstudados, 0));
+	const pctDe = (feitos: number, total: number) => (total > 0 ? Math.round((feitos / total) * 100) : 0);
 
 	const media = (f: (l: LinhaBalanceamento) => number) =>
 		cobertura.length > 0 ? cobertura.reduce((t, l) => t + f(l), 0) / cobertura.length : 0;
@@ -149,6 +151,7 @@
 			</span>
 		</div>
 		<ul class="legenda">
+			<li><b>Estudados</b> — quantos tópicos da matéria você já estudou; anda a cada conclusão.</li>
 			<li><b>Volta a cada</b> — de quantos em quantos dias esta matéria reaparece.</li>
 			<li><b>Aprendo</b> — quantas vezes vejo a matéria enquanto aprendo o conteúdo.</li>
 			<li>
@@ -166,6 +169,7 @@
 					<tr>
 						<th>Disciplina</th>
 						<th title="Quantos tópicos a matéria tem no edital">Tópicos</th>
+						<th title="Quantos tópicos você já estudou">Estudados</th>
 						<th title="Intervalo médio entre dois dias que estudam esta matéria">
 							Volta a cada
 						</th>
@@ -186,6 +190,16 @@
 								{l.nome}
 							</td>
 							<td>{l.temas || '—'}</td>
+							<td class="estudados">
+								{#if l.temas > 0}
+									<span>{l.temasEstudados} de {l.temas}</span>
+									<span class="mini-bar" aria-hidden="true"
+										><i style="width:{pctDe(l.temasEstudados, l.temas)}%"></i></span
+									>
+								{:else}
+									—
+								{/if}
+							</td>
 							<td>
 								{#if l.intervaloDias > 0}
 									{nf1.format(l.intervaloDias)} dias
@@ -210,6 +224,7 @@
 					<tr>
 						<td>Média do plano</td>
 						<td>{totalTemas}</td>
+						<td class="estudados">{totalEstudados} de {totalTemas} · {pctDe(totalEstudados, totalTemas)}%</td>
 						<td>{nf1.format(mediaIntervalo)} dias</td>
 						<td>{nf1.format(mediaPassadas)}×</td>
 						<td class="destaque">{nf1.format(mediaVisitas)}×</td>
@@ -314,6 +329,24 @@
 {/if}
 
 <style>
+	.estudados {
+		white-space: nowrap;
+	}
+	.mini-bar {
+		display: inline-block;
+		vertical-align: middle;
+		width: 48px;
+		height: 4px;
+		margin-left: 8px;
+		border-radius: 2px;
+		background: var(--border);
+		overflow: hidden;
+	}
+	.mini-bar i {
+		display: block;
+		height: 100%;
+		background: var(--good);
+	}
 	/* The headline figure of the page. */
 	.voltas {
 		display: flex;

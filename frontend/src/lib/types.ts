@@ -290,6 +290,9 @@ export interface Atividade {
 	passada: number;
 	/** Verdadeiro quando foi o estudante que colocou a atividade aqui. */
 	movida: boolean;
+	/** Tópico marcado como estudado antes da data dele: registrado neste dia,
+	 *  mas fora da lista do dia. */
+	antecipada: boolean;
 	horas: number | null;
 	questoes: number | null;
 	acertos: number | null;
@@ -371,6 +374,9 @@ export interface LinhaBalanceamento {
 	blocosReta: number;
 	/** Topics the discipline has. */
 	temas: number;
+	/** Quantos desses tópicos já foram estudados (1ª passada concluída, inclusive
+	 *  os marcados como estudados antes da hora). Anda a cada conclusão. */
+	temasEstudados: number;
 	/** Complete passes over the whole subject in the content phase. */
 	passadas: number;
 	/** Days of the learning phase that study this subject — times you come back. */

@@ -74,6 +74,12 @@ type Atividade struct {
 	// replanejamento do futuro não a arrasta de volta: a escolha dele vale mais
 	// que a do motor.
 	Movida bool
+
+	// Antecipada é o tópico marcado como estudado antes da data dele. Fica no
+	// dia em que foi marcado — é o registro de que foi estudado, e conta nas
+	// estatísticas —, mas não é conteúdo do dia: a tela não o lista, e
+	// compactar não o move.
+	Antecipada bool
 }
 
 // Duracao resolve a duração planejada, caindo na do bloco padrão.

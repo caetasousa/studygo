@@ -175,6 +175,21 @@ func CompactarAtividades(
 		return atividades
 	}
 
+	// A antecipada não é conteúdo do dia: não entra na fila nem mede a carga.
+	// Ela volta no fim, no mesmo dia, depois do que o dia recebeu.
+	fixas := []Atividade{}
+	conteudo := make([]Atividade, 0, len(atividades))
+
+	for _, a := range atividades {
+		if a.Antecipada {
+			fixas = append(fixas, a)
+		} else {
+			conteudo = append(conteudo, a)
+		}
+	}
+
+	atividades = conteudo
+
 	// What each day currently holds, in order.
 	porDia := agruparPorDia(atividades)
 
@@ -275,6 +290,24 @@ func CompactarAtividades(
 			a.Posicao = base + i
 			saida = append(saida, a)
 		}
+	}
+
+	if len(fixas) == 0 {
+		return saida
+	}
+
+	ocupadas := map[time.Time]int{}
+	for _, a := range saida {
+		ocupadas[day(a.Data)]++
+	}
+
+	sort.SliceStable(fixas, func(i, j int) bool { return fixas[i].Posicao < fixas[j].Posicao })
+
+	for _, a := range fixas {
+		dt := day(a.Data)
+		a.Posicao = ocupadas[dt]
+		ocupadas[dt]++
+		saida = append(saida, a)
 	}
 
 	return saida

@@ -154,3 +154,59 @@ func TestSemConteudoJaConcluido_IgnoraCaixaEEspacos(t *testing.T) {
 		t.Errorf("o tópico estudado voltou com outra caixa: %+v", out)
 	}
 }
+
+// A antecipada some do cronograma, mas continua existindo: é o registro de que
+// o tópico foi estudado. Como pode errar — escrito antes do código:
+//
+//	R8  o que foi estudado antes da hora não fica marcado como antecipado, e aparece como linha no dia
+//	R9  o estudo do próprio dia (concluído na data) é marcado como antecipado e some
+func TestArrumarEstudado_MarcaAntecipada(t *testing.T) {
+	t.Parallel()
+
+	domingo := diaUtil(time.September, 27)
+	atividades := []plano.Atividade{
+		conteudo("sex", diaUtil(time.September, 25), 0, "RLM", "Frações", 1),
+		conteudo("f1", diaUtil(time.October, 7), 0, "BD", "SQL", 1),
+	}
+
+	out, _ := plano.ArrumarEstudado(atividades, diasSegASex(), domingo, conjunto("sex", "f1"), conjunto("sex", "f1"))
+	for _, a := range out {
+		switch a.ID {
+		case uid("f1"):
+			if !a.Antecipada {
+				t.Error("R8: o estudado antes da hora não ficou marcado como antecipado")
+			}
+		case uid("sex"):
+			if a.Antecipada {
+				t.Error("R9: o estudo do próprio dia virou antecipado")
+			}
+		}
+	}
+}
+
+// TopicosEstudados alimenta o balanceamento: quantos tópicos da matéria já
+// foram estudados. Como pode errar — escrito antes do código:
+//
+//	E1  o tópico estudado duas vezes (1ª passada e antecipado) conta duas
+//	E2  o bloco que junta dois tópicos conta um só, ou conta tópico de outra matéria
+//	E3  a grafia diferente ("pipelines" × "Pipelines") deixa de contar
+//	E4  a 2ª passada ou a atividade pendente contam como estudo
+func TestTopicosEstudados(t *testing.T) {
+	t.Parallel()
+
+	d := diaUtil(time.September, 14)
+	atividades := []plano.Atividade{
+		conteudo("a", d, 0, "DEVOPS", "Pipelines de desenvolvimento", 1),
+		conteudo("b", d, 1, "DEVOPS", "pipelines de desenvolvimento", 1), // E1, E3
+		conteudo("c", d, 2, "DEVOPS", "Git  ·  Docker", 1),               // E2
+		conteudo("d", d, 3, "INFRA", "Docker", 1),                        // E2: outra matéria
+		conteudo("e", d, 4, "DEVOPS", "Kubernetes", 2),                   // E4
+		conteudo("f", d, 5, "DEVOPS", "Terraform", 1),                    // E4: pendente
+	}
+	temas := []string{"Pipelines de desenvolvimento", "Git", "Docker", "Kubernetes", "Terraform"}
+
+	got := plano.TopicosEstudados("DEVOPS", temas, atividades, conjunto("a", "b", "c", "d", "e"))
+	if got != 3 {
+		t.Errorf("estudados = %d, quer 3 (Pipelines, Git, Docker)", got)
+	}
+}
