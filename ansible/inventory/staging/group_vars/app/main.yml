@@ -4,12 +4,10 @@
 # por um túnel da Cloudflare.
 #
 # O servidor só fica no ar com o PC ligado e a distro de pé.
-# Os domínios de caetasousa.tech se foram em 25/09/2026. Hoje o nome só
-# alimenta o CORS_ORIGIN (a SPA é servida do mesmo endereço que a API, então
-# não faz diferença) — o endereço público é o do Quick Tunnel, abaixo, e o
-# nginx aceita qualquer nome. Troque aqui quando houver domínio próprio.
-app_domain: staging.cronograma.caetasousa.tech
-app_domain_www: cronograma.caetasousa.tech
+# O endereço público: a rota do túnel com token na Cloudflare aponta
+# studygo.d4ffy.com para o nginx (docs/cloudflare-tunnel.md). O nome também
+# alimenta o CORS_ORIGIN; o nginx aceita qualquer nome.
+app_domain: studygo.d4ffy.com
 app_dir: /opt/studygo-staging
 backend_port: 18080
 frontend_port: 15173
@@ -55,8 +53,8 @@ postgres_args:
   - work_mem=2MB
   - maintenance_work_mem=32MB
   - effective_cache_size=128MB
-# Sem domínio próprio (os de caetasousa.tech se foram em 25/09/2026): o endereço
-# público é um *.trycloudflare.com que muda a cada reinício do serviço — veja
-# com `make servidor-endereco`. Com um domínio na Cloudflare, aponte-o para o
-# túnel do token (cloudflared_token) e desligue isto.
-cloudflared_rapido: true
+# Com domínio próprio (d4ffy.com, na Cloudflare), o túnel com token
+# (cloudflared_token) leva o endereço fixo, e o Quick Tunnel
+# (*.trycloudflare.com, que mudava a cada reinício) fica desligado. Ligar isto
+# de volta é o plano B sem domínio.
+cloudflared_rapido: false

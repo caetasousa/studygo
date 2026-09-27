@@ -210,7 +210,7 @@ recuperar isso, se for o caso, é consulta à mão naquele arquivo.
 | | staging |
 |---|---|
 | Servidor | distro `ubuntu-server` do WSL, usuário `studygo` ([deploy.md](deploy.md)) |
-| Endereço | `*.trycloudflare.com`, muda a cada reinício — `make servidor-endereco` ([cloudflare-tunnel.md](cloudflare-tunnel.md)) |
+| Endereço | `https://studygo.d4ffy.com`, pelo túnel com token ([cloudflare-tunnel.md](cloudflare-tunnel.md)) |
 | Diretório | `/opt/studygo-staging` |
 | Banco | `studygo_staging` |
 | Deploy | automático, a cada push na main |

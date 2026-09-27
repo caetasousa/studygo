@@ -117,12 +117,12 @@ e2e: ## Testes E2E do app inteiro num stack isolado (exige Docker)
 
 # ------------------------------------------------------------------- servidor
 
-# O endereço público do servidor no WSL (Quick Tunnel da Cloudflare). Muda a
-# cada reinício do serviço cloudflared-studygo; o log guarda o da vez.
-servidor-endereco: ## Mostra o endereço público atual (*.trycloudflare.com) do servidor no WSL
-	@$(SERVIDOR) \
-		"sudo journalctl -u cloudflared-studygo --no-pager -o cat | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1" \
-		|| echo "servidor fora do ar? confira: wsl.exe -l -v"
+# O endereço público do servidor no WSL: o domínio que a rota do túnel com
+# token aponta para o nginx (docs/cloudflare-tunnel.md).
+ENDERECO_PUBLICO := https://studygo.d4ffy.com
+
+servidor-endereco: ## Mostra o endereço público do servidor no WSL
+	@echo "$(ENDERECO_PUBLICO)"
 
 # Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um
 # template externo fixado por tag. Acrescentar aqui uma ferramenta que o runner
@@ -243,7 +243,7 @@ SESSAO_SRV = export XDG_RUNTIME_DIR=/run/user/$$(id -u) DBUS_SESSION_BUS_ADDRESS
 servidor-desligar: ## Para o app, o Docker, o nginx e o túnel do servidor (a distro fica ociosa)
 	@if ! $(servidor-rodando); then echo "a distro do servidor não está rodando: nada a desligar"; exit 0; fi; \
 	echo "parando os containers, o Docker, o nginx e o túnel..."; \
-	$(SERVIDOR) '$(DOCKER_SRV) stop >/dev/null 2>&1; $(SESSAO_SRV); systemctl --user stop docker; sudo systemctl stop nginx cloudflared-studygo' \
+	$(SERVIDOR) '$(DOCKER_SRV) stop >/dev/null 2>&1; $(SESSAO_SRV); systemctl --user stop docker; sudo systemctl stop nginx cloudflared' \
 		|| { echo "não consegui parar tudo: make servidor-status"; exit 1; }; \
 	echo "servidor desligado; a distro fica ociosa. Para voltar: make servidor-ligar"
 
@@ -258,7 +258,7 @@ servidor-ligar: ## Liga o servidor, espera o app responder e mostra o endereço 
 	fi; \
 	printf 'esperando o servidor'; \
 	for i in $$(seq 1 60); do timeout 5 $(SERVIDOR) true 2>/dev/null && break; printf '.'; sleep 2; done; echo; \
-	$(SERVIDOR) '$(SESSAO_SRV); sudo systemctl start nginx cloudflared-studygo; systemctl --user start docker && $(DOCKER_SRV) start' >/dev/null 2>&1; \
+	$(SERVIDOR) '$(SESSAO_SRV); sudo systemctl start nginx cloudflared; systemctl --user start docker && $(DOCKER_SRV) start' >/dev/null 2>&1; \
 	printf 'esperando o app'; \
 	for i in $$(seq 1 60); do curl -fsS -m 3 http://127.0.0.1:8480/health >/dev/null 2>&1 && break; printf '.'; sleep 2; done; echo; \
 	curl -fsS -m 5 http://127.0.0.1:8480/health >/dev/null 2>&1 || { echo "o app não respondeu em 2 min: make servidor-status"; exit 1; }; \

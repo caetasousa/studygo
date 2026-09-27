@@ -47,20 +47,17 @@ Há dois serviços `cloudflared` no servidor, com papéis diferentes:
 
 | Serviço | Endereço | Situação |
 |---|---|---|
-| `cloudflared-studygo` | `https://<palavras-aleatórias>.trycloudflare.com` | **em uso**. Quick Tunnel: grátis, sem conta, sem domínio. **Muda a cada reinício** do serviço |
-| `cloudflared` | nenhum, por enquanto | túnel **com token**, ligado à conta da Cloudflare, conectado e *Healthy*. Espera um domínio próprio para ter endereço fixo |
-
-O endereço da vez:
+| `cloudflared` | `https://studygo.d4ffy.com` | **em uso**. Túnel **com token**, ligado à conta da Cloudflare; a rota do painel aponta o domínio para o nginx |
+| `cloudflared-studygo` | `https://<palavras-aleatórias>.trycloudflare.com` | **plano B, desligado**. Quick Tunnel: grátis, sem conta, sem domínio, e **muda a cada reinício**. Liga com `cloudflared_rapido: true` no inventário |
 
 ```bash
-make servidor-endereco
+make servidor-endereco   # o endereço público
 ```
 
 > [!WARNING]
-> O Chrome e o Edge costumam marcar endereços `*.trycloudflare.com` como
-> **perigosos**: o serviço é gratuito e anônimo, e golpistas o usam muito. Não
-> é defeito do servidor — o HTTPS é válido. A correção é um domínio próprio
-> (ver [Endereço fixo](#-endereço-fixo-com-domínio-próprio)).
+> No plano B, o Chrome e o Edge costumam marcar `*.trycloudflare.com` como
+> **perigoso**: o serviço é gratuito e anônimo, e golpistas o usam muito. Não
+> é defeito do servidor — o HTTPS é válido.
 
 ---
 
@@ -150,7 +147,8 @@ O Quick Tunnel **não aparece no painel**: é anônimo, não pertence à conta.
 
 ## 🌐 Endereço fixo com domínio próprio
 
-Quando houver um domínio:
+Feito em 27/09/2026 com `d4ffy.com` (o studygo em `studygo.d4ffy.com`, a raiz
+livre para outros projetos). Para refazer, ou para outro domínio:
 
 1. **Domínio na Cloudflare.** Comprado nela (Domain Registration → Register
    Domains; já nasce na conta), ou trazido de outro registrador (**Add a

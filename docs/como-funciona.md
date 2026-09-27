@@ -150,14 +150,12 @@ conexão de dentro para fora, e as visitas chegam por ela.
 
 | | |
 |---|---|
-| Endereço | `https://<palavras>.trycloudflare.com` — muda quando o túnel reinicia; `make servidor-endereco` mostra o da vez |
+| Endereço | `https://studygo.d4ffy.com` |
 | Quem usa | você e quem estiver testando |
 | Dados | de teste |
 | Como publica | automático, a cada envio para a `main` |
 
-> ⚠️ O servidor é este computador: com ele desligado, o site sai do ar. E o
-> navegador pode avisar "site perigoso" no endereço `trycloudflare.com` — é a
-> fama do serviço grátis, não um problema do app. Um domínio próprio resolve
+> ⚠️ O servidor é este computador: com ele desligado, o site sai do ar
 > ([cloudflare-tunnel.md](cloudflare-tunnel.md)).
 
 ---

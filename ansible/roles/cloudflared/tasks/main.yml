@@ -90,3 +90,13 @@
     enabled: true
     state: "{{ 'restarted' if unidade_rapido.changed else 'started' }}"
     daemon_reload: true
+
+# Com domínio, o endereço temporário sobra: parado e desabilitado, para não
+# gastar memória nem publicar um segundo endereço do mesmo app.
+- name: Desligar o endereço temporário (com domínio)
+  when: not (cloudflared_rapido | default(false))
+  systemd:
+    name: cloudflared-{{ projeto }}
+    enabled: false
+    state: stopped
+  failed_when: false

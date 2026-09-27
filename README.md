@@ -166,7 +166,7 @@ aplicação chega lá só pela pipeline.
 |---|---|
 | `make servidor-ligar` | liga o servidor (a distro, se estiver parada, e o app, o nginx e o túnel), espera o app responder e mostra o endereço público novo |
 | `make servidor-desligar` | para o app, o Docker, o nginx e o túnel do servidor; a distro fica ociosa. O app sai do ar e a esteira não implanta até ligar de novo |
-| `make servidor-endereco` | mostra o endereço público atual (`*.trycloudflare.com`), que muda a cada reinício do túnel |
+| `make servidor-endereco` | mostra o endereço público (`https://studygo.d4ffy.com`) |
 | `make servidor-health` | consulta o `/health` no servidor e pelo endereço público: responde? que versão e que schema estão no ar? |
 | `make servidor-status` | lista os containers da aplicação no servidor (o Docker rootless do usuário `studygo`) |
 | `make servidor-logs svc=backend` | últimas linhas de log de um serviço no servidor; sem `svc`, de todos |
