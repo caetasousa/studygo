@@ -310,12 +310,6 @@ a {
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
 }
-.alert-slot {
-	margin-top: 16px;
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-}
 .callout {
 	display: flex;
 	gap: 10px;

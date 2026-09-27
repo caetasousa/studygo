@@ -183,3 +183,53 @@ func TopicosEstudados(disciplina string, temas []string, atividades []Atividade,
 
 	return n
 }
+
+// Cobertura é o que o cronograma gravado faz com os tópicos de uma matéria na
+// fase de aprender: quantos deles aparecem (estudados ou por estudar) e
+// quantas vezes, somando as aparições.
+type Cobertura struct {
+	Cobertos  int
+	Aparicoes int
+}
+
+// CoberturaDaMateria lê o cronograma como ele está — com o que foi
+// antecipado, reorganizado ou removido — em vez dos blocos que o motor
+// calcularia. Cada tópico conta dentro dos blocos que juntam vários: uma
+// matéria com mais tópicos que vagas vê todos eles, só que agrupados, e contar
+// blocos a fazia parecer incompleta. Reforço, revisão dirigida e a reta final
+// não são aprender.
+func CoberturaDaMateria(dias []Dia, disciplina string, temas []string) Cobertura {
+	daMateria := map[string]bool{}
+	for _, t := range temas {
+		daMateria[normalizarTema(t)] = true
+	}
+
+	vistos := map[string]bool{}
+	c := Cobertura{}
+
+	for _, d := range dias {
+		if d.Fase == FaseReta {
+			continue
+		}
+
+		for _, it := range d.Itens {
+			if it.Disciplina != disciplina || temaBase(it.Tema) != it.Tema {
+				continue
+			}
+
+			for _, p := range PartesDoTema(it.Tema) {
+				k := normalizarTema(p)
+				if !daMateria[k] {
+					continue
+				}
+
+				c.Aparicoes++
+				vistos[k] = true
+			}
+		}
+	}
+
+	c.Cobertos = len(vistos)
+
+	return c
+}

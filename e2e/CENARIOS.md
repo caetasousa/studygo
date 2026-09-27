@@ -57,6 +57,9 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C15 | marcar o tópico num dia que não é de estudo (domingo) deixa a atividade concluída na data futura, sem reorganizar; ou o tópico estudado volta adiante com outra grafia | o tópico fica "feito lá no final" e o cronograma não anda; ou o conteúdo se repete |
 | C16 | o tópico marcado como estudado antes da hora aparece como mais uma linha no dia em que foi marcado, ou desmarcar não o devolve | o dia vira um depósito de tópicos; ou o clique errado não tem volta |
 | C17 | concluir ou marcar um tópico como estudado não move o balanceamento | o painel de "onde estou" não mostra o que já foi estudado |
+| C18 | editar as questões de uma matéria no balanceamento devolve as outras ao número do edital | a retificação do edital digitada matéria por matéria se desfaz sozinha |
+| C19 | a matéria com mais tópicos que horários aparece como incompleta no balanceamento, mesmo com todos os tópicos no cronograma (agrupados) | o painel diz que não dá para ver a matéria inteira quando dá |
+| C20 | o topo da tela avisa de isenção, recurso, cobertura ou orçamento, e as datas que importam (inscrições, pagamento, prova) se perdem entre eles | a pessoa passa a ignorar os avisos e perde o boleto |
 
 ## D. Configurações e dados
 

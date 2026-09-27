@@ -41,18 +41,62 @@
 	</div>
 {/if}
 
+<!-- Só as datas que não podem passar — inscrições, pagamento, prova —, numa
+     faixa só. Os demais prazos do edital ficam em Datas do edital. -->
 {#if plano && plano.alertas.length > 0}
-	<div class="alert-slot">
+	<ul class="prazos" aria-label="Datas importantes">
 		{#each plano.alertas as a (a.titulo)}
-			<div class="callout {a.nivel}">
-				<span class="em"><NavIcon name="alerta" size="md" /></span>
-				<div><b>{a.titulo}</b><br />{a.texto}</div>
-			</div>
+			<li class="prazo {a.nivel}">
+				<span class="prazo-ic"><NavIcon name="prova" size="sm" /></span>
+				<b>{a.titulo}</b>
+				<span class="prazo-tx">{a.texto}</span>
+			</li>
 		{/each}
-	</div>
+	</ul>
 {/if}
 
 <style>
+	.prazos {
+		list-style: none;
+		margin: 14px 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.prazo {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		padding: 6px 11px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--bg-card);
+		font-size: 13px;
+	}
+	.prazo-ic {
+		display: inline-flex;
+		color: var(--text-faint);
+	}
+	.prazo-tx {
+		color: var(--text-muted);
+	}
+	.prazo.warn {
+		border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+		background: color-mix(in srgb, var(--warn) 10%, transparent);
+	}
+	.prazo.warn .prazo-ic,
+	.prazo.warn b {
+		color: var(--warn);
+	}
+	.prazo.danger {
+		border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+		background: color-mix(in srgb, var(--danger) 12%, transparent);
+	}
+	.prazo.danger .prazo-ic,
+	.prazo.danger b {
+		color: var(--danger);
+	}
 	/* The title icon supports the heading; it does not compete with it. */
 	.title-ic {
 		display: grid;

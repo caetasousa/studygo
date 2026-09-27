@@ -13,6 +13,8 @@ type Severidade string
 const (
 	// SeveridadeAviso: dá para conviver, mas é bom saber.
 	SeveridadeAviso Severidade = "warn"
+	// SeveridadeInfo é o prazo ainda distante: informa, sem alarmar.
+	SeveridadeInfo Severidade = "info"
 	// SeveridadePerigo: o plano não entrega o que promete.
 	SeveridadePerigo Severidade = "danger"
 )

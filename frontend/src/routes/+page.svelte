@@ -5,7 +5,7 @@
 	import TemaTexto from '$lib/components/TemaTexto.svelte';
 	import { linkQuestoes } from '$lib/tec';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import { fc, fmtDuracao, hojeISO, diffDays, nf1 } from '$lib/format';
+	import { fc, fmtDuracao, hojeISO, nf1 } from '$lib/format';
 
 	/**
 	 * A tela Hoje.
@@ -32,12 +32,6 @@
 	const deficit = $derived.by(() => {
 		if (!plano || plano.props.horasTotal === 0) return [];
 		return [...plano.balanceamento].sort((a, b) => a.desvio - b.desvio).slice(0, 3);
-	});
-
-	const proxMarco = $derived.by(() => {
-		if (!plano) return null;
-		const h = hojeISO();
-		return plano.marcos.find((m) => (m.dataFim ?? m.dataInicio) >= h) ?? null;
 	});
 
 	/**
@@ -184,15 +178,6 @@
 				</div>
 			</div>
 
-			{#if proxMarco}
-				<div class="card">
-					<div class="card-top">Próxima data do edital</div>
-					<div class="card-body marco">
-						<b>{fc(proxMarco.dataInicio)}{proxMarco.dataFim ? ' a ' + fc(proxMarco.dataFim) : ''}</b>
-						<span>em {diffDays(hojeISO(), proxMarco.dataInicio)} dias · {proxMarco.titulo}</span>
-					</div>
-				</div>
-			{/if}
 		</div>
 	</div>
 
@@ -263,14 +248,5 @@
 	}
 	.ver-tudo:hover {
 		color: var(--accent);
-	}
-	.marco {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		font-size: 13px;
-	}
-	.marco span {
-		color: var(--text-muted);
 	}
 </style>

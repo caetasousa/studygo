@@ -240,6 +240,7 @@ type linhaBalanceamento struct {
 	BlocosReta     int     `json:"blocosReta"`
 	Temas          int     `json:"temas"`
 	TemasEstudados int     `json:"temasEstudados"`
+	TemasCobertos  int     `json:"temasCobertos"`
 	Passadas       float64 `json:"passadas"`
 	Visitas        int     `json:"visitas"`
 	RevisoesGerais float64 `json:"revisoesGerais"`
@@ -474,6 +475,7 @@ func balanceamentoParaDTO(linhas []service.LinhaBalanceamento) []linhaBalanceame
 			BlocosReta:     l.BlocosReta,
 			Temas:          l.Temas,
 			TemasEstudados: l.TemasEstudados,
+			TemasCobertos:  l.TemasCobertos,
 			Passadas:       l.Passadas,
 			Visitas:        l.Visitas,
 			RevisoesGerais: l.RevisoesGerais,

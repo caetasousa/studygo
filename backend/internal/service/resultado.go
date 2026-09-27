@@ -198,6 +198,9 @@ type LinhaBalanceamento struct {
 	// TemasEstudados é quantos desses tópicos já foram estudados: anda a cada
 	// conclusão, inclusive do que foi marcado como estudado antes da hora.
 	TemasEstudados int
+	// TemasCobertos é quantos tópicos aparecem no cronograma gravado (estudados
+	// ou por estudar). Abaixo de Temas, o plano não chega a algum deles.
+	TemasCobertos  int
 	Passadas       float64
 	Visitas        int
 	RevisoesGerais float64

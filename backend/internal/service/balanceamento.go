@@ -3,7 +3,6 @@ package service
 import (
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"studygo/internal/domain/concurso"
@@ -28,6 +27,18 @@ func montarBalanceamento(
 
 	for i, d := range c.Disciplinas {
 		sd := stats.Disciplina[d.Codigo]
+
+		// "Aprendo" e o aviso de matéria incompleta vêm do cronograma gravado:
+		// o que foi antecipado, reorganizado ou tirado por repetição conta como
+		// está, e cada tópico conta dentro dos blocos que juntam vários.
+		cobertura := plano.CoberturaDaMateria(res.Dias, d.Codigo, d.Temas)
+		passadas := passadasDe(res.Slots[d.Codigo], len(d.Temas))
+		cobertos := len(d.Temas)
+
+		if len(d.Temas) > 0 {
+			passadas = arredondar1(float64(cobertura.Aparicoes) / float64(len(d.Temas)))
+			cobertos = cobertura.Cobertos
+		}
 
 		var pctIdeal float64
 		if res.SomaPontos != 0 {
@@ -61,7 +72,8 @@ func montarBalanceamento(
 			BlocosReta:     res.SlotsReta[d.Codigo],
 			Temas:          len(d.Temas),
 			TemasEstudados: plano.TopicosEstudados(d.Codigo, d.Temas, atividades, concluida),
-			Passadas:       passadasDe(res.Slots[d.Codigo], len(d.Temas)),
+			Passadas:       passadas,
+			TemasCobertos:  cobertos,
 			Visitas:        visitas[d.Codigo],
 			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
 			IntervaloDias:  intervalos[d.Codigo],
@@ -187,173 +199,104 @@ func montarProps(
 	}
 }
 
-// montarAlertas redige em português as decisões que o domínio tomou.
+// montarAlertas avisa só dos três prazos que importam a quem estuda: o período
+// de inscrições, o último dia de pagamento da inscrição e a prova. A cobertura
+// e o orçamento de questões têm lugar na tela de balanceamento, e os demais
+// marcos (isenção, recursos, divulgações), na de datas — no topo de toda tela,
+// eram avisos demais para os três que de fato não podem passar.
 //
-// A REGRA de quando avisar mora em domain/plano/alerta.go; aqui só se escolhe a
-// frase. Separar os dois é o que permite mudar o texto sem tocar na regra, e
-// testar a regra sem depender da redação.
+// Cada um aparece até a data passar (ou o prazo ser marcado como cumprido), e
+// o tom sobe conforme ela chega.
 func montarAlertas(
 	c concurso.Concurso,
 	checks map[uuid.UUID]bool,
-	linhas []LinhaBalanceamento,
+	prova time.Time,
 	agora time.Time,
 ) []Alerta {
+	agora = plano.DayOf(agora)
+	p := concurso.PrazosChave(c.Marcos)
 	out := []Alerta{}
 
-	cobertura := make([]plano.LinhaCobertura, 0, len(linhas))
-	for _, l := range linhas {
-		cobertura = append(cobertura, plano.LinhaCobertura{
-			Codigo:         l.Codigo,
-			Nome:           l.Nome,
-			Temas:          l.Temas,
-			Passadas:       l.Passadas,
-			Questoes:       l.Questoes,
-			QuestoesEdital: l.QuestoesEdital,
-			Delta:          l.Delta,
+	if m := p.Inscricao; m != nil && !checks[m.ID] {
+		inicio, fim := plano.DayOf(m.DataInicio), plano.DayOf(fimDoMarco(*m))
+
+		switch {
+		case fim.Before(agora):
+		case !agora.Before(inicio):
+			out = append(out, Alerta{
+				Nivel:  nivelPorProximidade(plano.DiffDays(agora, fim), true),
+				Titulo: "Inscrições abertas até " + dataCurta(fim),
+				Texto:  "Encerram " + quando(plano.DiffDays(agora, fim)) + ".",
+			})
+		default:
+			titulo := "Inscrições em " + dataCurta(inicio)
+			if !fim.Equal(inicio) {
+				titulo = "Inscrições de " + dataCurta(inicio) + " a " + dataCurta(fim)
+			}
+
+			out = append(out, Alerta{
+				Nivel:  nivelPorProximidade(plano.DiffDays(agora, inicio), false),
+				Titulo: titulo,
+				Texto:  "Abrem " + quando(plano.DiffDays(agora, inicio)) + ".",
+			})
+		}
+	}
+
+	if m := p.Pagamento; m != nil && !checks[m.ID] {
+		if fim := plano.DayOf(fimDoMarco(*m)); !fim.Before(agora) {
+			out = append(out, Alerta{
+				Nivel:  nivelPorProximidade(plano.DiffDays(agora, fim), true),
+				Titulo: "Pagamento da inscrição até " + dataCurta(fim),
+				Texto:  "O boleto vence " + quando(plano.DiffDays(agora, fim)) + ".",
+			})
+		}
+	}
+
+	if prova.IsZero() && p.Prova != nil {
+		prova = p.Prova.DataInicio
+	}
+
+	if dia := plano.DayOf(prova); !prova.IsZero() && !dia.Before(agora) {
+		out = append(out, Alerta{
+			Nivel:  nivelPorProximidade(plano.DiffDays(agora, dia), false),
+			Titulo: "Prova em " + dia.Format("02/01/2006"),
+			Texto:  "É " + quando(plano.DiffDays(agora, dia)) + ".",
 		})
 	}
 
-	if a := plano.CoberturaDoPlano(cobertura); a != nil {
-		out = append(out, textoDaCobertura(*a))
-	}
-
-	if a := plano.OrcamentoDoPlano(cobertura); a != nil {
-		out = append(out, textoDoOrcamento(*a))
-	}
-
-	return append(out, alertasDeMarco(c, checks, agora)...)
-}
-
-func textoDaCobertura(a plano.AlertaCobertura) Alerta {
-	var b strings.Builder
-
-	for i, d := range a.Incompletas {
-		if i > 0 {
-			b.WriteString("; ")
-		}
-
-		b.WriteString(d.Nome)
-
-		if d.Passadas == 0 {
-			b.WriteString(" (não entra no plano)")
-
-			continue
-		}
-
-		b.WriteString(" (")
-		b.WriteString(strconv.Itoa(int(d.Passadas * 100)))
-		b.WriteString("% do conteúdo)")
-	}
-
-	titulo := "O plano não cobre todo o conteúdo"
-	if a.SemNenhuma > 0 {
-		titulo = "Há matéria que não entra no plano"
-	}
-
-	return Alerta{
-		Nivel:  string(a.Severidade),
-		Titulo: titulo,
-		Texto: "Não há dias suficientes até a prova para percorrer estas matérias " +
-			"inteiras uma vez: " + b.String() + ". Adiante a data de início, " +
-			"acrescente dias de estudo na semana, aumente os blocos por dia — ou " +
-			"aceite e escolha por onde cortar, sabendo do buraco.",
-	}
-}
-
-func textoDoOrcamento(a plano.AlertaOrcamento) Alerta {
-	verbo := "tire"
-	if a.Sobra < 0 {
-		verbo = "distribua mais"
-	}
-
-	sobra := a.Sobra
-	if sobra < 0 {
-		sobra = -sobra
-	}
-
-	var b strings.Builder
-
-	b.WriteString("As mais fora do eixo: ")
-
-	for i, d := range a.MaisForaDoEixo {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-
-		b.WriteString(d.Nome)
-		b.WriteString(" (")
-
-		if d.Delta > 0 {
-			b.WriteString("+")
-		}
-
-		b.WriteString(strconv.Itoa(d.Delta))
-		b.WriteString(")")
-	}
-
-	if len(a.MaisForaDoEixo) == 0 {
-		b.Reset()
-		b.WriteString("Ajuste as questões por matéria na tela de balanceamento.")
-	} else {
-		b.WriteString(". O motor divide o tempo em proporção estrita, então " +
-			"aumentar uma matéria tira tempo de todas as outras.")
-	}
-
-	return Alerta{
-		Nivel: string(a.Severidade),
-		Titulo: "Você distribuiu " + strconv.Itoa(a.Distribuidas) + " de " +
-			strconv.Itoa(a.NoEdital) + " questões — " + verbo + " " + strconv.Itoa(sobra),
-		Texto: b.String(),
-	}
-}
-
-// alertasDeMarco avisa dos prazos do edital que ainda exigem ação. No máximo
-// dois: uma lista longa de avisos deixa de ser aviso.
-func alertasDeMarco(
-	c concurso.Concurso,
-	checks map[uuid.UUID]bool,
-	agora time.Time,
-) []Alerta {
-	out := []Alerta{}
-
-	for _, m := range c.Marcos {
-		if !m.ExigeAcao || checks[m.ID] {
-			continue
-		}
-
-		fim := m.DataInicio
-		if m.DataFim != nil {
-			fim = *m.DataFim
-		}
-
-		if plano.DayOf(fim).Before(agora) {
-			continue
-		}
-
-		dist := plano.DiffDays(agora, m.DataInicio)
-
-		switch {
-		case dist <= 0:
-			out = append(out, Alerta{
-				Nivel:  string(plano.SeveridadePerigo),
-				Titulo: "Prazo aberto agora — encerra em " + dataCurta(fim),
-				Texto:  m.Titulo,
-			})
-		case dist <= 7:
-			out = append(out, Alerta{
-				Nivel: string(plano.SeveridadeAviso),
-				Titulo: "Faltam " + strconv.Itoa(dist) + " dias — abre em " +
-					dataCurta(m.DataInicio),
-				Texto: m.Titulo,
-			})
-		}
-
-		if len(out) == 2 {
-			break
-		}
-	}
-
 	return out
+}
+
+func fimDoMarco(m concurso.Marco) time.Time {
+	if m.DataFim != nil {
+		return *m.DataFim
+	}
+
+	return m.DataInicio
+}
+
+// nivelPorProximidade: o prazo que encerra (inscrição aberta, boleto) fica
+// vermelho nos últimos 3 dias; qualquer um fica amarelo na última semana.
+func nivelPorProximidade(dias int, encerra bool) string {
+	switch {
+	case encerra && dias <= 3:
+		return string(plano.SeveridadePerigo)
+	case dias <= 7:
+		return string(plano.SeveridadeAviso)
+	default:
+		return string(plano.SeveridadeInfo)
+	}
+}
+
+func quando(dias int) string {
+	switch dias {
+	case 0:
+		return "hoje"
+	case 1:
+		return "amanhã"
+	default:
+		return "em " + strconv.Itoa(dias) + " dias"
+	}
 }
 
 func dataCurta(t time.Time) string {

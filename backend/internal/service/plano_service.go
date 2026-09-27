@@ -303,7 +303,7 @@ func aplicarConfig(
 	}
 
 	if cmd.Questoes != nil {
-		cfg.Questoes = questoesValidas(cmd.Questoes, cur)
+		cfg.Questoes = questoesValidas(cmd.Questoes, cfg.Questoes, cur)
 	}
 
 	aplicarMetodo(&cfg, cur, cmd)
@@ -387,14 +387,23 @@ func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) 
 
 // questoesValidas mantém só as disciplinas que o concurso tem, para que uma
 // matéria removida não continue pesando na distribuição.
-func questoesValidas(entrada map[string]int, cur concurso.Concurso) map[string]int {
+// questoesValidas aplica as questões pedidas por cima das que o plano já tem.
+// O balanceamento edita uma matéria por vez e manda só ela: a matéria que não
+// veio no pedido fica como estava — voltar ao número do edital desfazia a
+// edição anterior em silêncio. O edital só vale para a que nunca foi editada.
+func questoesValidas(entrada, atuais map[string]int, cur concurso.Concurso) map[string]int {
 	out := map[string]int{}
 
 	for _, d := range cur.Disciplinas {
-		if q, ok := entrada[d.Codigo]; ok {
+		switch q, ok := entrada[d.Codigo]; {
+		case ok:
 			out[d.Codigo] = max(q, 0)
-		} else {
-			out[d.Codigo] = d.QuestoesPadrao
+		default:
+			if atual, tem := atuais[d.Codigo]; tem {
+				out[d.Codigo] = atual
+			} else {
+				out[d.Codigo] = d.QuestoesPadrao
+			}
 		}
 	}
 

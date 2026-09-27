@@ -184,7 +184,7 @@
 				</thead>
 				<tbody>
 					{#each cobertura as l (l.codigo)}
-						<tr class:incompleta={l.temas > 0 && l.passadas < 1}>
+						<tr class:incompleta={l.temas > 0 && l.temasCobertos < l.temas}>
 							<td>
 								<span class="chip-dot" style="background:var(--c{l.cor}-tx)"></span>
 								{l.nome}
@@ -209,9 +209,12 @@
 							</td>
 							<td>
 								{nf1.format(l.passadas)}×
-								{#if l.temas > 0 && l.passadas < 1}
-									<span class="aviso-cob" title="O plano não chega ao fim desta matéria">
-										{Math.round(l.passadas * 100)}% dela
+								{#if l.temas > 0 && l.temasCobertos < l.temas}
+									<span
+										class="aviso-cob"
+										title="{l.temas - l.temasCobertos} tópico(s) desta matéria não aparecem no cronograma"
+									>
+										{pctDe(l.temasCobertos, l.temas)}% dela
 									</span>
 								{/if}
 							</td>
@@ -256,6 +259,7 @@
 										min="0"
 										max="60"
 										step="1"
+										aria-label="Questões de {l.nome}"
 										value={l.questoes}
 										oninput={(e) => onQuestoes(l.codigo, e)}
 									/>

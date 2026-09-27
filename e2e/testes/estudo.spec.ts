@@ -1,4 +1,4 @@
-import { test, expect, abrirHoje, dataEmDias, materiasDoDia, registrar, type Page } from './base';
+import { test, expect, abrirHoje, dataEmDias, DISCIPLINAS_PADRAO, materiasDoDia, registrar, type Page } from './base';
 
 /** As listas de matérias do cronograma, uma por dia, na ordem da tela. */
 function diasDoCronograma(page: Page) {
@@ -399,5 +399,59 @@ test.describe('estudo do dia', () => {
 
 		await page.goto('/balanceamento');
 		await expect(linhaDo()).toContainText('1 de 6');
+	});
+
+	test('[C18] editar as questões de uma matéria não desfaz a edição da outra', async ({ page, api }) => {
+		const slug = await api.concurso('Retificação E2E');
+		await page.goto('/balanceamento');
+		await expect(page.getByRole('spinbutton', { name: /^Questões de / }).first()).toBeVisible();
+		const por = await page.getByRole('spinbutton', { name: /^Questões de / }).evaluateAll((els) =>
+			els.map((e) => e.getAttribute('aria-label')!.replace('Questões de ', ''))
+		);
+		const [a, b] = por;
+		await page.getByRole('spinbutton', { name: `Questões de ${a}` }).fill('33');
+		await expect.poll(async () => (await api.plano(slug)).balanceamento.find((l: { nome: string }) => l.nome === a).questoes).toBe(33);
+		await page.getByRole('spinbutton', { name: `Questões de ${b}` }).fill('7');
+		await expect.poll(async () => (await api.plano(slug)).balanceamento.find((l: { nome: string }) => l.nome === b).questoes).toBe(7);
+
+		await page.reload();
+		await expect(page.getByRole('spinbutton', { name: `Questões de ${a}` })).toHaveValue('33');
+		await expect(page.getByRole('spinbutton', { name: `Questões de ${b}` })).toHaveValue('7');
+	});
+
+	test('[C19] matéria com mais tópicos que horários não aparece como incompleta', async ({ page, api }) => {
+		const temas = Array.from({ length: 150 }, (_, i) => `Tópico ${String(i + 1).padStart(3, '0')}`);
+		const slug = await api.concurso('Cobertura agrupada E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
+		]);
+		const linha = (await api.plano(slug)).balanceamento.find((l: { nome: string }) => l.nome === 'Informática');
+		expect(linha.temasCobertos).toBe(150);
+		expect(linha.passadas).toBeGreaterThanOrEqual(1);
+
+		await page.goto('/balanceamento');
+		const cobertura = page.getByRole('row').filter({ hasText: 'Informática' }).first();
+		await expect(cobertura).not.toContainText('% dela');
+	});
+
+	test('[C20] o topo mostra só inscrições, pagamento e prova', async ({ page, api }) => {
+		await api.concurso('Prazos E2E', DISCIPLINAS_PADRAO, {
+			marcos: [
+				{ data: dataEmDias(2), dataFim: dataEmDias(3), titulo: 'Período da solicitação de Isenção do pagamento do valor de inscrição', exigeAcao: true },
+				{ data: dataEmDias(4), dataFim: '', titulo: 'Prazo para recurso quanto ao resultado dos pedidos de isenção', exigeAcao: true },
+				{ data: dataEmDias(5), dataFim: dataEmDias(20), titulo: 'Período das inscrições (exclusivamente via internet)', exigeAcao: true },
+				{ data: dataEmDias(21), dataFim: '', titulo: 'Último dia para pagamento do valor da inscrição.', exigeAcao: true }
+			]
+		});
+		await abrirHoje(page);
+		const prazos = page.getByRole('list', { name: 'Datas importantes' }).getByRole('listitem');
+		await expect(prazos).toHaveCount(3);
+		await expect(prazos.nth(0)).toContainText('Inscrições de');
+		await expect(prazos.nth(0)).toContainText('Abrem em 5 dias');
+		await expect(prazos.nth(1)).toContainText('Pagamento da inscrição até');
+		await expect(prazos.nth(2)).toContainText('Prova em');
+		const topo = page.locator('main');
+		await expect(topo.getByText(/isenção/i)).toHaveCount(0);
+		await expect(topo.getByText('O plano não cobre todo o conteúdo')).toHaveCount(0);
 	});
 });

@@ -377,6 +377,9 @@ export interface LinhaBalanceamento {
 	/** Quantos desses tópicos já foram estudados (1ª passada concluída, inclusive
 	 *  os marcados como estudados antes da hora). Anda a cada conclusão. */
 	temasEstudados: number;
+	/** Quantos tópicos aparecem no cronograma gravado, estudados ou por estudar.
+	 *  Abaixo de `temas`, o plano não chega a algum deles. */
+	temasCobertos: number;
 	/** Complete passes over the whole subject in the content phase. */
 	passadas: number;
 	/** Days of the learning phase that study this subject — times you come back. */

@@ -29,6 +29,7 @@
       "questoesEdital": "number",
       "revisoesGerais": "number",
       "temas": "number",
+      "temasCobertos": "number",
       "temasEstudados": "number",
       "visitas": "number"
     }

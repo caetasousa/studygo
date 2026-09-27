@@ -135,7 +135,7 @@ func (c carregador) montar(ctx context.Context, cx contexto) (PlanoMontado, erro
 		Marcos:                montarMarcos(cx.Concurso, cx.Plano.Marcos),
 		Balanceamento:         balanceamento,
 		Props:                 montarProps(cfg, res.Dias, stats, agora),
-		Alertas:               montarAlertas(cx.Concurso, cx.Plano.Marcos, balanceamento, agora),
+		Alertas:               montarAlertas(cx.Concurso, cx.Plano.Marcos, cfg.Prova, agora),
 		HojeIndex:             hojeIndex,
 		TemMovimentacaoManual: TemMovimentacaoManual(cx.Atividades),
 		GeradoEm:              c.relogio.Now(),

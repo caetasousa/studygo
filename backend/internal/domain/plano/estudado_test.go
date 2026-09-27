@@ -210,3 +210,42 @@ func TestTopicosEstudados(t *testing.T) {
 		t.Errorf("estudados = %d, quer 3 (Pipelines, Git, Docker)", got)
 	}
 }
+
+// CoberturaDaMateria alimenta o "Aprendo" e o aviso de matéria incompleta do
+// balanceamento, lendo o cronograma GRAVADO. Como pode errar — escrito antes
+// do código:
+//
+//	K1  o bloco que junta três tópicos conta como um tópico só, e a matéria parece incompleta
+//	K2  o tópico com outra grafia não conta
+//	K3  reforço e revisão dirigida contam como aprender
+//	K4  a reta final conta
+//	K5  o tópico já estudado (concluído ou antecipado) deixa de contar
+//	K6  o tópico que não aparece em lugar nenhum conta como coberto
+func TestCoberturaDaMateria(t *testing.T) {
+	t.Parallel()
+
+	dias := []plano.Dia{
+		{Data: diaUtil(time.September, 14), Fase: plano.FaseBase, Itens: []plano.ItemDia{
+			{Disciplina: "DEV", Tema: "Git  ·  Docker  ·  CI", Passada: 1}, // K1
+			{Disciplina: "DEV", Tema: "pipelines", Passada: 1},             // K2, K5 (a data não importa)
+			{Disciplina: "OUT", Tema: "Kubernetes", Passada: 1},            // outra matéria
+		}},
+		{Data: diaUtil(time.September, 15), Fase: plano.FaseBase, Itens: []plano.ItemDia{
+			{Disciplina: "DEV", Tema: "Git", Passada: 2},
+			{Disciplina: "DEV", Tema: "Reforço — Docker", Passada: 1}, // K3
+		}},
+		{Data: diaUtil(time.December, 1), Fase: plano.FaseReta, Itens: []plano.ItemDia{
+			{Disciplina: "DEV", Tema: "Kubernetes", Passada: 1}, // K4
+		}},
+	}
+	temas := []string{"Git", "Docker", "CI", "Pipelines", "Kubernetes"} // K6: Kubernetes só na reta
+
+	c := plano.CoberturaDaMateria(dias, "DEV", temas)
+	if c.Cobertos != 4 {
+		t.Errorf("cobertos = %d, quer 4 (Git, Docker, CI, Pipelines)", c.Cobertos)
+	}
+
+	if c.Aparicoes != 5 {
+		t.Errorf("aparições = %d, quer 5 (Git ×2, Docker, CI, Pipelines)", c.Aparicoes)
+	}
+}
