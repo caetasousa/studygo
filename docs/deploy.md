@@ -101,12 +101,23 @@ O túnel com token (para um domínio próprio) usa o `cloudflared_token` do
 `secrets.yml`; o passo a passo está em [cloudflare-tunnel.md](cloudflare-tunnel.md).
 
 Para o servidor voltar sozinho quando o Windows liga, uma tarefa agendada
-mantém a distro de pé (no PowerShell, uma vez):
+mantém a distro de pé (no PowerShell **como administrador**, uma vez):
 
 ```powershell
-schtasks /Create /TN "studygo-servidor" /SC ONLOGON /RL LIMITED /F `
-  /TR "conhost.exe --headless wsl.exe -d ubuntu-server --exec sleep infinity"
+$acao = New-ScheduledTaskAction -Execute "conhost.exe" `
+  -Argument "--headless wsl.exe -d ubuntu-server --exec sleep infinity"
+$gatilho = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$config = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
+  -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName "studygo-servidor" -Action $acao `
+  -Trigger $gatilho -Settings $config -RunLevel Limited -Force
 ```
+
+Sem limite de tempo e liberada na bateria, de propósito: a tarefa é o que
+mantém a distro acordada, e o padrão do Windows (interromper em 72 horas, não
+rodar na bateria) derrubava o servidor sozinho. Ela dispara no **logon**: com
+o Windows ligado e ninguém logado (uma reinicialização de atualização de
+madrugada), o site fica fora até alguém entrar.
 
 ---
 
