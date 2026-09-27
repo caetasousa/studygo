@@ -3,6 +3,7 @@
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { pareceEmentaCorrida, ROTULO_BLOCO, semNumeroInicial } from '$lib/estudo';
 	import { partesTema, tagStyle } from '$lib/format';
+	import type { Atividade } from '$lib/types';
 
 	/**
 	 * O conteúdo programático de UMA matéria, aberto de qualquer linha do
@@ -13,9 +14,15 @@
 	 * painel lateral só se pagaria se houvesse o que cruzar com o cronograma
 	 * atrás — e não há: a ementa se explica sozinha.
 	 *
-	 * Nada vai ao servidor; os temas já vieram no plano. A numeração é a da
-	 * posição, como em /conteudo — o texto guardado pode trazer a sua própria, e
-	 * duas numerações na mesma linha não se explicam.
+	 * Os temas já vieram no plano. A numeração é a da posição, como em
+	 * /conteudo — o texto guardado pode trazer a sua própria, e duas numerações
+	 * na mesma linha não se explicam.
+	 *
+	 * Marcar "já estudei" registra a próxima 1ª passada do tópico como
+	 * concluída: se ela estava agendada para a frente, o servidor a traz para
+	 * hoje e encosta o resto do cronograma (antecipar compra tempo, não abre
+	 * vão). Revisão e 2ª passada ficam onde estão — estudar antes não dispensa
+	 * revisar.
 	 */
 	let {
 		codigo,
@@ -55,6 +62,42 @@
 
 	const marcado = (t: string) => doBloco.has(chave(t));
 
+	// --- já estudei ------------------------------------------------------------
+	const ROTULOS = ['Reforço — ', 'Revisão dirigida — '];
+
+	/** As 1ª passadas desta matéria, na ordem do cronograma, com o que cada uma cobre. */
+	const passadas = $derived(
+		(plano?.dias ?? []).flatMap((d) =>
+			d.itens
+				.filter((i) => i.disciplina === codigo && i.passada <= 1 && !ROTULOS.some((p) => i.tema.startsWith(p)))
+				.map((i) => ({ item: i, cobre: new Set(partesTema(i.tema).map(chave)) }))
+		)
+	);
+
+	const doTopico = (t: string): Atividade[] =>
+		passadas.filter((p) => p.cobre.has(chave(t))).map((p) => p.item);
+
+	let salvando = $state<string | null>(null);
+	let erroMarca = $state<string | null>(null);
+
+	async function marcarEstudado(t: string, sim: boolean) {
+		const atividades = doTopico(t);
+		// Marcar conclui a próxima pendente; desmarcar desfaz a última concluída.
+		const alvo = sim ? atividades.find((a) => !a.concluido) : atividades.findLast((a) => a.concluido);
+		if (!alvo) return;
+		salvando = chave(t);
+		erroMarca = null;
+		const erro = await planoStore.salvarAtividade(alvo.id, {
+			horas: alvo.horas,
+			questoes: alvo.questoes,
+			acertos: alvo.acertos,
+			nota: alvo.nota,
+			concluido: sim
+		});
+		salvando = null;
+		erroMarca = erro;
+	}
+
 	// --- foco e teclado -----------------------------------------------------
 	let painel = $state<HTMLElement | null>(null);
 
@@ -75,7 +118,7 @@
 
 		if (e.key !== 'Tab' || !painel) return;
 
-		const foco = painel.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]');
+		const foco = painel.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled)');
 		if (foco.length === 0) return;
 
 		const primeiro = foco[0];
@@ -128,10 +171,23 @@
 					<a href="/concursos/{slug}/editar">editar o concurso</a>.
 				</p>
 			{:else}
+				<p class="dica">Marque o que você já estudou: o tópico vem para hoje e o cronograma se reorganiza.</p>
+				{#if erroMarca}<div class="form-error" role="alert">{erroMarca}</div>{/if}
 				<ol class="topicos">
 					{#each temas as t, i (i)}
 						{@const aqui = marcado(t)}
-						<li class:marcado={aqui} data-marcado={aqui ? '1' : '0'} aria-current={aqui}>
+						{@const atividades = doTopico(t)}
+						{@const estudado = atividades.some((a) => a.concluido)}
+						<li class:marcado={aqui} class:estudado data-marcado={aqui ? '1' : '0'} aria-current={aqui}>
+							<input
+								type="checkbox"
+								class="estudei"
+								aria-label="Já estudei: {semNumeroInicial(t)}"
+								title={atividades.length === 0 ? 'Este tópico não está no cronograma' : 'Já estudei'}
+								checked={estudado}
+								disabled={atividades.length === 0 || salvando !== null}
+								onchange={(e) => marcarEstudado(t, e.currentTarget.checked)}
+							/>
 							<span class="num">{i + 1}</span>
 							<span class="txt">{semNumeroInicial(t)}</span>
 							{#if pareceEmentaCorrida(t)}
@@ -239,7 +295,7 @@
 	}
 	.topicos li {
 		display: grid;
-		grid-template-columns: 2.2em minmax(0, 1fr) auto;
+		grid-template-columns: 1.2em 2.2em minmax(0, 1fr) auto;
 		gap: 10px;
 		align-items: baseline;
 		font-size: 14px;
@@ -269,6 +325,24 @@
 	.txt {
 		min-width: 0;
 	}
+	.estudei {
+		margin: 0;
+		align-self: center;
+		accent-color: var(--good);
+		cursor: pointer;
+	}
+	.estudei:disabled {
+		cursor: default;
+	}
+	/* O que já foi estudado sai da frente sem sumir: é a ementa inteira que se lê. */
+	.topicos li.estudado .txt {
+		color: var(--text-muted);
+	}
+	.dica {
+		margin: 8px 8px 4px;
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
 	.dividir {
 		font-family: var(--font-mono);
 		font-size: 10px;
@@ -289,10 +363,10 @@
 			padding: 12px;
 		}
 		.topicos li {
-			grid-template-columns: 2.2em minmax(0, 1fr);
+			grid-template-columns: 1.2em 2.2em minmax(0, 1fr);
 		}
 		.dividir {
-			grid-column: 2;
+			grid-column: 3;
 		}
 	}
 </style>

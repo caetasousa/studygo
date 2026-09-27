@@ -209,4 +209,49 @@ test.describe('estudo do dia', () => {
 		await expect(dialogo.getByLabel('Questões')).toHaveValue('8');
 		await expect(dialogo.getByLabel('Acertos')).toHaveValue('6');
 	});
+
+	test('[C12][C13] marcar na ementa o tópico já estudado o antecipa, e desmarcar desfaz', async ({ page, api }) => {
+		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'];
+		const slug = await api.concurso('Antecipar tópico E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] }
+		]);
+		const antes = await api.plano(slug);
+		const hoje = antes.dias[antes.hojeIndex].data;
+		const codigo = antes.concurso.disciplinas.find((d: { nome: string }) => d.nome === 'Informática').codigo;
+		type Item = { id: string; disciplina: string; tema: string; passada: number; concluido: boolean };
+		type Dia = { data: string; itens: Item[] };
+		const primeiras = (p: { dias: Dia[] }, tema: string) =>
+			p.dias.flatMap((d) => d.itens.map((i) => ({ ...i, data: d.data })))
+				.filter((i) => i.disciplina === codigo && i.tema === tema && i.passada <= 1);
+		// Um tópico que o cronograma só traria depois de hoje.
+		const tema = temas.find((t) => primeiras(antes, t).every((i) => i.data > hoje))!;
+		expect(tema, 'o cenário precisa de um tópico agendado para a frente').toBeTruthy();
+		const alvo = primeiras(antes, tema)[0];
+
+		await abrirCronograma(page);
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const ementa = page.getByRole('dialog', { name: 'Informática' });
+		const marca = ementa.getByRole('checkbox', { name: `Já estudei: ${tema}` });
+		await expect(marca).not.toBeChecked();
+		await marca.check();
+		await expect(marca).toBeChecked();
+
+		const depois = await api.plano(slug);
+		const movida = primeiras(depois, tema).find((i) => i.id === alvo.id)!;
+		expect(movida.data).toBe(hoje);
+		expect(movida.concluido).toBe(true);
+		// Não sobra 1ª passada dele agendada adiante: não reaparece na sequência.
+		expect(primeiras(depois, tema).filter((i) => i.data > hoje && !i.concluido)).toHaveLength(0);
+
+		await page.reload();
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		await expect(page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` })).toBeChecked();
+
+		// C13: um clique errado se desfaz.
+		await page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` }).uncheck();
+		await expect(page.getByRole('dialog', { name: 'Informática' }).getByRole('checkbox', { name: `Já estudei: ${tema}` })).not.toBeChecked();
+		const desfeito = primeiras(await api.plano(slug), tema).find((i) => i.id === alvo.id)!;
+		expect(desfeito.concluido).toBe(false);
+	});
 });

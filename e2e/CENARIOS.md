@@ -51,6 +51,8 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C9 | matéria abaixo de 70% não entra no caderno de erros, ou uma boa entra | erros sem revisão, ou revisão do que já se sabe |
 | C10 | o link do caderno de erros colado no registro não vale para a matéria toda | link some no dia seguinte |
 | C11 | a revisão do dia não abre com o que há para revisar, ou o resultado dela não fica gravado | o bloco de revisão vira enfeite |
+| C12 | marcar na ementa um tópico já estudado não o traz para hoje, deixa a 1ª passada dele ainda agendada adiante, ou não move o progresso | o tópico que já foi estudado reaparece na sequência, e a estatística não conta o estudo |
+| C13 | desmarcar o tópico não desfaz a conclusão | um clique errado vira estudo que não houve |
 
 ## D. Configurações e dados
 
