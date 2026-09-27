@@ -800,23 +800,24 @@ test.describe('legislação', () => {
 		await expect(page).toHaveURL(new RegExp(`/leis/${p.lei.slug}$`));
 	});
 
-	test('[L33] a pendência do edital aparece na leitura e leva a resolvê-la', async ({ api, page, baseURL }) => {
+	test('[L33] a lei esperando vínculo aparece na leitura, leva a resolvê-la, e o aviso some depois', async ({ api, page, baseURL }) => {
 		const numero = numeroUnico();
 		const p = copia(pacote(), idUnico(), numero);
 		await importar(baseURL!, p);
+		// O segundo tópico cita norma que nenhum vínculo resolve: não é pendência da leitura.
 		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026`, `Lei nº ${numeroUnico()}/2026: norma fora do catálogo`]);
 
 		await page.goto('/legislacao');
 		const aviso = page.getByRole('link', { name: /esperando vínculo/ });
 		await expect(aviso).toContainText('1 lei do catálogo esperando vínculo');
-		await expect(aviso).toContainText('1 tópico do edital sem lei no catálogo');
+		await expect(aviso).not.toContainText('sem lei');
 		await aviso.click();
 		await expect(page).toHaveURL(/\/legislacao\/gerenciar$/);
 		await page.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true }).click();
 		await expect(page.getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
 
 		await page.goto('/legislacao');
-		await expect(page.getByRole('link', { name: /sem lei no catálogo/ })).not.toContainText('esperando vínculo');
 		await expect(page.getByRole('link', { name: new RegExp(p.lei.curto) })).toBeVisible();
+		await expect(page.getByRole('link', { name: /esperando vínculo|sem lei/ })).toHaveCount(0);
 	});
 });

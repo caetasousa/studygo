@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import NavIcon from '$lib/components/NavIcon.svelte';
-	import { citaNorma, descreverRecorte, especieDaNorma } from '$lib/leis';
+	import { descreverRecorte, especieDaNorma } from '$lib/leis';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import type { LeiNaMateria, LeisDaMateria } from '$lib/types';
 
 	/**
 	 * As leis do concurso, para ler: uma estante por matéria, só com as
 	 * vinculadas. Vincular, importar e manter o catálogo ficam em
-	 * /legislacao/gerenciar — aqui só o aviso de que há algo a resolver lá.
+	 * /legislacao/gerenciar — aqui só o aviso de lei esperando vínculo.
 	 */
 	const slug = $derived(concursoStore.ativoSlug);
 
@@ -45,17 +45,13 @@
 	});
 
 	const esperando = $derived(materias.reduce((n, m) => n + m.sugeridas.length, 0));
-	const semLei = $derived(
-		materias.reduce(
-			(n, m) => n + m.temas.filter((t) => citaNorma(t.texto) && t.leis.length === 0 && t.sugeridas.length === 0).length,
-			0
-		)
-	);
-	const pendencias = $derived(
-		[
-			esperando > 0 ? `${esperando} ${esperando === 1 ? 'lei do catálogo esperando vínculo' : 'leis do catálogo esperando vínculo'}` : '',
-			semLei > 0 ? `${semLei} ${semLei === 1 ? 'tópico do edital sem lei no catálogo' : 'tópicos do edital sem lei no catálogo'}` : ''
-		].filter(Boolean)
+	// Só o que um clique resolve: vincular a lei que o catálogo já tem. Tópico
+	// que cita norma fora do catálogo (o PDTI, uma instrução normativa de outra
+	// matéria) fica na página de gerenciar — aqui o aviso nunca sumiria (L33).
+	const pendencia = $derived(
+		esperando === 0
+			? ''
+			: `${esperando} ${esperando === 1 ? 'lei do catálogo esperando vínculo' : 'leis do catálogo esperando vínculo'}`
 	);
 
 	const nf = new Intl.NumberFormat('pt-BR');
@@ -104,10 +100,10 @@
 			</dl>
 		{/if}
 
-		{#if pendencias.length > 0}
+		{#if pendencia}
 			<a class="pendencia" href="/legislacao/gerenciar">
 				<span class="ponto" aria-hidden="true"></span>
-				<span class="pendencia-texto">{pendencias.join(' · ')}</span>
+				<span class="pendencia-texto">{pendencia}</span>
 				<span class="resolver">Resolver</span>
 			</a>
 		{/if}
