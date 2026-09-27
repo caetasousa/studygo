@@ -15,6 +15,15 @@ type Resumo struct {
 	// Guardado são as raízes do que a versão ativa guarda; vazio é a lei
 	// inteira. Sem ele, a lei importada só em parte passaria por inteira.
 	Guardado []string
+	// Artigos vigentes na versão ativa: o tamanho do que há para ler.
+	Artigos int
+}
+
+// Progresso é o que uma pessoa já respondeu das questões ativas de uma lei,
+// contado pela última resposta de cada questão.
+type Progresso struct {
+	Respondidas int
+	Certas      int
 }
 
 // Texto é a versão ativa da lei, como o leitor a mostra.

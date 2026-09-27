@@ -142,3 +142,24 @@ export function descreverRecorte(trechos: { rotulo: string; nome: string; artigo
 	if (trechos.length === 0) return 'a lei inteira';
 	return trechos.map((t) => t.artigos || t.rotulo).join(' · ');
 }
+
+// O que parece nome de norma num tópico do edital.
+const NORMA =
+	/\b(lei|constitui[çc][ãa]o|resolu[çc][ãa]o|decreto|c[óo]digo|regimento|portaria|instru[çc][ãa]o normativa|medida provis[óo]ria|emenda constitucional)\b|n[º°o]\s*\d/i;
+
+/** O tópico cita uma norma: é onde cabe pesquisar e importar. */
+export function citaNorma(texto: string): boolean {
+	return NORMA.test(texto);
+}
+
+/**
+ * A espécie da norma, para o rótulo do cartão. Só exibição: o catálogo não
+ * guarda a espécie, e o nome dela está no nome da lei.
+ */
+export function especieDaNorma(l: { nome: string; curto: string }): string {
+	const t = `${l.curto} ${l.nome}`.toLowerCase();
+	if (t.includes('constitui')) return 'Constituição';
+	if (t.includes('decreto')) return 'Decreto';
+	if (/resolu|\b(ra|rn)\b|regimento/.test(t)) return 'Resolução';
+	return 'Lei';
+}

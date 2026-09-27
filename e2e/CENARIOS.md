@@ -107,6 +107,9 @@ Planalto terminados em `e2e/…`.
 | L28 | "vincular todas" vincula lei que nenhum tópico da matéria cita, ou deixa uma sugerida de fora | leis erradas na matéria; ou um clique por lei, dezoito vezes |
 | L29 | a lei importada só em parte aparece como "a lei inteira" na sugestão ou no vínculo | a pessoa acha que tem a lei toda para estudar |
 | L30 | no leitor, parágrafo, inciso e alínea saem no mesmo recuo do artigo | a lei vira um bloco embolado, sem hierarquia |
+| L31 | a página de leitura das leis mistura a importação, ou lista matéria que não tem lei nenhuma | a pessoa procura a lei que vai ler no meio de tópicos, botões de importar e matérias vazias |
+| L32 | o cartão da lei não diz o que cai dela, quantos artigos tem, nem quantas questões a pessoa já respondeu | não dá para escolher o que estudar agora, nem ver o avanço |
+| L33 | a pendência do edital (lei do catálogo sem vínculo, tópico sem lei no catálogo) some da leitura, ou aparece sem caminho para resolver | a norma que cai na prova fica de fora sem ninguém notar |
 
 ## Fora da suíte, de propósito
 

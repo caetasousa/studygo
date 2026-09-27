@@ -156,8 +156,8 @@ test.describe('legislação', () => {
 		await new Api(request, token).concurso('Captura E2E');
 		const contexto = await browser.newContext({ storageState: await request.storageState() });
 		const page = await contexto.newPage();
-		await page.goto('/legislacao');
-		await expect(page.getByRole('heading', { name: 'Legislação', level: 1 })).toBeVisible();
+		await page.goto('/legislacao/gerenciar');
+		await expect(page.getByRole('heading', { name: 'Gerenciar leis', level: 1 })).toBeVisible();
 
 		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei());
@@ -240,14 +240,14 @@ test.describe('legislação', () => {
 		expect(c.resultado.publicavel).toBe(true);
 
 		await api.concurso('Conta comum E2E');
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await abrirAdicionar(page);
 		await expect(page.getByLabel('Link da lei na fonte oficial')).toBeEditable();
 	});
 
 	test('[L11] a captura com bloqueio não pode ser publicada', async ({ page, api, conta }) => {
 		await api.concurso('Bloqueio E2E');
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'bloqueio'));
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
@@ -277,7 +277,7 @@ test.describe('legislação', () => {
 		expect((await semRevisar.json()).erro).toContain('marque como revisado');
 
 		await api.concurso('Aviso E2E');
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei('lei-exemplo', 'aviso'));
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
@@ -294,7 +294,7 @@ test.describe('legislação', () => {
 
 	test('[L13] link fora das fontes oficiais é recusado com o motivo', async ({ page, api }) => {
 		await api.concurso('Fonte E2E');
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill('https://www.exemplo.com/lei.htm');
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
@@ -437,7 +437,7 @@ test.describe('legislação', () => {
 			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
 		]);
 
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const materia = page.getByRole('region', { name: 'Legislação Institucional' });
 		await expect(materia.getByText(/^No catálogo/)).toBeVisible();
 		const outra = page.getByRole('region', { name: 'Língua Portuguesa' });
@@ -476,7 +476,7 @@ test.describe('legislação', () => {
 			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas: ['Lei nº 99.999/2026: controle externo'] },
 			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
 		]);
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await abrirAdicionar(page);
 		await page.getByLabel('Link da lei na fonte oficial').fill(linkDaLei());
 		await page.getByRole('button', { name: 'Capturar', exact: true }).click();
@@ -571,7 +571,7 @@ test.describe('legislação', () => {
 	test('[L22][L23] pesquisar o tópico mostra o que ele pede, e importar guarda só isso', async ({ page, api, conta }) => {
 		const numero = numeroUnico();
 		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026: controle externo`, 'Certificação digital']);
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const materia = page.getByRole('region', { name: 'Legislação E2E' });
 		// Só o tópico que cita norma tem pesquisa.
 		await expect(materia.getByRole('button', { name: 'Pesquisar e importar' })).toHaveCount(1);
@@ -607,7 +607,7 @@ test.describe('legislação', () => {
 		const numero = numeroUnico();
 		const headers = { Authorization: `Bearer ${conta.token}` };
 		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026: controle externo`, `Lei nº ${numero}/2026, art. 3º`]);
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const materia = page.getByRole('region', { name: 'Legislação E2E' });
 
 		await materia.getByRole('button', { name: 'Pesquisar e importar' }).first().click();
@@ -655,7 +655,7 @@ test.describe('legislação', () => {
 	test('[L26] norma sem fonte conhecida pede o link e segue', async ({ page, api }) => {
 		const numero = numeroUnico();
 		await concursoComTopico(api, numero, ['Resolução Administrativa nº 17/2024, que dispõe sobre a Política de Segurança']);
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		await page.getByRole('region', { name: 'Legislação E2E' }).getByRole('button', { name: 'Pesquisar e importar' }).click();
 
 		const importar = page.getByRole('region', { name: 'Importar do tópico' });
@@ -673,7 +673,7 @@ test.describe('legislação', () => {
 		const tema = `Lei Orgânica do Tribunal (Lei nº ${numero}/2026)`;
 		await concursoComTopico(api, numero, [tema, `Lei nº ${numeroUnico()}/2026: tema sem lei no catálogo`]);
 
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const materia = page.getByRole('region', { name: 'Legislação E2E' });
 		const topico = materia.getByRole('listitem').filter({ hasText: tema });
 		// A lei que já existe é oferecida no próprio tópico; importar de novo, não.
@@ -698,7 +698,7 @@ test.describe('legislação', () => {
 			{ nome: 'Outra Legislação', bloco: 'esp', questoes: 8, temas: [`Lei nº ${n3}/2026`] }
 		]);
 
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const materia = page.getByRole('region', { name: 'Legislação E2E' });
 		await materia.getByRole('button', { name: 'Vincular todas as sugeridas (2)' }).click();
 		await expect(materia.getByRole('link', { name: a.lei.curto })).toBeVisible();
@@ -735,7 +735,7 @@ test.describe('legislação', () => {
 		const tema = `Lei nº ${numero}/2026`;
 		await concursoComTopico(api, numero, [tema]);
 
-		await page.goto('/legislacao');
+		await page.goto('/legislacao/gerenciar');
 		const topico = page.getByRole('region', { name: 'Legislação E2E' }).getByRole('listitem').filter({ hasText: tema });
 		await expect(topico).toContainText('arts. 1º a 2º');
 		await expect(topico).not.toContainText('lei inteira');
@@ -755,5 +755,68 @@ test.describe('legislação', () => {
 		const [artigo, paragrafo, inciso] = [await recuo('art1'), await recuo('art1.par1'), await recuo('art1.inc1')];
 		expect(paragrafo).toBeGreaterThan(artigo);
 		expect(inciso).toBeGreaterThan(paragrafo);
+	});
+
+	test('[L31] a leitura mostra só as leis vinculadas, por matéria, sem importação', async ({ api, page, baseURL, conta }) => {
+		const numero = numeroUnico();
+		const p = copia(pacote(), idUnico(), numero);
+		await importar(baseURL!, p);
+		const slug = await api.concurso('Leitura E2E', [
+			{ nome: 'Legislação E2E', bloco: 'esp', questoes: 8, temas: [`Lei nº ${numero}/2026`] },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase'] }
+		]);
+		const headers = { Authorization: `Bearer ${conta.token}` };
+		const { disciplinas } = await (await page.request.get(`/api/concursos/${slug}/leis`, { headers })).json();
+		const legislacao = disciplinas.find((d: { nome: string }) => d.nome === 'Legislação E2E');
+		const res = await page.request.put(`/api/concursos/${slug}/disciplinas/${legislacao.disciplinaId}/leis/${p.lei.slug}`, { headers });
+		expect(res.status(), await res.text()).toBe(204);
+
+		await page.goto('/legislacao');
+		const materia = page.getByRole('region', { name: 'Legislação E2E' });
+		await expect(materia.getByRole('link', { name: new RegExp(p.lei.curto) })).toBeVisible();
+		// A matéria sem lei e a importação não estão aqui.
+		await expect(page.getByRole('region', { name: 'Língua Portuguesa' })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Pesquisar e importar' })).toHaveCount(0);
+		await expect(page.getByText('Adicionar lei pelo link')).toHaveCount(0);
+		await page.getByRole('link', { name: 'Gerenciar leis' }).click();
+		await expect(page).toHaveURL(/\/legislacao\/gerenciar$/);
+		await expect(page.getByText('Adicionar lei pelo link')).toBeVisible();
+	});
+
+	test('[L32] o cartão diz o que cai, os artigos e as questões respondidas', async ({ api, page, baseURL, conta }) => {
+		const p = await leiNoConcurso(api, page, conta.token, baseURL!);
+		await abrirLei(page, p.lei.slug);
+		const painel = await abrirQuestoes(page, 'Art. 1º');
+		await responder(painel, ENUNCIADO_1, 'B');
+		await painel.getByRole('button', { name: 'Fechar as questões' }).click();
+
+		await page.goto('/legislacao');
+		const cartao = page.getByRole('link', { name: new RegExp(p.lei.curto) });
+		// O recorte do tópico é o capítulo I: arts. 1º e 2º.
+		await expect(cartao).toContainText('arts. 1º a 2º');
+		await expect(cartao).toContainText('3 arts.');
+		await expect(cartao).toContainText('1 de 4 questões');
+		await cartao.click();
+		await expect(page).toHaveURL(new RegExp(`/leis/${p.lei.slug}$`));
+	});
+
+	test('[L33] a pendência do edital aparece na leitura e leva a resolvê-la', async ({ api, page, baseURL }) => {
+		const numero = numeroUnico();
+		const p = copia(pacote(), idUnico(), numero);
+		await importar(baseURL!, p);
+		await concursoComTopico(api, numero, [`Lei nº ${numero}/2026`, `Lei nº ${numeroUnico()}/2026: norma fora do catálogo`]);
+
+		await page.goto('/legislacao');
+		const aviso = page.getByRole('link', { name: /esperando vínculo/ });
+		await expect(aviso).toContainText('1 lei do catálogo esperando vínculo');
+		await expect(aviso).toContainText('1 tópico do edital sem lei no catálogo');
+		await aviso.click();
+		await expect(page).toHaveURL(/\/legislacao\/gerenciar$/);
+		await page.getByRole('button', { name: `Vincular ${p.lei.curto}`, exact: true }).click();
+		await expect(page.getByRole('link', { name: p.lei.curto }).first()).toBeVisible();
+
+		await page.goto('/legislacao');
+		await expect(page.getByRole('link', { name: /sem lei no catálogo/ })).not.toContainText('esperando vínculo');
+		await expect(page.getByRole('link', { name: new RegExp(p.lei.curto) })).toBeVisible();
 	});
 });

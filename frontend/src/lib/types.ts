@@ -668,18 +668,26 @@ export interface LeiResumo {
 	fonte: string;
 	versao: string;
 	questoes: number;
+	/** Artigos vigentes na versão ativa. */
+	artigos: number;
 	importadaEm: string;
 }
 
 /** A lei vista da matéria: o recorte que ela cobra, ou que o tópico pede. Vazio: a lei inteira. */
 export interface LeiNaMateria extends LeiResumo {
 	recorte: TrechoDoRecorte[];
+	/** Das questões ativas, quantas a pessoa respondeu e acertou (pela última resposta). */
+	respondidas: number;
+	certas: number;
 }
 
 export interface LeisDaMateria {
 	disciplinaId: string;
 	codigo: string;
 	nome: string;
+	/** Questões da matéria na prova e o peso de cada uma. */
+	questoes: number;
+	peso: number;
 	vinculadas: LeiNaMateria[];
 	sugeridas: LeiNaMateria[];
 	/**

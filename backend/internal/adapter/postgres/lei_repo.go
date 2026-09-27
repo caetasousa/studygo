@@ -29,7 +29,9 @@ func (r *LeiRepo) Catalogo(ctx context.Context) ([]lei.Resumo, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		`SELECT l.id, l.slug, l.nome, l.curto, l.fonte, l.reconhecer, v.versao, v.importada_em,
-		        (SELECT count(*) FROM leis_questoes q WHERE q.lei_id = l.id AND q.ativa), v.recorte
+		        (SELECT count(*) FROM leis_questoes q WHERE q.lei_id = l.id AND q.ativa), v.recorte,
+		        (SELECT count(*) FROM leis_dispositivos d
+		          WHERE d.versao_id = v.id AND d.tipo = 'artigo' AND NOT d.revogado)
 		   FROM leis l
 		   JOIN leis_versoes v ON v.lei_id = l.id AND v.ativa
 		  ORDER BY l.curto`,
@@ -44,11 +46,41 @@ func (r *LeiRepo) Catalogo(ctx context.Context) ([]lei.Resumo, error) {
 		var s lei.Resumo
 		if err := rows.Scan(
 			&s.Lei.ID, &s.Lei.Slug, &s.Lei.Nome, &s.Lei.Curto, &s.Lei.Fonte, &s.Lei.Reconhecer,
-			&s.Versao, &s.ImportadaEm, &s.Questoes, &s.Guardado,
+			&s.Versao, &s.ImportadaEm, &s.Questoes, &s.Guardado, &s.Artigos,
 		); err != nil {
 			return nil, fmt.Errorf("lendo lei: %w", err)
 		}
 		out = append(out, s)
+	}
+
+	return out, rows.Err()
+}
+
+func (r *LeiRepo) Progresso(ctx context.Context, usuarioID uuid.UUID) (map[uuid.UUID]lei.Progresso, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT q.lei_id, count(*), count(*) FILTER (WHERE u.acertou)
+		   FROM (SELECT DISTINCT ON (questao_id) questao_id, acertou
+		           FROM leis_respostas
+		          WHERE usuario_id = $1
+		          ORDER BY questao_id, respondida_em DESC) u
+		   JOIN leis_questoes q ON q.id = u.questao_id AND q.ativa
+		  GROUP BY q.lei_id`,
+		usuarioID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("contando respostas: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[uuid.UUID]lei.Progresso{}
+	for rows.Next() {
+		var id uuid.UUID
+		var p lei.Progresso
+		if err := rows.Scan(&id, &p.Respondidas, &p.Certas); err != nil {
+			return nil, fmt.Errorf("lendo respostas: %w", err)
+		}
+		out[id] = p
 	}
 
 	return out, rows.Err()

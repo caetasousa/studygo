@@ -346,13 +346,14 @@ type leiResumoDTO struct {
 	Fonte       string    `json:"fonte"`
 	Versao      string    `json:"versao"`
 	Questoes    int       `json:"questoes"`
+	Artigos     int       `json:"artigos"`
 	ImportadaEm time.Time `json:"importadaEm"`
 }
 
 func resumoLeiParaDTO(r lei.Resumo) leiResumoDTO {
 	return leiResumoDTO{
 		Slug: r.Lei.Slug, Nome: r.Lei.Nome, Curto: r.Lei.Curto, Fonte: r.Lei.Fonte,
-		Versao: r.Versao, Questoes: r.Questoes, ImportadaEm: r.ImportadaEm,
+		Versao: r.Versao, Questoes: r.Questoes, Artigos: r.Artigos, ImportadaEm: r.ImportadaEm,
 	}
 }
 
@@ -465,13 +466,17 @@ func trechosParaDTO(ts []lei.TrechoDoRecorte) []trechoDTO {
 
 type leiNaMateriaDTO struct {
 	leiResumoDTO
-	Recorte []trechoDTO `json:"recorte"`
+	Recorte     []trechoDTO `json:"recorte"`
+	Respondidas int         `json:"respondidas"`
+	Certas      int         `json:"certas"`
 }
 
 type leisDaMateriaDTO struct {
 	DisciplinaID string            `json:"disciplinaId"`
 	Codigo       string            `json:"codigo"`
 	Nome         string            `json:"nome"`
+	Questoes     int               `json:"questoes"`
+	Peso         int               `json:"peso"`
 	Vinculadas   []leiNaMateriaDTO `json:"vinculadas"`
 	Sugeridas    []leiNaMateriaDTO `json:"sugeridas"`
 	Temas        []temaDTO         `json:"temas"`
@@ -483,19 +488,26 @@ type temaDTO struct {
 	Sugeridas []string `json:"sugeridas"`
 }
 
+func leiNaMateriaParaDTO(r service.LeiNaMateria) leiNaMateriaDTO {
+	return leiNaMateriaDTO{
+		leiResumoDTO: resumoLeiParaDTO(r.Resumo), Recorte: trechosParaDTO(r.Recorte),
+		Respondidas: r.Progresso.Respondidas, Certas: r.Progresso.Certas,
+	}
+}
+
 func leisDaMateriaParaDTO(m service.LeisDaMateria) leisDaMateriaDTO {
 	d := leisDaMateriaDTO{
-		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome,
+		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome, Questoes: m.Questoes, Peso: m.Peso,
 		Vinculadas: []leiNaMateriaDTO{}, Sugeridas: []leiNaMateriaDTO{}, Temas: []temaDTO{},
 	}
 	for _, t := range m.Temas {
 		d.Temas = append(d.Temas, temaDTO{Texto: t.Texto, Leis: naoNula(t.Leis), Sugeridas: naoNula(t.Sugeridas)})
 	}
 	for _, r := range m.Vinculadas {
-		d.Vinculadas = append(d.Vinculadas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})
+		d.Vinculadas = append(d.Vinculadas, leiNaMateriaParaDTO(r))
 	}
 	for _, r := range m.Sugeridas {
-		d.Sugeridas = append(d.Sugeridas, leiNaMateriaDTO{resumoLeiParaDTO(r.Resumo), trechosParaDTO(r.Recorte)})
+		d.Sugeridas = append(d.Sugeridas, leiNaMateriaParaDTO(r))
 	}
 
 	return d

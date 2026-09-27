@@ -610,7 +610,8 @@ func (s *LeiService) Responder(ctx context.Context, usuarioID, questaoID uuid.UU
 // cobra (vinculada) ou que o tópico pede (sugerida).
 type LeiNaMateria struct {
 	lei.Resumo
-	Recorte []lei.TrechoDoRecorte
+	Recorte   []lei.TrechoDoRecorte
+	Progresso lei.Progresso
 }
 
 // LeisDaMateria são as leis de uma disciplina: as vinculadas e as que um
@@ -619,8 +620,11 @@ type LeisDaMateria struct {
 	DisciplinaID uuid.UUID
 	Codigo       string
 	Nome         string
-	Vinculadas   []LeiNaMateria
-	Sugeridas    []LeiNaMateria
+	// Questoes e Peso dizem quanto a matéria vale na prova.
+	Questoes   int
+	Peso       int
+	Vinculadas []LeiNaMateria
+	Sugeridas  []LeiNaMateria
 	// Temas são os tópicos da matéria e as leis vinculadas que cobrem cada um:
 	// é por eles que a importação começa.
 	Temas []TemaDaMateria
@@ -652,6 +656,11 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 		return nil, err
 	}
 
+	progresso, err := s.leis.Progresso(ctx, usuarioID)
+	if err != nil {
+		return nil, err
+	}
+
 	estruturas := map[uuid.UUID][]lei.Dispositivo{}
 	estrutura := func(id uuid.UUID) ([]lei.Dispositivo, error) {
 		if ds, ok := estruturas[id]; ok {
@@ -665,7 +674,10 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 
 	out := make([]LeisDaMateria, 0, len(c.Disciplinas))
 	for _, d := range c.Disciplinas {
-		m := LeisDaMateria{DisciplinaID: d.ID, Codigo: d.Codigo, Nome: d.Nome}
+		m := LeisDaMateria{
+			DisciplinaID: d.ID, Codigo: d.Codigo, Nome: d.Nome,
+			Questoes: d.QuestoesPadrao, Peso: concurso.PesoDe(d.Bloco, d.Peso),
+		}
 		for _, r := range catalogo {
 			i := slices.IndexFunc(vinculos[d.ID], func(v lei.Vinculo) bool { return v.LeiID == r.Lei.ID })
 			switch {
@@ -674,14 +686,14 @@ func (s *LeiService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, slug s
 				if err != nil {
 					return nil, err
 				}
-				m.Vinculadas = append(m.Vinculadas, LeiNaMateria{r, descreverVinculo(r, ds, vinculos[d.ID][i].Recorte)})
+				m.Vinculadas = append(m.Vinculadas, LeiNaMateria{r, descreverVinculo(r, ds, vinculos[d.ID][i].Recorte), progresso[r.Lei.ID]})
 			case r.Lei.CitadaEm(d.Temas):
 				ds, err := estrutura(r.Lei.ID)
 				if err != nil {
 					return nil, err
 				}
 				recorte := lei.RecorteDoEdital(r.Lei, d.Temas, ds)
-				m.Sugeridas = append(m.Sugeridas, LeiNaMateria{r, descreverVinculo(r, ds, recorte)})
+				m.Sugeridas = append(m.Sugeridas, LeiNaMateria{r, descreverVinculo(r, ds, recorte), progresso[r.Lei.ID]})
 			}
 		}
 		for _, t := range d.Temas {

@@ -29,6 +29,8 @@ type LeiRepository interface {
 	GravarQuestoes(ctx context.Context, leiID uuid.UUID, versao string, unidades []lei.Unidade, plano lei.PlanoDeImportacao) error
 
 	TextoAtivo(ctx context.Context, leiID uuid.UUID) (lei.Texto, error)
+	// Progresso conta, por lei, as questões ativas que a pessoa já respondeu.
+	Progresso(ctx context.Context, usuarioID uuid.UUID) (map[uuid.UUID]lei.Progresso, error)
 	QuestoesAtivas(ctx context.Context, leiID, usuarioID uuid.UUID) ([]lei.QuestaoComResposta, error)
 	Questao(ctx context.Context, id uuid.UUID) (lei.QuestaoPublicada, error)
 	Responder(ctx context.Context, r lei.Resposta) (lei.Resposta, error)
