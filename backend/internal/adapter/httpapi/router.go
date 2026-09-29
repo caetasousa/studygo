@@ -15,6 +15,7 @@ type Handlers struct {
 	Concurso *ConcursoHandler
 	Plano    *PlanoHandler
 	Lei      *LeiHandler
+	Mapa     *MapaHandler
 }
 
 // Limites reúne os limitadores das rotas que merecem um teto próprio.
@@ -155,6 +156,15 @@ func NewRouter(
 	protegida("GET /api/concursos/{slug}/leis", h.Lei.DoConcurso)
 	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/leis/{lei}", h.Lei.Vincular)
 	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/leis/{lei}", h.Lei.Desvincular)
+
+	// Mapas mentais: ao contrário da lei, cada mapa é da conta que o importou.
+	protegida("GET /api/mapas", h.Mapa.Catalogo)
+	protegida("POST /api/mapas", h.Mapa.Importar)
+	protegida("GET /api/mapas/{slug}", h.Mapa.Ler)
+	protegida("DELETE /api/mapas/{slug}", h.Mapa.Excluir)
+	protegida("GET /api/concursos/{slug}/mapas", h.Mapa.DoConcurso)
+	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Vincular)
+	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Desvincular)
 
 	return mux
 }

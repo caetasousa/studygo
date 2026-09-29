@@ -26,5 +26,10 @@ e2e/relatorio/
 conteudo/leis/*/original.*
 conteudo/leis/pacotes/
 
+# Mapas mentais: o texto deriva de aulas pagas, de uso pessoal — não vai para o
+# repositório público, como os PDFs. Só o README do formato é versionado.
+conteudo/mapas/*
+!conteudo/mapas/README.md
+
 # Permissões locais do Claude Code (as skills em .claude/skills são versionadas)
 .claude/settings.local.json

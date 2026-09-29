@@ -6,10 +6,12 @@
 	import { chave, lerMigrando } from '$lib/storageKey';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore, applyTheme, ehTema } from '$lib/stores/plano.svelte';
+	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Confirmacao from '$lib/components/Confirmacao.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 
 	let { children } = $props();
 
@@ -83,6 +85,14 @@
 	$effect(() => {
 		if (auth.isAuthenticated && concursoStore.ativoSlug) {
 			planoStore.carregar();
+		}
+	});
+
+	// Os mapas mentais do concurso aberto: é com eles que o cronograma sabe onde
+	// oferecer o acesso. Acompanham o concurso, como o plano.
+	$effect(() => {
+		if (auth.isAuthenticated && concursoStore.ativoSlug) {
+			void untrack(() => mapasStore.carregar());
 		}
 	});
 

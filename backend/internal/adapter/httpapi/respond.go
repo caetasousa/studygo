@@ -8,6 +8,7 @@ import (
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/lei"
+	"studygo/internal/domain/mapa"
 	"studygo/internal/domain/plano"
 	"studygo/internal/domain/usuario"
 	"studygo/internal/port"
@@ -74,6 +75,12 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, link.Error()
 	}
 
+	// O outline do mapa lista as linhas com problema, todas de uma vez.
+	var outline mapa.ErrTextoInvalido
+	if errors.As(err, &outline) {
+		return http.StatusUnprocessableEntity, outline.Error()
+	}
+
 	var pendentes lei.ErrAvisosPendentes
 	if errors.As(err, &pendentes) {
 		return http.StatusUnprocessableEntity, pendentes.Error()
@@ -121,7 +128,8 @@ func classificar(err error) (int, string) {
 	case errors.Is(err, lei.ErrNaoEncontrada),
 		errors.Is(err, lei.ErrQuestaoNaoEncontrada),
 		errors.Is(err, lei.ErrCapturaNaoEncontrada),
-		errors.Is(err, lei.ErrFonteNaoEncontrada):
+		errors.Is(err, lei.ErrFonteNaoEncontrada),
+		errors.Is(err, mapa.ErrNaoEncontrado):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),

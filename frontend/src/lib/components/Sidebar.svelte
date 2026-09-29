@@ -4,6 +4,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { diffDays, hojeISO } from '$lib/format';
 	import SidebarNavItem from './SidebarNavItem.svelte';
 	import IconButton from './IconButton.svelte';
@@ -37,6 +38,7 @@
 			itens: [
 				{ href: '/conteudo', icon: 'conteudo', label: 'Conteúdo programático' },
 				{ href: '/legislacao', icon: 'lei', label: 'Legislação' },
+				{ href: '/mapas', icon: 'mapa', label: 'Mapas mentais' },
 				{ href: '/datas', icon: 'datas', label: 'Datas do edital' }
 			]
 		},
@@ -145,6 +147,7 @@
 				onclick={() => {
 					concursoStore.limpar();
 					planoStore.limpar();
+					mapasStore.limpar();
 					auth.logout();
 				}}>Sair</button
 			>

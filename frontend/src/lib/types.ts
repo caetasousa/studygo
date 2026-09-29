@@ -832,3 +832,50 @@ export interface ImportacaoDeQuestoes {
 	desativadas: number;
 	mantidas: number;
 }
+
+// ---- mapas mentais ----
+
+/** O que o item é, além de texto: a tela o destaca para quem revisa. */
+export type MarcaDoItem = '' | 'def' | 'pegadinha' | 'cai' | 'ex' | 'questao';
+
+/** Um ponto do mapa e tudo o que está abaixo dele. */
+export interface ItemDoMapa {
+	texto: string;
+	marca: MarcaDoItem;
+	filhos: ItemDoMapa[];
+}
+
+export interface MapaResumo {
+	slug: string;
+	titulo: string;
+	fonte: string;
+	/** A matéria como a fonte a chama; só orienta o vínculo. */
+	materia: string;
+	/** Itens de cima (os ramos principais). */
+	ramos: number;
+	/** Todos os itens do mapa. */
+	itens: number;
+	importadoEm: string;
+}
+
+/** O mapa aberto: os ramos principais e tudo o que há abaixo deles. */
+export interface MapaLido {
+	mapa: MapaResumo;
+	arvore: ItemDoMapa[];
+}
+
+export interface MapaImportado {
+	mapa: MapaResumo;
+	/** Falso quando o slug já existia: o conteúdo foi trocado. */
+	novo: boolean;
+	/** As matérias do concurso aberto a que o mapa já foi vinculado. */
+	vinculadas: { codigo: string; nome: string }[];
+}
+
+/** Uma matéria do concurso com os mapas vinculados a ela (vazio se nenhum). */
+export interface MapasDaMateria {
+	disciplinaId: string;
+	codigo: string;
+	nome: string;
+	mapas: MapaResumo[];
+}

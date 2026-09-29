@@ -33,7 +33,8 @@
 		| 'topo'
 		| 'subir'
 		| 'descer'
-		| 'link';
+		| 'link'
+		| 'mapa';
 
 	/** Icon sizes, in px. `nav` is the sidebar/menu size; `sm` supports a label
 	 *  (metric badges, inline hints); `md` is the default for buttons and titles. */
@@ -195,6 +196,13 @@
 		<path d="M13 5h6v6" />
 		<path d="m19 5-8 8" />
 		<path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+	{:else if name === 'mapa'}
+		<!-- a central idea with three branches: the mind map -->
+		<circle cx="12" cy="12" r="2.4" />
+		<circle cx="5.6" cy="6.4" r="1.7" />
+		<circle cx="18.4" cy="6.4" r="1.7" />
+		<circle cx="12" cy="19" r="1.7" />
+		<path d="M10.3 10.4 7 7.6M13.7 10.4 17 7.6M12 14.4v2.9" />
 	{/if}
 </svg>
 

@@ -23,6 +23,10 @@ import type {
 	LeiResumo,
 	LeisDaMateria,
 	LeituraDeLei,
+	MapaImportado,
+	MapaLido,
+	MapaResumo,
+	MapasDaMateria,
 	PedidoDeCaptura,
 	PedidoDePublicacao,
 	PesquisaDoTema,
@@ -161,6 +165,33 @@ function bodyDe(fonte: FonteEdital | null, extras: ExtrasEdital = {}): RequestIn
 }
 
 export const api = {
+	// ---- mapas mentais ----
+	listarMapas: () => request<{ mapas: MapaResumo[] }>('/api/mapas'),
+
+	/**
+	 * Importa o outline do mapa. Com o concurso aberto, o servidor vincula o mapa
+	 * às matérias dele que o texto indica.
+	 */
+	importarMapa: (texto: string, concurso?: string | null) =>
+		request<MapaImportado>('/api/mapas', {
+			method: 'POST',
+			body: JSON.stringify({ texto, concurso: concurso ?? '' })
+		}),
+
+	lerMapa: (slug: string) => request<MapaLido>(`/api/mapas/${encodeURIComponent(slug)}`),
+
+	excluirMapa: (slug: string) => request<void>(`/api/mapas/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+
+	/** Todas as matérias do concurso, cada uma com os mapas vinculados a ela. */
+	mapasDoConcurso: (slug: string) =>
+		request<{ disciplinas: MapasDaMateria[] }>(`/api/concursos/${encodeURIComponent(slug)}/mapas`),
+
+	vincularMapa: (slug: string, disciplinaId: string, mapa: string, ligar: boolean) =>
+		request<void>(
+			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/mapas/${encodeURIComponent(mapa)}`,
+			{ method: ligar ? 'PUT' : 'DELETE' }
+		),
+
 	// ---- legislação ----
 	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),
 

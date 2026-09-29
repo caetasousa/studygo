@@ -2,6 +2,7 @@
 	import NavIcon from './NavIcon.svelte';
 	import IconButton from './IconButton.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { semNumeroInicial } from '$lib/estudo';
 	import { tagStyle } from '$lib/format';
 	import type { Atividade } from '$lib/types';
@@ -74,6 +75,16 @@
 	const cor = $derived(disc[item.disciplina]?.cor ?? 0);
 	const tema = $derived(semNumeroInicial(item.tema));
 
+	// Os mapas mentais da matéria. Com um só, o ícone abre o mapa; com vários,
+	// abre a lista da matéria — nenhum fica fora de alcance.
+	const mapas = $derived(mapasStore.doCodigo(item.disciplina));
+	const mapaUrl = $derived(
+		mapas.length === 1 ? `/mapas/${mapas[0].slug}` : `/mapas?materia=${encodeURIComponent(item.disciplina)}`
+	);
+	const mapaRotulo = $derived(
+		mapas.length === 1 ? `Abrir o mapa mental: ${mapas[0].titulo}` : `Mapas mentais de ${nome} (${mapas.length})`
+	);
+
 	// An activity the backend has not given an id to cannot be addressed yet, and
 	// one already marked done must not move: that would rewrite what was studied.
 	const movivel = $derived(podeMover && !!item.id && !concluida);
@@ -108,6 +119,11 @@
 	</button>
 
 	<span class="acoes">
+		{#if mapas.length > 0}
+			<a class="tec" href={mapaUrl} title={mapaRotulo} aria-label={mapaRotulo}>
+				<NavIcon name="mapa" size="sm" />
+			</a>
+		{/if}
 		{#if tecUrl}
 			<a
 				class="tec"

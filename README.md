@@ -47,6 +47,11 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   artigos, incisos e alíneas com link direto para cada dispositivo. Clique no
   artigo e resolva as questões (estilo da banca) que o citam; o gabarito vem
   com o trecho da lei grifado, e cada artigo mostra quanto você acertou.
+- **Mapas mentais** — o conteúdo de cada aula em galhos, com as definições, as
+  pegadinhas e o que cai em prova marcados. O mapa é escrito como um outline de
+  texto, importado pela tela e vinculado à matéria; o cronograma oferece o
+  acesso nas atividades dela. Abre como uma página de tópicos recolhíveis, feita
+  para ler também no celular e no tablet, com filtro. É da conta que o importou.
 - **Lembretes de revisão espaçada** — um worker calcula os temas de D-1/D-7/D-30
   que vencem no dia (hoje só loga; e-mail fica atrás da mesma interface).
 - **Multiusuário** — conta por e-mail/senha (argon2id + JWT), cada usuário com

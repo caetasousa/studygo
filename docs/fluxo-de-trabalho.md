@@ -247,6 +247,22 @@ Tudo pela tela, sem comando:
 Como a pesquisa e a captura podem errar, e o que elas conferem antes de
 liberar a publicação, está em `edital-processor/app/leis/README.md`.
 
+## 🧠 Mapas mentais: montar e importar
+
+1. **Montar.** Mande o PDF da aula ao Claude Code e peça o mapa mental: ele
+   segue `.claude/skills/mapa-mental` e grava `conteudo/mapas/<slug>.md`,
+   cobrindo o material inteiro. O texto **não vai para o git** — deriva de aula
+   paga e o repositório é público; só o README da pasta é versionado.
+2. **Importar.** **Mapas mentais → Importar mapa**: escolher o arquivo já
+   importa. Com o concurso aberto, o mapa é vinculado às matérias que o texto
+   indica (`materia:` ou `reconhecer:`) e o cronograma passa a oferecê-lo nelas.
+   Texto com problema é recusado inteiro, e a mensagem diz a linha; importar de
+   novo o mesmo mapa troca o conteúdo e mantém os vínculos.
+3. **No servidor.** Cada conta importa os próprios mapas (não há catálogo
+   compartilhado): quem estuda importa o mesmo arquivo pela tela do servidor.
+
+O formato do outline está em `conteudo/mapas/README.md`.
+
 ## 📖 Resumo dos alvos
 
 | Alvo | Para quê |

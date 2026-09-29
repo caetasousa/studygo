@@ -120,6 +120,36 @@ Planalto terminados em `e2e/…`.
 | L32 | o cartão da lei não diz o que cai dela, quantos artigos tem, nem quantas questões a pessoa já respondeu | não dá para escolher o que estudar agora, nem ver o avanço |
 | L33 | a lei do catálogo sem vínculo some da leitura, aparece sem caminho para resolver, ou o aviso fica por causa de tópico que nenhum vínculo resolve (o PDTI, uma instrução normativa de outra matéria) | a norma que cai na prova fica de fora; ou o aviso nunca some |
 
+## M. Mapas mentais
+
+O mapa mental é escrito fora do app, a partir de uma aula, como um outline de
+texto (`# título`, metadados `chave: valor` e itens `- texto` com recuo de dois
+espaços), e entra pela tela: **Mapas mentais → Importar mapa**. Ele é da conta
+que importou: é material de estudo pessoal, e não há catálogo compartilhado
+como o das leis. O vínculo com a matéria é pelo id da disciplina, e é por ele
+que o cronograma oferece o mapa. O mapa abre como uma página de tópicos
+recolhíveis, no jeito do Notion (escolha de 28/09/2026): cada ramo é uma seção
+colorida, e a página tem de ler bem no celular e no tablet, onde boa parte do
+estudo acontece.
+
+| id | Como quebra | O que o usuário vê |
+|---|---|---|
+| M1 | importar o texto não gera um mapa fiel: um item se perde, vai para o pai errado ou troca de ordem | o mapa abre com ramos faltando ou embaralhados |
+| M2 | importar o mesmo mapa de novo duplica o mapa, ou apaga o vínculo com a matéria | dois mapas iguais na lista; o acesso pelo cronograma some |
+| M3 | um texto com problema (sem título, recuo que pula um nível, marca desconhecida, item vazio, tabulação, chave desconhecida) é gravado pela metade, ou a recusa não diz a linha | mapa torto no app; ou a pessoa não sabe o que corrigir |
+| M4 | o mapa de uma conta aparece, abre, é vinculado ou excluído por outra conta | o material de estudo de um vaza para o outro |
+| M5 | as marcas (`[def]`, `[pegadinha]`, `[cai]`, `[ex]`, `[questao]`) aparecem como texto cru ou perdem o destaque, ou o **negrito** aparece com asteriscos | "[pegadinha]" escrito no item; nada destaca o que cai na prova |
+| M6 | a lista de mapas não agrupa pela matéria vinculada, ou esconde o mapa que ainda não tem matéria | o mapa importado "some", ou aparece na matéria errada |
+| M7 | vincular o mapa a uma matéria (ou desvincular) não fica gravado, ou vale para a disciplina de outro concurso | o vínculo some ao recarregar; o mapa aparece no concurso errado |
+| M8 | importar com o concurso aberto não vincula à matéria que o texto indica (`materia:` ou `reconhecer:`), ou vincula a uma que nada tem a ver | importa e o cronograma não oferece o mapa; ou oferece o de outra matéria |
+| M9 | o cronograma (ou o Hoje) não oferece o mapa da matéria que tem mapa, ou oferece o de uma matéria que não tem | não acha o mapa por onde estuda; ou um ícone sem destino |
+| M10 | a matéria com mais de um mapa só deixa abrir um deles pelo cronograma | o segundo mapa fica fora de alcance por onde se estuda |
+| M11 | excluir o mapa não pede confirmação, cancelar exclui mesmo assim, ou o cronograma continua apontando para o mapa apagado | perda por um clique; um link quebrado |
+| M12 | algum item do mapa fica sem caminho até a tela: um tópico que não abre, "Abrir tudo" que deixa algo fechado, ou "Recolher tudo" que some com os ramos | parte da matéria "não existe" no mapa |
+| M13 | um texto gigante (itens demais, fundo demais, linha enorme) é aceito sem limite | uma requisição que derruba o servidor, ou um mapa ilegível |
+| M14 | o filtro não acha o termo digitado sem acento ou em outra caixa, esconde o caminho até o item achado, ou mostra o item achado sem o que há dentro dele | a busca diz que não há o que existe; ou acha o título e esconde o que ele diz |
+| M15 | no celular ou no tablet a página rola para o lado, o tópico mais fundo fica espremido numa coluna estreita, o alvo do toque é pequeno demais, tocar no filtro dá zoom na página, ou o mapa abre todo desdobrado e o último ramo fica a várias telas de distância | o mapa não se lê no aparelho em que se estuda |
+
 ## Fora da suíte, de propósito
 
 - **A importação de desempenho do TEC** (o CSV do TEC no caderno de erros)

@@ -116,6 +116,9 @@ erDiagram
     atividades }o--|| disciplinas : "por id, nunca por valor"
     planos    ||--o{ registros_dia : "nota + cauda de revisão"
     planos    ||--o{ anotacoes : "caderno de erros"
+    usuarios  ||--o{ mapas : "importa"
+    mapas     ||--o{ mapas_itens : "árvore em pré-ordem"
+    disciplinas }o--o{ mapas : "disciplinas_mapas"
 ```
 
 <details>
@@ -127,6 +130,7 @@ usuarios ──┬── refresh_tokens
            │               │                 └── fontes
            │               ├── marcos
            │               └── conteudo_programatico
+           ├── mapas ──── mapas_itens        (e disciplinas_mapas ──► disciplinas)
            └── planos ─────┬── plano_disciplinas ──► disciplinas
                            ├── marco_checks ──► marcos
                            ├── anotacoes ──► disciplinas
@@ -142,7 +146,8 @@ migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
 sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
-legislação) e segue dali (a próxima é a **000012**): uma 000004 nova seria dada
+legislação) e segue dali (a 000012 criou os mapas mentais; a próxima é a
+**000013**): uma 000004 nova seria dada
 como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:
@@ -213,6 +218,44 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
 - **O vínculo lei ↔ matéria é sugerido, não imposto.** `lei.CitadaEm` procura os
   trechos de `reconhecer` ("16.168") nos tópicos da matéria; o estudante
   confirma e o vínculo vai para `disciplinas_leis`, pelo id da disciplina.
+
+### Mapas mentais (000012)
+
+```
+mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore em pré-ordem)
+        └── disciplinas_mapas ──► disciplinas
+```
+
+- **O mapa é da conta que o importou.** Deriva de material de estudo pessoal (uma
+  aula paga, por exemplo), então não há catálogo compartilhado, ao contrário da
+  lei — e o texto dos mapas fica fora do repositório público (`.gitignore`). Toda
+  consulta leva o dono; o que não é dele responde 404, como se não existisse.
+- **O mapa entra como texto.** Um outline (`# título`, metadados, itens `- texto`
+  com 2 espaços por nível), escrito fora do app — o formato está em
+  `conteudo/mapas/README.md` e o roteiro em `.claude/skills/mapa-mental` — e
+  importado pela tela. `mapa.Ler` (domínio, sem JSON) valida e devolve todos os
+  problemas de uma vez, com a linha de cada um. Limites: 5.000 itens, 10 níveis,
+  500 caracteres por item.
+- **A árvore é guardada achatada, em pré-ordem** (`ordem`, `pai`): a PK, a FK
+  composta `(mapa_id, pai) → (mapa_id, ordem)` e o `CHECK (pai < ordem)` deixam o
+  banco garantir que não há item órfão nem ciclo. Gravar é um COPY; ler é um
+  SELECT ordenado, e a árvore se monta em Go.
+- **Importar o mesmo slug troca o conteúdo e mantém o id** — e, com ele, os
+  vínculos: o mapa se corrige e se reimporta sem perder a matéria.
+- **O vínculo mapa ↔ matéria é pelo id da disciplina**, como o da lei. Importando
+  com um concurso aberto, o mapa é vinculado às matérias que o texto indica
+  (`materia:` bate com o nome; `reconhecer:` aparece num tópico) sem perguntar —
+  diferente da lei, porque um vínculo de mapa errado não custa nada e se desfaz
+  num clique. O cronograma só oferece o mapa a quem o vinculou.
+- **A tela é uma só: a página de tópicos recolhíveis, no jeito do Notion**
+  (escolha de 28/09/2026, entre quatro modelos testados). O motivo foi o
+  aparelho: boa parte do estudo é no celular e no tablet, e uma página que se lê
+  de cima para baixo dispensa arrastar e dar zoom. Por isso, com toque, cada
+  linha tem altura de dedo e os campos têm 16px (menos que isso, o iPhone dá zoom
+  ao tocar); no celular o mapa abre como sumário, só com os ramos, e o recuo por
+  nível encolhe. O filtro ignora acento e caixa, abre o caminho até cada achado e
+  mostra o que há dentro dele, com um estado de aberto próprio que não mexe no de
+  quem lê.
 
 ### O dia vira em Brasília
 
@@ -339,6 +382,11 @@ GET    /api/leis/{slug}                 ← texto ativo + questões (sem gabarit
 POST   /api/leis/questoes/{id}/respostas
 GET    /api/concursos/{slug}/leis       ← por matéria: vinculadas e sugeridas pelo tópico
 PUT|DELETE /api/concursos/{slug}/disciplinas/{id}/leis/{lei}
+
+GET    /api/mapas                       POST /api/mapas   ← importar o outline ({texto, concurso})
+GET    /api/mapas/{slug}                DELETE /api/mapas/{slug}
+GET    /api/concursos/{slug}/mapas      ← TODAS as matérias, cada uma com os mapas vinculados
+PUT|DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}
 ```
 
 ---
@@ -356,6 +404,7 @@ Conceitos de negócio em português, sem acento nos identificadores:
 | Atividade | `plano.Atividade` | `atividades` | `itens` |
 | Registro | `plano.RegistroAtividade` | `registros_atividade` | campos da atividade |
 | Anotação | `plano.Anotacao` | `anotacoes` | `anotacoes` |
+| Mapa mental | `mapa.Mapa` | `mapas` | `mapa` |
 
 Termos técnicos universais ficam em inglês: HTTP, JSON, JWT, handler,
 middleware, repository, adapter, service, port, worker, request, response,

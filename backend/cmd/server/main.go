@@ -77,6 +77,7 @@ func run(logger *slog.Logger) error {
 
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
 	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo, capturador)
+	mapaService := service.NewMapaService(postgres.NewMapaRepo(pool), concursoRepo)
 
 	// Os seis casos de uso do plano compartilham as mesmas dependências.
 	deps := service.Dependencias{
@@ -107,7 +108,8 @@ func run(logger *slog.Logger) error {
 			service.NewImportacaoTECService(deps),
 			logger,
 		),
-		Lei: httpapi.NewLeiHandler(leiService, logger),
+		Lei:  httpapi.NewLeiHandler(leiService, logger),
+		Mapa: httpapi.NewMapaHandler(mapaService, logger),
 	}
 
 	router := httpapi.NewRouter(handlers, tokens, authService, httpapi.LimitesPadrao(logger), logger)

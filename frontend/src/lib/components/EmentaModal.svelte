@@ -1,8 +1,10 @@
 <script lang="ts">
 	import IconButton from './IconButton.svelte';
+	import NavIcon from './NavIcon.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
+	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { pareceEmentaCorrida, ROTULO_BLOCO, semNumeroInicial } from '$lib/estudo';
-	import { partesTema, tagStyle } from '$lib/format';
+	import { nf0, partesTema, tagStyle } from '$lib/format';
 	import type { Atividade } from '$lib/types';
 
 	/**
@@ -41,6 +43,8 @@
 	const nome = $derived(disc?.nome ?? codigo);
 	const temas = $derived(disc?.temas ?? []);
 	const slug = $derived(plano?.concurso.slug ?? '');
+	// Os mapas mentais da matéria: o que se revê antes de abrir a ementa.
+	const mapas = $derived(mapasStore.doCodigo(codigo));
 
 	/** Comparação de assunto: sem a numeração da frente, sem caixa, sem espaço sobrando. */
 	const chave = (t: string) => semNumeroInicial(t).toLowerCase().replace(/\s+/g, ' ').trim();
@@ -171,6 +175,22 @@
 		</header>
 
 		<div class="corpo">
+			{#if mapas.length > 0}
+				<section class="mapas" aria-label="Mapas mentais da matéria">
+					<h3>Mapas mentais</h3>
+					<ul>
+						{#each mapas as m (m.slug)}
+							<li>
+								<a href="/mapas/{m.slug}">
+									<NavIcon name="mapa" size="sm" />
+									<span class="m-titulo">{m.titulo}</span>
+									<span class="m-conta">{m.ramos} ramos · {nf0.format(m.itens)} itens</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
 			{#if temas.length === 0}
 				<p class="vazia">
 					Sem tópicos cadastrados — os dias desta matéria mostram só o nome dela. Os temas ficam em
@@ -344,6 +364,50 @@
 	/* O que já foi estudado sai da frente sem sumir: é a ementa inteira que se lê. */
 	.topicos li.estudado .txt {
 		color: var(--text-muted);
+	}
+	/* Os mapas mentais da matéria ficam acima da ementa: é o que se revê antes. */
+	.mapas {
+		margin: 8px 8px 6px;
+		padding-bottom: 10px;
+		border-bottom: 1px solid var(--border);
+	}
+	.mapas h3 {
+		margin: 0 0 6px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+	}
+	.mapas ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.mapas a {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		padding: 7px 8px;
+		border-radius: 7px;
+		color: var(--text);
+		font-size: 14px;
+		text-decoration: none;
+	}
+	.mapas a:hover {
+		background: var(--bg-hover);
+	}
+	.m-titulo {
+		flex: 1;
+		min-width: 0;
+		font-weight: 600;
+	}
+	.m-conta {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		color: var(--text-faint);
 	}
 	.dica {
 		margin: 8px 8px 4px;

@@ -25,6 +25,11 @@ artigo por artigo, e cada artigo traz questões sobre ele. A lei não é baixada
 pelo app — ela é organizada no computador de quem cuida do conteúdo, conferida
 palavra por palavra com o texto oficial, e só então publicada.
 
+Para revisar uma aula de relance, há os **Mapas mentais**: o conteúdo dela
+organizado em galhos, com o que cai em prova em destaque. Cada pessoa importa
+os seus (são material de estudo pessoal), liga cada um à matéria a que
+pertence, e o cronograma passa a oferecer o mapa nas atividades daquela matéria.
+
 ---
 
 ## As quatro peças
