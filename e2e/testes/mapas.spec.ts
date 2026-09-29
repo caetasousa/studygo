@@ -766,6 +766,15 @@ test.describe('questões dos mapas', () => {
 		});
 		await expect(page.getByRole('alert')).toContainText('o ramo "Vulcanismo" não existe no mapa');
 		await expect(page.getByText('Questões por ramo')).toHaveCount(0);
+
+		// Alternativas que só diferem na caixa ou na pontuação são outras alternativas:
+		// é o que uma questão de tokenização cobra.
+		const tokens = com((a) => {
+			a.questoes[3].alternativas = ['Chuva!', "['Chuva', '!']", 'CHUVA!', 'chuva'];
+		});
+		const aceita = await importarQuestoes(page.request, conta.token, tokens);
+		expect(aceita.status, JSON.stringify(aceita.corpo)).toBe(200);
+		expect((await questoesDo(page.request, conta.token))[3].alternativas).toEqual(tokens.questoes[3].alternativas);
 	});
 
 	test('[M18] o gabarito só vem com a resposta, a correção acerta nos dois tipos, e responder de novo conta a nova', async ({ page, api, conta }) => {

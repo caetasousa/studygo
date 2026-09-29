@@ -227,10 +227,12 @@ func (q Questao) problemas(ramos map[string]string) []string {
 	vistas := map[string]bool{}
 
 	for i, alt := range q.Alternativas {
-		chave := dobrar(alt)
+		// Repetida é a de mesmo texto. Caixa e pontuação contam: numa questão
+		// de tokenização, "['A', '!']" e "A!" são alternativas diferentes.
+		chave := strings.Join(strings.Fields(alt), " ")
 
 		switch {
-		case chave == "":
+		case dobrar(alt) == "":
 			add("alternativa %s vazia", letras[i])
 		case vistas[chave]:
 			add("alternativa %s repete outra", letras[i])
