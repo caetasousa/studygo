@@ -23,10 +23,12 @@ import type {
 	LeiResumo,
 	LeisDaMateria,
 	LeituraDeLei,
+	CorrecaoDoMapa,
 	MapaImportado,
 	MapaLido,
 	MapaResumo,
 	MapasDaMateria,
+	QuestoesImportadas,
 	PedidoDeCaptura,
 	PedidoDePublicacao,
 	PesquisaDoTema,
@@ -181,6 +183,23 @@ export const api = {
 	lerMapa: (slug: string) => request<MapaLido>(`/api/mapas/${encodeURIComponent(slug)}`),
 
 	excluirMapa: (slug: string) => request<void>(`/api/mapas/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+
+	/**
+	 * Importa o <slug>.questoes.json do mapa. O texto do arquivo vai como está:
+	 * quem o confere é o servidor, que devolve todos os problemas de uma vez.
+	 */
+	importarQuestoesDoMapa: (slug: string, conteudo: string) =>
+		request<QuestoesImportadas>(`/api/mapas/${encodeURIComponent(slug)}/questoes`, {
+			method: 'POST',
+			body: conteudo
+		}),
+
+	/** Responde uma questão do mapa: a letra, ou CERTO/ERRADO. */
+	responderQuestaoDoMapa: (id: string, resposta: string) =>
+		request<CorrecaoDoMapa>(`/api/mapas/questoes/${encodeURIComponent(id)}/respostas`, {
+			method: 'POST',
+			body: JSON.stringify({ resposta })
+		}),
 
 	/** Todas as matérias do concurso, cada uma com os mapas vinculados a ela. */
 	mapasDoConcurso: (slug: string) =>

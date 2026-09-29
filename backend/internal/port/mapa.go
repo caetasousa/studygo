@@ -35,4 +35,19 @@ type MapaRepository interface {
 	// Vincular é idempotente: vincular de novo não muda nada.
 	Vincular(ctx context.Context, disciplinaID, mapaID uuid.UUID) error
 	Desvincular(ctx context.Context, disciplinaID, mapaID uuid.UUID) error
+
+	// QuestoesGravadas devolve todas as questões do mapa, ativas ou não: é
+	// com elas que a importação decide o que é novo, o que mudou e o que saiu.
+	QuestoesGravadas(ctx context.Context, mapaID uuid.UUID) ([]mapa.QuestaoGravada, error)
+	// GravarQuestoes aplica o plano numa transação: o arquivo entra inteiro
+	// ou não entra.
+	GravarQuestoes(ctx context.Context, mapaID uuid.UUID, plano mapa.PlanoDeQuestoes) error
+	// Questoes lista as questões ativas do mapa, na ordem do arquivo, com a
+	// última resposta de cada uma.
+	Questoes(ctx context.Context, mapaID uuid.UUID) ([]mapa.QuestaoComResposta, error)
+	// QuestaoDoDono carrega a questão ativa de um mapa da conta; a de outra
+	// conta, ou retirada, responde ErrQuestaoNaoEncontrada.
+	QuestaoDoDono(ctx context.Context, usuarioID, questaoID uuid.UUID) (mapa.QuestaoComResposta, error)
+	// Responder grava uma tentativa; as anteriores ficam.
+	Responder(ctx context.Context, questaoID uuid.UUID, r mapa.Resposta) (mapa.Resposta, error)
 }

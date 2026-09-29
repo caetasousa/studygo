@@ -6,16 +6,19 @@
 	import { tagStyle } from '$lib/format';
 	import { indexar } from '$lib/mapas/arvore';
 	import Mapa from '$lib/mapas/Mapa.svelte';
+	import Questoes from '$lib/mapas/Questoes.svelte';
+	import { descreverPlacar, placar, porRamo } from '$lib/mapas/questoes';
 	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import type { MapaLido } from '$lib/types';
+	import type { CorrecaoDoMapa, MapaLido, QuestaoDoMapa, QuestoesImportadas } from '$lib/types';
 
 	/**
 	 * Um mapa mental aberto: o cabeçalho com as propriedades (matérias, fonte,
-	 * tamanho) e o mapa como uma página de tópicos recolhíveis. Manter o mapa
-	 * (excluir) fica recolhido no fim, como na página da lei.
+	 * tamanho) e o mapa como uma página de tópicos recolhíveis. As questões da
+	 * aula vêm depois do mapa, por ramo, e se resolvem num diálogo, como as da
+	 * lei. Manter o mapa (importar questões, excluir) fica recolhido no fim.
 	 */
 	const slug = $derived(page.params.slug ?? '');
 
@@ -62,12 +65,69 @@
 
 	const cor = (codigo: string) => planoStore.discIndex[codigo]?.cor ?? 0;
 
+	// --- questões ----------------------------------------------------------
+	const questoes = $derived(lido?.questoes ?? []);
+	const grupos = $derived(lido ? porRamo(lido.arvore, questoes) : []);
+	let aberto = $state<{ titulo: string; ids: string[] } | null>(null);
+	const doDialogo = $derived(
+		aberto ? questoes.filter((q) => aberto!.ids.includes(q.id)) : ([] as QuestaoDoMapa[])
+	);
+
+	function abrirQuestoes(titulo: string, qs: QuestaoDoMapa[]) {
+		aberto = { titulo, ids: qs.map((q) => q.id) };
+	}
+
+	/** A resposta atualiza o placar sem recarregar o mapa (e sem fechar os tópicos abertos). */
+	function respondida(id: string, c: CorrecaoDoMapa) {
+		for (const q of lido?.questoes ?? []) {
+			if (q.id === id) q.resposta = c;
+		}
+	}
+
+	let importandoQuestoes = $state(false);
+	let avisoQuestoes = $state<string | null>(null);
+	let erroQuestoes = $state<string | null>(null);
+
+	function descreverImportacao(r: QuestoesImportadas): string {
+		const n = (x: number, um: string, varios: string) => (x === 1 ? `1 ${um}` : `${x} ${varios}`);
+		const partes = [
+			r.novas && n(r.novas, 'questão nova', 'questões novas'),
+			r.atualizadas && n(r.atualizadas, 'atualizada', 'atualizadas'),
+			r.desativadas && n(r.desativadas, 'retirada', 'retiradas'),
+			r.mantidas && n(r.mantidas, 'sem mudança', 'sem mudança')
+		].filter(Boolean);
+		return partes.length ? `${partes.join(', ')}.` : 'Nada mudou.';
+	}
+
+	// O arquivo vai como está: é o servidor que confere e lista os problemas.
+	async function importarQuestoes(e: Event & { currentTarget: HTMLInputElement }) {
+		const arquivo = e.currentTarget.files?.[0];
+		e.currentTarget.value = '';
+		if (!arquivo) return;
+		importandoQuestoes = true;
+		avisoQuestoes = null;
+		erroQuestoes = null;
+		try {
+			const r = await api.importarQuestoesDoMapa(slug, await arquivo.text());
+			avisoQuestoes = descreverImportacao(r);
+			const novo = await api.lerMapa(slug);
+			if (lido) lido.questoes = novo.questoes;
+		} catch (err) {
+			erroQuestoes = err instanceof Error ? err.message : 'A importação das questões falhou';
+		} finally {
+			importandoQuestoes = false;
+		}
+	}
+
 	// --- excluir -----------------------------------------------------------
 	async function excluir() {
 		if (!lido) return;
+		const total = lido.questoes.length;
+		const junto =
+			total === 0 ? 'O mapa' : total === 1 ? 'O mapa, a questão e as suas respostas' : `O mapa, as ${total} questões e as suas respostas`;
 		const ok = await confirmar({
 			titulo: `Excluir “${lido.mapa.titulo}”?`,
-			texto: 'O mapa e o vínculo dele com as matérias saem do app. Para tê-lo de volta, é só importar o texto de novo.',
+			texto: `${junto} e o vínculo com as matérias saem do app. Para tê-lo de volta, é só importar de novo.`,
 			rotulo: 'Excluir mapa',
 			tom: 'perigo'
 		});
@@ -148,6 +208,17 @@
 			<dt>Tamanho</dt>
 			<dd>{lido.mapa.ramos} {lido.mapa.ramos === 1 ? 'ramo' : 'ramos'} · {nf.format(lido.mapa.itens)} itens</dd>
 		</div>
+		{#if questoes.length > 0}
+			<div class="linha">
+				<dt>Questões</dt>
+				<dd>
+					<span>{descreverPlacar(placar(questoes))}</span>
+					<button type="button" class="btn resolver" onclick={() => abrirQuestoes('Todas', questoes)}>
+						Resolver todas ({questoes.length})
+					</button>
+				</dd>
+			</div>
+		{/if}
 	</dl>
 
 	{#if erroVinculo}<div class="form-error" role="alert">{erroVinculo}</div>{/if}
@@ -158,14 +229,57 @@
 		{/key}
 	</div>
 
+	{#if grupos.length > 0}
+		<section class="questoes" aria-labelledby="questoes-por-ramo">
+			<h2 id="questoes-por-ramo" class="sec">Questões por ramo</h2>
+			<ul class="ramos" aria-label="Questões por ramo">
+				{#each grupos as g (g.ramo)}
+					{@const p = placar(g.questoes)}
+					<li>
+						<button type="button" class="ramo" onclick={() => abrirQuestoes(g.ramo, g.questoes)}>
+							<span class="r-titulo">{g.ramo}</span>
+							<span class="r-placar">
+								{p.total === 1 ? '1 questão' : `${p.total} questões`}{#if p.respondidas > 0}
+									· {p.respondidas} de {p.total} respondidas · {p.certas === 1 ? '1 certa' : `${p.certas} certas`}{/if}
+							</span>
+							<span class="barra" aria-hidden="true">
+								<span class="certas" style="width:{(p.certas / p.total) * 100}%"></span>
+								<span class="erradas" style="width:{(p.erradas / p.total) * 100}%"></span>
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
+
 	<details class="manter">
 		<summary>Manter este mapa</summary>
 		<p class="page-sub">
 			Para corrigir ou ampliar o mapa, importe o texto de novo em <a href="/mapas">Mapas mentais</a>: o mesmo
 			endereço troca o conteúdo e mantém as matérias vinculadas.
 		</p>
+
+		<h2 class="sec">Importar questões</h2>
+		<p class="page-sub">
+			O <code>{slug}.questoes.json</code>, com as questões da aula, cada uma presa a um ramo do mapa. Importar de novo
+			não duplica nada, e as respostas das questões que continuam ficam.
+		</p>
+		{#if avisoQuestoes}<p class="ok" role="status">{avisoQuestoes}</p>{/if}
+		{#if erroQuestoes}<div class="form-error" role="alert">{erroQuestoes}</div>{/if}
+		<label class="arquivo">
+			<span>Questões do mapa (.json)</span>
+			<input type="file" accept=".json,application/json" disabled={importandoQuestoes} onchange={importarQuestoes} />
+		</label>
+		{#if importandoQuestoes}<p class="page-sub">Importando…</p>{/if}
+
+		<h2 class="sec">Excluir</h2>
 		<button type="button" class="btn danger" onclick={excluir}>Excluir mapa</button>
 	</details>
+
+	{#if aberto}
+		<Questoes titulo={aberto.titulo} questoes={doDialogo} onrespondida={respondida} onclose={() => (aberto = null)} />
+	{/if}
 {/if}
 
 <style>
@@ -293,6 +407,92 @@
 	}
 	.manter .page-sub {
 		margin: 10px 0 12px;
+	}
+	.manter .sec {
+		margin: 18px 0 0;
+		font-size: 14px;
+		font-weight: 700;
+	}
+	.manter code {
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+	.ok {
+		margin: 0 0 10px;
+		font-size: 13px;
+		color: var(--good);
+	}
+	.arquivo {
+		display: grid;
+		gap: 5px;
+		margin-bottom: 8px;
+		font-size: 12.5px;
+		color: var(--text-muted);
+	}
+	.resolver {
+		padding: 5px 10px;
+	}
+
+	/* As questões por ramo, como as questões por unidade da lei. */
+	.questoes {
+		margin-top: 32px;
+		max-width: 860px;
+	}
+	.questoes .sec {
+		margin: 0 0 10px;
+		font-size: 16px;
+		font-weight: 700;
+	}
+	.ramos {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 6px;
+	}
+	.ramo {
+		display: grid;
+		gap: 4px;
+		width: 100%;
+		padding: 10px 12px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg-card);
+		color: var(--text);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	@media (hover: hover) {
+		.ramo:hover {
+			background: var(--bg-hover);
+		}
+	}
+	.ramo:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+	.r-titulo {
+		font-size: 14px;
+		font-weight: 600;
+		overflow-wrap: anywhere;
+	}
+	.r-placar {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+	.barra {
+		display: flex;
+		height: 4px;
+		border-radius: 2px;
+		overflow: hidden;
+		background: var(--bg-soft);
+	}
+	.barra .certas {
+		background: var(--good);
+	}
+	.barra .erradas {
+		background: var(--danger);
 	}
 
 	@media (max-width: 620px) {

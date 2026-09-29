@@ -1,0 +1,39 @@
+{
+  "mapa": "ciclo-da-agua",
+  "questoes": [
+    {
+      "id": "q1",
+      "ramo": "Evaporação",
+      "origem": "Sintética · E2E",
+      "enunciado": "A evaporação leva a água líquida ao estado",
+      "alternativas": ["sólido.", "gasoso.", "de plasma.", "líquido superaquecido.", "cristalino."],
+      "gabarito": "B",
+      "comentario": "Evaporar é passar do líquido ao gasoso; as outras não são mudança para vapor."
+    },
+    {
+      "id": "q2",
+      "ramo": "Condensação",
+      "origem": "Sintética · E2E",
+      "enunciado": "A condensação forma as nuvens quando o vapor esfria.",
+      "gabarito": "Certo",
+      "comentario": "O vapor que esfria volta ao estado líquido em gotículas: são as nuvens."
+    },
+    {
+      "id": "q3",
+      "ramo": "Precipitação",
+      "origem": "Sintética · E2E",
+      "enunciado": "Neve e granizo são a mesma forma de precipitação.",
+      "gabarito": "Errado",
+      "comentario": "A banca troca uma pela outra: neve são cristais de gelo; granizo, pedras de gelo."
+    },
+    {
+      "id": "q4",
+      "ramo": "Precipitação",
+      "origem": "Sintética · E2E",
+      "enunciado": "Qual destas NÃO é uma forma de precipitação?",
+      "alternativas": ["Chuva.", "Neve.", "Granizo.", "Orvalho."],
+      "gabarito": "D",
+      "comentario": "O orvalho se forma na superfície, por condensação; não cai das nuvens."
+    }
+  ]
+}

@@ -51,7 +51,9 @@ contra a saída original); em volta deles cresceu um app multiusuário de verdad
   pegadinhas e o que cai em prova marcados. O mapa é escrito como um outline de
   texto, importado pela tela e vinculado à matéria; o cronograma oferece o
   acesso nas atividades dela. Abre como uma página de tópicos recolhíveis, feita
-  para ler também no celular e no tablet, com filtro. É da conta que o importou.
+  para ler também no celular e no tablet, com filtro. As questões da aula
+  (múltipla escolha ou Certo/Errado) vêm num arquivo à parte e se resolvem ali,
+  por ramo, com o gabarito só depois da resposta. É da conta que o importou.
 - **Lembretes de revisão espaçada** — um worker calcula os temas de D-1/D-7/D-30
   que vencem no dia (hoje só loga; e-mail fica atrás da mesma interface).
 - **Multiusuário** — conta por e-mail/senha (argon2id + JWT), cada usuário com

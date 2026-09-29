@@ -132,6 +132,11 @@ recolhíveis, no jeito do Notion (escolha de 28/09/2026): cada ramo é uma seç�
 colorida, e a página tem de ler bem no celular e no tablet, onde boa parte do
 estudo acontece.
 
+As questões das aulas não ficam no mapa: vêm num arquivo à parte
+(`<slug>.questoes.json`, fora do git como o mapa), importado na página do mapa,
+e são resolvidas ali, como as da lei — cada uma presa a um ramo, múltipla
+escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
+
 | id | Como quebra | O que o usuário vê |
 |---|---|---|
 | M1 | importar o texto não gera um mapa fiel: um item se perde, vai para o pai errado ou troca de ordem | o mapa abre com ramos faltando ou embaralhados |
@@ -149,6 +154,12 @@ estudo acontece.
 | M13 | um texto gigante (itens demais, fundo demais, linha enorme) é aceito sem limite | uma requisição que derruba o servidor, ou um mapa ilegível |
 | M14 | o filtro não acha o termo digitado sem acento ou em outra caixa, esconde o caminho até o item achado, ou mostra o item achado sem o que há dentro dele | a busca diz que não há o que existe; ou acha o título e esconde o que ele diz |
 | M15 | no celular ou no tablet a página rola para o lado, o tópico mais fundo fica espremido numa coluna estreita, o alvo do toque é pequeno demais, tocar no filtro dá zoom na página, ou o mapa abre todo desdobrado e o último ramo fica a várias telas de distância | o mapa não se lê no aparelho em que se estuda |
+| M16 | importar as questões de um mapa grava uma questão a menos, fora de ordem, no ramo errado, ou importar de novo duplica, apaga as respostas ou deixa à vista a questão que saiu do arquivo | faltam questões; aparecem duas vezes; o que já respondi some; resolvo questão que o professor retirou |
+| M17 | um arquivo de questões com problema (JSON ilegível, de outro mapa, ramo que o mapa não tem, gabarito fora das alternativas, Certo/Errado com alternativas, alternativa repetida, enunciado ou comentário vazio, chave repetida) é gravado pela metade, ou a mensagem não diz qual questão e o quê | questões quebradas no mapa; não sei o que corrigir no arquivo |
+| M18 | o gabarito ou o comentário chegam à tela antes da resposta; a correção erra (letra ou Certo/Errado); a resposta não fica gravada; responder de novo apaga a anterior ou não conta a nova | a questão não serve para treinar; o placar mente; perco o histórico |
+| M19 | as questões do mapa de uma conta aparecem, são importadas ou respondidas por outra conta | o material e o desempenho de um vazam para o outro |
+| M20 | a página do mapa não agrupa as questões pelo ramo, o placar (respondidas, certas) não anda ao responder, "Só o que errei" mostra o que acertei, ou no celular o diálogo das questões não cabe na tela e a alternativa não tem alvo de dedo | não acho as questões do assunto que acabei de revisar; não consigo resolver no celular |
+| M21 | o mapa sem questões mostra uma seção vazia, ou excluir o mapa deixa questões e respostas para trás (ou não avisa que vão junto) | tela poluída; lixo que ninguém alcança |
 
 ## Fora da suíte, de propósito
 

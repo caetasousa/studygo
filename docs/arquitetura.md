@@ -118,6 +118,8 @@ erDiagram
     planos    ||--o{ anotacoes : "caderno de erros"
     usuarios  ||--o{ mapas : "importa"
     mapas     ||--o{ mapas_itens : "árvore em pré-ordem"
+    mapas     ||--o{ mapas_questoes : "questões da aula"
+    mapas_questoes ||--o{ mapas_respostas : "cada tentativa"
     disciplinas }o--o{ mapas : "disciplinas_mapas"
 ```
 
@@ -130,7 +132,8 @@ usuarios ──┬── refresh_tokens
            │               │                 └── fontes
            │               ├── marcos
            │               └── conteudo_programatico
-           ├── mapas ──── mapas_itens        (e disciplinas_mapas ──► disciplinas)
+           ├── mapas ──┬── mapas_itens        (e disciplinas_mapas ──► disciplinas)
+           │           └── mapas_questoes ──── mapas_respostas
            └── planos ─────┬── plano_disciplinas ──► disciplinas
                            ├── marco_checks ──► marcos
                            ├── anotacoes ──► disciplinas
@@ -146,8 +149,8 @@ migrations 000004 a 000007, que criavam as tabelas `provas_*`, saíram do bundle
 junto. Produção nunca as aplicou. Staging e os bancos locais que as aplicaram
 ficam com essas tabelas órfãs — o runner pula versão registrada cujo arquivo
 sumiu, e o código não as lê. Por isso a numeração pulou para a 000008 (a da
-legislação) e segue dali (a 000012 criou os mapas mentais; a próxima é a
-**000013**): uma 000004 nova seria dada
+legislação) e segue dali (a 000012 criou os mapas mentais, a 000013 as questões
+deles; a próxima é a **000014**): uma 000004 nova seria dada
 como aplicada nesses bancos e nunca rodaria.
 
 Regras que o schema carrega:
@@ -219,10 +222,11 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   trechos de `reconhecer` ("16.168") nos tópicos da matéria; o estudante
   confirma e o vínculo vai para `disciplinas_leis`, pelo id da disciplina.
 
-### Mapas mentais (000012)
+### Mapas mentais (000012, e as questões na 000013)
 
 ```
 mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore em pré-ordem)
+        ├── mapas_questoes ──── mapas_respostas   (as questões da aula e cada tentativa)
         └── disciplinas_mapas ──► disciplinas
 ```
 
@@ -256,6 +260,20 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   nível encolhe. O filtro ignora acento e caixa, abre o caminho até cada achado e
   mostra o que há dentro dele, com um estado de aberto próprio que não mexe no de
   quem lê.
+- **As questões da aula não moram no mapa** (pedido de 29/09/2026: "fazer como
+  nas legislações"). Vêm de um arquivo à parte, `<slug>.questoes.json`, fora do
+  git como o mapa, importado em "Manter este mapa"; cada questão fica presa a um
+  **ramo** do mapa, guardado como o texto do ramo (o mapa se reimporta trocando
+  os itens, e a questão não pode cair junto). Sem alternativas, a questão é de
+  julgar (gabarito `CERTO`/`ERRADO`, como a Cebraspe cobra); com elas, de
+  múltipla escolha, de 2 a 5. `mapa.ValidarQuestoes` confere o arquivo contra o
+  mapa (o slug, os ramos) e devolve todos os problemas de uma vez. Como na lei,
+  a chave do arquivo mantém o id e as respostas numa reimportação, a questão que
+  sai é desativada e não apagada, e o gabarito e o comentário só chegam à tela
+  com a resposta. A resposta é do dono do mapa, então excluir o mapa (com
+  confirmação que diz quantas questões vão junto) leva questões e respostas em
+  cascata. A marca `[questao]` do outline segue aceita, para não recusar mapa
+  antigo, mas não se usa mais.
 
 ### O dia vira em Brasília
 
@@ -384,7 +402,9 @@ GET    /api/concursos/{slug}/leis       ← por matéria: vinculadas e sugeridas
 PUT|DELETE /api/concursos/{slug}/disciplinas/{id}/leis/{lei}
 
 GET    /api/mapas                       POST /api/mapas   ← importar o outline ({texto, concurso})
-GET    /api/mapas/{slug}                DELETE /api/mapas/{slug}
+GET    /api/mapas/{slug}                DELETE /api/mapas/{slug}   ← a leitura traz as questões, sem gabarito
+POST   /api/mapas/{slug}/questoes       ← importar o <slug>.questoes.json
+POST   /api/mapas/questoes/{id}/respostas   ← {resposta: A–E | CERTO | ERRADO}; devolve a correção
 GET    /api/concursos/{slug}/mapas      ← TODAS as matérias, cada uma com os mapas vinculados
 PUT|DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}
 ```

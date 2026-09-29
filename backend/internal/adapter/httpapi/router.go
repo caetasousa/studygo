@@ -162,6 +162,8 @@ func NewRouter(
 	protegida("POST /api/mapas", h.Mapa.Importar)
 	protegida("GET /api/mapas/{slug}", h.Mapa.Ler)
 	protegida("DELETE /api/mapas/{slug}", h.Mapa.Excluir)
+	protegida("POST /api/mapas/{slug}/questoes", h.Mapa.ImportarQuestoes)
+	protegida("POST /api/mapas/questoes/{id}/respostas", h.Mapa.Responder)
 	protegida("GET /api/concursos/{slug}/mapas", h.Mapa.DoConcurso)
 	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Vincular)
 	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Desvincular)

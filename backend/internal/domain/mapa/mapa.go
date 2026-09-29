@@ -66,12 +66,14 @@ const (
 	// CaiEmProva é o que a aula avisa que cai.
 	CaiEmProva Marca = "cai"
 	Exemplo    Marca = "ex"
-	// Questao é uma questão de prova e o que ela ensina.
-	Questao Marca = "questao"
+	// MarcaQuestao marca um item que cita uma questão de prova. As questões
+	// de verdade moram no arquivo de questões do mapa (ver Questao); a marca
+	// segue aceita para não recusar outline antigo.
+	MarcaQuestao Marca = "questao"
 )
 
 // Marcas são as que o outline entende, na ordem em que a mensagem de erro as lista.
-var Marcas = []Marca{Definicao, Pegadinha, CaiEmProva, Exemplo, Questao}
+var Marcas = []Marca{Definicao, Pegadinha, CaiEmProva, Exemplo, MarcaQuestao}
 
 // Item é um ponto do mapa e tudo o que está abaixo dele.
 type Item struct {

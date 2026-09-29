@@ -1,6 +1,6 @@
 ---
 name: mapa-mental
-description: Monta o mapa mental de uma aula em PDF (ou de um assunto), como outline de texto em conteudo/mapas/<slug>.md, cobrindo todo o conteúdo do material e validado pela importação. Use quando o usuário mandar uma aula, PDF ou resumo e pedir o mapa mental dela.
+description: Monta o mapa mental de uma aula em PDF (ou de um assunto), como outline de texto em conteudo/mapas/<slug>.md, cobrindo todo o conteúdo do material e validado pela importação, e as questões da aula em conteudo/mapas/<slug>.questoes.json. Use quando o usuário mandar uma aula, PDF ou resumo e pedir o mapa mental dela.
 ---
 
 # Mapa mental de uma aula
@@ -45,9 +45,7 @@ antes de ser de estilo:
 - **Marcas** (uma por item, no começo): `[def]` definição que a banca cobra pelo
   enunciado; `[pegadinha]` o que a banca inverte, misturando dois conceitos;
   `[cai]` o que a aula avisa que cai ("gravem isso", "aparece toda hora");
-  `[ex]` exemplo; `[questao]` questão de prova e o que ela ensina.
-- Questão comentada vai **junto do conceito que ela cobra**, com o gabarito e o
-  motivo, e o índice de todas as questões da aula entra também num ramo à parte.
+  `[ex]` exemplo. Não use `[questao]`: questão não entra no mapa.
 
 ## O que todo mapa de aula leva, além da teoria
 
@@ -55,8 +53,24 @@ antes de ser de estilo:
   com uma linha para cada lado. É onde a banca pesca.
 - **Números e siglas**: as contagens para decorar ("7 princípios, 4 dimensões"),
   as siglas expandidas e os macetes da aula.
-- **Questões comentadas**: uma por item, com banca, ano, órgão, gabarito e o que
-  a alternativa certa ensina.
+
+## As questões da aula
+
+Vão em `conteudo/mapas/<slug>.questoes.json` (formato em
+`conteudo/mapas/README.md`), **não no mapa**: o usuário pediu que fossem como as
+da lei, resolvidas na página, com o gabarito só depois da resposta.
+
+- **Todas as questões do material**: as comentadas do fim e as que aparecem no
+  meio da teoria ("Hora de praticar", exemplos de banca). Quando uma da teoria é
+  a mesma de uma das comentadas, no mesmo formato, entra uma vez só.
+- Texto **literal** do PDF: enunciado, alternativas e comentário do professor
+  (com a análise de cada alternativa, uma por linha). O gabarito é o da aula; se
+  o comentário e a linha "Gabarito" divergirem, pare e diga ao usuário.
+- `origem` com banca, ano, cargo e órgão, sem dado do comprador.
+- `ramo` é o ramo principal do mapa que trata do assunto cobrado.
+- Extrair do texto do PDF (PyMuPDF, no venv do edital-processor) com um script
+  no scratchpad é mais fiel que redigitar: o texto das questões é longo.
+  Tire o cabeçalho e o rodapé de cada página antes.
 
 ## O que nunca vai no arquivo
 
@@ -83,7 +97,9 @@ O repositório é público e o mapa deriva de material pago, de uso pessoal.
 
 1. Valide o texto importando-o na stack local (`make up` e **Mapas mentais →
    Importar mapa**): a mensagem lista todos os problemas com a linha de cada um
-   — recuo que pula nível, marca desconhecida, item vazio.
+   — recuo que pula nível, marca desconhecida, item vazio. As questões, em
+   **Manter este mapa → Importar questões**: a mensagem diz a questão e o
+   problema (ramo que o mapa não tem, gabarito fora das alternativas…).
 2. Confira a contagem ("N ramos, M itens") contra o que o material tem, e abra o
    mapa na largura de um celular (é onde ele mais é lido): o ramo mais fundo
    tem de ler bem, e o filtro tem de achar os termos que a aula destaca.

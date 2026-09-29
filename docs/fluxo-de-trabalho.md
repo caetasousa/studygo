@@ -258,10 +258,16 @@ liberar a publicação, está em `edital-processor/app/leis/README.md`.
    indica (`materia:` ou `reconhecer:`) e o cronograma passa a oferecê-lo nelas.
    Texto com problema é recusado inteiro, e a mensagem diz a linha; importar de
    novo o mesmo mapa troca o conteúdo e mantém os vínculos.
-3. **No servidor.** Cada conta importa os próprios mapas (não há catálogo
-   compartilhado): quem estuda importa o mesmo arquivo pela tela do servidor.
+3. **Questões.** As questões da aula vão num arquivo à parte,
+   `conteudo/mapas/<slug>.questoes.json` (também fora do git), que o Claude Code
+   escreve junto com o mapa. Na página do mapa, **Manter este mapa → Importar
+   questões**; elas aparecem em "Questões por ramo" e se resolvem ali, como as da
+   lei. Importar de novo não duplica nada e mantém as respostas.
+4. **No servidor.** Cada conta importa os próprios mapas e questões (não há
+   catálogo compartilhado): quem estuda importa os mesmos arquivos pela tela do
+   servidor.
 
-O formato do outline está em `conteudo/mapas/README.md`.
+O formato do outline e o do arquivo de questões estão em `conteudo/mapas/README.md`.
 
 ## 📖 Resumo dos alvos
 

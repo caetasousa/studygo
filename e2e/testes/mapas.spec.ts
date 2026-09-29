@@ -622,3 +622,298 @@ test.describe('mapas mentais no tablet', () => {
 		expect(await semRolagemLateral(page)).toBe(true);
 	});
 });
+
+// As questões das aulas ficam fora do mapa, num arquivo à parte importado na
+// página dele (e2e/fixtures/mapa-exemplo.questoes.json, sintético como o mapa).
+const QUESTOES = new URL('../fixtures/mapa-exemplo.questoes.json', import.meta.url);
+const questoesDoExemplo = () => JSON.parse(readFileSync(QUESTOES, 'utf-8'));
+const caminhoDasQuestoes = fileURLToPath(QUESTOES);
+
+async function importarQuestoes(request: APIRequestContext, token: string, arquivo: unknown, slug = 'ciclo-da-agua') {
+	const res = await request.post(`/api/mapas/${slug}/questoes`, {
+		headers: { ...cabecalho(token), 'Content-Type': 'application/json' },
+		data: typeof arquivo === 'string' ? arquivo : JSON.stringify(arquivo)
+	});
+	return { status: res.status(), corpo: await res.json() };
+}
+
+async function responderQuestao(request: APIRequestContext, token: string, id: string, resposta: string) {
+	const res = await request.post(`/api/mapas/questoes/${id}/respostas`, { headers: cabecalho(token), data: { resposta } });
+	return { status: res.status(), corpo: await res.json() };
+}
+
+interface QuestaoLida {
+	id: string;
+	ramo: string;
+	origem: string;
+	enunciado: string;
+	alternativas: string[];
+	resposta: null | { escolhida: string; acertou: boolean; gabarito: string; comentario: string };
+}
+
+async function questoesDo(request: APIRequestContext, token: string, slug = 'ciclo-da-agua'): Promise<QuestaoLida[]> {
+	const res = await ler(request, token, slug);
+	expect(res.status()).toBe(200);
+	return (await res.json()).questoes;
+}
+
+/** O exemplo importado e as questões dele, pela API. */
+async function mapaComQuestoes(api: Api, page: Page, conta: Conta, nome: string) {
+	await api.concurso(nome, MATERIAS);
+	expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
+	const r = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
+	expect(r.status, JSON.stringify(r.corpo)).toBe(200);
+}
+
+test.describe('questões dos mapas', () => {
+	test('[M16] as questões importadas ficam fiéis, na ordem e no ramo; reimportar não duplica, não perde resposta e tira a que saiu', async ({ page, api, conta }) => {
+		await api.concurso('Questões E2E', MATERIAS);
+		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
+
+		// Pela tela, em "Manter este mapa", como na lei.
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByText('Manter este mapa').click();
+		await page.getByLabel('Questões do mapa (.json)').setInputFiles(caminhoDasQuestoes);
+		await expect(page.getByText('4 questões novas.')).toBeVisible();
+
+		const lidas = await questoesDo(page.request, conta.token);
+		expect(lidas.map((q) => [q.enunciado.slice(0, 20), q.ramo, q.alternativas.length])).toEqual([
+			['A evaporação leva a ', 'Evaporação', 5],
+			['A condensação forma ', 'Condensação', 0],
+			['Neve e granizo são a', 'Precipitação', 0],
+			['Qual destas NÃO é um', 'Precipitação', 4]
+		]);
+		expect(lidas[0]).toMatchObject({ origem: 'Sintética · E2E', alternativas: questoesDoExemplo().questoes[0].alternativas });
+
+		// Importar de novo o mesmo arquivo não muda nada.
+		const igual = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
+		expect(igual.corpo).toMatchObject({ novas: 0, atualizadas: 0, desativadas: 0, mantidas: 4 });
+		expect(await questoesDo(page.request, conta.token)).toHaveLength(4);
+
+		// A q1 respondida; depois o arquivo muda: q1 reescrita, q2 retirada, q5 nova.
+		const [q1] = lidas;
+		expect((await responderQuestao(page.request, conta.token, q1.id, 'A')).status).toBe(201);
+		const arquivo = questoesDoExemplo();
+		arquivo.questoes[0].enunciado = 'Ao evaporar, a água líquida passa ao estado';
+		arquivo.questoes.splice(1, 1);
+		arquivo.questoes.push({
+			id: 'q5', ramo: 'Infiltração', origem: 'Sintética · E2E',
+			enunciado: 'A infiltração abastece o lençol freático.', gabarito: 'Certo',
+			comentario: 'A água que infiltra no solo recarrega os aquíferos.'
+		});
+		const mudou = await importarQuestoes(page.request, conta.token, arquivo);
+		expect(mudou.corpo).toMatchObject({ novas: 1, atualizadas: 1, desativadas: 1, mantidas: 2 });
+
+		const depois = await questoesDo(page.request, conta.token);
+		expect(depois.map((q) => q.ramo)).toEqual(['Evaporação', 'Precipitação', 'Precipitação', 'Infiltração']);
+		expect(depois.some((q) => q.enunciado.startsWith('A condensação'))).toBe(false);
+		// A q1 é a mesma questão: o id e a resposta ficaram.
+		expect(depois[0]).toMatchObject({ id: q1.id, enunciado: 'Ao evaporar, a água líquida passa ao estado' });
+		expect(depois[0].resposta).toMatchObject({ escolhida: 'A', acertou: false });
+
+		// A retirada volta se o arquivo a trouxer de novo, com o mesmo id.
+		const volta = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
+		expect(volta.corpo).toMatchObject({ novas: 0, desativadas: 1 });
+		expect((await questoesDo(page.request, conta.token)).map((q) => q.id)).toContain(lidas[1].id);
+	});
+
+	test('[M17] o arquivo de questões com problema é recusado inteiro, e a mensagem diz a questão e o quê', async ({ page, api, conta }) => {
+		await api.concurso('Questões ruins E2E', MATERIAS);
+		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
+
+		const com = (mexer: (a: ReturnType<typeof questoesDoExemplo>) => void) => {
+			const a = questoesDoExemplo();
+			mexer(a);
+			return a;
+		};
+		const ruins: [string, unknown, RegExp][] = [
+			['não é JSON', '{ questoes: ', /não é um JSON válido/],
+			['de outro mapa', com((a) => (a.mapa = 'outro-mapa')), /é do mapa "outro-mapa", e esta página é do "ciclo-da-agua"/],
+			['sem questões', { mapa: 'ciclo-da-agua', questoes: [] }, /nenhuma questão/],
+			['ramo que o mapa não tem', com((a) => (a.questoes[0].ramo = 'Vulcanismo')), /questão q1: o ramo "Vulcanismo" não existe no mapa/],
+			['gabarito fora', com((a) => (a.questoes[0].gabarito = 'F')), /questão q1: gabarito "F" fora das alternativas \(A–E\)/],
+			['gabarito além das 4', com((a) => (a.questoes[3].gabarito = 'E')), /questão q4: gabarito "E" fora das alternativas \(A–D\)/],
+			['Certo/Errado com alternativas', com((a) => (a.questoes[1].alternativas = ['x', 'y'])), /questão q2: Certo\/Errado não leva alternativas/],
+			['gabarito de julgar errado', com((a) => (a.questoes[1].gabarito = 'Talvez')), /questão q2: gabarito "Talvez" — use Certo ou Errado/],
+			['alternativa repetida', com((a) => (a.questoes[0].alternativas[2] = 'gasoso.')), /questão q1: alternativa C repete outra/],
+			['uma alternativa só', com((a) => (a.questoes[0].alternativas = ['sólido.'])), /questão q1: precisa de 2 a 5 alternativas, tem 1/],
+			['enunciado vazio', com((a) => (a.questoes[2].enunciado = '  ')), /questão q3: enunciado vazio/],
+			['comentário vazio', com((a) => (a.questoes[2].comentario = '')), /questão q3: comentário vazio/],
+			['chave repetida', com((a) => (a.questoes[3].id = 'q1')), /chave "q1" repetida/],
+			['sem chave', com((a) => (a.questoes[3].id = '')), /questão 4: sem id/]
+		];
+		for (const [nome, arquivo, mensagem] of ruins) {
+			const r = await importarQuestoes(page.request, conta.token, arquivo);
+			expect(r.status, nome).toBe(422);
+			expect(r.corpo.erro, nome).toMatch(mensagem);
+		}
+
+		// Vários problemas de uma vez, e nenhuma questão pela metade.
+		const varios = com((a) => {
+			a.questoes[0].ramo = 'Vulcanismo';
+			a.questoes[2].comentario = '';
+		});
+		const r = await importarQuestoes(page.request, conta.token, varios);
+		expect(r.corpo.erro).toContain('questão q1');
+		expect(r.corpo.erro).toContain('questão q3');
+		expect(await questoesDo(page.request, conta.token)).toEqual([]);
+
+		// Pela tela, o aviso aparece e o mapa segue sem a seção de questões.
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByText('Manter este mapa').click();
+		await page.getByLabel('Questões do mapa (.json)').setInputFiles({
+			name: 'ruim.questoes.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(varios))
+		});
+		await expect(page.getByRole('alert')).toContainText('o ramo "Vulcanismo" não existe no mapa');
+		await expect(page.getByText('Questões por ramo')).toHaveCount(0);
+	});
+
+	test('[M18] o gabarito só vem com a resposta, a correção acerta nos dois tipos, e responder de novo conta a nova', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Responder E2E');
+		const [q1, q2, q3, q4] = await questoesDo(page.request, conta.token);
+
+		// Antes de responder, nada de gabarito nem comentário no que a tela recebe.
+		const cru = await (await ler(page.request, conta.token, 'ciclo-da-agua')).text();
+		expect(cru).not.toContain('Evaporar é passar do líquido');
+		expect(cru).not.toContain('"gabarito"');
+		expect(q1.resposta).toBeNull();
+
+		const errada = await responderQuestao(page.request, conta.token, q1.id, 'A');
+		expect(errada).toMatchObject({ status: 201, corpo: { escolhida: 'A', acertou: false, gabarito: 'B' } });
+		expect(errada.corpo.comentario).toContain('Evaporar é passar do líquido');
+		expect((await responderQuestao(page.request, conta.token, q2.id, 'CERTO')).corpo).toMatchObject({ acertou: true, gabarito: 'CERTO' });
+		expect((await responderQuestao(page.request, conta.token, q3.id, 'CERTO')).corpo).toMatchObject({ acertou: false, gabarito: 'ERRADO' });
+		expect((await responderQuestao(page.request, conta.token, q4.id, 'D')).corpo).toMatchObject({ acertou: true });
+
+		// Resposta que não cabe na questão é recusada, e não conta.
+		expect((await responderQuestao(page.request, conta.token, q4.id, 'E')).status).toBe(422);
+		expect((await responderQuestao(page.request, conta.token, q2.id, 'A')).status).toBe(422);
+		expect((await responderQuestao(page.request, conta.token, q1.id, 'CERTO')).status).toBe(422);
+
+		// Gravado: ao recarregar, cada questão traz a última resposta; responder de novo conta a nova.
+		expect((await responderQuestao(page.request, conta.token, q1.id, 'B')).corpo.acertou).toBe(true);
+		const lidas = await questoesDo(page.request, conta.token);
+		expect(lidas.map((q) => q.resposta?.acertou)).toEqual([true, true, false, true]);
+
+		// Pela tela: escolher, responder, ver o veredito e o comentário, e responder de novo.
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Precipitação/ }).click();
+		const dialogo = page.getByRole('dialog', { name: 'Questões — Precipitação' });
+		const neve = dialogo.getByRole('group', { name: /Neve e granizo/ });
+		await expect(neve.getByText('Errou — o item está Errado')).toBeVisible();
+		await neve.getByRole('button', { name: 'Responder de novo' }).click();
+		await expect(neve.getByText(/A banca troca uma pela outra/)).toHaveCount(0);
+		await neve.getByRole('radio', { name: 'Errado' }).check();
+		await neve.getByRole('button', { name: 'Responder', exact: true }).click();
+		await expect(neve.getByText('Acertou')).toBeVisible();
+		await expect(neve.getByText(/A banca troca uma pela outra/)).toBeVisible();
+		expect((await questoesDo(page.request, conta.token))[2].resposta).toMatchObject({ escolhida: 'ERRADO', acertou: true });
+	});
+
+	test('[M19] as questões de uma conta não aparecem, nem são importadas ou respondidas por outra', async ({ page, api, conta, baseURL }) => {
+		await mapaComQuestoes(api, page, conta, 'Questões da dona E2E');
+		const [q1] = await questoesDo(page.request, conta.token);
+
+		const { request, token } = await outraSessao(baseURL!);
+		expect((await importarQuestoes(request, token, questoesDoExemplo())).status).toBe(404);
+		expect((await responderQuestao(request, token, q1.id, 'B')).status).toBe(404);
+
+		// A outra conta com o mesmo mapa tem as questões dela, separadas.
+		expect((await importar(request, token, exemplo())).status).toBe(201);
+		expect((await importarQuestoes(request, token, questoesDoExemplo())).corpo.novas).toBe(4);
+		const dela = await questoesDo(request, token);
+		expect(dela.map((q) => q.id)).not.toContain(q1.id);
+		expect((await responderQuestao(request, token, dela[0].id, 'B')).status).toBe(201);
+		await request.dispose();
+
+		expect((await questoesDo(page.request, conta.token))[0].resposta).toBeNull();
+	});
+
+	test('[M20] a página agrupa as questões pelo ramo, o placar anda ao responder e "Só o que errei" filtra', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Placar E2E');
+		await page.goto('/mapas/ciclo-da-agua');
+
+		const lista = page.getByRole('list', { name: 'Questões por ramo' });
+		await expect(lista.getByRole('button')).toHaveText([
+			/^Evaporação\s*1 questão/,
+			/^Condensação\s*1 questão/,
+			/^Precipitação\s*2 questões/
+		]);
+
+		await lista.getByRole('button', { name: /^Precipitação/ }).click();
+		const dialogo = page.getByRole('dialog', { name: 'Questões — Precipitação' });
+		await expect(dialogo.getByText('2 questões · 0 respondidas · 0 certas')).toBeVisible();
+
+		const neve = dialogo.getByRole('group', { name: /Neve e granizo/ });
+		await neve.getByRole('radio', { name: 'Certo' }).check();
+		await neve.getByRole('button', { name: 'Responder', exact: true }).click();
+		await expect(neve.getByText('Errou — o item está Errado')).toBeVisible();
+
+		const orvalho = dialogo.getByRole('group', { name: /NÃO é uma forma/ });
+		await orvalho.getByRole('radio', { name: 'D) Orvalho.' }).check();
+		await orvalho.getByRole('button', { name: 'Responder', exact: true }).click();
+		await expect(orvalho.getByText('Acertou')).toBeVisible();
+		await expect(dialogo.getByText('2 questões · 2 respondidas · 1 certa')).toBeVisible();
+
+		await dialogo.getByLabel('Só o que errei').check();
+		await expect(dialogo.getByRole('group')).toHaveCount(1);
+		await expect(dialogo.getByRole('group', { name: /Neve e granizo/ })).toBeVisible();
+
+		await dialogo.getByRole('button', { name: 'Fechar as questões' }).click();
+		await expect(lista.getByRole('button', { name: /^Precipitação/ })).toContainText('2 de 2 respondidas · 1 certa');
+
+		// "Todas as questões" abre as quatro, e o placar da seção soma tudo.
+		await page.getByRole('button', { name: 'Resolver todas (4)' }).click();
+		await expect(page.getByRole('dialog', { name: 'Questões — Todas' }).getByRole('group')).toHaveCount(4);
+	});
+
+	test('[M21] o mapa sem questões não mostra a seção, e excluir o mapa leva questões e respostas, avisando', async ({ page, api, conta }) => {
+		await api.concurso('Sem questões E2E', MATERIAS);
+		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
+		await page.goto('/mapas/ciclo-da-agua');
+		await expect(page.getByRole('heading', { name: 'Ciclo da Água', level: 1 })).toBeVisible();
+		await expect(page.getByText('Questões por ramo')).toHaveCount(0);
+
+		const r = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
+		expect(r.status).toBe(200);
+		const [q1] = await questoesDo(page.request, conta.token);
+		await responderQuestao(page.request, conta.token, q1.id, 'B');
+
+		await page.reload();
+		await page.getByText('Manter este mapa').click();
+		await page.getByRole('button', { name: 'Excluir mapa' }).click();
+		const confirmar = page.getByRole('alertdialog');
+		await expect(confirmar).toContainText('as 4 questões e as suas respostas');
+		await confirmar.getByRole('button', { name: 'Excluir mapa' }).click();
+		await expect(page).toHaveURL(/\/mapas$/);
+
+		// A questão respondida some com o mapa: nem ela nem a resposta ficam à mão.
+		expect((await responderQuestao(page.request, conta.token, q1.id, 'B')).status).toBe(404);
+		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
+		expect(await questoesDo(page.request, conta.token)).toEqual([]);
+	});
+});
+
+test.describe('questões dos mapas no celular', () => {
+	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+	test('[M20] no celular o diálogo das questões cabe na tela e cada alternativa tem alvo de dedo', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Questões no celular E2E');
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).tap();
+
+		const dialogo = page.getByRole('dialog', { name: 'Questões — Evaporação' });
+		await expect(dialogo).toBeVisible();
+		const caixa = (await dialogo.boundingBox())!;
+		expect(caixa.x).toBeGreaterThanOrEqual(0);
+		expect(caixa.x + caixa.width).toBeLessThanOrEqual(390);
+
+		const gasoso = dialogo.getByRole('radio', { name: 'B) gasoso.' });
+		const alvo = (await dialogo.locator('label').filter({ hasText: 'B) gasoso.' }).boundingBox())!;
+		expect(alvo.height).toBeGreaterThanOrEqual(40);
+		await gasoso.tap();
+		await dialogo.getByRole('button', { name: 'Responder', exact: true }).tap();
+		await expect(dialogo.getByText('Acertou')).toBeVisible();
+		expect(await semRolagemLateral(page)).toBe(true);
+	});
+});

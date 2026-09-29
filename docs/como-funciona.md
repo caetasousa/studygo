@@ -29,6 +29,8 @@ Para revisar uma aula de relance, há os **Mapas mentais**: o conteúdo dela
 organizado em galhos, com o que cai em prova em destaque. Cada pessoa importa
 os seus (são material de estudo pessoal), liga cada um à matéria a que
 pertence, e o cronograma passa a oferecer o mapa nas atividades daquela matéria.
+As questões da aula vêm junto, num arquivo à parte, e se resolvem na página do
+mapa, ramo por ramo, como as da lei.
 
 ---
 

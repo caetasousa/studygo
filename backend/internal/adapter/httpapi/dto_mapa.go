@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"time"
 
 	"studygo/internal/domain/mapa"
@@ -28,9 +29,62 @@ type itemDoMapaDTO struct {
 // mapaLidoDTO é o mapa aberto: o resumo e a árvore, cujos itens de cima são os
 // ramos principais.
 type mapaLidoDTO struct {
-	Mapa   mapaResumoDTO   `json:"mapa"`
-	Arvore []itemDoMapaDTO `json:"arvore"`
+	Mapa     mapaResumoDTO      `json:"mapa"`
+	Arvore   []itemDoMapaDTO    `json:"arvore"`
+	Questoes []questaoDoMapaDTO `json:"questoes"`
 }
+
+// questaoDoMapaDTO é a questão como a tela a recebe: sem gabarito nem
+// comentário, que só vêm na resposta — a não ser que já respondida, e então
+// com a correção da última tentativa. Sem alternativas, é de Certo/Errado.
+type questaoDoMapaDTO struct {
+	ID           string             `json:"id"`
+	Ramo         string             `json:"ramo"`
+	Origem       string             `json:"origem"`
+	Enunciado    string             `json:"enunciado"`
+	Alternativas []string           `json:"alternativas"`
+	Resposta     *correcaoDoMapaDTO `json:"resposta"`
+}
+
+type correcaoDoMapaDTO struct {
+	Escolhida    string    `json:"escolhida"`
+	Acertou      bool      `json:"acertou"`
+	Gabarito     string    `json:"gabarito"`
+	Comentario   string    `json:"comentario"`
+	RespondidaEm time.Time `json:"respondidaEm"`
+}
+
+// arquivoDeQuestoesDTO é o <slug>.questoes.json que quem escreve as questões
+// mantém em conteudo/mapas e importa na página do mapa.
+type arquivoDeQuestoesDTO struct {
+	Mapa     string                      `json:"mapa"`
+	Questoes []questaoDoArquivoDoMapaDTO `json:"questoes"`
+}
+
+type questaoDoArquivoDoMapaDTO struct {
+	ID           string   `json:"id"`
+	Ramo         string   `json:"ramo"`
+	Origem       string   `json:"origem"`
+	Enunciado    string   `json:"enunciado"`
+	Alternativas []string `json:"alternativas"`
+	Gabarito     string   `json:"gabarito"`
+	Comentario   string   `json:"comentario"`
+}
+
+type questoesImportadasDTO struct {
+	Novas       int `json:"novas"`
+	Atualizadas int `json:"atualizadas"`
+	Desativadas int `json:"desativadas"`
+	Mantidas    int `json:"mantidas"`
+}
+
+type respostaDoMapaRequest struct {
+	// Resposta é a letra (A–E) ou, na de julgar, CERTO ou ERRADO.
+	Resposta string `json:"resposta"`
+}
+
+var errQuestoesDoMapaIlegiveis = errors.New(
+	`o arquivo de questões não é um JSON válido: esperava {"mapa": "<slug>", "questoes": [...]}`)
 
 type importarMapaRequest struct {
 	// Texto é o outline do mapa (conteudo/mapas/README.md).
@@ -76,15 +130,54 @@ func itensDoMapaParaDTO(itens []mapa.Item) []itemDoMapaDTO {
 	return out
 }
 
-func mapaLidoParaDTO(m mapa.Mapa) mapaLidoDTO {
+func mapaLidoParaDTO(l service.MapaLido) mapaLidoDTO {
+	m := l.Mapa
 	ramos, itens := m.Contar()
+
+	questoes := make([]questaoDoMapaDTO, 0, len(l.Questoes))
+	for _, q := range l.Questoes {
+		questoes = append(questoes, questaoDoMapaParaDTO(q))
+	}
 
 	return mapaLidoDTO{
 		Mapa: mapaResumoDTO{
 			Slug: m.Slug, Titulo: m.Titulo, Fonte: m.Fonte, Materia: m.Materia, Ramos: ramos, Itens: itens,
 		},
-		Arvore: itensDoMapaParaDTO(m.Ramos),
+		Arvore:   itensDoMapaParaDTO(m.Ramos),
+		Questoes: questoes,
 	}
+}
+
+func questaoDoMapaParaDTO(q mapa.QuestaoComResposta) questaoDoMapaDTO {
+	out := questaoDoMapaDTO{
+		ID: q.ID.String(), Ramo: q.Questao.Ramo, Origem: q.Questao.Origem, Enunciado: q.Questao.Enunciado,
+		Alternativas: naoNula(q.Questao.Alternativas),
+	}
+
+	if q.Ultima != nil {
+		c := correcaoDoMapaParaDTO(service.CorrecaoDe(q.Questao, *q.Ultima))
+		out.Resposta = &c
+	}
+
+	return out
+}
+
+func correcaoDoMapaParaDTO(c service.CorrecaoDoMapa) correcaoDoMapaDTO {
+	return correcaoDoMapaDTO{
+		Escolhida: c.Escolhida, Acertou: c.Acertou, Gabarito: c.Gabarito, Comentario: c.Comentario, RespondidaEm: c.Em,
+	}
+}
+
+func arquivoDeQuestoesDoDTO(d arquivoDeQuestoesDTO) mapa.ArquivoDeQuestoes {
+	qs := make([]mapa.Questao, 0, len(d.Questoes))
+	for _, q := range d.Questoes {
+		qs = append(qs, mapa.Questao{
+			Chave: q.ID, Ramo: q.Ramo, Origem: q.Origem, Enunciado: q.Enunciado,
+			Alternativas: q.Alternativas, Gabarito: q.Gabarito, Comentario: q.Comentario,
+		})
+	}
+
+	return mapa.ArquivoDeQuestoes{Mapa: d.Mapa, Questoes: qs}
 }
 
 func mapaImportadoParaDTO(r service.MapaImportado) mapaImportadoDTO {

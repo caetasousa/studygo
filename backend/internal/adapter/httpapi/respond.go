@@ -81,6 +81,12 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, outline.Error()
 	}
 
+	// O arquivo de questões do mapa também: cada problema com a questão dele.
+	var questoes mapa.ErrQuestoesInvalidas
+	if errors.As(err, &questoes) {
+		return http.StatusUnprocessableEntity, questoes.Error()
+	}
+
 	var pendentes lei.ErrAvisosPendentes
 	if errors.As(err, &pendentes) {
 		return http.StatusUnprocessableEntity, pendentes.Error()
@@ -129,13 +135,16 @@ func classificar(err error) (int, string) {
 		errors.Is(err, lei.ErrQuestaoNaoEncontrada),
 		errors.Is(err, lei.ErrCapturaNaoEncontrada),
 		errors.Is(err, lei.ErrFonteNaoEncontrada),
-		errors.Is(err, mapa.ErrNaoEncontrado):
+		errors.Is(err, mapa.ErrNaoEncontrado),
+		errors.Is(err, mapa.ErrQuestaoNaoEncontrada):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),
 		errors.Is(err, lei.ErrCapturaBloqueada),
 		errors.Is(err, lei.ErrCapturaFalhou),
-		errors.Is(err, errQuestoesIlegiveis):
+		errors.Is(err, errQuestoesIlegiveis),
+		errors.Is(err, errQuestoesDoMapaIlegiveis),
+		errors.Is(err, mapa.ErrRespostaInvalida):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	case errors.Is(err, lei.ErrCapturaEmAndamento),

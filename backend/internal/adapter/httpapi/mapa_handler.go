@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -151,4 +152,56 @@ func (h *MapaHandler) vincular(w http.ResponseWriter, r *http.Request, ligar boo
 	}
 
 	writeJSON(w, h.logger, http.StatusNoContent, nil)
+}
+
+func (h *MapaHandler) ImportarQuestoes(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var d arquivoDeQuestoesDTO
+	if err := decodeLimitado(w, r, &d, maxCorpoMapa); err != nil {
+		if errors.Is(err, errRequisicaoInvalida) {
+			err = errQuestoesDoMapaIlegiveis
+		}
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	res, err := h.mapas.ImportarQuestoes(r.Context(), id, r.PathValue("slug"), arquivoDeQuestoesDoDTO(d))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusOK, questoesImportadasDTO{
+		Novas: res.Novas, Atualizadas: res.Atualizadas, Desativadas: res.Desativadas, Mantidas: res.Mantidas,
+	})
+}
+
+func (h *MapaHandler) Responder(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+	questao, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+		return
+	}
+
+	var req respostaDoMapaRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	c, err := h.mapas.Responder(r.Context(), id, questao, req.Resposta)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+	writeJSON(w, h.logger, http.StatusCreated, correcaoDoMapaParaDTO(c))
 }

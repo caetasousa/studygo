@@ -862,6 +862,38 @@ export interface MapaResumo {
 export interface MapaLido {
 	mapa: MapaResumo;
 	arvore: ItemDoMapa[];
+	/** As questões ativas, na ordem do arquivo; vazio quando o mapa não tem. */
+	questoes: QuestaoDoMapa[];
+}
+
+/** A correção de uma resposta: só daqui a tela conhece gabarito e comentário. */
+export interface CorrecaoDoMapa {
+	/** A letra (A–E) ou CERTO/ERRADO. */
+	escolhida: string;
+	acertou: boolean;
+	gabarito: string;
+	comentario: string;
+	respondidaEm: string;
+}
+
+/** Uma questão da aula, presa a um ramo do mapa. Sem alternativas, é de Certo/Errado. */
+export interface QuestaoDoMapa {
+	id: string;
+	/** O título do ramo do mapa, como o mapa o escreve (sem negrito). */
+	ramo: string;
+	/** Banca, ano, órgão, cargo. */
+	origem: string;
+	enunciado: string;
+	alternativas: string[];
+	/** A última resposta, se houver. */
+	resposta: CorrecaoDoMapa | null;
+}
+
+export interface QuestoesImportadas {
+	novas: number;
+	atualizadas: number;
+	desativadas: number;
+	mantidas: number;
 }
 
 export interface MapaImportado {

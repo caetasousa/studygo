@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"slices"
+	"strings"
+	"time"
 
 	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/mapa"
@@ -92,8 +94,109 @@ func (s *MapaService) Catalogo(ctx context.Context, usuarioID uuid.UUID) ([]mapa
 }
 
 // Ler devolve o mapa inteiro.
-func (s *MapaService) Ler(ctx context.Context, usuarioID uuid.UUID, slug string) (mapa.Mapa, error) {
-	return s.mapas.PorSlug(ctx, usuarioID, slug)
+func (s *MapaService) Ler(ctx context.Context, usuarioID uuid.UUID, slug string) (MapaLido, error) {
+	m, err := s.mapas.PorSlug(ctx, usuarioID, slug)
+	if err != nil {
+		return MapaLido{}, err
+	}
+
+	qs, err := s.mapas.Questoes(ctx, m.ID)
+	if err != nil {
+		return MapaLido{}, err
+	}
+
+	return MapaLido{Mapa: m, Questoes: qs}, nil
+}
+
+// MapaLido é o mapa aberto, com as questões ativas dele. O gabarito vai junto
+// só até o adapter: quem decide mostrá-lo (apenas depois da resposta) é o DTO.
+type MapaLido struct {
+	Mapa     mapa.Mapa
+	Questoes []mapa.QuestaoComResposta
+}
+
+// QuestoesImportadas diz o que a importação fez com cada questão do arquivo.
+type QuestoesImportadas struct {
+	Novas       int
+	Atualizadas int
+	Desativadas int
+	Mantidas    int
+}
+
+// ImportarQuestoes grava as questões do arquivo no mapa da conta. O arquivo é
+// conferido contra o mapa (o slug, os ramos) antes de gravar, e entra inteiro
+// ou não entra; importar de novo casa as questões pela chave e mantém as
+// respostas.
+func (s *MapaService) ImportarQuestoes(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+	arquivo mapa.ArquivoDeQuestoes,
+) (QuestoesImportadas, error) {
+	m, err := s.mapas.PorSlug(ctx, usuarioID, slug)
+	if err != nil {
+		return QuestoesImportadas{}, err
+	}
+
+	qs, err := mapa.ValidarQuestoes(m, arquivo)
+	if err != nil {
+		return QuestoesImportadas{}, err
+	}
+
+	gravadas, err := s.mapas.QuestoesGravadas(ctx, m.ID)
+	if err != nil {
+		return QuestoesImportadas{}, err
+	}
+
+	plano := mapa.PlanejarQuestoes(gravadas, qs)
+	if err := s.mapas.GravarQuestoes(ctx, m.ID, plano); err != nil {
+		return QuestoesImportadas{}, err
+	}
+
+	return QuestoesImportadas{
+		Novas:       len(plano.Novas),
+		Atualizadas: len(plano.Atualizadas),
+		Desativadas: len(plano.Desativar),
+		Mantidas:    plano.Mantidas,
+	}, nil
+}
+
+// CorrecaoDoMapa é o que volta da resposta: agora, sim, com gabarito e
+// comentário.
+type CorrecaoDoMapa struct {
+	Escolhida  string
+	Acertou    bool
+	Gabarito   string
+	Comentario string
+	Em         time.Time
+}
+
+// CorrecaoDe junta a questão e a resposta no que a tela mostra depois de
+// responder.
+func CorrecaoDe(q mapa.Questao, r mapa.Resposta) CorrecaoDoMapa {
+	return CorrecaoDoMapa{Escolhida: r.Resposta, Acertou: r.Acertou, Gabarito: q.Gabarito, Comentario: q.Comentario, Em: r.Em}
+}
+
+// Responder corrige e grava a resposta a uma questão de um mapa da conta.
+func (s *MapaService) Responder(ctx context.Context, usuarioID, questaoID uuid.UUID, resposta string) (CorrecaoDoMapa, error) {
+	q, err := s.mapas.QuestaoDoDono(ctx, usuarioID, questaoID)
+	if err != nil {
+		return CorrecaoDoMapa{}, err
+	}
+
+	acertou, err := q.Questao.Corrigir(resposta)
+	if err != nil {
+		return CorrecaoDoMapa{}, err
+	}
+
+	r, err := s.mapas.Responder(ctx, q.ID, mapa.Resposta{
+		Resposta: strings.ToUpper(strings.TrimSpace(resposta)), Acertou: acertou,
+	})
+	if err != nil {
+		return CorrecaoDoMapa{}, err
+	}
+
+	return CorrecaoDe(q.Questao, r), nil
 }
 
 // Excluir apaga o mapa e os vínculos dele.
