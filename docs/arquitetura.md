@@ -272,7 +272,10 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   sai é desativada e não apagada, e o gabarito e o comentário só chegam à tela
   com a resposta. A resposta é do dono do mapa, então excluir o mapa (com
   confirmação que diz quantas questões vão junto) leva questões e respostas em
-  cascata. A marca `[questao]` do outline segue aceita, para não recusar mapa
+  cascata. A página agrupa as questões por ramo ou por **banca**; a banca é
+  lida pelo domínio (`Questao.Banca`) do começo da `origem`, juntando as
+  grafias da mesma banca ("CEBRASPE (CESPE)", "ADAPTADA - FGV"), e vai pronta
+  no DTO — a tela não a calcula. A marca `[questao]` do outline segue aceita, para não recusar mapa
   antigo, mas não se usa mais.
 
 ### O dia vira em Brasília

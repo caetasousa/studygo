@@ -41,6 +41,7 @@ type questaoDoMapaDTO struct {
 	ID           string             `json:"id"`
 	Ramo         string             `json:"ramo"`
 	Origem       string             `json:"origem"`
+	Banca        string             `json:"banca"`
 	Enunciado    string             `json:"enunciado"`
 	Alternativas []string           `json:"alternativas"`
 	Resposta     *correcaoDoMapaDTO `json:"resposta"`
@@ -150,7 +151,8 @@ func mapaLidoParaDTO(l service.MapaLido) mapaLidoDTO {
 
 func questaoDoMapaParaDTO(q mapa.QuestaoComResposta) questaoDoMapaDTO {
 	out := questaoDoMapaDTO{
-		ID: q.ID.String(), Ramo: q.Questao.Ramo, Origem: q.Questao.Origem, Enunciado: q.Questao.Enunciado,
+		ID: q.ID.String(), Ramo: q.Questao.Ramo, Origem: q.Questao.Origem, Banca: q.Questao.Banca(),
+		Enunciado:    q.Questao.Enunciado,
 		Alternativas: naoNula(q.Questao.Alternativas),
 	}
 

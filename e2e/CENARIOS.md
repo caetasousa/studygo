@@ -160,6 +160,7 @@ escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
 | M19 | as questões do mapa de uma conta aparecem, são importadas ou respondidas por outra conta | o material e o desempenho de um vazam para o outro |
 | M20 | a página do mapa não agrupa as questões pelo ramo, o placar (respondidas, certas) não anda ao responder, "Só o que errei" mostra o que acertei, ou no celular o diálogo das questões não cabe na tela e a alternativa não tem alvo de dedo | não acho as questões do assunto que acabei de revisar; não consigo resolver no celular |
 | M21 | o mapa sem questões mostra uma seção vazia, ou excluir o mapa deixa questões e respostas para trás (ou não avisa que vão junto) | tela poluída; lixo que ninguém alcança |
+| M22 | as questões do mapa não se agrupam por banca, a banca sai errada da origem ("CEBRASPE (CESPE)" e "CEBRASPE" viram duas; "ADAPTADA - FGV" não conta como FGV), o placar da banca não anda, ou o diálogo da banca traz questão de outra | não consigo treinar só a banca da minha prova |
 
 ## Fora da suíte, de propósito
 

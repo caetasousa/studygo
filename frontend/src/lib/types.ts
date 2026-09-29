@@ -883,6 +883,8 @@ export interface QuestaoDoMapa {
 	ramo: string;
 	/** Banca, ano, órgão, cargo. */
 	origem: string;
+	/** A banca, lida pelo servidor do começo da origem ("CEBRASPE (CESPE)" vira "CEBRASPE"). */
+	banca: string;
 	enunciado: string;
 	alternativas: string[];
 	/** A última resposta, se houver. */

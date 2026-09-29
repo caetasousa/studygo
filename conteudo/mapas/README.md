@@ -85,6 +85,10 @@ arquivo por mapa, e se resolvem na página dele, como as da lei.
 - `id` é a chave da questão: importar de novo casa por ela, mantém as respostas
   e desativa a que sumiu do arquivo. Não reaproveite o id de uma questão para
   outra.
+- `origem` **começa pela banca**, separada do resto por ` · ` ("FGV · 2024 ·
+  …"): é daí que a página agrupa as questões por banca. "CEBRASPE (CESPE)" conta
+  como CEBRASPE e "ADAPTADA - FGV" como FGV; a questão do próprio professor vai
+  como "Inédita do professor · …".
 - `ramo` é o título de um ramo principal do mapa (sem o negrito; caixa e acento
   não contam). É onde a questão aparece na página.
 - Sem `alternativas`, a questão é de julgar e o `gabarito` é `Certo` ou `Errado`.

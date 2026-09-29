@@ -66,7 +66,8 @@ da lei, resolvidas na página, com o gabarito só depois da resposta.
 - Texto **literal** do PDF: enunciado, alternativas e comentário do professor
   (com a análise de cada alternativa, uma por linha). O gabarito é o da aula; se
   o comentário e a linha "Gabarito" divergirem, pare e diga ao usuário.
-- `origem` com banca, ano, cargo e órgão, sem dado do comprador.
+- `origem` com banca, ano, cargo e órgão, sem dado do comprador, e **a banca
+  primeiro**, separada por ` · `: a página agrupa as questões por ela.
 - `ramo` é o ramo principal do mapa que trata do assunto cobrado.
 - Extrair do texto do PDF (PyMuPDF, no venv do edital-processor) com um script
   no scratchpad é mais fiel que redigitar: o texto das questões é longo.

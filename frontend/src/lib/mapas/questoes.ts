@@ -21,8 +21,9 @@ export function descreverPlacar(p: Placar): string {
 	return `${questoes} · ${respondidas} · ${certas}`;
 }
 
+/** Um ramo ou uma banca, com as questões dele. */
 export interface GrupoDeQuestoes {
-	ramo: string;
+	titulo: string;
 	questoes: QuestaoDoMapa[];
 }
 
@@ -44,8 +45,24 @@ export function porRamo(arvore: ItemDoMapa[], questoes: QuestaoDoMapa[]): GrupoD
 		return i === -1 ? ordem.length : i;
 	};
 	return [...grupos.entries()]
-		.map(([ramo, qs]) => ({ ramo, questoes: qs }))
-		.sort((a, b) => posicao(a.ramo) - posicao(b.ramo));
+		.map(([ramo, qs]) => ({ titulo: ramo, questoes: qs }))
+		.sort((a, b) => posicao(a.titulo) - posicao(b.titulo));
+}
+
+/**
+ * As questões por banca: a de mais questões primeiro, empate pelo nome. A
+ * banca vem pronta do servidor; a ordem das questões dentro dela é a do arquivo.
+ */
+export function porBanca(questoes: QuestaoDoMapa[]): GrupoDeQuestoes[] {
+	const grupos = new Map<string, QuestaoDoMapa[]>();
+	for (const q of questoes) {
+		const lista = grupos.get(q.banca) ?? [];
+		lista.push(q);
+		grupos.set(q.banca, lista);
+	}
+	return [...grupos.entries()]
+		.map(([banca, qs]) => ({ titulo: banca, questoes: qs }))
+		.sort((a, b) => b.questoes.length - a.questoes.length || a.titulo.localeCompare(b.titulo, 'pt-BR'));
 }
 
 /** Como a resposta aparece: a letra, ou "Certo"/"Errado". */

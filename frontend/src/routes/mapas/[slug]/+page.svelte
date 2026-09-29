@@ -7,7 +7,7 @@
 	import { indexar } from '$lib/mapas/arvore';
 	import Mapa from '$lib/mapas/Mapa.svelte';
 	import Questoes from '$lib/mapas/Questoes.svelte';
-	import { descreverPlacar, placar, porRamo } from '$lib/mapas/questoes';
+	import { descreverPlacar, placar, porBanca, porRamo } from '$lib/mapas/questoes';
 	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
@@ -67,7 +67,28 @@
 
 	// --- questões ----------------------------------------------------------
 	const questoes = $derived(lido?.questoes ?? []);
-	const grupos = $derived(lido ? porRamo(lido.arvore, questoes) : []);
+	// Por ramo, na ordem do mapa, ou por banca, para treinar a da prova. A
+	// escolha fica no aparelho: quem estuda por banca quer abrir já assim.
+	const CHAVE_AGRUPAR = 'studygo:mapas:agrupar-questoes';
+	let agrupar = $state<'ramo' | 'banca'>(lerAgrupar());
+	function lerAgrupar(): 'ramo' | 'banca' {
+		try {
+			return localStorage.getItem(CHAVE_AGRUPAR) === 'banca' ? 'banca' : 'ramo';
+		} catch {
+			return 'ramo';
+		}
+	}
+	function escolherAgrupar(modo: 'ramo' | 'banca') {
+		agrupar = modo;
+		try {
+			localStorage.setItem(CHAVE_AGRUPAR, modo);
+		} catch {
+			// sem armazenamento, a escolha vale só nesta visita
+		}
+	}
+	const grupos = $derived(
+		!lido ? [] : agrupar === 'banca' ? porBanca(questoes) : porRamo(lido.arvore, questoes)
+	);
 	let aberto = $state<{ titulo: string; ids: string[] } | null>(null);
 	const doDialogo = $derived(
 		aberto ? questoes.filter((q) => aberto!.ids.includes(q.id)) : ([] as QuestaoDoMapa[])
@@ -230,17 +251,24 @@
 	</div>
 
 	{#if grupos.length > 0}
-		<section class="questoes" aria-labelledby="questoes-por-ramo">
-			<h2 id="questoes-por-ramo" class="sec">Questões por ramo</h2>
-			<ul class="ramos" aria-label="Questões por ramo">
-				{#each grupos as g (g.ramo)}
+		<section class="questoes" aria-labelledby="questoes-titulo">
+			<div class="q-topo">
+				<h2 id="questoes-titulo" class="sec">Questões</h2>
+				<div class="agrupar" role="group" aria-label="Agrupar as questões">
+					<button type="button" aria-pressed={agrupar === 'ramo'} onclick={() => escolherAgrupar('ramo')}>Por ramo</button>
+					<button type="button" aria-pressed={agrupar === 'banca'} onclick={() => escolherAgrupar('banca')}>Por banca</button>
+				</div>
+			</div>
+			<ul class="ramos" aria-label={agrupar === 'banca' ? 'Questões por banca' : 'Questões por ramo'}>
+				{#each grupos as g (g.titulo)}
 					{@const p = placar(g.questoes)}
 					<li>
-						<button type="button" class="ramo" onclick={() => abrirQuestoes(g.ramo, g.questoes)}>
-							<span class="r-titulo">{g.ramo}</span>
+						<button type="button" class="ramo" onclick={() => abrirQuestoes(g.titulo, g.questoes)}>
+							<span class="r-titulo">{g.titulo}</span>
 							<span class="r-placar">
-								{p.total === 1 ? '1 questão' : `${p.total} questões`}{#if p.respondidas > 0}
-									· {p.respondidas} de {p.total} respondidas · {p.certas === 1 ? '1 certa' : `${p.certas} certas`}{/if}
+								{p.total === 1 ? '1 questão' : `${p.total} questões`}{p.respondidas > 0
+									? ` · ${p.respondidas} de ${p.total} respondidas · ${p.certas === 1 ? '1 certa' : `${p.certas} certas`}`
+									: ''}
 							</span>
 							<span class="barra" aria-hidden="true">
 								<span class="certas" style="width:{(p.certas / p.total) * 100}%"></span>
@@ -439,9 +467,46 @@
 		max-width: 860px;
 	}
 	.questoes .sec {
-		margin: 0 0 10px;
+		margin: 0;
 		font-size: 16px;
 		font-weight: 700;
+	}
+	.q-topo {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 10px;
+	}
+	.agrupar {
+		display: inline-flex;
+		border: 1px solid var(--border);
+		border-radius: 7px;
+		overflow: hidden;
+	}
+	.agrupar button {
+		padding: 5px 12px;
+		border: 0;
+		background: transparent;
+		color: var(--text-muted);
+		font: inherit;
+		font-size: 12.5px;
+		cursor: pointer;
+	}
+	.agrupar button + button {
+		border-left: 1px solid var(--border);
+	}
+	.agrupar button[aria-pressed='true'] {
+		background: var(--bg-hover);
+		color: var(--text);
+		font-weight: 600;
+	}
+	@media (pointer: coarse) {
+		.agrupar button {
+			min-height: 40px;
+			padding-inline: 16px;
+		}
 	}
 	.ramos {
 		list-style: none;

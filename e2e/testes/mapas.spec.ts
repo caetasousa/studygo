@@ -646,6 +646,7 @@ interface QuestaoLida {
 	id: string;
 	ramo: string;
 	origem: string;
+	banca: string;
 	enunciado: string;
 	alternativas: string[];
 	resposta: null | { escolhida: string; acertou: boolean; gabarito: string; comentario: string };
@@ -683,7 +684,7 @@ test.describe('questões dos mapas', () => {
 			['Neve e granizo são a', 'Precipitação', 0],
 			['Qual destas NÃO é um', 'Precipitação', 4]
 		]);
-		expect(lidas[0]).toMatchObject({ origem: 'Sintética · E2E', alternativas: questoesDoExemplo().questoes[0].alternativas });
+		expect(lidas[0]).toMatchObject({ origem: 'FGV · 2024 · Sintética E2E', banca: 'FGV', alternativas: questoesDoExemplo().questoes[0].alternativas });
 
 		// Importar de novo o mesmo arquivo não muda nada.
 		const igual = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
@@ -697,7 +698,7 @@ test.describe('questões dos mapas', () => {
 		arquivo.questoes[0].enunciado = 'Ao evaporar, a água líquida passa ao estado';
 		arquivo.questoes.splice(1, 1);
 		arquivo.questoes.push({
-			id: 'q5', ramo: 'Infiltração', origem: 'Sintética · E2E',
+			id: 'q5', ramo: 'Infiltração', origem: 'FCC · 2021 · Sintética E2E',
 			enunciado: 'A infiltração abastece o lençol freático.', gabarito: 'Certo',
 			comentario: 'A água que infiltra no solo recarrega os aquíferos.'
 		});
@@ -765,7 +766,7 @@ test.describe('questões dos mapas', () => {
 			name: 'ruim.questoes.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(varios))
 		});
 		await expect(page.getByRole('alert')).toContainText('o ramo "Vulcanismo" não existe no mapa');
-		await expect(page.getByText('Questões por ramo')).toHaveCount(0);
+		await expect(page.getByRole('heading', { name: 'Questões', exact: true, level: 2 })).toHaveCount(0);
 
 		// Alternativas que só diferem na caixa ou na pontuação são outras alternativas:
 		// é o que uma questão de tokenização cobra.
@@ -881,7 +882,7 @@ test.describe('questões dos mapas', () => {
 		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
 		await page.goto('/mapas/ciclo-da-agua');
 		await expect(page.getByRole('heading', { name: 'Ciclo da Água', level: 1 })).toBeVisible();
-		await expect(page.getByText('Questões por ramo')).toHaveCount(0);
+		await expect(page.getByRole('heading', { name: 'Questões', exact: true, level: 2 })).toHaveCount(0);
 
 		const r = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
 		expect(r.status).toBe(200);
@@ -900,6 +901,38 @@ test.describe('questões dos mapas', () => {
 		expect((await responderQuestao(page.request, conta.token, q1.id, 'B')).status).toBe(404);
 		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
 		expect(await questoesDo(page.request, conta.token)).toEqual([]);
+	});
+});
+
+test.describe('questões dos mapas por banca', () => {
+	test('[M22] as questões se agrupam pela banca da origem, com placar, e o diálogo da banca só traz as dela', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Bancas E2E');
+
+		// A banca é o começo da origem, sem o "(CESPE)" e sem o "ADAPTADA -".
+		expect((await questoesDo(page.request, conta.token)).map((q) => q.banca)).toEqual(['FGV', 'CEBRASPE', 'FGV', 'CEBRASPE']);
+
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByRole('button', { name: 'Por banca' }).click();
+		const lista = page.getByRole('list', { name: 'Questões por banca' });
+		await expect(lista.getByRole('button')).toHaveText([/^CEBRASPE\s*2 questões/, /^FGV\s*2 questões/]);
+
+		await lista.getByRole('button', { name: /^FGV/ }).click();
+		const dialogo = page.getByRole('dialog', { name: 'Questões — FGV' });
+		await expect(dialogo.getByRole('group')).toHaveCount(2);
+		await expect(dialogo.getByRole('group', { name: /A evaporação leva/ })).toBeVisible();
+		await expect(dialogo.getByRole('group', { name: /Neve e granizo/ })).toBeVisible();
+
+		const neve = dialogo.getByRole('group', { name: /Neve e granizo/ });
+		await neve.getByRole('radio', { name: 'Errado' }).check();
+		await neve.getByRole('button', { name: 'Responder', exact: true }).click();
+		await expect(neve.getByText('Acertou')).toBeVisible();
+		await dialogo.getByRole('button', { name: 'Fechar as questões' }).click();
+		await expect(lista.getByRole('button', { name: /^FGV/ })).toContainText('1 de 2 respondidas · 1 certa');
+		await expect(lista.getByRole('button', { name: /^CEBRASPE/ })).not.toContainText('respondidas');
+
+		// Voltar a "Por ramo" mostra os ramos de novo.
+		await page.getByRole('button', { name: 'Por ramo' }).click();
+		await expect(page.getByRole('list', { name: 'Questões por ramo' })).toBeVisible();
 	});
 });
 

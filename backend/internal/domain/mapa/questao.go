@@ -93,6 +93,33 @@ func (q Questao) Corrigir(resposta string) (bool, error) {
 	return r == q.Gabarito, nil
 }
 
+// SemBanca agrupa as questões cuja origem não diz a banca.
+const SemBanca = "Sem banca"
+
+// Banca é a banca da questão, lida do começo da origem ("FCC · 2025 · …").
+// A mesma banca aparece escrita de mais de um jeito nas aulas — "CEBRASPE
+// (CESPE)" e "CEBRASPE", "ADAPTADA - FGV" e "FGV" —, e o agrupamento por
+// banca só serve se elas caírem juntas: sai o prefixo "ADAPTADA -" e o
+// "(CESPE)". Os outros parênteses ficam: em "Com. Org. (IFSP)" eles são a banca.
+func (q Questao) Banca() string {
+	b, _, _ := strings.Cut(q.Origem, "·")
+	b = strings.TrimSpace(b)
+
+	if resto, ok := strings.CutPrefix(strings.ToUpper(b), "ADAPTADA"); ok {
+		b = strings.TrimSpace(strings.TrimLeft(b[len(b)-len(resto):], " -–"))
+	}
+
+	if antes, ok := strings.CutSuffix(b, "(CESPE)"); ok && strings.TrimSpace(antes) != "" {
+		b = strings.TrimSpace(antes)
+	}
+
+	if b == "" {
+		return SemBanca
+	}
+
+	return b
+}
+
 // Assinatura resume o conteúdo: igual, a reimportação não mexe na questão.
 func (q Questao) Assinatura() string {
 	h := sha256.New()
