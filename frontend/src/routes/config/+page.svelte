@@ -540,19 +540,22 @@
 									>
 								{/each}
 							</div>
-							<div class="day-sel quando" role="group" aria-label="Quando estudar {d.nome}">
-								<button
-									type="button"
-									aria-pressed={!cfg.soNaRetaFinal?.[d.codigo]}
-									style="width:auto;padding:0 10px"
-									onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: false } })}>o plano todo</button
-								>
-								<button
-									type="button"
-									aria-pressed={!!cfg.soNaRetaFinal?.[d.codigo]}
-									style="width:auto;padding:0 10px"
-									onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: true } })}>só na reta final</button
-								>
+							<div class="quando">
+								<span class="quando-rot" aria-hidden="true">Quando estudar</span>
+								<div class="day-sel" role="group" aria-label="Quando estudar {d.nome}">
+									<button
+										type="button"
+										aria-pressed={!cfg.soNaRetaFinal?.[d.codigo]}
+										style="width:auto;padding:0 10px"
+										onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: false } })}>o plano todo</button
+									>
+									<button
+										type="button"
+										aria-pressed={!!cfg.soNaRetaFinal?.[d.codigo]}
+										style="width:auto;padding:0 10px"
+										onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: true } })}>só na reta final</button
+									>
+								</div>
 							</div>
 						</div>
 					{/each}
@@ -687,6 +690,25 @@
 	}
 	.modo-linha .day-sel button {
 		white-space: nowrap;
+	}
+	/* "Quando estudar" é outra pergunta que as de cima (como e quanto): linha
+	   própria, com rótulo e um respiro, para não ler como mais um modo. */
+	.quando {
+		flex: 0 0 100%;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 10px;
+		margin-top: 6px;
+		padding-top: 8px;
+		border-top: 1px dashed var(--border);
+	}
+	.quando-rot {
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+	.quando .day-sel {
+		gap: 6px;
 	}
 
 	/* Sem largura nem para um grupo inteiro, os botões dele também quebram. */

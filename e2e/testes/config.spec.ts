@@ -49,6 +49,32 @@ test.describe('configurações e dados', () => {
 		expect(depois.props.horasTotal).toBeGreaterThan(0);
 	});
 
+	test('[D12] refazer o cronograma com um lançamento sem conclusão adiante não falha e guarda o lançamento', async ({ page, api, conta }) => {
+		const slug = await api.concurso('Lançado adiante E2E');
+		const antes = await api.plano(slug);
+		const alvo = antes.dias[antes.hojeIndex + 1].itens[0];
+		expect(alvo, 'o cenário precisa de uma matéria amanhã').toBeTruthy();
+		// Lançado e não concluído: é o rastro de um "já estudei" desmarcado.
+		const res = await page.request.put(`/api/concursos/${slug}/plano/atividades/${alvo.id}/registro`, {
+			headers: { Authorization: `Bearer ${conta.token}` },
+			data: { atividadeId: alvo.id, horas: 0.5, questoes: null, acertos: null, nota: '', concluido: false }
+		});
+		expect(res.ok(), await res.text()).toBeTruthy();
+
+		await abrirConfig(page);
+		const gravou = page.waitForResponse((r) => /\/api\/concursos\/[^/]+\/plano$/.test(r.url()) && r.request().method() === 'PUT');
+		await page.getByRole('group', { name: 'Blocos por dia' }).getByRole('button', { name: '3', exact: true }).click();
+		const resposta = await gravou;
+		expect(resposta.ok(), await resposta.text()).toBeTruthy();
+
+		const depois = await api.plano(slug);
+		type Item = { id: string; horas: number | null };
+		const lancado = depois.dias.flatMap((d: { itens: Item[] }) => d.itens).find((i: Item) => i.id === alvo.id);
+		expect(lancado?.horas, 'o lançamento sumiu do cronograma').toBe(0.5);
+		// O cronograma foi refeito: dali em diante, três matérias por dia.
+		expect(depois.dias[depois.hojeIndex + 2].itens).toHaveLength(3);
+	});
+
 	test('[D3] a planilha exportada traz o estudo de volta em outra conta', async ({ page, api, browser }, info) => {
 		const origem = await api.concurso('Planilha E2E');
 		await abrirHoje(page);

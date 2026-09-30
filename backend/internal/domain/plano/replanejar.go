@@ -776,13 +776,13 @@ func SemConteudoJaConcluido(
 func SemAtrasadas(
 	atividades []Atividade,
 	hoje time.Time,
-	concluida func(uuid.UUID) bool,
+	lancada func(uuid.UUID) bool,
 ) []Atividade {
 	hoje = day(hoje)
 	saida := make([]Atividade, 0, len(atividades))
 
 	for _, a := range atividades {
-		if day(a.Data).Before(hoje) && !concluida(a.ID) {
+		if day(a.Data).Before(hoje) && !lancada(a.ID) {
 			continue
 		}
 

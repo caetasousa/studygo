@@ -232,7 +232,7 @@ func (s *CronogramaService) RestaurarOrdem(
 	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
 
 	return s.gravarEMontar(
-		ctx, c, plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida),
+		ctx, c, plano.Replanejar(atuais, novas, hoje, c.Registros.Lancada),
 	)
 }
 
@@ -338,7 +338,7 @@ func (s *CronogramaService) ReorganizarDesde(
 	novas := plano.Materializar(res.Dias, idsPorCodigo(c.Concurso))
 
 	return s.gravarEMontar(
-		ctx, c, plano.Replanejar(atuais, novas, desde, c.Registros.Concluida),
+		ctx, c, plano.Replanejar(atuais, novas, desde, c.Registros.Lancada),
 	)
 }
 

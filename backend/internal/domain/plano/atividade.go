@@ -170,8 +170,10 @@ func Materializar(dias []Dia, porCodigo map[string]uuid.UUID) []Atividade {
 // Replanejar recalcula o cronograma dos dias que ainda estão por vir,
 // preservando o que não pode ser mexido.
 //
-// A regra que o estudante espera: o que já passou, o que está concluído e o que
+// A regra que o estudante espera: o que já passou, o que tem lançamento e o que
 // ele arrumou à mão fica onde está; os dias à frente seguem a configuração nova.
+// Lançamento, e não só conclusão: a atividade com registro não pode sair do
+// cronograma — o banco recusa o cronograma inteiro —, e `lancada` é quem diz.
 // Uma atividade é preservada quando QUALQUER uma dessas condições vale, e as
 // demais dão lugar às recém-geradas.
 //
@@ -182,7 +184,7 @@ func Replanejar(
 	atuais []Atividade,
 	novas []Atividade,
 	desde time.Time,
-	concluida func(uuid.UUID) bool,
+	lancada func(uuid.UUID) bool,
 ) []Atividade {
 	desde = day(desde)
 
@@ -209,7 +211,7 @@ func Replanejar(
 	for _, a := range atuais {
 		dt := day(a.Data)
 
-		if dt.Before(desde) || concluida(a.ID) || a.Movida {
+		if dt.Before(desde) || lancada(a.ID) || a.Movida {
 			preservadas = append(preservadas, a)
 			marcarOcupada(a)
 			intocados[dt] = true

@@ -77,6 +77,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | D9 | adiar uma matéria para a reta final a deixa na fase de aprender, não refaz o cronograma, não fica gravado, ou apaga o que já foi estudado | a matéria de peso baixo continua tomando os dias de agora; ou o estudo dela some |
 | D10 | na reta final a matéria adiada vem como "Revisão dirigida" de algo nunca estudado, deixa tópico de fora ou repete tópico; ou o balanceamento a acusa de incompleta | estuda como revisão o que nunca viu; tópico sem estudo; aviso falso de matéria que não é vista |
 | D11 | voltar a matéria para o plano todo não a devolve à fase de aprender; ou adiar todas as matérias é aceito e esvazia a fase de aprender | um clique sem volta; semanas em branco |
+| D12 | refazer o cronograma (mudar os blocos, adiar uma matéria, reorganizar) quando há uma atividade adiante com lançamento mas sem conclusão — um "já estudei" desmarcado, horas lançadas sem concluir — tenta apagá-la e o banco recusa; a configuração fica gravada e o cronograma, velho | "erro interno" ao salvar; a matéria adiada continua aparecendo, e salvar de novo não refaz nada |
 
 ## L. Legislação
 

@@ -57,6 +57,16 @@ func (r Registros) Concluida(id uuid.UUID) bool {
 	return ok && reg.Concluido
 }
 
+// Lancada diz se a atividade tem registro, concluída ou não. É o que a prende
+// ao cronograma: o banco não deixa apagar atividade com registro (a FK é
+// RESTRICT), e um lançamento sem conclusão — horas lançadas, um "já estudei"
+// desmarcado — também é história.
+func (r Registros) Lancada(id uuid.UUID) bool {
+	_, ok := r[id]
+
+	return ok
+}
+
 // DiaConcluido diz se um dia está terminado: quando TODA atividade agendada
 // para ele está concluída.
 //

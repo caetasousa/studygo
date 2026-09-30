@@ -191,7 +191,7 @@ func (s *PlanoService) replanejarFuturo(
 		c.Atividades,
 		novas,
 		desde,
-		c.Registros.Concluida,
+		c.Registros.Lancada,
 	)
 
 	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, atividades); err != nil {

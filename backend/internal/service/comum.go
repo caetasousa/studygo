@@ -261,7 +261,7 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 		return nil, 0
 	}
 
-	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Concluida)
+	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Lancada)
 
 	// A marca de "movida" vale contra o motor, não contra o calendário: quando o
 	// plano encolhe, manter posições escolhidas à mão travaria justamente as
@@ -286,7 +286,7 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 	// que impede a redistribuição de reagendar tudo que o estudante já estudou.
 	novas = plano.SemConteudoJaConcluido(novas, c.Atividades, c.Registros.Concluida)
 
-	replanejadas := plano.Replanejar(atuais, novas, hoje, c.Registros.Concluida)
+	replanejadas := plano.Replanejar(atuais, novas, hoje, c.Registros.Lancada)
 
 	// O desconto deixa buracos: os dias que perderam conteúdo ficariam curtos, e
 	// o que sobrou continuaria na data em que o motor o pôs. Compactar empurra a
