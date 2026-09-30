@@ -54,7 +54,8 @@ func TestContratoHTTP_Plano(t *testing.T) {
 			BlocosPorDia: 2, MinutosBloco: 60, MinutosRevisao: 20,
 			Reforcos:  map[string]float64{"LINPO": 1},
 			Simulados: "semanal", Discursiva: true,
-			Modos: map[string]string{"LINPO": "completo"}, PctQuestoes: 0.5, LimiarFraco: 70,
+			Modos: map[string]string{"LINPO": "completo"}, SoNaRetaFinal: map[string]bool{"LINPO": true},
+			PctQuestoes: 0.5, LimiarFraco: 70,
 		},
 		Dias: []service.DiaDoPlano{{
 			N: 1, Data: data, Semana: 1, Fase: "base", Tipo: "est",

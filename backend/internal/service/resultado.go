@@ -89,6 +89,7 @@ type ConfigDoPlano struct {
 	Simulados      string
 	Discursiva     bool
 	Modos          map[string]string
+	SoNaRetaFinal  map[string]bool
 	PctQuestoes    float64
 	LimiarFraco    int
 }
@@ -184,6 +185,9 @@ type LinhaBalanceamento struct {
 	QuestoesEdital int
 	Delta          int
 	Modo           string
+	// SoNaRetaFinal: a matéria foi adiada, e o que ela tem na reta final é
+	// estudo, não revisão — RevisoesGerais fica zero.
+	SoNaRetaFinal  bool
 	Peso           int
 	Pontos         int
 	PctIdeal       float64

@@ -23,6 +23,7 @@
       "questoes": "number",
       "questoesEdital": "number",
       "revisoesGerais": "number",
+      "soNaRetaFinal": "bool",
       "temas": "number",
       "temasCobertos": "number",
       "temasEstudados": "number",

@@ -108,8 +108,24 @@ func construir(
 	dist, somaDist := pesosDistribuicao(codes, pontos, cfg)
 	n := cfg.BlocosPorDia
 
-	res.Slots = distribui(len(diasEst)*n, codes, dist, somaDist)
+	// A matéria adiada não entra na fase de aprender: as vagas dela ficam com as
+	// outras, na proporção de sempre.
+	codesBase, somaBase := codes, somaDist
+	if algumaNaRetaFinal(cfg, codes) {
+		codesBase, somaBase = semAsDaRetaFinal(cfg, codes, dist)
+	}
+
+	res.Slots = distribui(len(diasEst)*n, codesBase, dist, somaBase)
 	res.SlotsReta = distribui(len(diasRevD)*n, codes, dist, somaDist)
+
+	distReta, somaReta := dist, somaDist
+	if algumaNaRetaFinal(cfg, codes) {
+		res.SlotsReta = distribuiReta(len(diasRevD)*n, codes, dist, temas, cfg)
+		// As vagas da adiada não seguem o peso da prova, e sim os tópicos dela:
+		// espaçar pelas próprias vagas a espalha pela reta, em vez de amontoá-la
+		// nos últimos dias, quando as outras já acabaram.
+		distReta, somaReta = res.SlotsReta, somaDe(res.SlotsReta)
+	}
 
 	filas := map[string][]reparteItem{}
 	ptr := map[string]int{}
@@ -121,8 +137,8 @@ func construir(
 		filasR[k] = reparte(temas[k], res.SlotsReta[k])
 	}
 
-	ordem := despareia(ordena(res.Slots, dist, codes, somaDist), n)
-	ordemR := despareia(ordena(res.SlotsReta, dist, codes, somaDist), n)
+	ordem := despareia(ordena(res.Slots, dist, codesBase, somaBase), n)
+	ordemR := despareia(ordena(res.SlotsReta, distReta, codes, somaReta), n)
 
 	res.Simulado = simulado(cfg, c)
 	simTema := res.Simulado.Tema()
@@ -147,11 +163,11 @@ func construir(
 		case d.papel == "est":
 			base.Tipo = TipoEstudo
 			base.Meta = metaEstudo
-			base.Itens = puxaBloco(ordem, &oi, n, filas, ptr, "")
+			base.Itens = puxaBloco(ordem, &oi, n, filas, ptr, "", nil)
 		case d.papel == "revd":
 			base.Tipo = TipoRevisaoDirigida
 			base.Meta = metaRevD
-			base.Itens = puxaBloco(ordemR, &ori, n, filasR, ptrR, prefixoRevisaoDirigida)
+			base.Itens = puxaBloco(ordemR, &ori, n, filasR, ptrR, prefixoRevisaoDirigida, cfg.NaRetaFinal)
 		case d.papel == "sim":
 			base.Tipo = TipoSimulado
 			base.Meta = simMeta
@@ -337,7 +353,9 @@ func (c Composicao) Tema() string {
 }
 
 // puxaBloco consumes up to n discipline slots from ordem and pulls the next
-// queued topic for each. prefix, when set, is prepended to the topic text.
+// queued topic for each. prefix, when set, is prepended to the topic text —
+// menos na disciplina que `semPrefixo` aponta: a adiada para a reta final é
+// estudada ali pela primeira vez, e chamar isso de revisão seria mentir.
 func puxaBloco(
 	ordem []string,
 	cursor *int,
@@ -345,6 +363,7 @@ func puxaBloco(
 	filas map[string][]reparteItem,
 	ptr map[string]int,
 	prefix string,
+	semPrefixo func(string) bool,
 ) []ItemDia {
 	itens := []ItemDia{}
 
@@ -369,9 +388,14 @@ func puxaBloco(
 			ptr[k]++
 		}
 
+		rotulo := prefix
+		if semPrefixo != nil && semPrefixo(k) {
+			rotulo = ""
+		}
+
 		itens = append(itens, ItemDia{
 			Disciplina: k,
-			Tema:       prefix + tema,
+			Tema:       rotulo + tema,
 			Passada:    pass,
 		})
 	}
@@ -632,6 +656,97 @@ func pesosDistribuicao(codes []string, pontos map[string]int, cfg Config) (map[s
 	}
 
 	return out, soma
+}
+
+// algumaNaRetaFinal diz se alguma disciplina foi adiada. Sem nenhuma, o motor
+// segue exatamente o caminho de sempre — o golden test depende disso.
+func algumaNaRetaFinal(cfg Config, codes []string) bool {
+	for _, k := range codes {
+		if cfg.NaRetaFinal(k) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// semAsDaRetaFinal são as disciplinas da fase de aprender e a soma dos pesos
+// delas.
+func semAsDaRetaFinal(cfg Config, codes []string, dist map[string]int) ([]string, int) {
+	out := make([]string, 0, len(codes))
+	soma := 0
+
+	for _, k := range codes {
+		if !cfg.NaRetaFinal(k) {
+			out = append(out, k)
+			soma += dist[k]
+		}
+	}
+
+	return out, soma
+}
+
+// distribuiReta divide os blocos da reta final quando há disciplina adiada.
+//
+// A adiada é ESTUDADA ali, pela primeira e única vez: pede um bloco por tópico.
+// Juntas, as adiadas ficam com no máximo metade da reta — a outra metade é a
+// revisão dirigida do resto, que é para o que a reta existe. Quando não cabem,
+// dividem essa metade na proporção dos tópicos, e reparte junta vários tópicos
+// num bloco. O que sobra vai para as outras pelo peso da prova, como sempre.
+func distribuiReta(
+	total int,
+	codes []string,
+	dist map[string]int,
+	temas map[string][]string,
+	cfg Config,
+) map[string]int {
+	adiadas, outras := []string{}, []string{}
+	pedidos := map[string]int{}
+	pedido, somaOutras := 0, 0
+
+	for _, k := range codes {
+		if cfg.NaRetaFinal(k) {
+			adiadas = append(adiadas, k)
+			pedidos[k] = maxInt(len(temas[k]), 1)
+			pedido += pedidos[k]
+
+			continue
+		}
+
+		outras = append(outras, k)
+		somaOutras += dist[k]
+	}
+
+	teto := total
+	if len(outras) > 0 {
+		teto = total / 2
+	}
+
+	slots := pedidos
+	if pedido > teto {
+		slots = distribui(teto, adiadas, pedidos, pedido)
+	}
+
+	usados := 0
+	for _, k := range adiadas {
+		usados += slots[k]
+	}
+
+	out := distribui(total-usados, outras, dist, somaOutras)
+	for _, k := range adiadas {
+		out[k] = slots[k]
+	}
+
+	return out
+}
+
+func somaDe(m map[string]int) int {
+	soma := 0
+	for _, v := range m {
+		soma += v
+	}
+
+	return soma
 }
 
 func filterPapel(dias []*diaTmp, papel string) []*diaTmp {

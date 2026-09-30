@@ -507,7 +507,10 @@
 					Matérias de peso maior (as <b>específicas</b> valem 2, as básicas 1) já aparecem mais vezes
 					no cronograma. O <b>reforço</b> multiplica ainda mais uma matéria em que você está com
 					dificuldade — ela aparece em mais dias. O tamanho do bloco continua o que você definiu
-					em “Minutos por bloco”.
+					em “Minutos por bloco”. <b>Só na reta final</b> tira a matéria da fase de aprender — o
+					tempo dela vai para as outras — e a estuda perto da prova: na reta final, cada tópico
+					dela aparece uma vez, como estudo, não como revisão. Serve à matéria de poucas questões
+					e peso baixo, que não compensa ver desde já.
 				</p>
 				<div class="modos">
 					{#each disciplinas as d (d.codigo)}
@@ -536,6 +539,20 @@
 										onclick={() => salvar({ reforcos: { [d.codigo]: r.v } })}>{r.r}</button
 									>
 								{/each}
+							</div>
+							<div class="day-sel quando" role="group" aria-label="Quando estudar {d.nome}">
+								<button
+									type="button"
+									aria-pressed={!cfg.soNaRetaFinal?.[d.codigo]}
+									style="width:auto;padding:0 10px"
+									onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: false } })}>o plano todo</button
+								>
+								<button
+									type="button"
+									aria-pressed={!!cfg.soNaRetaFinal?.[d.codigo]}
+									style="width:auto;padding:0 10px"
+									onclick={() => salvar({ soNaRetaFinal: { [d.codigo]: true } })}>só na reta final</button
+								>
 							</div>
 						</div>
 					{/each}

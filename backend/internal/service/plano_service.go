@@ -57,6 +57,7 @@ type ConfigCommand struct {
 	Simulados      *string
 	Discursiva     *bool
 	Modos          map[string]string
+	SoNaRetaFinal  map[string]bool
 	PctQuestoes    *float64
 	LimiarFraco    *int
 }
@@ -133,7 +134,28 @@ func datasMudaram(antes, depois plano.Config) bool {
 		}
 	}
 
+	// Adiar uma matéria para a reta final (ou trazê-la de volta) redistribui a
+	// fase de aprender inteira.
+	for k := range mapasUnidos(antes.SoNaRetaFinal, depois.SoNaRetaFinal) {
+		if antes.NaRetaFinal(k) != depois.NaRetaFinal(k) {
+			return true
+		}
+	}
+
 	return len(antes.Reforcos) != len(depois.Reforcos)
+}
+
+func mapasUnidos(a, b map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(a)+len(b))
+	for k := range a {
+		out[k] = true
+	}
+
+	for k := range b {
+		out[k] = true
+	}
+
+	return out
 }
 
 // desdeQuando diz de que dia em diante o replanejamento pode mexer.
@@ -308,7 +330,23 @@ func aplicarConfig(
 
 	aplicarMetodo(&cfg, cur, cmd)
 
+	if len(cur.Disciplinas) > 0 && todasNaRetaFinal(cfg, cur) {
+		return plano.Config{}, erroDeValidacao(
+			"deixe ao menos uma matéria no plano todo: com todas só na reta final, a fase de aprender fica vazia",
+		)
+	}
+
 	return cfg.Normalizar(), nil
+}
+
+func todasNaRetaFinal(cfg plano.Config, cur concurso.Concurso) bool {
+	for _, d := range cur.Disciplinas {
+		if !cfg.NaRetaFinal(d.Codigo) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) {
@@ -383,6 +421,20 @@ func aplicarMetodo(cfg *plano.Config, cur concurso.Concurso, cmd ConfigCommand) 
 		cfg.Reforcos = reforcos
 	}
 
+	if cmd.SoNaRetaFinal != nil {
+		adiadas := make(map[string]bool, len(cfg.SoNaRetaFinal)+len(cmd.SoNaRetaFinal))
+		for codigo, sim := range cfg.SoNaRetaFinal {
+			adiadas[codigo] = sim
+		}
+
+		for codigo, sim := range cmd.SoNaRetaFinal {
+			if cur.DisciplinaPorCodigo(codigo) != nil {
+				adiadas[codigo] = sim
+			}
+		}
+
+		cfg.SoNaRetaFinal = adiadas
+	}
 }
 
 // questoesValidas mantém só as disciplinas que o concurso tem, para que uma

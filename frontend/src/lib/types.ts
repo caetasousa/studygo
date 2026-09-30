@@ -272,6 +272,9 @@ export interface Config {
 	simulados: Simulados;
 	discursiva: boolean;
 	modos: Record<string, Modo>;
+	/** Matérias adiadas para a reta final: fora da fase de aprender, estudadas
+	 *  (não revisadas) na reta. Só as adiadas aparecem, com `true`. */
+	soNaRetaFinal: Record<string, boolean>;
 	pctQuestoes: number;
 	limiarFraco: number;
 }
@@ -367,6 +370,8 @@ export interface LinhaBalanceamento {
 	questoesEdital: number;
 	delta: number;
 	modo: Modo;
+	/** Adiada para a reta final: o que ela tem lá é estudo, e `revisoesGerais` é 0. */
+	soNaRetaFinal: boolean;
 	peso: number;
 	pontos: number;
 	pctIdeal: number;
@@ -446,6 +451,8 @@ export interface ConfigInput {
 	simulados?: Simulados;
 	discursiva?: boolean;
 	modos?: Record<string, Modo>;
+	/** Remendo: só as matérias que mudaram. */
+	soNaRetaFinal?: Record<string, boolean>;
 	pctQuestoes?: number;
 	limiarFraco?: number;
 }

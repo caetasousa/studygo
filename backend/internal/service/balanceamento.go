@@ -31,13 +31,19 @@ func montarBalanceamento(
 		// "Aprendo" e o aviso de matéria incompleta vêm do cronograma gravado:
 		// o que foi antecipado, reorganizado ou tirado por repetição conta como
 		// está, e cada tópico conta dentro dos blocos que juntam vários.
-		cobertura := plano.CoberturaDaMateria(res.Dias, d.Codigo, d.Temas)
+		adiada := cfg.NaRetaFinal(d.Codigo)
+		cobertura := plano.CoberturaDaMateria(res.Dias, d.Codigo, d.Temas, adiada)
 		passadas := passadasDe(res.Slots[d.Codigo], len(d.Temas))
 		cobertos := len(d.Temas)
 
 		if len(d.Temas) > 0 {
 			passadas = arredondar1(float64(cobertura.Aparicoes) / float64(len(d.Temas)))
 			cobertos = cobertura.Cobertos
+		}
+
+		revisoes := revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas))
+		if adiada {
+			revisoes = 0
 		}
 
 		var pctIdeal float64
@@ -65,6 +71,7 @@ func montarBalanceamento(
 			QuestoesEdital: d.QuestoesPadrao,
 			Delta:          cfg.Questoes[d.Codigo] - d.QuestoesPadrao,
 			Modo:           string(cfg.ModoDe(d.Codigo)),
+			SoNaRetaFinal:  adiada,
 			Peso:           d.Peso,
 			Pontos:         res.Pontos[d.Codigo],
 			PctIdeal:       arredondar1(pctIdeal),
@@ -75,7 +82,7 @@ func montarBalanceamento(
 			Passadas:       passadas,
 			TemasCobertos:  cobertos,
 			Visitas:        visitas[d.Codigo],
-			RevisoesGerais: revisoesRetaDe(res.SlotsReta[d.Codigo], len(d.Temas)),
+			RevisoesGerais: revisoes,
 			IntervaloDias:  intervalos[d.Codigo],
 			HorasPrevisto: arredondar1(
 				float64(res.Slots[d.Codigo]+res.SlotsReta[d.Codigo]) * horasPorBloco,

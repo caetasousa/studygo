@@ -236,3 +236,87 @@ test.describe('configurações e dados', () => {
 		expect(depois.dias[depois.hojeIndex + 1].itens).toHaveLength(2);
 	});
 });
+
+test.describe('matéria só na reta final', () => {
+	const LEGISLACAO = ['Lei Orgânica', 'Regimento Interno', 'Estatuto dos Servidores'];
+	const DISCIPLINAS = [
+		{ nome: 'Informática', bloco: 'esp' as const, questoes: 10, temas: ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'] },
+		{ nome: 'Língua Portuguesa', bloco: 'ger' as const, questoes: 20, temas: ['Crase', 'Regência', 'Concordância'] },
+		{ nome: 'Legislação Institucional', bloco: 'ger' as const, questoes: 5, temas: LEGISLACAO }
+	];
+	type Item = { disciplina: string; tema: string; passada: number };
+	type Dia = { data: string; fase: 'base' | 'reta'; tipo: string; itens: Item[] };
+	type Plano = { dias: Dia[]; hojeIndex: number; concurso: { disciplinas: { nome: string; codigo: string }[] } };
+	const codigoDe = (p: Plano, nome: string) => p.concurso.disciplinas.find((d) => d.nome === nome)!.codigo;
+	/** Os itens da matéria depois de hoje, numa fase. */
+	const adiante = (p: Plano, codigo: string, fase: 'base' | 'reta') => {
+		const hoje = p.dias[p.hojeIndex].data;
+		return p.dias.filter((d) => d.data > hoje && d.fase === fase).flatMap((d) => d.itens).filter((i) => i.disciplina === codigo);
+	};
+	const quando = (page: Page) => page.getByRole('group', { name: 'Quando estudar Legislação Institucional' });
+	const gravar = (page: Page) =>
+		page.waitForResponse((r) => /\/api\/concursos\/[^/]+\/plano$/.test(r.url()) && r.request().method() === 'PUT');
+
+	test('[D9][D10] adiar a matéria a tira da fase de aprender e a estuda inteira, uma vez, na reta final', async ({ page, api }) => {
+		const slug = await api.concurso('Adiar E2E', DISCIPLINAS);
+		await abrirHoje(page);
+		const [estudada] = await materiasDoDia(page);
+		await registrar(page, estudada, { minutos: 60, questoes: 10, acertos: 8, concluir: true });
+		const antes: Plano = await api.plano(slug);
+		const leg = codigoDe(antes, 'Legislação Institucional');
+		expect(adiante(antes, leg, 'base').length, 'o cenário precisa da matéria na fase de aprender').toBeGreaterThan(0);
+
+		await abrirConfig(page);
+		await expect(quando(page).getByRole('button', { name: 'o plano todo' })).toHaveAttribute('aria-pressed', 'true');
+		const gravou = gravar(page);
+		await quando(page).getByRole('button', { name: 'só na reta final' }).click();
+		expect((await gravou).ok()).toBeTruthy();
+
+		const depois: Plano & { props: { horasTotal: number }; balanceamento: { codigo: string; temasCobertos: number }[] } = await api.plano(slug);
+		expect(adiante(depois, leg, 'base'), 'a matéria adiada continua na fase de aprender').toHaveLength(0);
+		// Na reta final ela é ESTUDADA: cada tópico uma vez, sem o rótulo de revisão.
+		const naReta = adiante(depois, leg, 'reta');
+		expect(naReta.map((i) => i.tema).sort()).toEqual([...LEGISLACAO].sort());
+		expect(naReta.every((i) => i.passada === 1)).toBe(true);
+		// As outras continuam sendo revisadas na reta final.
+		const outras = depois.dias.filter((d) => d.tipo === 'revd').flatMap((d) => d.itens).filter((i) => i.disciplina !== leg);
+		expect(outras.length).toBeGreaterThan(0);
+		expect(outras.every((i) => i.tema.startsWith('Revisão dirigida — '))).toBe(true);
+		expect(depois.props.horasTotal, 'adiar a matéria apagou o estudo').toBe(antes.props.horasTotal);
+		expect(depois.balanceamento.find((l) => l.codigo === leg)!.temasCobertos).toBe(LEGISLACAO.length);
+
+		await page.reload();
+		await expect(quando(page).getByRole('button', { name: 'só na reta final' })).toHaveAttribute('aria-pressed', 'true');
+
+		await page.goto('/balanceamento');
+		const linha = page.getByRole('row').filter({ hasText: 'Legislação Institucional' }).first();
+		await expect(linha).toContainText('só na reta final');
+		// Todos os tópicos estão no cronograma: a linha não acusa matéria incompleta.
+		await expect(linha).not.toHaveClass(/incompleta/);
+	});
+
+	test('[D11] a matéria volta ao plano todo, e adiar todas é recusado', async ({ page, api, conta }) => {
+		const slug = await api.concurso('Desadiar E2E', DISCIPLINAS);
+		await abrirConfig(page);
+		let gravou = gravar(page);
+		await quando(page).getByRole('button', { name: 'só na reta final' }).click();
+		expect((await gravou).ok()).toBeTruthy();
+		const leg = codigoDe(await api.plano(slug), 'Legislação Institucional');
+		expect(adiante(await api.plano(slug), leg, 'base')).toHaveLength(0);
+
+		gravou = gravar(page);
+		await quando(page).getByRole('button', { name: 'o plano todo' }).click();
+		expect((await gravou).ok()).toBeTruthy();
+		expect(adiante(await api.plano(slug), leg, 'base').length, 'a matéria não voltou à fase de aprender').toBeGreaterThan(0);
+
+		// Todas adiadas deixariam a fase de aprender sem matéria nenhuma.
+		const p: Plano = await api.plano(slug);
+		const todas = Object.fromEntries(p.concurso.disciplinas.map((d) => [d.codigo, true]));
+		const res = await page.request.put(`/api/concursos/${slug}/plano`, {
+			headers: { Authorization: `Bearer ${conta.token}` },
+			data: { soNaRetaFinal: todas }
+		});
+		expect(res.ok()).toBeFalsy();
+		expect(await res.text()).toContain('reta final');
+	});
+});

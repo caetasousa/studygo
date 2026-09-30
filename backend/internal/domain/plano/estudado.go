@@ -197,8 +197,9 @@ type Cobertura struct {
 // calcularia. Cada tópico conta dentro dos blocos que juntam vários: uma
 // matéria com mais tópicos que vagas vê todos eles, só que agrupados, e contar
 // blocos a fazia parecer incompleta. Reforço, revisão dirigida e a reta final
-// não são aprender.
-func CoberturaDaMateria(dias []Dia, disciplina string, temas []string) Cobertura {
+// não são aprender — menos para a matéria adiada para a reta final
+// (`naRetaFinal`), que é estudada ali pela primeira vez.
+func CoberturaDaMateria(dias []Dia, disciplina string, temas []string, naRetaFinal bool) Cobertura {
 	daMateria := map[string]bool{}
 	for _, t := range temas {
 		daMateria[normalizarTema(t)] = true
@@ -208,7 +209,7 @@ func CoberturaDaMateria(dias []Dia, disciplina string, temas []string) Cobertura
 	c := Cobertura{}
 
 	for _, d := range dias {
-		if d.Fase == FaseReta {
+		if d.Fase == FaseReta && !naRetaFinal {
 			continue
 		}
 

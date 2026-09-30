@@ -76,7 +76,9 @@ func (c carregador) montar(ctx context.Context, cx contexto) (PlanoMontado, erro
 		dd.Horas, dd.Questoes, dd.Acertos = plano.TotaisDoDia(cx.Atividades, cx.Registros, dt)
 
 		for _, a := range plano.AtividadesDoDia(cx.Atividades, dt) {
-			if a.Tipo.DeDiaInteiro() && len(d.Itens) > 0 {
+			// O dia de revisão dirigida que recebeu a matéria adiada mostra os dois:
+			// o estudo dela e a revisão das outras (ver plano.AplicarNosDias).
+			if a.Tipo.DeDiaInteiro() && len(d.Itens) > 0 && d.Tipo != plano.TipoRevisaoDirigida {
 				continue
 			}
 
@@ -210,6 +212,13 @@ func montarConfig(cfg plano.Config, tema string) ConfigDoPlano {
 		reforcos[codigo] = cfg.ReforcoDe(codigo)
 	}
 
+	adiadas := map[string]bool{}
+	for codigo, sim := range cfg.SoNaRetaFinal {
+		if sim {
+			adiadas[codigo] = true
+		}
+	}
+
 	// MinutosBloco é o que a tela de ajustes edita. Quando o plano nunca teve
 	// duração explícita, informa a implícita em HorasDia, para que a tela mostre
 	// um número real e o primeiro save o solidifique.
@@ -235,6 +244,7 @@ func montarConfig(cfg plano.Config, tema string) ConfigDoPlano {
 		Simulados:      string(cfg.Simulados),
 		Discursiva:     cfg.Discursiva,
 		Modos:          modos,
+		SoNaRetaFinal:  adiadas,
 		PctQuestoes:    cfg.PctQuestoes,
 		LimiarFraco:    cfg.LimiarFraco,
 	}

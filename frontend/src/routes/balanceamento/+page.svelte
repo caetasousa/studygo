@@ -156,7 +156,8 @@
 			<li><b>Aprendo</b> — quantas vezes vejo a matéria enquanto aprendo o conteúdo.</li>
 			<li>
 				<b>Reta final</b> — a última fase repassa cada matéria inteira uma vez, sempre.
-				Ali cada bloco cobre vários tópicos de uma vez.
+				Ali cada bloco cobre vários tópicos de uma vez. A matéria marcada
+				<b>só na reta final</b> é estudada ali, e não revisada.
 			</li>
 			<li>
 				<b>Volto</b> — em quantos dias eu volto a esta matéria antes da reta final.
@@ -188,6 +189,7 @@
 							<td>
 								<span class="chip-dot" style="background:var(--c{l.cor}-tx)"></span>
 								{l.nome}
+								{#if l.soNaRetaFinal}<span class="so-reta">só na reta final</span>{/if}
 							</td>
 							<td>{l.temas || '—'}</td>
 							<td class="estudados">
@@ -219,7 +221,13 @@
 								{/if}
 							</td>
 							<td class="destaque">{l.visitas}×</td>
-							<td class="fraco">{nf1.format(l.revisoesGerais)}×</td>
+							<td class="fraco">
+								{#if l.soNaRetaFinal}
+									<span title="Adiada: a reta final é onde ela é estudada, não revisada">estudo</span>
+								{:else}
+									{nf1.format(l.revisoesGerais)}×
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -420,6 +428,15 @@
 	   not read as just another row. */
 	tr.incompleta td {
 		background: var(--danger-soft);
+	}
+	/* A matéria adiada: o "Aprendo" dela acontece na reta final, e sem a marca
+	   a linha parece dizer que ela não tem vez antes da prova. */
+	.so-reta {
+		display: block;
+		font-size: 10.5px;
+		font-weight: 600;
+		color: var(--warn);
+		white-space: nowrap;
 	}
 	.aviso-cob {
 		display: block;

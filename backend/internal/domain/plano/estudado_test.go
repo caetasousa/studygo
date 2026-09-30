@@ -240,7 +240,7 @@ func TestCoberturaDaMateria(t *testing.T) {
 	}
 	temas := []string{"Git", "Docker", "CI", "Pipelines", "Kubernetes"} // K6: Kubernetes só na reta
 
-	c := plano.CoberturaDaMateria(dias, "DEV", temas)
+	c := plano.CoberturaDaMateria(dias, "DEV", temas, false)
 	if c.Cobertos != 4 {
 		t.Errorf("cobertos = %d, quer 4 (Git, Docker, CI, Pipelines)", c.Cobertos)
 	}

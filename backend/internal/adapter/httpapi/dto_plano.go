@@ -87,6 +87,7 @@ type configDTO struct {
 	Simulados      string             `json:"simulados"`
 	Discursiva     bool               `json:"discursiva"`
 	Modos          map[string]string  `json:"modos"`
+	SoNaRetaFinal  map[string]bool    `json:"soNaRetaFinal"`
 	PctQuestoes    float64            `json:"pctQuestoes"`
 	LimiarFraco    int                `json:"limiarFraco"`
 }
@@ -233,6 +234,7 @@ type linhaBalanceamento struct {
 	QuestoesEdital int     `json:"questoesEdital"`
 	Delta          int     `json:"delta"`
 	Modo           string  `json:"modo"`
+	SoNaRetaFinal  bool    `json:"soNaRetaFinal"`
 	Peso           int     `json:"peso"`
 	Pontos         int     `json:"pontos"`
 	PctIdeal       float64 `json:"pctIdeal"`
@@ -450,6 +452,7 @@ func configParaDTO(c service.ConfigDoPlano) configDTO {
 		Simulados:      c.Simulados,
 		Discursiva:     c.Discursiva,
 		Modos:          c.Modos,
+		SoNaRetaFinal:  c.SoNaRetaFinal,
 		PctQuestoes:    c.PctQuestoes,
 		LimiarFraco:    c.LimiarFraco,
 	}
@@ -468,6 +471,7 @@ func balanceamentoParaDTO(linhas []service.LinhaBalanceamento) []linhaBalanceame
 			QuestoesEdital: l.QuestoesEdital,
 			Delta:          l.Delta,
 			Modo:           l.Modo,
+			SoNaRetaFinal:  l.SoNaRetaFinal,
 			Peso:           l.Peso,
 			Pontos:         l.Pontos,
 			PctIdeal:       l.PctIdeal,

@@ -74,6 +74,9 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | D6 | o dossiê do NotebookLM sai sem a ementa e as leis cadastradas | fonte inútil para colar |
 | D7 | compactar não fecha o vão deixado no cronograma, ou desfaz a ordem manual | dias vazios no meio e conteúdo espremido no fim |
 | D8 | reorganizar a partir de uma data mexe no que já foi estudado, ou não refaz o que vem depois | histórico reescrito, ou plano velho |
+| D9 | adiar uma matéria para a reta final a deixa na fase de aprender, não refaz o cronograma, não fica gravado, ou apaga o que já foi estudado | a matéria de peso baixo continua tomando os dias de agora; ou o estudo dela some |
+| D10 | na reta final a matéria adiada vem como "Revisão dirigida" de algo nunca estudado, deixa tópico de fora ou repete tópico; ou o balanceamento a acusa de incompleta | estuda como revisão o que nunca viu; tópico sem estudo; aviso falso de matéria que não é vista |
+| D11 | voltar a matéria para o plano todo não a devolve à fase de aprender; ou adiar todas as matérias é aceito e esvazia a fase de aprender | um clique sem volta; semanas em branco |
 
 ## L. Legislação
 

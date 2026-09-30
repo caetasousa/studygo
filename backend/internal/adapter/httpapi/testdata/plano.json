@@ -28,6 +28,7 @@
       "questoes": "number",
       "questoesEdital": "number",
       "revisoesGerais": "number",
+      "soNaRetaFinal": "bool",
       "temas": "number",
       "temasCobertos": "number",
       "temasEstudados": "number",
@@ -95,6 +96,9 @@
     "retaFinalDias": "number",
     "revisaoSemanal": "bool",
     "simulados": "string",
+    "soNaRetaFinal": {
+      "LINPO": "bool"
+    },
     "temaUi": "string"
   },
   "dias": [

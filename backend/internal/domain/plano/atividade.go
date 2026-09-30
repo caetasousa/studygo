@@ -3,6 +3,7 @@ package plano
 import (
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -130,13 +131,23 @@ func Materializar(dias []Dia, porCodigo map[string]uuid.UUID) []Atividade {
 		}
 
 		for i, it := range d.Itens {
+			tipo := tipoDaAtividade(d.Tipo)
+
+			// Na reta final, o bloco sem o rótulo de revisão é a matéria adiada
+			// para lá: é estudo de uma matéria, e aponta para ela como qualquer
+			// dia de conteúdo — senão não teria registro, estatística nem "já
+			// estudei".
+			if d.Tipo == TipoRevisaoDirigida && !ehRevisaoDirigida(it.Tema) {
+				tipo = AtividadeConteudo
+			}
+
 			a := Atividade{
 				ID:      uuid.New(),
 				Data:    data,
 				Posicao: i,
 				Tema:    it.Tema,
 				Passada: it.Passada,
-				Tipo:    tipoDaAtividade(d.Tipo),
+				Tipo:    tipo,
 			}
 
 			// Só o que é de uma matéria aponta para uma disciplina. Um dia de
@@ -400,10 +411,15 @@ func AplicarNosDias(dias []Dia, atividades []Atividade) {
 
 		sort.SliceStable(lista, func(x, y int) bool { return lista[x].Posicao < lista[y].Posicao })
 
+		// O dia de revisão dirigida que recebeu a matéria adiada mistura os dois:
+		// o estudo dela e a revisão das outras. Os dois são blocos do dia, e é
+		// com os dois que o tempo dele se divide.
+		misto := dias[i].Tipo == TipoRevisaoDirigida && temConteudo(lista)
+
 		itens := make([]ItemDia, 0, len(lista))
 
 		for _, a := range lista {
-			if a.Tipo.DeDiaInteiro() {
+			if a.Tipo.DeDiaInteiro() && !(misto && a.Tipo == AtividadeRevisao) {
 				continue
 			}
 
@@ -417,6 +433,22 @@ func AplicarNosDias(dias []Dia, atividades []Atividade) {
 
 		dias[i].Itens = itens
 	}
+}
+
+func temConteudo(atividades []Atividade) bool {
+	for _, a := range atividades {
+		if !a.Tipo.DeDiaInteiro() {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ehRevisaoDirigida diz se o bloco da reta final é revisão — o rótulo que o
+// motor põe — ou estudo da matéria adiada, que vem sem ele.
+func ehRevisaoDirigida(tema string) bool {
+	return strings.HasPrefix(tema, prefixoRevisaoDirigida)
 }
 
 // doDia devolve as atividades de um dia, ordenadas por posição.

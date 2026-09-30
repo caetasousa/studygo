@@ -39,8 +39,11 @@ type Config struct {
 	Simulados      Frequencia      // com que frequência um simulado completo aparece na reta final
 	Discursiva     bool            // reservar um dia de discursiva na reta final
 	Modos          map[string]Modo // como cada disciplina é estudada
-	PctQuestoes    float64         // fatia do bloco de estudo gasta em questões
-	LimiarFraco    int             // % abaixo do qual uma bateria conta como fraca
+	// SoNaRetaFinal tira a disciplina da fase de aprender e a estuda na reta
+	// final: a de poucas questões e peso baixo, que não compensa ver desde já.
+	SoNaRetaFinal map[string]bool
+	PctQuestoes   float64 // fatia do bloco de estudo gasta em questões
+	LimiarFraco   int     // % abaixo do qual uma bateria conta como fraca
 }
 
 // Frequencia é com que frequência um simulado completo aparece na reta final.
@@ -84,6 +87,7 @@ func ConfigPadrao() Config {
 		Simulados:      SimuladoSemanal,
 		Discursiva:     true,
 		Modos:          map[string]Modo{},
+		SoNaRetaFinal:  map[string]bool{},
 		PctQuestoes:    0.5,
 		LimiarFraco:    70,
 	}
@@ -107,7 +111,7 @@ func (c Config) Normalizar() Config {
 	// pergunta não respondida como se fosse resposta (Discursiva=false, por
 	// exemplo).
 	if c.Simulados == "" {
-		modos, reforcos := c.Modos, c.Reforcos
+		modos, reforcos, adiadas := c.Modos, c.Reforcos, c.SoNaRetaFinal
 		blocos := c.BlocosPorDia
 
 		c.BlocosPorDia = d.BlocosPorDia
@@ -123,6 +127,7 @@ func (c Config) Normalizar() Config {
 
 		c.Modos = modosNaoNulos(modos)
 		c.Reforcos = reforcosNaoNulos(reforcos)
+		c.SoNaRetaFinal = adiadasNaoNulas(adiadas)
 		c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 		c.HorasDia = horasDiaEfetiva(c)
 
@@ -151,6 +156,7 @@ func (c Config) Normalizar() Config {
 
 	c.Modos = modosNaoNulos(c.Modos)
 	c.Reforcos = reforcosNaoNulos(c.Reforcos)
+	c.SoNaRetaFinal = adiadasNaoNulas(c.SoNaRetaFinal)
 	c.MinutosBloco = minutosBlocoValido(c.MinutosBloco)
 	c.HorasDia = horasDiaEfetiva(c)
 
@@ -167,6 +173,11 @@ func (c Config) ModoDe(codigo string) Modo {
 	default:
 		return ModoCompleto
 	}
+}
+
+// NaRetaFinal diz se a disciplina foi adiada para a reta final.
+func (c Config) NaRetaFinal(codigo string) bool {
+	return c.SoNaRetaFinal[codigo]
 }
 
 // ReforcoDe é o peso extra de uma disciplina, com padrão 1 e limitado a uma
@@ -233,6 +244,14 @@ func modosNaoNulos(m map[string]Modo) map[string]Modo {
 func reforcosNaoNulos(m map[string]float64) map[string]float64 {
 	if m == nil {
 		return map[string]float64{}
+	}
+
+	return m
+}
+
+func adiadasNaoNulas(m map[string]bool) map[string]bool {
+	if m == nil {
+		return map[string]bool{}
 	}
 
 	return m

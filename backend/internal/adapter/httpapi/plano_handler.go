@@ -112,6 +112,7 @@ type configRequest struct {
 	Simulados      *string            `json:"simulados"`
 	Discursiva     *bool              `json:"discursiva"`
 	Modos          map[string]string  `json:"modos"`
+	SoNaRetaFinal  map[string]bool    `json:"soNaRetaFinal"`
 	PctQuestoes    *float64           `json:"pctQuestoes"`
 	LimiarFraco    *int               `json:"limiarFraco"`
 }
@@ -147,6 +148,7 @@ func (h *PlanoHandler) Salvar(w http.ResponseWriter, r *http.Request) {
 		Simulados:      req.Simulados,
 		Discursiva:     req.Discursiva,
 		Modos:          req.Modos,
+		SoNaRetaFinal:  req.SoNaRetaFinal,
 		PctQuestoes:    req.PctQuestoes,
 		LimiarFraco:    req.LimiarFraco,
 	}

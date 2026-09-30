@@ -63,6 +63,7 @@ func escanearPlano(linha pgx.Row) (plano.Plano, error) {
 	p.Config.Questoes = map[string]int{}
 	p.Config.Modos = map[string]plano.Modo{}
 	p.Config.Reforcos = map[string]float64{}
+	p.Config.SoNaRetaFinal = map[string]bool{}
 
 	return p, nil
 }
@@ -102,7 +103,7 @@ func (r *PlanoRepo) PorUsuario(
 func (r *PlanoRepo) carregarDisciplinas(ctx context.Context, p *plano.Plano) error {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT d.codigo, pd.questoes, pd.modo, pd.reforco::float8
+		`SELECT d.codigo, pd.questoes, pd.modo, pd.reforco::float8, pd.so_na_reta_final
 		 FROM plano_disciplinas pd
 		 JOIN disciplinas d ON d.id = pd.disciplina_id
 		 WHERE pd.plano_id = $1`,
@@ -119,15 +120,20 @@ func (r *PlanoRepo) carregarDisciplinas(ctx context.Context, p *plano.Plano) err
 			questoes int
 			modo     string
 			reforco  float64
+			adiada   bool
 		)
 
-		if err := rows.Scan(&codigo, &questoes, &modo, &reforco); err != nil {
+		if err := rows.Scan(&codigo, &questoes, &modo, &reforco, &adiada); err != nil {
 			return fmt.Errorf("lendo plano_disciplina: %w", err)
 		}
 
 		p.Config.Questoes[codigo] = questoes
 		p.Config.Modos[codigo] = plano.Modo(modo)
 		p.Config.Reforcos[codigo] = reforco
+
+		if adiada {
+			p.Config.SoNaRetaFinal[codigo] = true
+		}
 	}
 
 	return rows.Err()
@@ -235,12 +241,13 @@ func substituirDisciplinasDoPlano(ctx context.Context, tx pgx.Tx, p plano.Plano)
 		// assim uma disciplina removida do concurso simplesmente não insere nada,
 		// em vez de estourar a FK.
 		lote.Queue(
-			`INSERT INTO plano_disciplinas (plano_id, disciplina_id, questoes, modo, reforco)
-			 SELECT $1, d.id, $3, $4, $5
+			`INSERT INTO plano_disciplinas
+			   (plano_id, disciplina_id, questoes, modo, reforco, so_na_reta_final)
+			 SELECT $1, d.id, $3, $4, $5, $6
 			   FROM disciplinas d
 			   JOIN planos p ON p.concurso_id = d.concurso_id
 			  WHERE p.id = $1 AND d.codigo = $2`,
-			p.ID, codigo, questoes, string(modo), reforco,
+			p.ID, codigo, questoes, string(modo), reforco, p.Config.NaRetaFinal(codigo),
 		)
 	}
 

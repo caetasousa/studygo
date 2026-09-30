@@ -89,7 +89,7 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 	h := cfg.HorasDia * 60
 
 	if len(d.Itens) > 0 {
-		rev := d.Tipo == TipoRevisaoDirigida
+		reta := d.Tipo == TipoRevisaoDirigida
 
 		// Content blocks have a length of their own; the review block sits beside
 		// them with its own. Nothing is a percentage of anything else, so moving
@@ -112,9 +112,18 @@ func Blocos(d Dia, ctx BlocoCtx) []Bloco {
 				porBloco = int(math.Round(float64(d.Meta) * float64(minutos[idx]) / conteudoMin))
 			}
 
+			// A matéria adiada é estudada na reta final, não revisada; e a revisão
+			// que divide o dia com ela não é de uma matéria só.
+			rev := reta && ehRevisaoDirigida(it.Tema)
+			nome := ctx.Nomes[it.Disciplina]
+
+			if it.Disciplina == "" {
+				nome = it.Tema
+			}
+
 			out = append(out, Bloco{
 				Minutos: minutos[idx],
-				Titulo:  rotuloBloco(idx) + " — " + ctx.Nomes[it.Disciplina],
+				Titulo:  rotuloBloco(idx) + " — " + nome,
 				Detalhe: detalheDoBloco(cfg.ModoDe(it.Disciplina), rev, porBloco),
 			})
 		}
