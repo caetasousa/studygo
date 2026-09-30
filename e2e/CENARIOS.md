@@ -60,6 +60,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | C18 | editar as questões de uma matéria no balanceamento devolve as outras ao número do edital | a retificação do edital digitada matéria por matéria se desfaz sozinha |
 | C19 | a matéria com mais tópicos que horários aparece como incompleta no balanceamento, mesmo com todos os tópicos no cronograma (agrupados) | o painel diz que não dá para ver a matéria inteira quando dá |
 | C20 | o topo da tela avisa de isenção, recurso, cobertura ou orçamento, e as datas que importam (inscrições, pagamento, prova) se perdem entre eles | a pessoa passa a ignorar os avisos e perde o boleto |
+| C21 | depois de desmarcar um tópico estudado antes da hora, o dia fica com conteúdo depois de um antecipado, e a próxima conclusão grava o estudo mas falha ao reorganizar o cronograma (duas atividades na mesma posição do dia) | "erro interno" a cada matéria concluída ou tópico marcado; ao recarregar o estudo está lá, mas o cronograma não andou |
 
 ## D. Configurações e dados
 

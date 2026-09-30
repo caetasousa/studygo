@@ -378,6 +378,49 @@ test.describe('estudo do dia', () => {
 		await expect(page.getByText('1 tópico estudado antes da hora')).toHaveCount(0);
 	});
 
+	test('[C21] desmarcar um tópico antecipado não quebra as conclusões seguintes', async ({ page, api }) => {
+		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados', 'Hardware', 'Backup', 'Internet', 'Planilhas'];
+		const slug = await api.concurso('Desmarcar e seguir E2E', [
+			{ nome: 'Informática', bloco: 'esp', questoes: 10, temas },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Regência'] }
+		]);
+		const antes = await api.plano(slug);
+		const hoje = antes.dias[antes.hojeIndex].data;
+		const codigo = antes.concurso.disciplinas.find((d: { nome: string }) => d.nome === 'Informática').codigo;
+		type Item = { id: string; disciplina: string; tema: string; passada: number; concluido: boolean; antecipada: boolean };
+		type Dia = { data: string; itens: Item[] };
+		const primeiras = (p: { dias: Dia[] }, tema: string) =>
+			p.dias.flatMap((d) => d.itens.map((i) => ({ ...i, data: d.data })))
+				.filter((i) => i.disciplina === codigo && i.tema === tema && i.passada <= 1);
+		// Três tópicos que o cronograma só traria depois de hoje.
+		const [a, b, c] = temas.filter((t) => primeiras(antes, t).length > 0 && primeiras(antes, t).every((i) => i.data > hoje));
+		expect(c, 'o cenário precisa de três tópicos agendados para a frente').toBeTruthy();
+		const estado = async (tema: string) => primeiras(await api.plano(slug), tema)[0];
+
+		await abrirCronograma(page);
+		await page.getByRole('button', { name: /^Informática: .*Ver o conteúdo programático/ }).first().click();
+		const ementa = page.getByRole('dialog', { name: 'Informática' });
+		const marca = (tema: string) => ementa.getByRole('checkbox', { name: `Já estudei: ${tema}` });
+
+		await marca(a).check();
+		await expect.poll(async () => (await estado(a)).antecipada).toBe(true);
+		await marca(b).check();
+		await expect.poll(async () => (await estado(b)).antecipada).toBe(true);
+		// O clique errado: b volta a ser conteúdo do dia, depois do antecipado a.
+		await marca(b).uncheck();
+		await expect.poll(async () => (await estado(b)).concluido).toBe(false);
+
+		// A conclusão seguinte tem de reorganizar o cronograma, não só gravar o estudo.
+		await marca(c).check();
+		await expect.poll(async () => (await estado(c)).concluido).toBe(true);
+		await expect(ementa.getByRole('alert')).toHaveCount(0);
+		const feito = await estado(c);
+		expect(feito.data).toBe(hoje);
+		expect(feito.antecipada).toBe(true);
+		expect((await estado(a)).antecipada).toBe(true);
+		expect((await estado(b)).concluido).toBe(false);
+	});
+
 	test('[C17] o balanceamento mostra os tópicos estudados, e anda a cada marcação', async ({ page, api }) => {
 		const temas = ['Redes', 'Linux', 'Windows', 'Nuvem', 'Segurança', 'Bancos de dados'];
 		const slug = await api.concurso('Balanceamento estudado E2E', [

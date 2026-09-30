@@ -176,7 +176,8 @@ func CompactarAtividades(
 	}
 
 	// A antecipada não é conteúdo do dia: não entra na fila nem mede a carga.
-	// Ela volta no fim, no mesmo dia, depois do que o dia recebeu.
+	// Ela volta no fim, no mesmo dia: depois do que o dia recebeu, quando ele
+	// foi reempacotado; na posição que já tinha, quando não foi.
 	fixas := []Atividade{}
 	conteudo := make([]Atividade, 0, len(atividades))
 
@@ -305,8 +306,17 @@ func CompactarAtividades(
 
 	for _, a := range fixas {
 		dt := day(a.Data)
-		a.Posicao = ocupadas[dt]
-		ocupadas[dt]++
+
+		// Só o dia que a compactação reempacotou tem o conteúdo em 0..n-1, e só
+		// nele a antecipada precisa de lugar novo. No dia que ela não governa o
+		// conteúdo ficou onde estava — e pode estar DEPOIS de uma antecipada,
+		// quando um "já estudei" foi desmarcado: renumerar ali põe as duas na
+		// mesma posição, e o banco recusa o cronograma inteiro.
+		if !dt.Before(desde) && naFase[dt] {
+			a.Posicao = ocupadas[dt]
+			ocupadas[dt]++
+		}
+
 		saida = append(saida, a)
 	}
 
