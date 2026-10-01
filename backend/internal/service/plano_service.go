@@ -194,6 +194,8 @@ func (s *PlanoService) replanejarFuturo(
 		c.Registros.Lancada,
 	)
 
+	atividades, _ = emDiaComOEstudado(*c, atividades, plano.DayOf(s.relogio.Now()))
+
 	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, atividades); err != nil {
 		return err
 	}

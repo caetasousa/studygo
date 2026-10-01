@@ -400,6 +400,8 @@ func (s *CronogramaService) gravarEMontar(
 	c contexto,
 	atividades []plano.Atividade,
 ) (PlanoMontado, error) {
+	atividades, _ = emDiaComOEstudado(c, atividades, plano.DayOf(s.relogio.Now()))
+
 	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, atividades); err != nil {
 		return PlanoMontado{}, err
 	}

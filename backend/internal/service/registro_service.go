@@ -112,26 +112,10 @@ func (s *RegistroService) desantecipar(ctx context.Context, c *contexto, id uuid
 // de hoje. Adiantar-se deve comprar tempo, não deixar o tópico estudado
 // "feito lá no final" nem repetido adiante.
 func (s *RegistroService) arrumarEstudado(ctx context.Context, c *contexto) error {
-	hoje := plano.DayOf(s.relogio.Now())
-	res := plano.Gerar(c.Plano.Config, &c.Concurso)
-
-	lancada := func(id uuid.UUID) bool {
-		_, ok := c.Registros[id]
-
-		return ok
-	}
-
-	arrumadas, mudou := plano.ArrumarEstudado(c.Atividades, res.Dias, hoje, c.Registros.Concluida, lancada)
+	arrumadas, mudou := emDiaComOEstudado(*c, c.Atividades, plano.DayOf(s.relogio.Now()))
 	if !mudou {
 		return nil
 	}
-
-	// Encosta a partir do dia SEGUINTE ao que recebeu o estudo feito (hoje, ou
-	// o dia de estudo mais próximo): compactar esse dia o reempacotaria e
-	// empurraria a atividade recém-concluída para a frente de novo.
-	c.Atividades = arrumadas
-	desde := naoAntesDe(plano.DiaDoEstudoFeito(res.Dias, hoje), hoje).AddDate(0, 0, 1)
-	arrumadas = compactarDesde(*c, arrumadas, desde)
 
 	if err := s.cronograma.SubstituirAtividades(ctx, c.Plano.ID, arrumadas); err != nil {
 		return err

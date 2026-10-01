@@ -300,6 +300,31 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 	), len(atrasados)
 }
 
+// emDiaComOEstudado aplica plano.ArrumarEstudado a um cronograma e encosta o
+// resto a partir do dia seguinte ao que recebeu o estudo feito (hoje, ou o dia
+// de estudo mais próximo): compactar esse dia o reempacotaria e empurraria a
+// atividade recém-concluída para a frente de novo.
+//
+// A conclusão é quem dispara a regra, mas não é a única a precisar dela: quem
+// refaz o cronograma (reorganizar, restaurar a ordem, mudar a configuração,
+// absorver o atraso) parte do motor, que não conhece o histórico, e preserva o
+// concluído onde está. Sem passar por aqui, o tópico estudado antes da hora que
+// uma arrumação interrompida deixou no dia futuro ficava lá, riscado, e a 1ª
+// passada dele voltava a ser agendada.
+func emDiaComOEstudado(c contexto, atividades []plano.Atividade, hoje time.Time) ([]plano.Atividade, bool) {
+	res := plano.Gerar(c.Plano.Config, &c.Concurso)
+
+	arrumadas, mudou := plano.ArrumarEstudado(atividades, res.Dias, hoje, c.Registros.Concluida, c.Registros.Lancada)
+	if !mudou {
+		return atividades, false
+	}
+
+	c.Atividades = arrumadas
+	desde := naoAntesDe(plano.DiaDoEstudoFeito(res.Dias, hoje), hoje).AddDate(0, 0, 1)
+
+	return compactarDesde(c, arrumadas, desde), true
+}
+
 // idsPorCodigo indexa as disciplinas pelo código, que é como o motor as nomeia.
 func idsPorCodigo(cur concurso.Concurso) map[string]uuid.UUID {
 	out := make(map[string]uuid.UUID, len(cur.Disciplinas))
