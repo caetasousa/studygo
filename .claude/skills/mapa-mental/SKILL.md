@@ -32,6 +32,21 @@ antes de ser de estilo:
    ficou de fora — números, siglas, exemplos, exceções, o "cai muito". O que
    estava num quadro colorido costuma ser justamente o que cai em prova.
 
+## Vários PDFs de uma vez
+
+O padrão é o mesmo com um PDF ou com dez — o usuário pediu isso expressamente:
+
+- **Um mapa por aula**, cada um com o seu `slug` e o seu `.questoes.json`. Não
+  funda aulas num mapa só, nem quebre uma aula em vários.
+- Antes de escrever, leia o tópico do edital que as aulas cobrem e confira que
+  a soma dos mapas o cobre inteiro. Dentro de cada aula, vale a cobertura total
+  de cima: o recorte pelo edital decide **quais aulas** entram, nunca o que sai
+  de dentro de uma aula.
+- Assunto que aparece em duas aulas fica no mapa da aula que o trata como tema;
+  na outra, um item curto basta. Questão repetida entre aulas entra numa só.
+- Valide e importe cada mapa, e feche com um quadro: mapa, ramos, itens,
+  questões e bancas.
+
 ## Estrutura
 
 - **Ramos principais** seguem as seções do material, na ordem dele (introdução,
@@ -67,7 +82,15 @@ da lei, resolvidas na página, com o gabarito só depois da resposta.
   (com a análise de cada alternativa, uma por linha). O gabarito é o da aula; se
   o comentário e a linha "Gabarito" divergirem, pare e diga ao usuário.
 - `origem` com banca, ano, cargo e órgão, sem dado do comprador, e **a banca
-  primeiro**, separada por ` · `: a página agrupa as questões por ela.
+  primeiro**, separada por ` · ` (`FCC · TRT 15 · 2018`): a página agrupa as
+  questões por ela. Escreva a banca sempre do mesmo jeito no arquivo (não ora
+  `CEBRASPE`, ora `CEBRASPE (CESPE)`), senão o grupo se divide em dois.
+- **Confira cada gabarito contra a tabela "Gabarito" da aula**: o script que
+  extrai erra em quebra de linha ("Letra\nE") e em origem com parêntese aberto.
+  Divergência zero antes de importar.
+- Questão que depende de figura leva a figura transcrita entre colchetes. Erro
+  da fonte (alternativas idênticas, gabarito contra a teoria) não se corrige:
+  marque entre colchetes no próprio texto e conte ao usuário.
 - `ramo` é o ramo principal do mapa que trata do assunto cobrado.
 - Extrair do texto do PDF (PyMuPDF, no venv do edital-processor) com um script
   no scratchpad é mais fiel que redigitar: o texto das questões é longo.
@@ -92,7 +115,10 @@ O repositório é público e o mapa deriva de material pago, de uso pessoal.
 - `materia`: o nome da matéria como o edital a chama; `reconhecer`: termos que
   um tópico do edital cita ("ITIL"). Com o concurso aberto na tela, a
   importação vincula o mapa às matérias que casam, e o cronograma passa a
-  oferecê-lo nelas.
+  oferecê-lo nelas. Confira com quais casou: `materia` casa por palavra e pode
+  pegar outra matéria de nome parecido ("Engenharia de Software" também casa
+  com "Engenharia de Software Assistida por IA"). Nesse caso, omita `materia` e
+  vincule só por `reconhecer`, com o termo que o tópico do edital cita.
 
 ## Fechar
 

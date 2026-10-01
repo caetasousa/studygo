@@ -28,6 +28,7 @@ Evite duplicar informações destes arquivos:
 | 🚢 | `docs/deploy.md` | o servidor no WSL e o Ansible |
 | ☁️ | `docs/cloudflare-tunnel.md` | o túnel da Cloudflare |
 | 🔁 | `docs/ci-cd.md` | pipeline, runners, digest e rollback |
+| 🧠 | `.claude/skills/mapa-mental/SKILL.md` | o padrão dos mapas mentais e das questões das aulas, com um PDF ou vários |
 | 📌 | manifests, lockfiles, Dockerfiles | versões das dependências |
 
 Quando documentação e código divergirem, investigue a implementação e atualize
