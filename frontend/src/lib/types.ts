@@ -879,7 +879,10 @@ export interface CorrecaoDoMapa {
 	escolhida: string;
 	acertou: boolean;
 	gabarito: string;
+	/** O que vale para a questão toda; o trecho de cada alternativa vai em `explicacoes`. */
 	comentario: string;
+	/** Uma por alternativa, na ordem delas; vazia quando o comentário não separa as alternativas. */
+	explicacoes: string[];
 	respondidaEm: string;
 }
 

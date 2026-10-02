@@ -164,17 +164,26 @@ func (s *MapaService) ImportarQuestoes(
 // CorrecaoDoMapa é o que volta da resposta: agora, sim, com gabarito e
 // comentário.
 type CorrecaoDoMapa struct {
-	Escolhida  string
-	Acertou    bool
-	Gabarito   string
-	Comentario string
-	Em         time.Time
+	Escolhida string
+	Acertou   bool
+	Gabarito  string
+	// Comentario é o que vale para a questão toda; quando o comentário explica
+	// alternativa por alternativa, o trecho de cada uma vai em Explicacoes (na
+	// ordem delas) e fica fora daqui.
+	Comentario  string
+	Explicacoes []string
+	Em          time.Time
 }
 
 // CorrecaoDe junta a questão e a resposta no que a tela mostra depois de
 // responder.
 func CorrecaoDe(q mapa.Questao, r mapa.Resposta) CorrecaoDoMapa {
-	return CorrecaoDoMapa{Escolhida: r.Resposta, Acertou: r.Acertou, Gabarito: q.Gabarito, Comentario: q.Comentario, Em: r.Em}
+	geral, explicacoes := q.Explicacoes()
+
+	return CorrecaoDoMapa{
+		Escolhida: r.Resposta, Acertou: r.Acertou, Gabarito: q.Gabarito,
+		Comentario: geral, Explicacoes: explicacoes, Em: r.Em,
+	}
 }
 
 // Responder corrige e grava a resposta a uma questão de um mapa da conta.

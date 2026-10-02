@@ -649,7 +649,7 @@ interface QuestaoLida {
 	banca: string;
 	enunciado: string;
 	alternativas: string[];
-	resposta: null | { escolhida: string; acertou: boolean; gabarito: string; comentario: string };
+	resposta: null | { escolhida: string; acertou: boolean; gabarito: string; comentario: string; explicacoes: string[] };
 }
 
 async function questoesDo(request: APIRequestContext, token: string, slug = 'ciclo-da-agua'): Promise<QuestaoLida[]> {
@@ -901,6 +901,70 @@ test.describe('questões dos mapas', () => {
 		expect((await responderQuestao(page.request, conta.token, q1.id, 'B')).status).toBe(404);
 		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
 		expect(await questoesDo(page.request, conta.token)).toEqual([]);
+	});
+});
+
+test.describe('explicação por alternativa', () => {
+	test('[M23] a explicação de cada alternativa fica debaixo dela: aberta a da certa ao acertar, a da marcada ao errar, e as outras a um toque', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Explicações E2E');
+		const [q1, q2, , q4] = await questoesDo(page.request, conta.token);
+
+		// O comentário escrito alternativa por alternativa chega separado, na ordem delas.
+		const certa = await responderQuestao(page.request, conta.token, q1.id, 'B');
+		expect(certa.corpo.comentario).toBe('Evaporar é passar do líquido ao gasoso.');
+		expect(certa.corpo.explicacoes).toEqual([
+			'Errada. Passar ao sólido é solidificar.',
+			"Correta. O vapor d'água é a água no estado gasoso.",
+			'Errada. Plasma pede temperatura de estrela, não de chuva.',
+			'Errada. Líquido superaquecido continua líquido.',
+			'Errada. Cristalino é o gelo, de novo sólido.'
+		]);
+		// O que não separa (prosa, ou Certo/Errado) vem inteiro, sem explicação por alternativa.
+		const prosa = await responderQuestao(page.request, conta.token, q4.id, 'A');
+		expect(prosa.corpo).toMatchObject({ comentario: questoesDoExemplo().questoes[3].comentario, explicacoes: [] });
+		expect((await responderQuestao(page.request, conta.token, q2.id, 'CERTO')).corpo.explicacoes).toEqual([]);
+
+		// Pela tela, ao acertar: a explicação da certa aberta, as outras a um toque.
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).click();
+		const dialogo = page.getByRole('dialog', { name: 'Questões — Evaporação' });
+		const questao = dialogo.getByRole('group', { name: /A evaporação leva/ });
+		const opcao = (letra: string) => questao.locator('.opcao').filter({ has: page.getByRole('radio', { name: new RegExp(`^${letra}\\)`) }) });
+
+		await expect(questao.getByText('Acertou')).toBeVisible();
+		await expect(questao.getByText('Evaporar é passar do líquido ao gasoso.')).toBeVisible();
+		await expect(opcao('B').getByText("Correta. O vapor d'água é a água no estado gasoso.")).toBeVisible();
+		await expect(questao.getByText(/^Errada\./)).toHaveCount(0);
+		await expect(questao.getByRole('button', { name: /^Ver explicação/ })).toHaveCount(4);
+		await opcao('C').getByRole('button', { name: 'Ver explicação da C' }).click();
+		await expect(opcao('C').getByText('Errada. Plasma pede temperatura de estrela, não de chuva.')).toBeVisible();
+		await opcao('C').getByRole('button', { name: 'Ocultar explicação da C' }).click();
+		await expect(questao.getByText(/^Errada\./)).toHaveCount(0);
+
+		// Ao errar: a certa destacada, a explicação da marcada aberta, e a da certa a um toque.
+		await questao.getByRole('button', { name: 'Responder de novo' }).click();
+		await expect(questao.getByText(/^Correta\./)).toHaveCount(0);
+		await questao.getByRole('radio', { name: 'A) sólido.' }).check();
+		await questao.getByRole('button', { name: 'Responder', exact: true }).click();
+		await expect(questao.getByText('Errou — gabarito B')).toBeVisible();
+		await expect(opcao('B')).toHaveClass(/gabarito/);
+		await expect(opcao('A')).toHaveClass(/marcada/);
+		await expect(opcao('A').getByText('Errada. Passar ao sólido é solidificar.')).toBeVisible();
+		await expect(questao.getByText(/^Correta\./)).toHaveCount(0);
+		await opcao('B').getByRole('button', { name: 'Ver explicação da B' }).click();
+		await expect(opcao('B').getByText("Correta. O vapor d'água é a água no estado gasoso.")).toBeVisible();
+
+		// Recarregado, a resposta gravada traz as explicações do mesmo jeito.
+		await page.reload();
+		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).click();
+		await expect(opcao('A').getByText('Errada. Passar ao sólido é solidificar.')).toBeVisible();
+
+		// A questão em prosa mostra o comentário inteiro e nenhum botão.
+		await dialogo.getByRole('button', { name: 'Fechar as questões' }).click();
+		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Precipitação/ }).click();
+		const orvalho = page.getByRole('dialog', { name: 'Questões — Precipitação' }).getByRole('group', { name: /NÃO é uma forma/ });
+		await expect(orvalho.getByText(/O orvalho se forma na superfície/)).toBeVisible();
+		await expect(orvalho.getByRole('button', { name: /explicação/ })).toHaveCount(0);
 	});
 });
 

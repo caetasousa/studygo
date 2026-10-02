@@ -48,10 +48,13 @@ type questaoDoMapaDTO struct {
 }
 
 type correcaoDoMapaDTO struct {
-	Escolhida    string    `json:"escolhida"`
-	Acertou      bool      `json:"acertou"`
-	Gabarito     string    `json:"gabarito"`
-	Comentario   string    `json:"comentario"`
+	Escolhida  string `json:"escolhida"`
+	Acertou    bool   `json:"acertou"`
+	Gabarito   string `json:"gabarito"`
+	Comentario string `json:"comentario"`
+	// Explicacoes traz uma por alternativa, na ordem delas, ou nenhuma: aí o
+	// comentário é a explicação inteira.
+	Explicacoes  []string  `json:"explicacoes"`
 	RespondidaEm time.Time `json:"respondidaEm"`
 }
 
@@ -166,7 +169,8 @@ func questaoDoMapaParaDTO(q mapa.QuestaoComResposta) questaoDoMapaDTO {
 
 func correcaoDoMapaParaDTO(c service.CorrecaoDoMapa) correcaoDoMapaDTO {
 	return correcaoDoMapaDTO{
-		Escolhida: c.Escolhida, Acertou: c.Acertou, Gabarito: c.Gabarito, Comentario: c.Comentario, RespondidaEm: c.Em,
+		Escolhida: c.Escolhida, Acertou: c.Acertou, Gabarito: c.Gabarito, Comentario: c.Comentario,
+		Explicacoes: naoNula(c.Explicacoes), RespondidaEm: c.Em,
 	}
 }
 

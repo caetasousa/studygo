@@ -11,6 +11,10 @@
 	 *
 	 * No celular o diálogo ocupa a tela, e cada alternativa tem altura de dedo:
 	 * é onde boa parte das questões vai ser resolvida.
+	 *
+	 * Quando o comentário explica alternativa por alternativa, a explicação
+	 * aparece debaixo de cada uma: aberta a da certa (se acertou) ou a da
+	 * marcada (se errou), e as outras a um toque, para não soterrar a questão.
 	 */
 	let {
 		titulo,
@@ -36,6 +40,8 @@
 	let enviando = $state<string | null>(null);
 	let erro = $state<string | null>(null);
 	let soErradas = $state(false);
+	/** O que a pessoa abriu ou fechou à mão, por "questão:alternativa". */
+	let explicacaoAberta = $state<Record<string, boolean>>({});
 
 	const visiveis = $derived(soErradas ? questoes.filter((q) => q.resposta && !q.resposta.acertou) : questoes);
 	const p = $derived(placar(questoes));
@@ -52,6 +58,14 @@
 			: `Errou — gabarito ${r.gabarito}`;
 	}
 
+	function abertaDeSaida(r: CorrecaoDoMapa, valor: string): boolean {
+		return r.acertou ? valor === r.gabarito : valor === r.escolhida;
+	}
+
+	function esquecerExplicacoes(id: string) {
+		for (const k of Object.keys(explicacaoAberta)) if (k.startsWith(`${id}:`)) delete explicacaoAberta[k];
+	}
+
 	async function responder(q: QuestaoDoMapa) {
 		const escolhida = escolhas[q.id];
 		if (!escolhida) return;
@@ -60,6 +74,7 @@
 		try {
 			const c = await api.responderQuestaoDoMapa(q.id, escolhida);
 			refazendo[q.id] = false;
+			esquecerExplicacoes(q.id);
 			onrespondida(q.id, c);
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível gravar a resposta';
@@ -122,29 +137,55 @@
 					<legend>{q.enunciado}</legend>
 					{#if q.origem}<p class="origem">{q.origem}</p>{/if}
 					<div class="alternativas" class:julgar={q.alternativas.length === 0}>
-						{#each opcoes(q) as o (o.valor)}
-							<label
-								class="alt"
+						{#each opcoes(q) as o, i (o.valor)}
+							{@const explicacao = r?.explicacoes[i]}
+							{@const chave = `${q.id}:${o.valor}`}
+							{@const aberta = r && (explicacaoAberta[chave] ?? abertaDeSaida(r, o.valor))}
+							<div
+								class="opcao"
 								class:gabarito={r && r.gabarito === o.valor}
 								class:marcada={r && r.escolhida === o.valor}
 							>
-								<input
-									type="radio"
-									name="q-{q.id}"
-									value={o.valor}
-									disabled={!!r}
-									checked={r ? r.escolhida === o.valor : escolhas[q.id] === o.valor}
-									onchange={() => (escolhas[q.id] = o.valor)}
-								/>
-								<span>{o.rotulo}</span>
-							</label>
+								<label class="alt">
+									<input
+										type="radio"
+										name="q-{q.id}"
+										value={o.valor}
+										disabled={!!r}
+										checked={r ? r.escolhida === o.valor : escolhas[q.id] === o.valor}
+										onchange={() => (escolhas[q.id] = o.valor)}
+									/>
+									<span>{o.rotulo}</span>
+								</label>
+								{#if explicacao}
+									{#if aberta}
+										<p class="explicacao" id="exp-{chave}">{explicacao}</p>
+									{/if}
+									<button
+										class="ver"
+										type="button"
+										aria-expanded={aberta}
+										aria-controls="exp-{chave}"
+										onclick={() => (explicacaoAberta[chave] = !aberta)}
+									>
+										{aberta ? 'Ocultar explicação' : 'Ver explicação'}<span class="sr-only"> da {o.valor}</span>
+									</button>
+								{/if}
+							</div>
 						{/each}
 					</div>
 
 					{#if r}
 						<p class="veredito">{veredito(q, r)}</p>
-						<p class="comentario">{r.comentario}</p>
-						<button class="btn" type="button" onclick={() => (refazendo[q.id] = true)}>
+						{#if r.comentario}<p class="comentario">{r.comentario}</p>{/if}
+						<button
+							class="btn"
+							type="button"
+							onclick={() => {
+								refazendo[q.id] = true;
+								esquecerExplicacoes(q.id);
+							}}
+						>
 							Responder de novo
 						</button>
 					{:else}
@@ -266,10 +307,15 @@
 		flex-direction: row;
 		gap: 8px;
 	}
-	.alternativas.julgar .alt {
+	.alternativas.julgar .opcao {
 		flex: 1;
+	}
+	.alternativas.julgar .alt {
 		justify-content: center;
 		border: 1px solid var(--border);
+	}
+	.opcao {
+		border-radius: 6px;
 	}
 	.alt {
 		display: flex;
@@ -291,11 +337,45 @@
 		margin-top: 3px;
 		flex: none;
 	}
-	.alt.gabarito {
+	.opcao.gabarito {
 		background: var(--good-soft);
 	}
-	.alt.marcada:not(.gabarito) {
+	.opcao.marcada:not(.gabarito) {
 		background: var(--danger-soft);
+	}
+	/* A explicação e o botão alinham com o texto da alternativa, não com o rádio. */
+	.explicacao {
+		margin: 0 8px 0 29px;
+		padding: 2px 0 4px 10px;
+		border-left: 2px solid var(--border);
+		font-size: 13.5px;
+		line-height: 1.55;
+		white-space: pre-line;
+		overflow-wrap: anywhere;
+	}
+	.gabarito .explicacao {
+		border-left-color: var(--good);
+	}
+	.marcada:not(.gabarito) .explicacao {
+		border-left-color: var(--danger);
+	}
+	.ver {
+		display: block;
+		margin: 0 0 4px 29px;
+		padding: 2px 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		font-size: 12.5px;
+		color: var(--text-muted);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	@media (hover: hover) {
+		.ver:hover {
+			color: var(--text);
+		}
 	}
 	.veredito {
 		font-weight: 700;
@@ -328,6 +408,13 @@
 		}
 		.btn {
 			padding-block: 11px;
+		}
+		.ver {
+			min-height: 36px;
+			padding-block: 8px;
+		}
+		.explicacao {
+			margin-left: 34px;
 		}
 	}
 

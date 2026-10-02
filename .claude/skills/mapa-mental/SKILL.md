@@ -79,7 +79,9 @@ da lei, resolvidas na página, com o gabarito só depois da resposta.
   meio da teoria ("Hora de praticar", exemplos de banca). Quando uma da teoria é
   a mesma de uma das comentadas, no mesmo formato, entra uma vez só.
 - Texto **literal** do PDF: enunciado, alternativas e comentário do professor
-  (com a análise de cada alternativa, uma por linha). O gabarito é o da aula; se
+  (com a análise de cada alternativa, uma por linha, começando pela letra —
+  `a) Errada. …` —, que a tela mostra debaixo de cada alternativa; veja
+  `conteudo/mapas/README.md`). O gabarito é o da aula; se
   o comentário e a linha "Gabarito" divergirem, pare e diga ao usuário.
 - `origem` com banca, ano, cargo e órgão, sem dado do comprador, e **a banca
   primeiro**, separada por ` · ` (`FCC · TRT 15 · 2018`): a página agrupa as

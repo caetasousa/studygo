@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -91,6 +92,63 @@ func (q Questao) Corrigir(resposta string) (bool, error) {
 	}
 
 	return r == q.Gabarito, nil
+}
+
+// marcadorDeAlternativa é a linha que abre a explicação de uma alternativa no
+// comentário, como os professores escrevem: "a) Errada. …", "(B) Correta. …".
+var marcadorDeAlternativa = regexp.MustCompile(`^\s*\(?([a-eA-E])\)\s*(.*)$`)
+
+// Explicacoes separa o comentário da questão de múltipla escolha no que vale
+// para a questão toda (o que vem antes do "a)") e na explicação de cada
+// alternativa, para a tela mostrar o porquê ao lado de cada uma.
+//
+// Só separa quando o comentário traz todas as letras, em ordem, cada uma no
+// começo de uma linha e com texto. Fora isso devolve o comentário inteiro e
+// nenhuma explicação: pôr numa alternativa o texto de outra é pior que mostrar
+// o comentário como veio.
+func (q Questao) Explicacoes() (geral string, porAlternativa []string) {
+	n := len(q.Alternativas)
+	if n == 0 {
+		return q.Comentario, nil
+	}
+
+	var intro []string
+
+	trechos := make([][]string, 0, n)
+
+	for _, linha := range strings.Split(strings.ReplaceAll(q.Comentario, "\r\n", "\n"), "\n") {
+		if m := marcadorDeAlternativa.FindStringSubmatch(linha); m != nil {
+			i := strings.Index("abcde", strings.ToLower(m[1]))
+			if i >= n {
+				return q.Comentario, nil
+			}
+
+			if i == len(trechos) {
+				trechos = append(trechos, []string{m[2]})
+				continue
+			}
+		}
+
+		if len(trechos) == 0 {
+			intro = append(intro, linha)
+		} else {
+			trechos[len(trechos)-1] = append(trechos[len(trechos)-1], linha)
+		}
+	}
+
+	if len(trechos) != n {
+		return q.Comentario, nil
+	}
+
+	porAlternativa = make([]string, n)
+	for i, t := range trechos {
+		porAlternativa[i] = strings.TrimSpace(strings.Join(t, "\n"))
+		if porAlternativa[i] == "" {
+			return q.Comentario, nil
+		}
+	}
+
+	return strings.TrimSpace(strings.Join(intro, "\n")), porAlternativa
 }
 
 // SemBanca agrupa as questões cuja origem não diz a banca.

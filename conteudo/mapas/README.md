@@ -95,6 +95,12 @@ arquivo por mapa, e se resolvem na página dele, como as da lei.
   Com elas, de 2 a 5 (A–E), e o `gabarito` é a letra.
 - `comentario` é o que a tela mostra depois da resposta; quebras de linha (`\n`)
   aparecem.
+- Na de múltipla escolha, o comentário que traz cada alternativa numa linha
+  própria, começando pela letra (`a) Errada. …`, `(B) Correto. …`), aparece
+  separado: cada trecho debaixo da sua alternativa — aberto o da certa ao
+  acertar e o da marcada ao errar, os outros a um toque — e o que vem antes do
+  `a)` como comentário geral. Só separa com todas as letras, em ordem e com
+  texto; fora isso, o comentário aparece inteiro.
 
 Limites: 1.000 questões por arquivo; enunciado e comentário até 5.000
 caracteres, alternativa até 2.000. O arquivo com problema é recusado inteiro, e
