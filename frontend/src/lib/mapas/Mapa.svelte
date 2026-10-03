@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { browser } from '$app/environment';
 	import Item from './Item.svelte';
 	import { caminhosAte, contarAchados, idsComFilhos, paraBusca, type NoDoMapa } from './arvore';
 	import type { Placar } from './questoes';
@@ -29,16 +27,11 @@
 		onquestoes?: (no: NoDoMapa) => void;
 	} = $props();
 
-	// No celular o mapa abre como sumário: só os ramos, e cada um abre no toque.
-	// Com a primeira camada aberta, o último ramo ficaria a várias telas de
-	// distância. Numa tela maior, os ramos já saem abertos.
-	const celular = browser && window.matchMedia('(max-width: 620px)').matches;
-
-	// `untrack`: é o estado de saída, lido uma vez. A página recria o mapa quando
-	// troca de mapa, então `nos` não muda debaixo dele.
-	const abertos = new SvelteSet<string>(
-		celular ? [] : untrack(() => nos.filter((n) => n.filhos.length > 0).map((n) => n.id))
-	);
+	// O mapa abre sempre como sumário: só os ramos, e cada um abre no clique.
+	// Já saíram abertos numa tela maior, e quem estuda tinha de fechar ramo por
+	// ramo a cada visita (pedido de 03/10/2026); no celular, o último ramo ficava
+	// a várias telas de distância.
+	const abertos = new SvelteSet<string>();
 
 	// A busca tem o próprio estado de aberto: ela abre o caminho até cada achado
 	// sem mexer no que quem lê tinha aberto, que volta quando o filtro sai.

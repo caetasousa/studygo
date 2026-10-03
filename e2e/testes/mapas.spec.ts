@@ -460,8 +460,11 @@ test.describe('mapas mentais', () => {
 		await page.goto('/mapas/ciclo-da-agua');
 		const topicos = topicosDo(page);
 
-		// Numa tela de computador os ramos saem abertos, e o que está abaixo deles, recolhido.
-		await expect(topicos.getByRole('button', { name: 'Evaporação', exact: true })).toHaveAttribute('aria-expanded', 'true');
+		// O mapa abre recolhido, em qualquer tela: só os ramos à vista.
+		const evaporacao = topicos.getByRole('button', { name: 'Evaporação', exact: true });
+		await expect(evaporacao).toHaveAttribute('aria-expanded', 'false');
+		await expect(topicos.getByText('Uma poça que seca ao sol')).toHaveCount(0);
+		await evaporacao.click();
 		await expect(topicos.getByText('Uma poça que seca ao sol')).toBeVisible();
 		await expect(topicos.getByText('Acontece na superfície dos oceanos')).toHaveCount(0);
 
@@ -526,7 +529,7 @@ test.describe('mapas mentais', () => {
 		// Sem filtro, o mapa volta como estava antes da busca.
 		await filtro.fill('');
 		await expect(achados).toHaveCount(0);
-		await expect(topicos.getByRole('button', { name: 'Evaporação', exact: true })).toHaveAttribute('aria-expanded', 'true');
+		await expect(topicos.getByRole('button', { name: 'Evaporação', exact: true })).toHaveAttribute('aria-expanded', 'false');
 		await expect(topicos.getByText('Ocorre quando o vapor esfria')).toHaveCount(0);
 	});
 
@@ -606,15 +609,15 @@ test.describe('mapas mentais no celular', () => {
 test.describe('mapas mentais no tablet', () => {
 	test.use({ viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true });
 
-	test('[M15] no tablet o mapa abre com os ramos à vista, tem alvo de dedo e não rola para o lado', async ({ page, api, conta }) => {
+	test('[M15] no tablet o mapa abre recolhido, tem alvo de dedo e não rola para o lado', async ({ page, api, conta }) => {
 		await api.concurso('Tablet E2E', MATERIAS);
 		await importar(page.request, conta.token, exemplo());
 		await page.goto('/mapas/ciclo-da-agua');
 		const topicos = topicosDo(page);
 
-		// Com espaço, os ramos saem abertos, como no computador.
-		await expect(topicos.getByRole('button', { name: 'Evaporação', exact: true })).toHaveAttribute('aria-expanded', 'true');
-		await expect(topicos.getByText('Uma poça que seca ao sol')).toBeVisible();
+		// Recolhido, como no computador e no celular: só os ramos à vista.
+		await expect(topicos.getByRole('button', { name: 'Evaporação', exact: true })).toHaveAttribute('aria-expanded', 'false');
+		await expect(topicos.getByText('Uma poça que seca ao sol')).toHaveCount(0);
 		expect((await topicos.getByRole('button', { name: 'Condensação', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(36);
 
 		await page.getByRole('button', { name: 'Abrir tudo' }).tap();

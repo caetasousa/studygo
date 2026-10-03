@@ -64,10 +64,13 @@ O padrão é o mesmo com um PDF ou com dez — o usuário pediu isso expressamen
 
 ## O que todo mapa de aula leva, além da teoria
 
-- **Não confunda**: um item por par de conceitos que a aula manda distinguir,
-  com uma linha para cada lado. É onde a banca pesca.
-- **Números e siglas**: as contagens para decorar ("7 princípios, 4 dimensões"),
-  as siglas expandidas e os macetes da aula.
+- **Números e nomes**: as contagens para decorar ("7 princípios, 4 dimensões"),
+  os nomes que a banca cobra e os macetes da aula.
+
+**Não** crie o ramo "Não confunda" nem a lista "Siglas" — o usuário pediu que
+saíssem de toda importação (03/10/2026). O que a aula manda distinguir fica no
+próprio ramo do assunto, como `[pegadinha]`; a sigla é expandida onde a teoria
+a apresenta, no item dela.
 
 ## As questões da aula
 
