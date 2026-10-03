@@ -27,6 +27,12 @@ type MapaRepository interface {
 	// novo. Tudo numa transação: o mapa nunca fica pela metade.
 	Gravar(ctx context.Context, usuarioID uuid.UUID, m mapa.Mapa) (mapa.Resumo, bool, error)
 
+	// TrocarItens grava a árvore editada do mapa e desativa as questões
+	// listadas, numa transação. `itensAntes` é quantos itens o mapa tinha
+	// quando foi lido: se outro pedido o mudou nesse meio-tempo, nada é gravado
+	// e o erro é mapa.ErrItemMudou.
+	TrocarItens(ctx context.Context, mapaID uuid.UUID, itensAntes int, ramos []mapa.Item, desativar []uuid.UUID) error
+
 	// Excluir apaga o mapa, os itens e os vínculos.
 	Excluir(ctx context.Context, usuarioID uuid.UUID, slug string) error
 

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { api } from '$lib/api';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { tagStyle } from '$lib/format';
-	import { indexar } from '$lib/mapas/arvore';
+	import { indexar, paraBusca, type NoDoMapa } from '$lib/mapas/arvore';
 	import Mapa from '$lib/mapas/Mapa.svelte';
 	import Questoes from '$lib/mapas/Questoes.svelte';
 	import { descreverPlacar, placar, porBanca, porRamo } from '$lib/mapas/questoes';
@@ -12,13 +12,19 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import type { CorrecaoDoMapa, MapaLido, QuestaoDoMapa, QuestoesImportadas } from '$lib/types';
+	import type { CorrecaoDoMapa, ItemDoMapa, MapaLido, QuestaoDoMapa, QuestoesImportadas } from '$lib/types';
 
 	/**
 	 * Um mapa mental aberto: o cabeçalho com as propriedades (matérias, fonte,
-	 * tamanho) e o mapa como uma página de tópicos recolhíveis. As questões da
-	 * aula vêm depois do mapa, por ramo, e se resolvem num diálogo, como as da
-	 * lei. Manter o mapa (importar questões, excluir) fica recolhido no fim.
+	 * tamanho) e, em duas abas, o mapa e as questões da aula. Antes as questões
+	 * vinham depois do mapa — no celular, várias telas abaixo dele. Na aba
+	 * delas, escolhe-se vê-las por conteúdo (os ramos) ou por banca, e filtrar
+	 * o que falta ou o que se errou; cada grupo se resolve num diálogo, como as
+	 * da lei. O ramo do mapa também mostra as questões dele e leva a elas.
+	 *
+	 * O mapa tem um modo de edição para tirar tópicos. A exclusão vale na hora
+	 * na tela e só vai ao servidor alguns segundos depois: é a janela do
+	 * "Desfazer". Manter o mapa (importar questões, excluir) fica no fim.
 	 */
 	const slug = $derived(page.params.slug ?? '');
 
@@ -65,30 +71,85 @@
 
 	const cor = (codigo: string) => planoStore.discIndex[codigo]?.cor ?? 0;
 
-	// --- questões ----------------------------------------------------------
+	// --- abas -------------------------------------------------------------
+	// A aba fica no endereço: voltar, recarregar ou mandar o link abre onde estava.
 	const questoes = $derived(lido?.questoes ?? []);
-	// Por ramo, na ordem do mapa, ou por banca, para treinar a da prova. A
-	// escolha fica no aparelho: quem estuda por banca quer abrir já assim.
+	const aba = $derived(page.url.searchParams.get('aba') === 'questoes' && questoes.length > 0 ? 'questoes' : 'mapa');
+
+	function escolherAba(a: 'mapa' | 'questoes') {
+		const url = new URL(page.url);
+		if (a === 'mapa') url.searchParams.delete('aba');
+		else url.searchParams.set('aba', a);
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	}
+
+	// As setas trocam de aba, como em toda lista de abas.
+	function teclasDasAbas(e: KeyboardEvent) {
+		if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+		e.preventDefault();
+		const outra = aba === 'mapa' ? 'questoes' : 'mapa';
+		escolherAba(outra);
+		document.getElementById(`aba-${outra}`)?.focus();
+	}
+
+	// --- questões ----------------------------------------------------------
+	// Por conteúdo (os ramos, na ordem do mapa) ou por banca, para treinar a da
+	// prova; e todas, as que faltam ou as que se errou. As escolhas ficam no
+	// aparelho: quem estuda por banca quer abrir já assim.
+	type Agrupar = 'ramo' | 'banca';
+	type Mostrar = 'todas' | 'sem-resposta' | 'erradas';
 	const CHAVE_AGRUPAR = 'studygo:mapas:agrupar-questoes';
-	let agrupar = $state<'ramo' | 'banca'>(lerAgrupar());
-	function lerAgrupar(): 'ramo' | 'banca' {
+	const CHAVE_MOSTRAR = 'studygo:mapas:mostrar-questoes';
+
+	function lerEscolha<T extends string>(chave: string, validas: readonly T[], padrao: T): T {
 		try {
-			return localStorage.getItem(CHAVE_AGRUPAR) === 'banca' ? 'banca' : 'ramo';
+			const v = localStorage.getItem(chave);
+			return validas.includes(v as T) ? (v as T) : padrao;
 		} catch {
-			return 'ramo';
+			return padrao;
 		}
 	}
-	function escolherAgrupar(modo: 'ramo' | 'banca') {
-		agrupar = modo;
+	function guardarEscolha(chave: string, valor: string) {
 		try {
-			localStorage.setItem(CHAVE_AGRUPAR, modo);
+			localStorage.setItem(chave, valor);
 		} catch {
 			// sem armazenamento, a escolha vale só nesta visita
 		}
 	}
-	const grupos = $derived(
-		!lido ? [] : agrupar === 'banca' ? porBanca(questoes) : porRamo(lido.arvore, questoes)
+
+	let agrupar = $state<Agrupar>(lerEscolha(CHAVE_AGRUPAR, ['ramo', 'banca'], 'ramo'));
+	let mostrar = $state<Mostrar>(lerEscolha(CHAVE_MOSTRAR, ['todas', 'sem-resposta', 'erradas'], 'todas'));
+
+	const ROTULO_MOSTRAR: Record<Mostrar, string> = {
+		todas: 'Todas',
+		'sem-resposta': 'Sem resposta',
+		erradas: 'Que errei'
+	};
+	const VAZIO_MOSTRAR: Record<Mostrar, string> = {
+		todas: 'Sem questões.',
+		'sem-resposta': 'Todas as questões já têm resposta.',
+		erradas: 'Nenhum erro por aqui.'
+	};
+
+	const filtradas = $derived(
+		questoes.filter((q) =>
+			mostrar === 'todas' ? true : mostrar === 'sem-resposta' ? q.resposta === null : q.resposta !== null && !q.resposta.acertou
+		)
 	);
+	const grupos = $derived(
+		!lido ? [] : agrupar === 'banca' ? porBanca(filtradas) : porRamo(lido.arvore, filtradas)
+	);
+	const geral = $derived(placar(questoes));
+
+	/** As questões de um ramo do mapa, pelo título como a importação o compara. */
+	function questoesDoNo(no: NoDoMapa): QuestaoDoMapa[] {
+		const titulo = paraBusca(no.item.texto);
+		return questoes.filter((q) => paraBusca(q.ramo) === titulo);
+	}
+	function placarDoRamo(no: NoDoMapa) {
+		const qs = questoesDoNo(no);
+		return qs.length > 0 ? placar(qs) : null;
+	}
 	let aberto = $state<{ titulo: string; ids: string[] } | null>(null);
 	const doDialogo = $derived(
 		aberto ? questoes.filter((q) => aberto!.ids.includes(q.id)) : ([] as QuestaoDoMapa[])
@@ -139,6 +200,111 @@
 			importandoQuestoes = false;
 		}
 	}
+
+	// --- editar ------------------------------------------------------------
+	let editando = $state(false);
+	let erroEdicao = $state<string | null>(null);
+
+	/**
+	 * A exclusão que ainda não foi ao servidor: o tópico já saiu da tela, e
+	 * "Desfazer" o põe de volta no mesmo lugar. `raw`: são os próprios objetos
+	 * do mapa, que têm de voltar como eram (é deles o estado de aberto).
+	 */
+	interface Pendente {
+		slug: string;
+		caminho: number[];
+		texto: string;
+		irmaos: ItemDoMapa[];
+		indice: number;
+		item: ItemDoMapa;
+		timer: ReturnType<typeof setTimeout>;
+	}
+	let pendente = $state.raw<Pendente | null>(null);
+	const JANELA_DE_DESFAZER = 6000;
+
+	const semNegrito = (t: string) => t.replaceAll('**', '');
+
+	function irmaosDe(caminho: number[]): ItemDoMapa[] {
+		let lista = lido!.arvore;
+		for (const i of caminho.slice(0, -1)) lista = lista[i].filhos;
+		return lista;
+	}
+
+	async function excluirTopico(no: NoDoMapa) {
+		if (!lido) return;
+		erroEdicao = null;
+		const titulo = semNegrito(no.item.texto);
+
+		// O que leva conteúdo junto pergunta antes, dizendo quanto.
+		if (no.total > 0) {
+			const nq = no.nivel === 0 ? questoesDoNo(no).length : 0;
+			const itens = no.total === 1 ? 'o item que há dentro dele' : `os ${no.total} itens que há dentro dele`;
+			const qs = nq === 0 ? '' : nq === 1 ? ' e a questão do ramo' : ` e as ${nq} questões do ramo`;
+			const ok = await confirmar({
+				titulo: `Excluir “${titulo}”?`,
+				texto: `Sai junto ${itens}${qs}${nq ? ' (as respostas ficam guardadas)' : ''}. Dá para desfazer logo em seguida.`,
+				rotulo: 'Excluir',
+				tom: 'perigo'
+			});
+			if (!ok) return;
+		}
+
+		// Uma exclusão por vez no servidor: a anterior vai antes desta.
+		if (!(await gravarPendente()) || !lido) return;
+
+		const irmaos = irmaosDe(no.caminho);
+		const indice = no.caminho[no.caminho.length - 1];
+		const item = irmaos[indice];
+		if (!item || item.texto !== no.item.texto) return;
+
+		irmaos.splice(indice, 1);
+		pendente = {
+			slug,
+			caminho: no.caminho,
+			texto: no.item.texto,
+			irmaos,
+			indice,
+			item,
+			timer: setTimeout(() => void gravarPendente(), JANELA_DE_DESFAZER)
+		};
+	}
+
+	function desfazer() {
+		const p = pendente;
+		if (!p) return;
+		clearTimeout(p.timer);
+		pendente = null;
+		p.irmaos.splice(p.indice, 0, p.item);
+	}
+
+	/** Manda ao servidor a exclusão pendente. Falhou, o tópico volta à tela. */
+	async function gravarPendente(keepalive = false): Promise<boolean> {
+		const p = pendente;
+		if (!p) return true;
+		clearTimeout(p.timer);
+		pendente = null;
+		try {
+			const r = await api.excluirItemDoMapa(p.slug, p.caminho, p.texto, keepalive);
+			if (lido && slug === p.slug) {
+				lido.mapa = r.mapa;
+				lido.questoes = r.questoes;
+			}
+			return true;
+		} catch (e) {
+			p.irmaos.splice(p.indice, 0, p.item);
+			erroEdicao = e instanceof Error ? e.message : 'Não foi possível excluir o tópico';
+			return false;
+		}
+	}
+
+	// Sair da página não perde a exclusão: ela vai na hora, e o fechamento da
+	// aba espera o pedido (keepalive).
+	beforeNavigate(() => void gravarPendente());
+	$effect(() => {
+		const aoFechar = () => void gravarPendente(true);
+		window.addEventListener('pagehide', aoFechar);
+		return () => window.removeEventListener('pagehide', aoFechar);
+	});
 
 	// --- excluir -----------------------------------------------------------
 	async function excluir() {
@@ -229,37 +395,110 @@
 			<dt>Tamanho</dt>
 			<dd>{lido.mapa.ramos} {lido.mapa.ramos === 1 ? 'ramo' : 'ramos'} · {nf.format(lido.mapa.itens)} itens</dd>
 		</div>
-		{#if questoes.length > 0}
-			<div class="linha">
-				<dt>Questões</dt>
-				<dd>
-					<span>{descreverPlacar(placar(questoes))}</span>
-					<button type="button" class="btn resolver" onclick={() => abrirQuestoes('Todas', questoes)}>
-						Resolver todas ({questoes.length})
-					</button>
-				</dd>
-			</div>
-		{/if}
 	</dl>
 
 	{#if erroVinculo}<div class="form-error" role="alert">{erroVinculo}</div>{/if}
 
-	<div class="mapa">
+	{#if questoes.length > 0}
+		<div class="abas" role="tablist" aria-label="Partes do mapa">
+			<button
+				type="button"
+				role="tab"
+				id="aba-mapa"
+				aria-selected={aba === 'mapa'}
+				aria-controls="painel-mapa"
+				tabindex={aba === 'mapa' ? 0 : -1}
+				onclick={() => escolherAba('mapa')}
+				onkeydown={teclasDasAbas}
+			>
+				Mapa
+			</button>
+			<button
+				type="button"
+				role="tab"
+				id="aba-questoes"
+				aria-selected={aba === 'questoes'}
+				aria-controls="painel-questoes"
+				tabindex={aba === 'questoes' ? 0 : -1}
+				onclick={() => escolherAba('questoes')}
+				onkeydown={teclasDasAbas}
+			>
+				Questões <span class="contagem">{questoes.length}</span>
+			</button>
+		</div>
+	{/if}
+
+	<div
+		class="mapa"
+		class:com-abas={questoes.length > 0}
+		id="painel-mapa"
+		role={questoes.length > 0 ? 'tabpanel' : undefined}
+		aria-labelledby={questoes.length > 0 ? 'aba-mapa' : undefined}
+		hidden={aba !== 'mapa'}
+	>
+		{#if erroEdicao}<div class="form-error" role="alert">{erroEdicao}</div>{/if}
 		{#key slug}
-			<Mapa {nos} />
+			<Mapa
+				{nos}
+				{editando}
+				onalternarEdicao={() => (editando = !editando)}
+				onexcluir={excluirTopico}
+				questoesDoRamo={placarDoRamo}
+				onquestoes={(no) => abrirQuestoes(semNegrito(no.item.texto), questoesDoNo(no))}
+			/>
 		{/key}
 	</div>
 
-	{#if grupos.length > 0}
-		<section class="questoes" aria-labelledby="questoes-titulo">
-			<div class="q-topo">
-				<h2 id="questoes-titulo" class="sec">Questões</h2>
-				<div class="agrupar" role="group" aria-label="Agrupar as questões">
-					<button type="button" aria-pressed={agrupar === 'ramo'} onclick={() => escolherAgrupar('ramo')}>Por ramo</button>
-					<button type="button" aria-pressed={agrupar === 'banca'} onclick={() => escolherAgrupar('banca')}>Por banca</button>
-				</div>
+	{#if questoes.length > 0}
+		<div
+			class="questoes"
+			id="painel-questoes"
+			role="tabpanel"
+			aria-labelledby="aba-questoes"
+			hidden={aba !== 'questoes'}
+		>
+			<div class="resumo">
+				<span class="barra grande" aria-hidden="true">
+					<span class="certas" style="width:{(geral.certas / geral.total) * 100}%"></span>
+					<span class="erradas" style="width:{(geral.erradas / geral.total) * 100}%"></span>
+				</span>
+				<p>
+					{descreverPlacar(geral)}{geral.respondidas > 0
+						? ` · ${Math.round((geral.certas / geral.respondidas) * 100)}% de acerto`
+						: ''}
+				</p>
 			</div>
-			<ul class="ramos" aria-label={agrupar === 'banca' ? 'Questões por banca' : 'Questões por ramo'}>
+
+			<div class="controles">
+				<label class="campo">
+					<span>Ver por</span>
+					<select bind:value={agrupar} onchange={() => guardarEscolha(CHAVE_AGRUPAR, agrupar)}>
+						<option value="ramo">Conteúdo</option>
+						<option value="banca">Banca</option>
+					</select>
+				</label>
+				<label class="campo">
+					<span>Mostrar</span>
+					<select bind:value={mostrar} onchange={() => guardarEscolha(CHAVE_MOSTRAR, mostrar)}>
+						<option value="todas">Todas</option>
+						<option value="sem-resposta">Sem resposta</option>
+						<option value="erradas">Que errei</option>
+					</select>
+				</label>
+				<button
+					type="button"
+					class="btn primary resolver"
+					disabled={filtradas.length === 0}
+					onclick={() => abrirQuestoes(ROTULO_MOSTRAR[mostrar], filtradas)}
+				>
+					Resolver {filtradas.length}
+				</button>
+			</div>
+
+			{#if grupos.length === 0}
+				<p class="vazia">{VAZIO_MOSTRAR[mostrar]}</p>
+			{/if}
+			<ul class="ramos" aria-label={agrupar === 'banca' ? 'Questões por banca' : 'Questões por conteúdo'}>
 				{#each grupos as g (g.titulo)}
 					{@const p = placar(g.questoes)}
 					<li>
@@ -278,14 +517,15 @@
 					</li>
 				{/each}
 			</ul>
-		</section>
+		</div>
 	{/if}
 
 	<details class="manter">
 		<summary>Manter este mapa</summary>
 		<p class="page-sub">
 			Para corrigir ou ampliar o mapa, importe o texto de novo em <a href="/mapas">Mapas mentais</a>: o mesmo
-			endereço troca o conteúdo e mantém as matérias vinculadas.
+			endereço troca o conteúdo e mantém as matérias vinculadas. Os tópicos excluídos aqui voltam se o texto
+			importado ainda os tiver.
 		</p>
 
 		<h2 class="sec">Importar questões</h2>
@@ -307,6 +547,13 @@
 
 	{#if aberto}
 		<Questoes titulo={aberto.titulo} questoes={doDialogo} onrespondida={respondida} onclose={() => (aberto = null)} />
+	{/if}
+
+	{#if pendente}
+		<div class="desfazer" role="status">
+			<span class="d-txt">“{semNegrito(pendente.texto)}” excluído.</span>
+			<button type="button" onclick={desfazer}>Desfazer</button>
+		</div>
 	{/if}
 {/if}
 
@@ -422,6 +669,92 @@
 		padding-top: 16px;
 		border-top: 1px solid var(--border);
 	}
+	.mapa.com-abas {
+		margin-top: 0;
+		border-top: 0;
+	}
+
+	/* As abas no jeito do Notion: texto, e um traço embaixo da escolhida. */
+	.abas {
+		display: flex;
+		gap: 4px;
+		margin-top: 18px;
+		border-bottom: 1px solid var(--border);
+		max-width: 860px;
+	}
+	.abas button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: -1px;
+		padding: 8px 12px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--text-muted);
+		font: inherit;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.abas button[aria-selected='true'] {
+		border-bottom-color: var(--text);
+		color: var(--text);
+	}
+	@media (hover: hover) {
+		.abas button:hover {
+			color: var(--text);
+		}
+	}
+	.abas button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+	.contagem {
+		padding: 1px 7px;
+		border-radius: 999px;
+		background: var(--bg-soft);
+		font-size: 11.5px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* O "Desfazer" no pé da tela, como no Gmail e no Notion. */
+	.desfazer {
+		position: fixed;
+		left: 50%;
+		bottom: calc(20px + env(safe-area-inset-bottom));
+		transform: translateX(-50%);
+		z-index: 60;
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		max-width: calc(100vw - 32px);
+		padding: 10px 10px 10px 16px;
+		border-radius: 9px;
+		background: var(--text);
+		color: var(--bg);
+		box-shadow: var(--shadow-pop);
+		font-size: 13.5px;
+	}
+	.d-txt {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.desfazer button {
+		flex: none;
+		padding: 6px 10px;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-weight: 700;
+		text-decoration: underline;
+		cursor: pointer;
+	}
 
 	.manter {
 		margin: 36px 0 24px;
@@ -457,56 +790,56 @@
 		font-size: 12.5px;
 		color: var(--text-muted);
 	}
-	.resolver {
-		padding: 5px 10px;
-	}
-
-	/* As questões por ramo, como as questões por unidade da lei. */
+	/* As questões, como as questões por unidade da lei. */
 	.questoes {
-		margin-top: 32px;
+		padding-top: 16px;
 		max-width: 860px;
 	}
-	.questoes .sec {
+	.resumo {
+		display: grid;
+		gap: 6px;
+		margin-bottom: 14px;
+	}
+	.resumo p {
 		margin: 0;
-		font-size: 16px;
-		font-weight: 700;
-	}
-	.q-topo {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-bottom: 10px;
-	}
-	.agrupar {
-		display: inline-flex;
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		overflow: hidden;
-	}
-	.agrupar button {
-		padding: 5px 12px;
-		border: 0;
-		background: transparent;
+		font-size: 13px;
 		color: var(--text-muted);
+	}
+	.barra.grande {
+		height: 6px;
+		border-radius: 3px;
+	}
+	.controles {
+		display: flex;
+		align-items: flex-end;
+		flex-wrap: wrap;
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+	.campo {
+		display: grid;
+		gap: 4px;
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+	.campo select {
+		padding: 7px 10px;
+		border: 1px solid var(--border-strong);
+		border-radius: 7px;
+		background: var(--bg-card);
+		color: var(--text);
 		font: inherit;
-		font-size: 12.5px;
+		font-size: 13.5px;
 		cursor: pointer;
 	}
-	.agrupar button + button {
-		border-left: 1px solid var(--border);
+	.resolver {
+		margin-left: auto;
+		padding: 8px 14px;
 	}
-	.agrupar button[aria-pressed='true'] {
-		background: var(--bg-hover);
-		color: var(--text);
-		font-weight: 600;
-	}
-	@media (pointer: coarse) {
-		.agrupar button {
-			min-height: 40px;
-			padding-inline: 16px;
-		}
+	.vazia {
+		margin: 4px 0 10px;
+		font-size: 13px;
+		color: var(--text-muted);
 	}
 	.ramos {
 		list-style: none;
@@ -565,6 +898,18 @@
 			grid-template-columns: minmax(0, 1fr);
 			gap: 3px;
 		}
+		/* No celular as abas dividem a largura, e os controles também. */
+		.abas button {
+			flex: 1;
+			justify-content: center;
+		}
+		.campo {
+			flex: 1 1 40%;
+		}
+		.resolver {
+			flex-basis: 100%;
+			margin-left: 0;
+		}
 	}
 
 	@media (pointer: coarse) {
@@ -574,9 +919,16 @@
 			width: 32px;
 			height: 32px;
 		}
-		.vincular {
-			padding-block: 8px;
+		.vincular,
+		.campo select {
+			padding-block: 9px;
 			font-size: 16px;
+		}
+		.abas button {
+			min-height: 44px;
+		}
+		.resolver {
+			padding-block: 11px;
 		}
 	}
 </style>

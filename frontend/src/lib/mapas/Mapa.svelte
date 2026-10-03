@@ -4,6 +4,7 @@
 	import { browser } from '$app/environment';
 	import Item from './Item.svelte';
 	import { caminhosAte, contarAchados, idsComFilhos, paraBusca, type NoDoMapa } from './arvore';
+	import type { Placar } from './questoes';
 
 	/**
 	 * O mapa mental como uma página de tópicos recolhíveis, no jeito do Notion: a
@@ -11,7 +12,22 @@
 	 * Foi o modelo escolhido (28/09/2026) porque boa parte do estudo é no celular e
 	 * no tablet — lê de cima para baixo, sem arrastar nem dar zoom.
 	 */
-	let { nos }: { nos: NoDoMapa[] } = $props();
+	let {
+		nos,
+		editando = false,
+		onalternarEdicao,
+		onexcluir,
+		questoesDoRamo,
+		onquestoes
+	}: {
+		nos: NoDoMapa[];
+		/** No modo de edição cada tópico ganha a lixeira. */
+		editando?: boolean;
+		onalternarEdicao?: () => void;
+		onexcluir?: (no: NoDoMapa) => void;
+		questoesDoRamo?: (no: NoDoMapa) => Placar | null;
+		onquestoes?: (no: NoDoMapa) => void;
+	} = $props();
 
 	// No celular o mapa abre como sumário: só os ramos, e cada um abre no toque.
 	// Com a primeira camada aberta, o último ramo ficaria a várias telas de
@@ -68,7 +84,18 @@
 	/>
 	<button type="button" class="btn" onclick={abrirTudo}>Abrir tudo</button>
 	<button type="button" class="btn" onclick={recolherTudo}>Recolher tudo</button>
+	{#if onalternarEdicao}
+		<button type="button" class="btn editar" class:primary={editando} aria-pressed={editando} onclick={onalternarEdicao}>
+			{editando ? 'Concluir edição' : 'Editar'}
+		</button>
+	{/if}
 </div>
+
+{#if editando}
+	<p class="aviso-edicao" role="status">
+		Modo de edição: a lixeira exclui o tópico e tudo o que há dentro dele. Dá para desfazer logo em seguida.
+	</p>
+{/if}
 
 {#if filtro !== ''}
 	<p class="achados" role="status">
@@ -82,7 +109,7 @@
 
 <ul class="pagina" aria-label="Tópicos do mapa">
 	{#each nos as no (no.id)}
-		<Item {no} abertos={ativos} {alternar} {filtro} />
+		<Item {no} abertos={ativos} {alternar} {filtro} {editando} {onexcluir} {questoesDoRamo} {onquestoes} />
 	{/each}
 </ul>
 
@@ -114,6 +141,16 @@
 	.btn {
 		padding: 8px 12px;
 	}
+	.aviso-edicao {
+		margin: 4px 0 6px;
+		padding: 8px 12px;
+		border-radius: 7px;
+		background: var(--bg-soft);
+		color: var(--text-muted);
+		font-size: 13px;
+		max-width: 860px;
+		box-sizing: border-box;
+	}
 	.achados {
 		margin: 4px 0 0;
 		font-size: 13px;
@@ -133,6 +170,9 @@
 		}
 		.btn {
 			flex: 1;
+		}
+		.editar {
+			flex-basis: 100%;
 		}
 	}
 

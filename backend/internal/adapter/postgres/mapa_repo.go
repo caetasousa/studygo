@@ -244,6 +244,63 @@ func linhasDoMapa(id uuid.UUID, ramos []mapa.Item) [][]any {
 	return linhas
 }
 
+func (r *MapaRepo) TrocarItens(
+	ctx context.Context,
+	mapaID uuid.UUID,
+	itensAntes int,
+	ramos []mapa.Item,
+	desativar []uuid.UUID,
+) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("abrindo transação: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback depois do commit é no-op
+
+	// A linha do mapa travada: duas edições ao mesmo tempo se enfileiram, e a
+	// segunda vê a contagem que a primeira deixou.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM mapas WHERE id = $1 FOR UPDATE`, mapaID); err != nil {
+		return fmt.Errorf("travando o mapa: %w", err)
+	}
+
+	var itens int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM mapas_itens WHERE mapa_id = $1`, mapaID).Scan(&itens); err != nil {
+		return fmt.Errorf("contando os itens do mapa: %w", err)
+	}
+
+	if itens != itensAntes {
+		return mapa.ErrItemMudou
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM mapas_itens WHERE mapa_id = $1`, mapaID); err != nil {
+		return fmt.Errorf("apagando os itens do mapa: %w", err)
+	}
+
+	if _, err := tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"mapas_itens"},
+		[]string{"mapa_id", "ordem", "pai", "texto", "marca"},
+		pgx.CopyFromRows(linhasDoMapa(mapaID, ramos)),
+	); err != nil {
+		return fmt.Errorf("gravando itens do mapa: %w", err)
+	}
+
+	if len(desativar) > 0 {
+		if _, err := tx.Exec(ctx,
+			`UPDATE mapas_questoes SET ativa = false WHERE mapa_id = $1 AND id = ANY($2)`,
+			mapaID, desativar,
+		); err != nil {
+			return fmt.Errorf("desativando as questões do ramo: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("confirmando o mapa: %w", err)
+	}
+
+	return nil
+}
+
 func (r *MapaRepo) Excluir(ctx context.Context, usuarioID uuid.UUID, slug string) error {
 	res, err := r.pool.Exec(ctx, `DELETE FROM mapas WHERE usuario_id = $1 AND slug = $2`, usuarioID, slug)
 	if err != nil {

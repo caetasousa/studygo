@@ -163,6 +163,7 @@ func NewRouter(
 	protegida("GET /api/mapas/{slug}", h.Mapa.Ler)
 	protegida("DELETE /api/mapas/{slug}", h.Mapa.Excluir)
 	protegida("POST /api/mapas/{slug}/questoes", h.Mapa.ImportarQuestoes)
+	protegida("POST /api/mapas/{slug}/itens/excluir", h.Mapa.ExcluirItem)
 	protegida("POST /api/mapas/questoes/{id}/respostas", h.Mapa.Responder)
 	protegida("GET /api/concursos/{slug}/mapas", h.Mapa.DoConcurso)
 	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Vincular)

@@ -201,6 +201,19 @@ export const api = {
 			body: JSON.stringify({ resposta })
 		}),
 
+	/**
+	 * Tira um tópico do mapa (e o que há dentro dele). O caminho são os índices
+	 * desde o ramo; o texto é o que a tela mostrava, e o servidor recusa (409)
+	 * se o caminho já aponta outro tópico. `keepalive` deixa o pedido terminar
+	 * mesmo com a página sendo fechada.
+	 */
+	excluirItemDoMapa: (slug: string, caminho: number[], texto: string, keepalive = false) =>
+		request<MapaLido>(`/api/mapas/${encodeURIComponent(slug)}/itens/excluir`, {
+			method: 'POST',
+			body: JSON.stringify({ caminho, texto }),
+			keepalive
+		}),
+
 	/** Todas as matérias do concurso, cada uma com os mapas vinculados a ela. */
 	mapasDoConcurso: (slug: string) =>
 		request<{ disciplinas: MapasDaMateria[] }>(`/api/concursos/${encodeURIComponent(slug)}/mapas`),

@@ -769,3 +769,41 @@ func TestServidor_EditalComProcessadorForaDoAr(t *testing.T) {
 		t.Errorf("mensagem = %q, quer falar em sobrecarga", corpo["erro"])
 	}
 }
+
+// ---------------------------------------------------------------- mapa
+
+// Excluir pelo caminho com o texto de outro tópico é 409: o mapa mudou desde
+// que a tela o abriu, e apagar assim mesmo levaria o item errado. A tela não
+// produz esse estado sozinha (é preciso outra aba); aqui ele se provoca.
+func TestServidor_ExcluirTopicoDeMapaQueMudouE409(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+
+	mapaTexto, _ := json.Marshal(map[string]string{"texto": "# Ciclo\nslug: ciclo\n\n- Evaporação\n  - Calor\n- Chuva\n"})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(mapaTexto)), http.StatusCreated)
+
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/ciclo/itens/excluir", c.token,
+		`{"caminho":[0,0],"texto":"Outro texto"}`), http.StatusConflict)
+
+	resp := s.json(t, http.MethodPost, "/api/mapas/ciclo/itens/excluir", c.token, `{"caminho":[0,0],"texto":"Calor"}`)
+	esperarStatus(t, resp, http.StatusOK)
+
+	var lido struct {
+		Mapa   struct{ Itens int }
+		Arvore []struct {
+			Texto  string
+			Filhos []any
+		}
+	}
+	lerJSON(t, resp, &lido)
+
+	if lido.Mapa.Itens != 2 || len(lido.Arvore) != 2 || len(lido.Arvore[0].Filhos) != 0 {
+		t.Errorf("mapa depois da exclusão = %+v", lido)
+	}
+
+	outra := s.cadastrar(t)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/ciclo/itens/excluir", outra.token,
+		`{"caminho":[0],"texto":"Evaporação"}`), http.StatusNotFound)
+}

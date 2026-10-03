@@ -82,6 +82,14 @@ type questoesImportadasDTO struct {
 	Mantidas    int `json:"mantidas"`
 }
 
+// exclusaoDeItemRequest aponta o tópico pelo caminho de índices desde o ramo
+// ([3,1,4]) e leva o texto que a tela mostrava, para o servidor recusar se o
+// mapa mudou nesse meio-tempo.
+type exclusaoDeItemRequest struct {
+	Caminho []int  `json:"caminho"`
+	Texto   string `json:"texto"`
+}
+
 type respostaDoMapaRequest struct {
 	// Resposta é a letra (A–E) ou, na de julgar, CERTO ou ERRADO.
 	Resposta string `json:"resposta"`

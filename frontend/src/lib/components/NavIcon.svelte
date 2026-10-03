@@ -34,7 +34,8 @@
 		| 'subir'
 		| 'descer'
 		| 'link'
-		| 'mapa';
+		| 'mapa'
+		| 'lixeira';
 
 	/** Icon sizes, in px. `nav` is the sidebar/menu size; `sm` supports a label
 	 *  (metric badges, inline hints); `md` is the default for buttons and titles. */
@@ -203,6 +204,12 @@
 		<circle cx="18.4" cy="6.4" r="1.7" />
 		<circle cx="12" cy="19" r="1.7" />
 		<path d="M10.3 10.4 7 7.6M13.7 10.4 17 7.6M12 14.4v2.9" />
+	{:else if name === 'lixeira'}
+		<!-- trash can: delete this item -->
+		<path d="M5 7h14" />
+		<path d="M10 7V5h4v2" />
+		<path d="M7 7l1 12h8l1-12" />
+		<path d="M10.5 10.5v5.5M13.5 10.5v5.5" />
 	{/if}
 </svg>
 

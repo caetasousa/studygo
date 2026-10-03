@@ -148,6 +148,7 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, err.Error()
 
 	case errors.Is(err, lei.ErrCapturaEmAndamento),
+		errors.Is(err, mapa.ErrItemMudou),
 		errors.Is(err, lei.ErrLeiJaExiste):
 		return http.StatusConflict, err.Error()
 

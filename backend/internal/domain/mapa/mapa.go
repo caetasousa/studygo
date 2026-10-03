@@ -112,6 +112,78 @@ func (m Mapa) Contar() (ramos, itens int) {
 	return len(m.Ramos), itens
 }
 
+// ErrItemMudou é o caminho que já não aponta o item que a pessoa viu: o mapa
+// mudou desde que a tela o abriu (outra aba, uma reimportação). Apagar pelo
+// caminho assim mesmo apagaria outro item.
+var ErrItemMudou = errors.New("o mapa mudou desde que você o abriu — recarregue a página e tente de novo")
+
+// SemItem devolve o mapa sem o item do caminho (os índices desde o ramo:
+// [3 1 4] é o quinto filho do segundo filho do quarto ramo) e sem tudo o que
+// há dentro dele, e o item tirado.
+//
+// O texto confere que o caminho ainda aponta o item que a pessoa viu; se não
+// aponta, nada sai. O mapa recebido não é alterado.
+func (m Mapa) SemItem(caminho []int, texto string) (Mapa, Item, error) {
+	var tirado Item
+
+	var tirar func(itens []Item, caminho []int) ([]Item, bool)
+
+	tirar = func(itens []Item, caminho []int) ([]Item, bool) {
+		i := caminho[0]
+		if i < 0 || i >= len(itens) {
+			return nil, false
+		}
+
+		novos := append([]Item(nil), itens...)
+
+		if len(caminho) == 1 {
+			if itens[i].Texto != texto {
+				return nil, false
+			}
+
+			tirado = itens[i]
+
+			return append(novos[:i], novos[i+1:]...), true
+		}
+
+		filhos, ok := tirar(itens[i].Filhos, caminho[1:])
+		if !ok {
+			return nil, false
+		}
+
+		novos[i].Filhos = filhos
+
+		return novos, true
+	}
+
+	if len(caminho) == 0 {
+		return m, Item{}, ErrItemMudou
+	}
+
+	ramos, ok := tirar(m.Ramos, caminho)
+	if !ok {
+		return m, Item{}, ErrItemMudou
+	}
+
+	m.Ramos = ramos
+
+	return m, tirado, nil
+}
+
+// QuestoesDoRamo são as questões presas ao ramo, comparando o título como a
+// importação compara: sem negrito, acento nem caixa.
+func QuestoesDoRamo(qs []QuestaoComResposta, ramo string) []uuid.UUID {
+	var ids []uuid.UUID
+
+	for _, q := range qs {
+		if dobrar(q.Questao.Ramo) == dobrar(ramo) {
+			ids = append(ids, q.ID)
+		}
+	}
+
+	return ids
+}
+
 // Resumo é o mapa sem a árvore: o que a lista e o vínculo precisam.
 type Resumo struct {
 	ID          uuid.UUID

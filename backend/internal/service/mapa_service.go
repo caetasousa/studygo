@@ -208,6 +208,49 @@ func (s *MapaService) Responder(ctx context.Context, usuarioID, questaoID uuid.U
 	return CorrecaoDe(q.Questao, r), nil
 }
 
+// ExcluirItem tira do mapa um tópico e tudo o que há dentro dele. O texto
+// confere que o caminho ainda aponta o tópico que a pessoa viu.
+//
+// Sem o ramo, as questões dele saem da página (são desativadas, como as que
+// saem do arquivo): resolver questão de um assunto tirado do mapa não faz
+// sentido. As respostas ficam, e voltam com a questão se ela for importada de
+// novo.
+func (s *MapaService) ExcluirItem(
+	ctx context.Context,
+	usuarioID uuid.UUID,
+	slug string,
+	caminho []int,
+	texto string,
+) (MapaLido, error) {
+	m, err := s.mapas.PorSlug(ctx, usuarioID, slug)
+	if err != nil {
+		return MapaLido{}, err
+	}
+
+	editado, tirado, err := m.SemItem(caminho, texto)
+	if err != nil {
+		return MapaLido{}, err
+	}
+
+	var desativar []uuid.UUID
+
+	if len(caminho) == 1 {
+		qs, err := s.mapas.Questoes(ctx, m.ID)
+		if err != nil {
+			return MapaLido{}, err
+		}
+
+		desativar = mapa.QuestoesDoRamo(qs, tirado.Texto)
+	}
+
+	_, itens := m.Contar()
+	if err := s.mapas.TrocarItens(ctx, m.ID, itens, editado.Ramos, desativar); err != nil {
+		return MapaLido{}, err
+	}
+
+	return s.Ler(ctx, usuarioID, slug)
+}
+
 // Excluir apaga o mapa e os vínculos dele.
 func (s *MapaService) Excluir(ctx context.Context, usuarioID uuid.UUID, slug string) error {
 	return s.mapas.Excluir(ctx, usuarioID, slug)

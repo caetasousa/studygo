@@ -154,6 +154,29 @@ func (h *MapaHandler) vincular(w http.ResponseWriter, r *http.Request, ligar boo
 	writeJSON(w, h.logger, http.StatusNoContent, nil)
 }
 
+// ExcluirItem tira um tópico do mapa e devolve o mapa como ficou.
+func (h *MapaHandler) ExcluirItem(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var req exclusaoDeItemRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	m, err := h.mapas.ExcluirItem(r.Context(), id, r.PathValue("slug"), req.Caminho, req.Texto)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, mapaLidoParaDTO(m))
+}
+
 func (h *MapaHandler) ImportarQuestoes(w http.ResponseWriter, r *http.Request) {
 	id, ok := usuarioID(r.Context())
 	if !ok {

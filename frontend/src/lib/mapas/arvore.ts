@@ -15,12 +15,16 @@ const CORES = 13;
 /**
  * Um item com o que o mapa precisa saber dele além do texto.
  *
- * O `id` é o caminho de índices desde o ramo ("3.1.4"): é o que mantém de pé o
- * estado de aberto/fechado enquanto a tela se redesenha, e não depende do
- * texto, que se repete ("Propósito" aparece dezenas de vezes).
+ * O `id` é o que mantém de pé o estado de aberto/fechado enquanto a tela se
+ * redesenha. Ele é do ITEM, não da posição: quando a edição tira um tópico, os
+ * irmãos de baixo sobem uma posição e continuam abertos (ou fechados) como
+ * estavam. E não depende do texto, que se repete ("Propósito" aparece dezenas
+ * de vezes).
  */
 export interface NoDoMapa {
 	id: string;
+	/** Os índices desde o ramo ([3, 1, 4]): é como o servidor acha o item. */
+	caminho: number[];
 	/** 0 nos ramos principais. */
 	nivel: number;
 	/** O índice da cor do ramo de cima: todo o ramo usa a mesma. */
@@ -42,15 +46,30 @@ export function paraBusca(texto: string): string {
 	return texto.replaceAll('**', '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
+// O id de cada item, pela identidade do objeto: o mesmo item, relido depois de
+// uma edição, guarda o id que tinha.
+const idsDosItens = new WeakMap<ItemDoMapa, string>();
+let proximoId = 0;
+
+function idDe(item: ItemDoMapa): string {
+	let id = idsDosItens.get(item);
+	if (id === undefined) {
+		id = `i${proximoId++}`;
+		idsDosItens.set(item, id);
+	}
+	return id;
+}
+
 export function indexar(ramos: ItemDoMapa[]): NoDoMapa[] {
-	const descer = (itens: ItemDoMapa[], prefixo: string, nivel: number, cor: number | null): NoDoMapa[] =>
+	const descer = (itens: ItemDoMapa[], acima: number[], nivel: number, cor: number | null): NoDoMapa[] =>
 		itens.map((item, i) => {
-			const id = prefixo === '' ? String(i) : `${prefixo}.${i}`;
+			const caminho = [...acima, i];
 			const corDoNo = cor ?? i % CORES;
-			const filhos = descer(item.filhos, id, nivel + 1, corDoNo);
+			const filhos = descer(item.filhos, caminho, nivel + 1, corDoNo);
 
 			return {
-				id,
+				id: idDe(item),
+				caminho,
 				nivel,
 				cor: corDoNo,
 				item,
@@ -60,7 +79,7 @@ export function indexar(ramos: ItemDoMapa[]): NoDoMapa[] {
 			};
 		});
 
-	return descer(ramos, '', 0, null);
+	return descer(ramos, [], 0, null);
 }
 
 /** Os ids de todo item que tem filhos: o que "abrir tudo" abre. */

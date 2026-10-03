@@ -658,6 +658,13 @@ async function questoesDo(request: APIRequestContext, token: string, slug = 'cic
 	return (await res.json()).questoes;
 }
 
+/** A aba das questões, aberta, e a lista de grupos dela. */
+async function listaDeQuestoes(page: Page, nome = 'Questões por conteúdo') {
+	const aba = page.getByRole('tab', { name: /^Questões/ });
+	if ((await aba.getAttribute('aria-selected')) !== 'true') await aba.click();
+	return page.getByRole('list', { name: nome });
+}
+
 /** O exemplo importado e as questões dele, pela API. */
 async function mapaComQuestoes(api: Api, page: Page, conta: Conta, nome: string) {
 	await api.concurso(nome, MATERIAS);
@@ -766,7 +773,7 @@ test.describe('questões dos mapas', () => {
 			name: 'ruim.questoes.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(varios))
 		});
 		await expect(page.getByRole('alert')).toContainText('o ramo "Vulcanismo" não existe no mapa');
-		await expect(page.getByRole('heading', { name: 'Questões', exact: true, level: 2 })).toHaveCount(0);
+		await expect(page.getByRole('tab', { name: /^Questões/ })).toHaveCount(0);
 
 		// Alternativas que só diferem na caixa ou na pontuação são outras alternativas:
 		// é o que uma questão de tokenização cobra.
@@ -807,7 +814,7 @@ test.describe('questões dos mapas', () => {
 
 		// Pela tela: escolher, responder, ver o veredito e o comentário, e responder de novo.
 		await page.goto('/mapas/ciclo-da-agua');
-		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Precipitação/ }).click();
+		await (await listaDeQuestoes(page)).getByRole('button', { name: /^Precipitação/ }).click();
 		const dialogo = page.getByRole('dialog', { name: 'Questões — Precipitação' });
 		const neve = dialogo.getByRole('group', { name: /Neve e granizo/ });
 		await expect(neve.getByText('Errou — o item está Errado')).toBeVisible();
@@ -843,7 +850,7 @@ test.describe('questões dos mapas', () => {
 		await mapaComQuestoes(api, page, conta, 'Placar E2E');
 		await page.goto('/mapas/ciclo-da-agua');
 
-		const lista = page.getByRole('list', { name: 'Questões por ramo' });
+		const lista = await listaDeQuestoes(page);
 		await expect(lista.getByRole('button')).toHaveText([
 			/^Evaporação\s*1 questão/,
 			/^Condensação\s*1 questão/,
@@ -873,7 +880,7 @@ test.describe('questões dos mapas', () => {
 		await expect(lista.getByRole('button', { name: /^Precipitação/ })).toContainText('2 de 2 respondidas · 1 certa');
 
 		// "Todas as questões" abre as quatro, e o placar da seção soma tudo.
-		await page.getByRole('button', { name: 'Resolver todas (4)' }).click();
+		await page.getByRole('button', { name: 'Resolver 4' }).click();
 		await expect(page.getByRole('dialog', { name: 'Questões — Todas' }).getByRole('group')).toHaveCount(4);
 	});
 
@@ -882,7 +889,7 @@ test.describe('questões dos mapas', () => {
 		expect((await importar(page.request, conta.token, exemplo())).status).toBe(201);
 		await page.goto('/mapas/ciclo-da-agua');
 		await expect(page.getByRole('heading', { name: 'Ciclo da Água', level: 1 })).toBeVisible();
-		await expect(page.getByRole('heading', { name: 'Questões', exact: true, level: 2 })).toHaveCount(0);
+		await expect(page.getByRole('tab', { name: /^Questões/ })).toHaveCount(0);
 
 		const r = await importarQuestoes(page.request, conta.token, questoesDoExemplo());
 		expect(r.status).toBe(200);
@@ -926,7 +933,7 @@ test.describe('explicação por alternativa', () => {
 
 		// Pela tela, ao acertar: a explicação da certa aberta, as outras a um toque.
 		await page.goto('/mapas/ciclo-da-agua');
-		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).click();
+		await (await listaDeQuestoes(page)).getByRole('button', { name: /^Evaporação/ }).click();
 		const dialogo = page.getByRole('dialog', { name: 'Questões — Evaporação' });
 		const questao = dialogo.getByRole('group', { name: /A evaporação leva/ });
 		const opcao = (letra: string) => questao.locator('.opcao').filter({ has: page.getByRole('radio', { name: new RegExp(`^${letra}\\)`) }) });
@@ -956,12 +963,12 @@ test.describe('explicação por alternativa', () => {
 
 		// Recarregado, a resposta gravada traz as explicações do mesmo jeito.
 		await page.reload();
-		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).click();
+		await (await listaDeQuestoes(page)).getByRole('button', { name: /^Evaporação/ }).click();
 		await expect(opcao('A').getByText('Errada. Passar ao sólido é solidificar.')).toBeVisible();
 
 		// A questão em prosa mostra o comentário inteiro e nenhum botão.
 		await dialogo.getByRole('button', { name: 'Fechar as questões' }).click();
-		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Precipitação/ }).click();
+		await (await listaDeQuestoes(page)).getByRole('button', { name: /^Precipitação/ }).click();
 		const orvalho = page.getByRole('dialog', { name: 'Questões — Precipitação' }).getByRole('group', { name: /NÃO é uma forma/ });
 		await expect(orvalho.getByText(/O orvalho se forma na superfície/)).toBeVisible();
 		await expect(orvalho.getByRole('button', { name: /explicação/ })).toHaveCount(0);
@@ -976,7 +983,8 @@ test.describe('questões dos mapas por banca', () => {
 		expect((await questoesDo(page.request, conta.token)).map((q) => q.banca)).toEqual(['FGV', 'CEBRASPE', 'FGV', 'CEBRASPE']);
 
 		await page.goto('/mapas/ciclo-da-agua');
-		await page.getByRole('button', { name: 'Por banca' }).click();
+		await listaDeQuestoes(page);
+		await page.getByLabel('Ver por').selectOption('banca');
 		const lista = page.getByRole('list', { name: 'Questões por banca' });
 		await expect(lista.getByRole('button')).toHaveText([/^CEBRASPE\s*2 questões/, /^FGV\s*2 questões/]);
 
@@ -994,9 +1002,115 @@ test.describe('questões dos mapas por banca', () => {
 		await expect(lista.getByRole('button', { name: /^FGV/ })).toContainText('1 de 2 respondidas · 1 certa');
 		await expect(lista.getByRole('button', { name: /^CEBRASPE/ })).not.toContainText('respondidas');
 
-		// Voltar a "Por ramo" mostra os ramos de novo.
-		await page.getByRole('button', { name: 'Por ramo' }).click();
-		await expect(page.getByRole('list', { name: 'Questões por ramo' })).toBeVisible();
+		// Voltar a ver por conteúdo mostra os ramos de novo.
+		await page.getByLabel('Ver por').selectOption('ramo');
+		await expect(page.getByRole('list', { name: 'Questões por conteúdo' })).toBeVisible();
+	});
+});
+
+test.describe('edição do mapa e aba de questões', () => {
+	test('[M24] no modo de edição a lixeira tira o tópico e o que há dentro dele, "Desfazer" o devolve, e a exclusão fica gravada', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Edição E2E');
+		let exclusoes = 0;
+		page.on('request', (r) => {
+			if (r.url().includes('/itens/excluir')) exclusoes++;
+		});
+
+		await page.goto('/mapas/ciclo-da-agua');
+		const topicos = page.getByRole('list', { name: 'Tópicos do mapa' });
+		const filhosDaPrecipitacao = topicos.getByText(/^(Chuva|Neve|Granizo)$/);
+
+		// Fora do modo de edição não há lixeira: nada se apaga por acidente.
+		await page.getByRole('button', { name: 'Abrir tudo' }).click();
+		await expect(page.getByRole('button', { name: /^Excluir “/ })).toHaveCount(0);
+		await page.getByRole('button', { name: 'Editar' }).click();
+		await expect(page.getByRole('button', { name: 'Excluir “Chuva”' })).toBeVisible();
+
+		// Um tópico sem nada dentro sai sem pergunta; "Desfazer" o devolve ao
+		// mesmo lugar, e nada vai ao servidor.
+		await page.getByRole('button', { name: 'Excluir “Chuva”' }).click();
+		await expect(filhosDaPrecipitacao).toHaveText(['Neve', 'Granizo']);
+		await page.getByRole('status').getByRole('button', { name: 'Desfazer' }).click();
+		await expect(filhosDaPrecipitacao).toHaveText(['Chuva', 'Neve', 'Granizo']);
+		await page.waitForTimeout(6500);
+		expect(exclusoes).toBe(0);
+
+		// O que tem conteúdo dentro pergunta antes, dizendo quanto vai junto.
+		await page.getByRole('button', { name: 'Excluir “Neve”' }).click();
+		const confirmacao = page.getByRole('alertdialog').or(page.getByRole('dialog'));
+		await expect(confirmacao).toContainText('Sai junto o item que há dentro dele');
+		const gravou = page.waitForResponse((r) => r.url().includes('/itens/excluir'), { timeout: 15_000 });
+		await confirmacao.getByRole('button', { name: 'Excluir' }).click();
+		await expect(filhosDaPrecipitacao).toHaveText(['Chuva', 'Granizo']);
+		expect((await gravou).status()).toBe(200);
+
+		// Gravado: recarregar não traz de volta, e só ele saiu.
+		await page.reload();
+		await page.getByRole('button', { name: 'Abrir tudo' }).click();
+		await expect(filhosDaPrecipitacao).toHaveText(['Chuva', 'Granizo']);
+		await expect(topicos.getByText('A banca troca neve por granizo')).toHaveCount(0);
+		await expect(topicos.getByText('Uma poça que seca ao sol')).toBeVisible();
+
+		// O ramo leva as questões dele junto, e avisa. Sair da página logo depois
+		// não perde a exclusão.
+		await page.getByRole('button', { name: 'Editar' }).click();
+		await page.getByRole('button', { name: 'Excluir “Precipitação”' }).click();
+		await expect(confirmacao).toContainText('as 2 questões do ramo (as respostas ficam guardadas)');
+		await confirmacao.getByRole('button', { name: 'Excluir' }).click();
+		await expect(topicos.getByText('Precipitação', { exact: true })).toHaveCount(0);
+		const saiu = page.waitForResponse((r) => r.url().includes('/itens/excluir'));
+		await page.getByRole('link', { name: '← Mapas mentais' }).click();
+		expect((await saiu).status()).toBe(200);
+
+		const lido = await (await ler(page.request, conta.token, 'ciclo-da-agua')).json();
+		expect(lido.arvore.map((r: { texto: string }) => r.texto)).toEqual(['Evaporação', 'Condensação', 'Infiltração']);
+		expect(lido.questoes.map((q: QuestaoLida) => q.ramo)).toEqual(['Evaporação', 'Condensação']);
+	});
+
+	test('[M25] as questões ficam numa aba, por conteúdo ou por banca, com filtro, e o ramo do mapa leva às dele', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Aba de questões E2E');
+		const [q1, q2] = await questoesDo(page.request, conta.token);
+		await responderQuestao(page.request, conta.token, q1.id, 'A');
+		await responderQuestao(page.request, conta.token, q2.id, 'CERTO');
+
+		await page.goto('/mapas/ciclo-da-agua');
+		const topicos = page.getByRole('list', { name: 'Tópicos do mapa' });
+
+		// O ramo diz quantas questões tem e abre as dele.
+		await topicos.getByRole('button', { name: 'Resolver as questões de Precipitação' }).click();
+		const doRamo = page.getByRole('dialog', { name: 'Questões — Precipitação' });
+		await expect(doRamo.getByRole('group')).toHaveCount(2);
+		await doRamo.getByRole('button', { name: 'Fechar as questões' }).click();
+		await expect(topicos.getByRole('button', { name: /^Resolver as questões de Infiltração/ })).toHaveCount(0);
+
+		// A aba das questões fica no endereço, e o mapa sai da frente.
+		await page.getByRole('tab', { name: /^Questões/ }).click();
+		await expect(page).toHaveURL(/aba=questoes/);
+		await expect(topicos).toBeHidden();
+		await expect(page.getByText('4 questões · 2 respondidas · 1 certa · 50% de acerto')).toBeVisible();
+
+		const porConteudo = page.getByRole('list', { name: 'Questões por conteúdo' });
+		await page.getByLabel('Mostrar').selectOption('erradas');
+		await expect(porConteudo.getByRole('button')).toHaveText([/^Evaporação\s*1 questão/]);
+		await page.getByRole('button', { name: 'Resolver 1' }).click();
+		const erradas = page.getByRole('dialog', { name: 'Questões — Que errei' });
+		await expect(erradas.getByRole('group')).toHaveCount(1);
+		await expect(erradas.getByRole('group', { name: /A evaporação leva/ })).toBeVisible();
+		await erradas.getByRole('button', { name: 'Fechar as questões' }).click();
+
+		await page.getByLabel('Mostrar').selectOption('sem-resposta');
+		await expect(porConteudo.getByRole('button')).toHaveText([/^Precipitação\s*2 questões/]);
+		await page.getByLabel('Ver por').selectOption('banca');
+		await expect(page.getByRole('list', { name: 'Questões por banca' }).getByRole('button')).toHaveText([
+			/^CEBRASPE\s*1 questão/,
+			/^FGV\s*1 questão/
+		]);
+
+		// Recarregar volta à mesma aba, com as mesmas escolhas.
+		await page.reload();
+		await expect(page.getByRole('tab', { name: /^Questões/ })).toHaveAttribute('aria-selected', 'true');
+		await expect(page.getByLabel('Ver por')).toHaveValue('banca');
+		await expect(page.getByLabel('Mostrar')).toHaveValue('sem-resposta');
 	});
 });
 
@@ -1006,7 +1120,7 @@ test.describe('questões dos mapas no celular', () => {
 	test('[M20] no celular o diálogo das questões cabe na tela e cada alternativa tem alvo de dedo', async ({ page, api, conta }) => {
 		await mapaComQuestoes(api, page, conta, 'Questões no celular E2E');
 		await page.goto('/mapas/ciclo-da-agua');
-		await page.getByRole('list', { name: 'Questões por ramo' }).getByRole('button', { name: /^Evaporação/ }).tap();
+		await (await listaDeQuestoes(page)).getByRole('button', { name: /^Evaporação/ }).tap();
 
 		const dialogo = page.getByRole('dialog', { name: 'Questões — Evaporação' });
 		await expect(dialogo).toBeVisible();
@@ -1020,6 +1134,21 @@ test.describe('questões dos mapas no celular', () => {
 		await gasoso.tap();
 		await dialogo.getByRole('button', { name: 'Responder', exact: true }).tap();
 		await expect(dialogo.getByText('Acertou')).toBeVisible();
+		expect(await semRolagemLateral(page)).toBe(true);
+	});
+
+	test('[M25][M24] no celular a aba das questões está na primeira tela, e a lixeira tem alvo de dedo', async ({ page, api, conta }) => {
+		await mapaComQuestoes(api, page, conta, 'Edição no celular E2E');
+		await page.goto('/mapas/ciclo-da-agua');
+
+		const aba = (await page.getByRole('tab', { name: /^Questões/ }).boundingBox())!;
+		expect(aba.y + aba.height).toBeLessThanOrEqual(844);
+		expect(aba.height).toBeGreaterThanOrEqual(40);
+
+		await page.getByRole('button', { name: 'Editar' }).tap();
+		const lixeira = (await page.getByRole('button', { name: 'Excluir “Evaporação”' }).boundingBox())!;
+		expect(lixeira.height).toBeGreaterThanOrEqual(40);
+		expect(lixeira.width).toBeGreaterThanOrEqual(40);
 		expect(await semRolagemLateral(page)).toBe(true);
 	});
 });
