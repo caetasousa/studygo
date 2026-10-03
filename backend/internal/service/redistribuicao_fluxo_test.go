@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -32,22 +34,28 @@ func unidadeDe(a plano.Atividade) unidade {
 
 // estudarPrimeirosDias conclui tudo que está agendado nos primeiros `n` dias e
 // devolve as unidades cobertas.
-func estudarPrimeirosDias(ce *cenario, n int) map[unidade]bool {
+func estudarPrimeirosDias(t *testing.T, ce *cenario, n int) map[unidade]bool {
+	t.Helper()
+
 	estudado := map[unidade]bool{}
+	as := ce.atividades(t)
+	regs := []plano.RegistroAtividade{}
 
 	for d := range n {
 		dia := ce.hoje.AddDate(0, 0, d)
 
-		for _, a := range plano.AtividadesDoDia(ce.cronograma.atividades, dia) {
+		for _, a := range plano.AtividadesDoDia(as, dia) {
 			if a.Disciplina == "" {
 				continue
 			}
 
-			ce.cronograma.registros[a.ID] = plano.RegistroAtividade{
-				AtividadeID: a.ID, Concluido: true,
-			}
+			regs = append(regs, plano.RegistroAtividade{AtividadeID: a.ID, Concluido: true})
 			estudado[unidadeDe(a)] = true
 		}
+	}
+
+	if err := ce.deps.Cronograma.SalvarRegistros(t.Context(), ce.plano(t).ID, regs); err != nil {
+		t.Fatalf("registrando os dias estudados: %v", err)
 	}
 
 	return estudado
@@ -57,13 +65,13 @@ func TestAbsorverAtraso_NaoReagendaCoberturaJaConcluida(t *testing.T) {
 	ce := novoCenario(t)
 	ce.obter(t)
 
-	estudado := estudarPrimeirosDias(ce, 14)
+	estudado := estudarPrimeirosDias(t, ce, 14)
 
 	hoje := ce.hoje.AddDate(0, 0, 16)
 	ce.avancarPara(hoje)
 	ce.absorver(t)
 
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if plano.DayOf(a.Data).Before(hoje) || a.Disciplina == "" {
 			continue
 		}
@@ -91,7 +99,7 @@ func TestAbsorverAtraso_PreservaARepeticaoDaSegundaPassada(t *testing.T) {
 	ce.obter(t)
 
 	antes := map[unidade]int{}
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if a.Disciplina != "" && a.Passada == 2 {
 			antes[unidadeDe(a)]++
 		}
@@ -101,14 +109,14 @@ func TestAbsorverAtraso_PreservaARepeticaoDaSegundaPassada(t *testing.T) {
 		t.Fatal("cenário inválido: o plano precisa ter repetições de segunda passada")
 	}
 
-	estudarPrimeirosDias(ce, 14)
+	estudarPrimeirosDias(t, ce, 14)
 
 	hoje := ce.hoje.AddDate(0, 0, 16)
 	ce.avancarPara(hoje)
 	ce.absorver(t)
 
 	depois := map[unidade]int{}
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if a.Disciplina != "" && a.Passada == 2 {
 			depois[unidadeDe(a)]++
 		}
@@ -132,20 +140,20 @@ func TestAbsorverAtraso_NaoPerdeConteudoNaoEstudado(t *testing.T) {
 	ce.obter(t)
 
 	antes := map[unidade]bool{}
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if a.Disciplina != "" {
 			antes[unidadeDe(a)] = true
 		}
 	}
 
-	estudado := estudarPrimeirosDias(ce, 14)
+	estudado := estudarPrimeirosDias(t, ce, 14)
 
 	hoje := ce.hoje.AddDate(0, 0, 16)
 	ce.avancarPara(hoje)
 	ce.absorver(t)
 
 	sobrou := map[unidade]bool{}
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if a.Disciplina != "" {
 			sobrou[unidadeDe(a)] = true
 		}

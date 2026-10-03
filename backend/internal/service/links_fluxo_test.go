@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -23,7 +25,7 @@ func TestPlanoService_AtualizarLinksDisciplina(t *testing.T) {
 	ce.obter(t)
 
 	svc := NewPlanoService(ce.deps)
-	codigo := ce.concursos.c.Disciplinas[0].Codigo
+	codigo := ce.concurso(t).Disciplinas[0].Codigo
 
 	caderno := "https://www.tecconcursos.com.br/questoes/caderno/123"
 	notebook := "https://notebooklm.google.com/notebook/abc-123"
@@ -34,7 +36,7 @@ func TestPlanoService_AtualizarLinksDisciplina(t *testing.T) {
 		t.Fatalf("AtualizarLinksDisciplina: %v", err)
 	}
 
-	d := ce.concursos.c.Disciplinas[0]
+	d := ce.concurso(t).Disciplinas[0]
 
 	if d.CadernoURL != caderno {
 		t.Errorf("caderno = %q, quer %q", d.CadernoURL, caderno)
@@ -56,7 +58,7 @@ func TestPlanoService_AtualizarLinksDisciplina_vazioApaga(t *testing.T) {
 	ce.obter(t)
 
 	svc := NewPlanoService(ce.deps)
-	codigo := ce.concursos.c.Disciplinas[0].Codigo
+	codigo := ce.concurso(t).Disciplinas[0].Codigo
 
 	if _, err := svc.AtualizarLinksDisciplina(ctx, ce.usuario, ce.slug, codigo,
 		concurso.Links{Caderno: "https://tec/caderno", Notebook: "https://notebooklm/x"},
@@ -70,7 +72,7 @@ func TestPlanoService_AtualizarLinksDisciplina_vazioApaga(t *testing.T) {
 		t.Fatalf("segunda gravação: %v", err)
 	}
 
-	d := ce.concursos.c.Disciplinas[0]
+	d := ce.concurso(t).Disciplinas[0]
 
 	if d.NotebookURL != "" {
 		t.Errorf("notebook = %q, quer vazio", d.NotebookURL)
@@ -90,7 +92,7 @@ func TestPlanoService_AtualizarLinksDisciplina_aparaEspacos(t *testing.T) {
 	ce.obter(t)
 
 	svc := NewPlanoService(ce.deps)
-	codigo := ce.concursos.c.Disciplinas[0].Codigo
+	codigo := ce.concurso(t).Disciplinas[0].Codigo
 
 	if _, err := svc.AtualizarLinksDisciplina(ctx, ce.usuario, ce.slug, codigo,
 		concurso.Links{Notebook: "  https://notebooklm.google.com/notebook/abc  "},
@@ -98,7 +100,7 @@ func TestPlanoService_AtualizarLinksDisciplina_aparaEspacos(t *testing.T) {
 		t.Fatalf("AtualizarLinksDisciplina: %v", err)
 	}
 
-	if got := ce.concursos.c.Disciplinas[0].NotebookURL; got != "https://notebooklm.google.com/notebook/abc" {
+	if got := ce.concurso(t).Disciplinas[0].NotebookURL; got != "https://notebooklm.google.com/notebook/abc" {
 		t.Errorf("notebook = %q, quer sem espaços", got)
 	}
 }
@@ -133,7 +135,7 @@ func TestPlanilha_NotebookViajaNoCSV(t *testing.T) {
 	ce.obter(t)
 
 	notebook := "https://notebooklm.google.com/notebook/xyz-789"
-	ce.concursos.c.Disciplinas[0].NotebookURL = notebook
+	ce.gravarConcurso(t, func(c *concurso.Concurso) { c.Disciplinas[0].NotebookURL = notebook })
 
 	svc := NewPlanilhaService(ce.deps)
 
@@ -147,7 +149,7 @@ func TestPlanilha_NotebookViajaNoCSV(t *testing.T) {
 	}
 
 	// Instalação nova: a matéria voltou sem link nenhum.
-	ce.concursos.c.Disciplinas[0].NotebookURL = ""
+	ce.gravarConcurso(t, func(c *concurso.Concurso) { c.Disciplinas[0].NotebookURL = "" })
 
 	if _, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
 		CSV: string(csv), Confirmar: true,
@@ -155,7 +157,7 @@ func TestPlanilha_NotebookViajaNoCSV(t *testing.T) {
 		t.Fatalf("importar: %v", err)
 	}
 
-	if got := ce.concursos.c.Disciplinas[0].NotebookURL; got != notebook {
+	if got := ce.concurso(t).Disciplinas[0].NotebookURL; got != notebook {
 		t.Errorf("notebook na volta = %q, quer %q", got, notebook)
 	}
 }
@@ -182,7 +184,7 @@ func TestPlanilha_CSVAntigoNaoApagaONotebook(t *testing.T) {
 	antigo := removerColunaNotebook(string(csv))
 
 	notebook := "https://notebooklm.google.com/notebook/preservar"
-	ce.concursos.c.Disciplinas[0].NotebookURL = notebook
+	ce.gravarConcurso(t, func(c *concurso.Concurso) { c.Disciplinas[0].NotebookURL = notebook })
 
 	if _, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
 		CSV: antigo, Confirmar: true,
@@ -190,7 +192,7 @@ func TestPlanilha_CSVAntigoNaoApagaONotebook(t *testing.T) {
 		t.Fatalf("importando planilha antiga: %v", err)
 	}
 
-	if got := ce.concursos.c.Disciplinas[0].NotebookURL; got != notebook {
+	if got := ce.concurso(t).Disciplinas[0].NotebookURL; got != notebook {
 		t.Errorf("notebook = %q; uma planilha antiga não pode apagá-lo", got)
 	}
 }

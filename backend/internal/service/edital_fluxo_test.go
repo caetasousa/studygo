@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -5,9 +7,9 @@ import (
 	"testing"
 
 	"studygo/internal/adapter/editalproc"
+	"studygo/internal/adapter/postgres"
+	"studygo/internal/platform/pgtest"
 	"studygo/internal/port"
-
-	"github.com/google/uuid"
 )
 
 // O assistente de edital, ponta a ponta, contra um edital REAL congelado.
@@ -36,7 +38,7 @@ var pdfDeMentira = port.EditalUpload{PDF: []byte("%PDF-1.4 fake"), MIME: "applic
 func TestEdital_AnalisarListaOsDoisCargos(t *testing.T) {
 	t.Parallel()
 
-	svc := NewConcursoService(&fakeConcursos{}, processadorDeFixture(t))
+	svc := NewConcursoService(postgres.NewConcursoRepo(pgtest.Novo(t)), processadorDeFixture(t))
 
 	a, err := svc.AnalisarEdital(context.Background(), "dono", pdfDeMentira)
 	if err != nil {
@@ -76,7 +78,7 @@ func TestEdital_AnalisarListaOsDoisCargos(t *testing.T) {
 func TestEdital_EstruturaTrazTotalPorGrupoEBloqueia(t *testing.T) {
 	t.Parallel()
 
-	svc := NewConcursoService(&fakeConcursos{}, processadorDeFixture(t))
+	svc := NewConcursoService(postgres.NewConcursoRepo(pgtest.Novo(t)), processadorDeFixture(t))
 	ctx := context.Background()
 
 	a, err := svc.AnalisarEdital(ctx, "dono", pdfDeMentira)
@@ -138,7 +140,7 @@ func TestEdital_EstruturaTrazTotalPorGrupoEBloqueia(t *testing.T) {
 func TestEdital_ConteudoSoDasDisciplinasPedidas(t *testing.T) {
 	t.Parallel()
 
-	svc := NewConcursoService(&fakeConcursos{}, processadorDeFixture(t))
+	svc := NewConcursoService(postgres.NewConcursoRepo(pgtest.Novo(t)), processadorDeFixture(t))
 	ctx := context.Background()
 
 	a, err := svc.AnalisarEdital(ctx, "dono", pdfDeMentira)
@@ -171,7 +173,8 @@ func TestEdital_ConteudoSoDasDisciplinasPedidas(t *testing.T) {
 func TestEdital_DoPdfAoConcursoSalvo(t *testing.T) {
 	t.Parallel()
 
-	repo := &fakeConcursos{}
+	pool := pgtest.Novo(t)
+	repo := postgres.NewConcursoRepo(pool)
 	svc := NewConcursoService(repo, processadorDeFixture(t))
 	ctx := context.Background()
 
@@ -232,7 +235,7 @@ func TestEdital_DoPdfAoConcursoSalvo(t *testing.T) {
 		})
 	}
 
-	resumo, _, err := svc.Criar(ctx, uuid.New(), cmd)
+	resumo, _, err := svc.Criar(ctx, novoDono(t, pool), cmd)
 	if err != nil {
 		t.Fatalf("Criar: %v", err)
 	}
@@ -241,7 +244,10 @@ func TestEdital_DoPdfAoConcursoSalvo(t *testing.T) {
 		t.Error("o concurso salvo veio sem slug")
 	}
 
-	salvo := repo.c
+	salvo, err := repo.PorSlug(ctx, resumo.Slug)
+	if err != nil {
+		t.Fatalf("lendo o concurso salvo: %v", err)
+	}
 
 	if len(salvo.Disciplinas) != len(cmd.Disciplinas) {
 		t.Fatalf("disciplinas salvas = %d, quer %d", len(salvo.Disciplinas), len(cmd.Disciplinas))

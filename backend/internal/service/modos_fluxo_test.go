@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -16,8 +18,8 @@ func TestSalvar_ModoDeUmaMateriaNaoApagaAsOutras(t *testing.T) {
 	svc := NewPlanoService(ce.deps)
 	ctx := context.Background()
 
-	primeira := ce.concursos.c.Disciplinas[0].Codigo
-	segunda := ce.concursos.c.Disciplinas[1].Codigo
+	primeira := ce.concurso(t).Disciplinas[0].Codigo
+	segunda := ce.concurso(t).Disciplinas[1].Codigo
 
 	if _, err := svc.Salvar(ctx, ce.usuario, ce.slug, ConfigCommand{
 		Modos: map[string]string{primeira: "questoes"},
@@ -50,8 +52,8 @@ func TestSalvar_ReforcoDeUmaMateriaNaoApagaOsOutros(t *testing.T) {
 	svc := NewPlanoService(ce.deps)
 	ctx := context.Background()
 
-	primeira := ce.concursos.c.Disciplinas[0].Codigo
-	segunda := ce.concursos.c.Disciplinas[1].Codigo
+	primeira := ce.concurso(t).Disciplinas[0].Codigo
+	segunda := ce.concurso(t).Disciplinas[1].Codigo
 
 	if _, err := svc.Salvar(ctx, ce.usuario, ce.slug, ConfigCommand{
 		Reforcos: map[string]float64{primeira: 2},

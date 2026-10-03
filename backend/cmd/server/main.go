@@ -20,6 +20,8 @@ import (
 	"studygo/internal/port"
 	"studygo/internal/service"
 	"studygo/migrations"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -54,16 +56,6 @@ func run(logger *slog.Logger) error {
 		logger.Info("migrations applied")
 	}
 
-	clock := port.SystemClock{}
-	hasher := crypto.NewArgon2Hasher(cfg.Argon2)
-	tokens := crypto.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTTL)
-
-	usuarioRepo := postgres.NewUsuarioRepo(pool)
-	concursoRepo := postgres.NewConcursoRepo(pool)
-	planoRepo := postgres.NewPlanoRepo(pool)
-	cronogramaRepo := postgres.NewCronogramaRepo(pool)
-	cadernoRepo := postgres.NewCadernoRepo(pool)
-
 	// O mesmo processador lê editais e captura leis.
 	var (
 		editalProc port.EditalProcessor  = editalproc.Indisponivel{}
@@ -74,6 +66,53 @@ func run(logger *slog.Logger) error {
 		editalProc, capturador = cliente, cliente
 		logger.Info("edital import enabled", slog.String("processor", cfg.EditalProcessorURL))
 	}
+
+	handler := montarHandler(pool, cfg, editalProc, capturador, logger)
+
+	srv := httpserver.New(
+		cfg.ServerAddr,
+		httpserver.WithHandler(handler),
+		// As rotas de importação esperam o Gemini (até uns 90s por chamada, duas
+		// por passo). Todo o resto responde em milissegundos; este prazo largo só
+		// existe para não cortar no meio uma resposta lenta que ia dar certo.
+		httpserver.WithWriteTimeout(240*time.Second),
+	)
+
+	logger.Info("server starting",
+		slog.String("addr", cfg.ServerAddr),
+		slog.String("versao", cfg.Versao),
+		slog.String("deploy", cfg.Deploy),
+	)
+
+	if err := srv.Run(ctx); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
+}
+
+// montarHandler liga repositories, casos de uso e handlers no http.Handler que
+// o servidor serve, com a cadeia de middlewares. Fica fora do run para que o
+// teste de integração suba exatamente esta fiação — e não uma cópia dela.
+//
+// O processador de edital vem de fora: ele é o serviço externo, e quem decide
+// qual usar (o cliente HTTP, ou nenhum) é a configuração.
+func montarHandler(
+	pool *pgxpool.Pool,
+	cfg config.Config,
+	editalProc port.EditalProcessor,
+	capturador port.CapturadorDeLeis,
+	logger *slog.Logger,
+) http.Handler {
+	clock := port.SystemClock{}
+	hasher := crypto.NewArgon2Hasher(cfg.Argon2)
+	tokens := crypto.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTTL)
+
+	usuarioRepo := postgres.NewUsuarioRepo(pool)
+	concursoRepo := postgres.NewConcursoRepo(pool)
+	planoRepo := postgres.NewPlanoRepo(pool)
+	cronogramaRepo := postgres.NewCronogramaRepo(pool)
+	cadernoRepo := postgres.NewCadernoRepo(pool)
 
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
 	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo, capturador)
@@ -120,7 +159,7 @@ func run(logger *slog.Logger) error {
 	// intenso de um laço automatizado.
 	global := middleware.NovoLimitador(240, 120, logger)
 
-	handler := middleware.Chain(
+	return middleware.Chain(
 		router,
 		middleware.RequestID,
 		middleware.Recover(logger),
@@ -128,25 +167,4 @@ func run(logger *slog.Logger) error {
 		middleware.CORS(cfg.CORSOrigin),
 		global.Middleware,
 	)
-
-	srv := httpserver.New(
-		cfg.ServerAddr,
-		httpserver.WithHandler(handler),
-		// As rotas de importação esperam o Gemini (até uns 90s por chamada, duas
-		// por passo). Todo o resto responde em milissegundos; este prazo largo só
-		// existe para não cortar no meio uma resposta lenta que ia dar certo.
-		httpserver.WithWriteTimeout(240*time.Second),
-	)
-
-	logger.Info("server starting",
-		slog.String("addr", cfg.ServerAddr),
-		slog.String("versao", cfg.Versao),
-		slog.String("deploy", cfg.Deploy),
-	)
-
-	if err := srv.Run(ctx); err != nil && err != http.ErrServerClosed {
-		return err
-	}
-
-	return nil
 }

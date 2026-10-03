@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -27,7 +29,7 @@ func TestPlanoService_Salvar_questoesDeUmaMateriaNaoReverteAsOutras(t *testing.T
 		t.Fatalf("salvando BANDA: %v", err)
 	}
 
-	q := ce.planos.p.Config.Questoes
+	q := ce.plano(t).Config.Questoes
 	if q["LINPO"] != 30 {
 		t.Errorf("Q1: LINPO voltou para %d, quer 30 (a edição anterior)", q["LINPO"])
 	}

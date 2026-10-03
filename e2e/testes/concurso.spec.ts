@@ -96,14 +96,19 @@ test.describe('concurso', () => {
 	});
 
 	test('[B5] os tópicos chegam ao conteúdo programático e ao dia', async ({ page, api }) => {
+		// A específica cadastrada primeiro: o conteúdo programático segue o edital,
+		// gerais antes de específicas, e não a ordem do cadastro.
 		await api.concurso('Temas E2E', [
-			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Concordância verbal', 'Regência'] },
-			{ nome: 'Direito Constitucional', bloco: 'esp', questoes: 15, temas: ['Direitos fundamentais', 'Controle de constitucionalidade'] }
+			{ nome: 'Direito Constitucional', bloco: 'esp', questoes: 15, temas: ['Direitos fundamentais', 'Controle de constitucionalidade'] },
+			{ nome: 'Língua Portuguesa', bloco: 'ger', questoes: 20, temas: ['Crase', 'Concordância verbal', 'Regência'] }
 		]);
 		await page.goto('/conteudo');
-		for (const tema of ['Crase', 'Concordância verbal', 'Direitos fundamentais']) {
-			await expect(page.getByText(tema).first()).toBeVisible();
-		}
+		const main = page.locator('main');
+		await expect(main.locator('h3')).toHaveText(['Conhecimentos gerais', 'Conhecimentos específicos']);
+		// A numeração é a do edital: matéria e tópico, contínua entre os grupos.
+		await expect(main.locator('h4')).toHaveText([/^1\s*Língua Portuguesa\s*3\s+tópicos$/, /^2\s*Direito Constitucional\s*2\s+tópicos$/]);
+		await expect(main.locator('ol.topicos li').first()).toHaveText(/^1\.1\s*Crase/);
+		await expect(main.locator('ol.topicos li').nth(3)).toHaveText(/^2\.1\s*Direitos fundamentais/);
 
 		await page.goto('/cronograma');
 		await expect(page.getByRole('button', { name: /: (Crase|Direitos fundamentais)\. Ver o conteúdo/ }).first()).toBeVisible();

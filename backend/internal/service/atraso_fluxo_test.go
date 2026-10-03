@@ -1,20 +1,15 @@
+//go:build integration
+
 package service
 
 import (
 	"context"
+	"maps"
 	"testing"
 	"time"
 
 	"studygo/internal/domain/plano"
-	"studygo/internal/port"
 )
-
-// avancarPara move o relógio do cenário, simulando os dias passando sem que
-// ninguém estude — que é a única forma de produzir atraso.
-func (ce *cenario) avancarPara(d time.Time) {
-	ce.deps.Relogio = relogioFixo{t: d}
-	ce.hoje = d
-}
 
 func (ce *cenario) absorver(t *testing.T) (PlanoMontado, int) {
 	t.Helper()
@@ -35,7 +30,7 @@ func TestAbsorverAtraso_EsvaziaODiaPerdido(t *testing.T) {
 	ce.obter(t) // materializa o cronograma
 
 	perdido := ce.hoje
-	antes := plano.AtividadesDoDia(ce.cronograma.atividades, perdido)
+	antes := plano.AtividadesDoDia(ce.atividades(t), perdido)
 
 	if len(antes) == 0 {
 		t.Fatal("cenário inválido: o primeiro dia precisa ter atividade")
@@ -50,7 +45,7 @@ func TestAbsorverAtraso_EsvaziaODiaPerdido(t *testing.T) {
 		t.Fatal("dias atrasados = 0, quer os dias vencidos sem registro")
 	}
 
-	if depois := plano.AtividadesDoDia(ce.cronograma.atividades, perdido); len(depois) != 0 {
+	if depois := plano.AtividadesDoDia(ce.atividades(t), perdido); len(depois) != 0 {
 		t.Errorf("o dia perdido ficou com %d atividades, quer vazio", len(depois))
 	}
 }
@@ -67,7 +62,7 @@ func TestAbsorverAtraso_MantemOCronogramaAdiante(t *testing.T) {
 
 	futuro := 0
 
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if !plano.DayOf(a.Data).Before(hoje) {
 			futuro++
 		}
@@ -83,7 +78,7 @@ func TestAbsorverAtraso_SemAtrasoNaoGrava(t *testing.T) {
 	ce := novoCenario(t)
 	ce.obter(t)
 
-	gravacoes := ce.cronograma.gravacoes
+	antes := ce.versoesDasLinhas(t)
 
 	_, dias := ce.absorver(t)
 
@@ -91,18 +86,17 @@ func TestAbsorverAtraso_SemAtrasoNaoGrava(t *testing.T) {
 		t.Errorf("dias atrasados = %d, quer 0 no primeiro dia do plano", dias)
 	}
 
-	if ce.cronograma.gravacoes != gravacoes {
+	if !maps.Equal(antes, ce.versoesDasLinhas(t)) {
 		t.Error("gravou o cronograma sem ter atraso para absorver")
 	}
 }
 
-// A varredura diária só carrega quem o banco apontou.
+// A varredura diária acha no banco quem está atrasado e replaneja.
 func TestAbsorverAtrasosDoDia_VarreOsPlanosApontados(t *testing.T) {
 	ce := novoCenario(t)
 	ce.obter(t)
 
 	ce.avancarPara(ce.hoje.AddDate(0, 0, 2))
-	ce.planos.comAtraso = []port.PlanoAtrasado{{UsuarioID: ce.usuario, Slug: ce.slug}}
 
 	n, err := NewCronogramaService(ce.deps).AbsorverAtrasosDoDia(context.Background())
 	if err != nil {
@@ -123,7 +117,7 @@ func TestReorganizarDesde_RefazODaDataEmDiante(t *testing.T) {
 	svc := NewCronogramaService(ce.deps)
 	desde := ce.hoje.AddDate(0, 0, 3)
 
-	antes := len(ce.cronograma.atividades)
+	antes := len(ce.atividades(t))
 
 	if _, err := svc.ReorganizarDesde(
 		context.Background(), ce.usuario, ce.slug, desde.Format("2006-01-02"),
@@ -131,12 +125,12 @@ func TestReorganizarDesde_RefazODaDataEmDiante(t *testing.T) {
 		t.Fatalf("ReorganizarDesde: %v", err)
 	}
 
-	if len(ce.cronograma.atividades) == 0 {
+	if len(ce.atividades(t)) == 0 {
 		t.Fatalf("o cronograma ficou vazio (tinha %d)", antes)
 	}
 
 	// O que é anterior à data escolhida não se mexe.
-	for _, a := range ce.cronograma.atividades {
+	for _, a := range ce.atividades(t) {
 		if plano.DayOf(a.Data).Before(desde) && a.Data.IsZero() {
 			t.Error("atividade anterior à data perdeu a data")
 		}

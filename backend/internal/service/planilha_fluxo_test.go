@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -6,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/plano"
 )
 
@@ -52,7 +55,7 @@ func TestPlanilha_ExportarEImportarDeVolta(t *testing.T) {
 
 	// O histórico some — é a instalação nova, com o mesmo concurso e o mesmo
 	// cronograma, mas sem nada lançado.
-	if err := ce.cronograma.ApagarRegistros(ctx, ce.planos.p.ID); err != nil {
+	if err := ce.deps.Cronograma.ApagarRegistros(ctx, ce.plano(t).ID); err != nil {
 		t.Fatalf("ApagarRegistros: %v", err)
 	}
 
@@ -68,7 +71,7 @@ func TestPlanilha_ExportarEImportarDeVolta(t *testing.T) {
 		t.Fatalf("prévia: aplicadas=%d recusadas=%v", len(prev.Aplicadas), prev.Recusadas)
 	}
 
-	if prev.Gravadas != 0 || len(ce.cronograma.registros) != 0 {
+	if prev.Gravadas != 0 || len(ce.registros(t)) != 0 {
 		t.Fatal("a prévia gravou registro")
 	}
 
@@ -83,7 +86,7 @@ func TestPlanilha_ExportarEImportarDeVolta(t *testing.T) {
 		t.Fatalf("gravadas = %d, quer 2", res.Gravadas)
 	}
 
-	volta := ce.cronograma.registros[primeira.ID]
+	volta := ce.registros(t)[primeira.ID]
 
 	if volta.Horas == nil || *volta.Horas != horas {
 		t.Errorf("horas na volta = %v, quer %v", volta.Horas, horas)
@@ -133,7 +136,7 @@ func TestPlanilha_ImportarPreservaAAnotacaoDaAtividade(t *testing.T) {
 		t.Fatalf("importar: %v", err)
 	}
 
-	if nota := ce.cronograma.registros[alvo.ID].Nota; nota != "revisar crase" {
+	if nota := ce.registros(t)[alvo.ID].Nota; nota != "revisar crase" {
 		t.Errorf("nota depois da importação = %q, quer %q", nota, "revisar crase")
 	}
 }
@@ -199,17 +202,7 @@ func TestPlanilha_ImportarReconstroiODiaQueFaltava(t *testing.T) {
 	perdido := estudo[2]
 
 	// O dia fica vazio, como depois de um AbsorverAtraso.
-	sobrando := []plano.Atividade{}
-
-	for _, a := range ce.cronograma.atividades {
-		if !plano.DayOf(a.Data).Equal(dataDe(t, perdido.Data)) {
-			sobrando = append(sobrando, a)
-		}
-	}
-
-	if err := ce.cronograma.SubstituirAtividades(ctx, ce.planos.p.ID, sobrando); err != nil {
-		t.Fatalf("esvaziando o dia: %v", err)
-	}
+	ce.esvaziarDia(t, dataDe(t, perdido.Data))
 
 	// E o tempo passa: aquele dia agora é passado.
 	ce.deps.Relogio = relogioFixo{t: diaT(2026, time.September, 30)}
@@ -246,13 +239,13 @@ func TestPlanilha_ImportarReconstroiODiaQueFaltava(t *testing.T) {
 	}
 
 	// As atividades voltaram ao dia, com o estudo lançado nelas.
-	doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, perdido.Data))
+	doDia := plano.AtividadesDoDia(ce.atividades(t), dataDe(t, perdido.Data))
 	if len(doDia) != 2 {
 		t.Fatalf("o dia ficou com %d atividades, quer 2", len(doDia))
 	}
 
 	for _, a := range doDia {
-		if !ce.cronograma.registros[a.ID].Concluido {
+		if !ce.registros(t)[a.ID].Concluido {
 			t.Errorf("a atividade %s de %s ficou sem registro", a.Disciplina, data)
 		}
 	}
@@ -283,18 +276,6 @@ func TestPlanilha_ImportarRecusaAntesDoInicioDoPlano(t *testing.T) {
 	if !strings.Contains(res.Recusadas[0].Motivo, "início do plano") {
 		t.Errorf("motivo = %q, devia mandar ajustar o início do plano", res.Recusadas[0].Motivo)
 	}
-}
-
-// dataDe converte a data ISO que a tela usa para o time.Time do domínio.
-func dataDe(t *testing.T, iso string) time.Time {
-	t.Helper()
-
-	d, err := time.Parse("2006-01-02", iso)
-	if err != nil {
-		t.Fatalf("data inválida %q: %v", iso, err)
-	}
-
-	return plano.DayOf(d.UTC())
 }
 
 // Mover o início do plano para TRÁS é o primeiro passo de quem recadastra um
@@ -356,17 +337,7 @@ func TestSalvar_OutraMudancaDeDataNaoRessuscitaODiaPerdido(t *testing.T) {
 
 	perdido := dataDe(t, diasDeEstudo(p)[2].Data)
 
-	sobrando := []plano.Atividade{}
-
-	for _, a := range ce.cronograma.atividades {
-		if !plano.DayOf(a.Data).Equal(perdido) {
-			sobrando = append(sobrando, a)
-		}
-	}
-
-	if err := ce.cronograma.SubstituirAtividades(ctx, ce.planos.p.ID, sobrando); err != nil {
-		t.Fatalf("esvaziando o dia: %v", err)
-	}
+	ce.esvaziarDia(t, perdido)
 
 	ce.deps.Relogio = relogioFixo{t: diaT(2026, time.September, 30)}
 
@@ -376,7 +347,7 @@ func TestSalvar_OutraMudancaDeDataNaoRessuscitaODiaPerdido(t *testing.T) {
 		t.Fatalf("Salvar: %v", err)
 	}
 
-	if doDia := plano.AtividadesDoDia(ce.cronograma.atividades, perdido); len(doDia) != 0 {
+	if doDia := plano.AtividadesDoDia(ce.atividades(t), perdido); len(doDia) != 0 {
 		t.Errorf("o dia perdido voltou a ter %d atividades", len(doDia))
 	}
 }
@@ -392,9 +363,9 @@ func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
 
 	// Uma anotação como a de quem estudou: matéria, tema e o que escapou.
 	data := dataDe(t, diasDeEstudo(p)[0].Data)
-	disciplina := ce.concursos.c.Disciplinas[0]
+	disciplina := ce.concurso(t).Disciplinas[0]
 
-	if _, err := ce.caderno.CriarAnotacao(ctx, ce.planos.p.ID, plano.Anotacao{
+	if _, err := ce.deps.Caderno.CriarAnotacao(ctx, ce.plano(t).ID, plano.Anotacao{
 		Data:         &data,
 		DisciplinaID: &disciplina.ID,
 		Tema:         "Crase",
@@ -412,7 +383,11 @@ func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
 	}
 
 	// A instalação nova: mesmo concurso, caderno em branco.
-	ce.caderno.anotacoes = nil
+	for _, a := range ce.anotacoes(t) {
+		if err := ce.deps.Caderno.RemoverAnotacao(ctx, ce.plano(t).ID, a.ID); err != nil {
+			t.Fatalf("limpando o caderno: %v", err)
+		}
+	}
 
 	res, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
 		CSV: string(csv), Confirmar: true,
@@ -425,11 +400,12 @@ func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
 		t.Fatalf("anotações importadas = %d, quer 1", res.Anotacoes)
 	}
 
-	if len(ce.caderno.anotacoes) != 1 {
-		t.Fatalf("o caderno ficou com %d anotações", len(ce.caderno.anotacoes))
+	anotacoes := ce.anotacoes(t)
+	if len(anotacoes) != 1 {
+		t.Fatalf("o caderno ficou com %d anotações", len(anotacoes))
 	}
 
-	volta := ce.caderno.anotacoes[0]
+	volta := anotacoes[0]
 
 	if volta.Texto != "errei a crase antes de pronome" || volta.Tema != "Crase" {
 		t.Errorf("anotação na volta = %+v", volta)
@@ -447,8 +423,8 @@ func TestPlanilha_ImportarTrazOCadernoDeErros(t *testing.T) {
 		t.Fatalf("segunda importação: %v", err)
 	}
 
-	if repetida.Anotacoes != 0 || len(ce.caderno.anotacoes) != 1 {
-		t.Errorf("a segunda importação duplicou o caderno: %d anotações", len(ce.caderno.anotacoes))
+	if n := len(ce.anotacoes(t)); repetida.Anotacoes != 0 || n != 1 {
+		t.Errorf("a segunda importação duplicou o caderno: %d anotações", n)
 	}
 }
 
@@ -466,17 +442,18 @@ func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
 	ce.obter(t)
 
 	link := "https://www.tecconcursos.com.br/questoes/caderno/123"
-	original := ce.concursos.c.Disciplinas[0]
+	original := ce.concurso(t).Disciplinas[0]
 
 	// Na instalação de origem: tag própria, caderno do TEC e só questões.
-	ce.concursos.c.Disciplinas[0].Codigo = "PT"
-	ce.concursos.c.Disciplinas[0].CadernoURL = link
-
-	cfg := ce.planos.p.Config
-	cfg.Modos = map[string]plano.Modo{"PT": plano.ModoQuestoes}
-	cfg.Reforcos = map[string]float64{"PT": 2}
-	cfg.Questoes = map[string]int{"PT": 42}
-	ce.planos.p.Config = cfg
+	ce.gravarConcurso(t, func(c *concurso.Concurso) {
+		c.Disciplinas[0].Codigo = "PT"
+		c.Disciplinas[0].CadernoURL = link
+	})
+	ce.gravarConfig(t, func(cfg *plano.Config) {
+		cfg.Modos = map[string]plano.Modo{"PT": plano.ModoQuestoes}
+		cfg.Reforcos = map[string]float64{"PT": 2}
+		cfg.Questoes = map[string]int{"PT": 42}
+	})
 
 	svc := NewPlanilhaService(ce.deps)
 
@@ -487,11 +464,15 @@ func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
 
 	// A instalação nova: o concurso foi recadastrado, então a matéria voltou ao
 	// código automático, sem link e sem ajustes.
-	ce.concursos.c.Disciplinas[0].Codigo = original.Codigo
-	ce.concursos.c.Disciplinas[0].CadernoURL = ""
-	ce.planos.p.Config.Modos = map[string]plano.Modo{}
-	ce.planos.p.Config.Reforcos = map[string]float64{}
-	ce.planos.p.Config.Questoes = map[string]int{original.Codigo: 15}
+	ce.gravarConcurso(t, func(c *concurso.Concurso) {
+		c.Disciplinas[0].Codigo = original.Codigo
+		c.Disciplinas[0].CadernoURL = ""
+	})
+	ce.gravarConfig(t, func(cfg *plano.Config) {
+		cfg.Modos = map[string]plano.Modo{}
+		cfg.Reforcos = map[string]float64{}
+		cfg.Questoes = map[string]int{original.Codigo: 15}
+	})
 
 	res, err := svc.ImportarCSV(ctx, ce.usuario, ce.slug, ImportarPlanilhaCommand{
 		CSV: string(csv), Confirmar: true,
@@ -504,7 +485,7 @@ func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
 		t.Fatal("a personalização da matéria não foi reconhecida na planilha")
 	}
 
-	volta := ce.concursos.c.Disciplinas[0]
+	volta := ce.concurso(t).Disciplinas[0]
 
 	if volta.CadernoURL != link {
 		t.Errorf("caderno na volta = %q, quer %q", volta.CadernoURL, link)
@@ -518,15 +499,15 @@ func TestPlanilha_ImportarTrazATagEOCadernoDaMateria(t *testing.T) {
 		t.Error("a matéria trocou de identidade")
 	}
 
-	if got := ce.planos.p.Config.ModoDe("PT"); got != plano.ModoQuestoes {
+	if got := ce.plano(t).Config.ModoDe("PT"); got != plano.ModoQuestoes {
 		t.Errorf("modo na volta = %q, quer %q", got, plano.ModoQuestoes)
 	}
 
-	if got := ce.planos.p.Config.ReforcoDe("PT"); got != 2 {
+	if got := ce.plano(t).Config.ReforcoDe("PT"); got != 2 {
 		t.Errorf("reforço na volta = %v, quer 2", got)
 	}
 
-	if got := ce.planos.p.Config.Questoes["PT"]; got != 42 {
+	if got := ce.plano(t).Config.Questoes["PT"]; got != 42 {
 		t.Errorf("questões na volta = %d, quer 42", got)
 	}
 }
@@ -567,19 +548,30 @@ func TestPlanilha_ImportarRedistribuiODiaQueNaoFoiEstudado(t *testing.T) {
 	}
 
 	// O dia perdido ficou vago; o que era dele foi para a frente.
-	if doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, perdido.Data)); len(doDia) != 0 {
+	if doDia := plano.AtividadesDoDia(ce.atividades(t), dataDe(t, perdido.Data)); len(doDia) != 0 {
 		t.Errorf("o dia perdido continuou com %d atividades", len(doDia))
 	}
 
 	// E o que foi estudado continua onde estava, com o registro dele.
-	doDia := plano.AtividadesDoDia(ce.cronograma.atividades, dataDe(t, estudado.Data))
+	doDia := plano.AtividadesDoDia(ce.atividades(t), dataDe(t, estudado.Data))
 	if len(doDia) != len(estudado.Itens) {
 		t.Fatalf("o dia estudado ficou com %d atividades, quer %d", len(doDia), len(estudado.Itens))
 	}
 
 	for _, a := range doDia {
-		if !ce.cronograma.registros[a.ID].Concluido {
+		if !ce.registros(t)[a.ID].Concluido {
 			t.Error("um registro importado se perdeu na redistribuição")
 		}
 	}
+}
+
+func (ce *cenario) anotacoes(t *testing.T) []plano.Anotacao {
+	t.Helper()
+
+	as, err := ce.deps.Caderno.Anotacoes(t.Context(), ce.plano(t).ID)
+	if err != nil {
+		t.Fatalf("lendo o caderno: %v", err)
+	}
+
+	return as
 }

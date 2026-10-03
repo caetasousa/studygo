@@ -74,10 +74,11 @@ Roda os três, na ordem, e para no primeiro que falhar:
 | 🐹 | `make check-backend` | `go build` · `go vet` · `go test` | `backend/` |
 | 🧡 | `make check-frontend` | `npm run check` · `npm test` | `frontend/` |
 | 🐍 | `make check-processor` | `ruff` · `mypy --strict` · `pytest` | `edital-processor/` |
-| 🐘 | `make check-db` | migrations + repositories + fluxos (Testcontainers) | `backend/` |
+| 🐘 | `make check-db` | migrations, repositories, casos de uso e o servidor por HTTP (Testcontainers) | `backend/` |
 
-Os testes que precisam de um PostgreSQL de verdade — migrations, repositories e
-os fluxos verticais — ficam fora do `make check`, para que ele não exija Docker:
+Os testes que precisam de um PostgreSQL de verdade — migrations, repositories,
+os casos de uso e o servidor inteiro por HTTP — ficam fora do `make check`, para
+que ele não exija Docker:
 
 ```bash
 make check-db

@@ -1,15 +1,13 @@
-package service_test
+//go:build integration
+
+package service
 
 import (
-	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"studygo/internal/domain/concurso"
-	"studygo/internal/port"
-	"studygo/internal/service"
-
-	"github.com/google/uuid"
 )
 
 // A colisão de slug é rara e por isso ninguém a vê acontecer — o que torna o
@@ -20,126 +18,83 @@ import (
 // de sufixos. Antes, a colisão virava 500 "erro interno" numa operação que só
 // precisava sortear de novo.
 
-// repoQueColide recusa as primeiras `recusas` tentativas com ErrSlugEmUso e
-// aceita a seguinte, guardando os slugs que foram tentados.
-type repoQueColide struct {
-	port.ConcursoRepository
-
-	recusas   int
-	tentativa int
-	tentados  []string
-}
-
-func (r *repoQueColide) Criar(_ context.Context, c concurso.Concurso) (concurso.Concurso, error) {
-	r.tentativa++
-	r.tentados = append(r.tentados, c.Slug)
-
-	if r.tentativa <= r.recusas {
-		return concurso.Concurso{}, concurso.ErrSlugEmUso
-	}
-
-	c.ID = uuid.New()
-
-	return c, nil
-}
-
-func comandoValido() service.ConcursoCommand {
-	return service.ConcursoCommand{
+func comandoValido() ConcursoCommand {
+	return ConcursoCommand{
 		Nome:  "Polícia Federal",
 		Prova: "2026-12-15",
-		Disciplinas: []service.DisciplinaCommand{
+		Disciplinas: []DisciplinaCommand{
 			{Nome: "Língua Portuguesa", Bloco: "ger", Questoes: 20},
 		},
 	}
 }
 
-func TestConcursoService_Criar_sorteiaOutroSlugNaColisao(t *testing.T) {
+// Dois estudantes cadastram o mesmo concurso: cada um ganha o seu slug, os dois
+// derivados do nome.
+func TestConcursoService_Criar_mesmoNomeGanhaSlugsDiferentes(t *testing.T) {
 	t.Parallel()
 
-	repo := &repoQueColide{recusas: 2}
-	svc := service.NewConcursoService(repo, nil)
+	ce := novoCenario(t)
+	svc := NewConcursoService(ce.deps.Concursos, nil)
 
-	resumo, _, err := svc.Criar(t.Context(), uuid.New(), comandoValido())
+	primeiro, _, err := svc.Criar(t.Context(), ce.usuario, comandoValido())
 	if err != nil {
-		t.Fatalf("Criar depois de duas colisões: %v", err)
+		t.Fatalf("Criar o primeiro: %v", err)
 	}
 
-	if repo.tentativa != 3 {
-		t.Errorf("tentativas = %d, quer 3", repo.tentativa)
+	segundo, _, err := svc.Criar(t.Context(), novoDono(t, ce.pool), comandoValido())
+	if err != nil {
+		t.Fatalf("Criar o segundo: %v", err)
 	}
 
-	// Repetir o mesmo slug colidiria de novo: o sorteio precisa acontecer DENTRO
-	// do laço, e é isso que este teste protege.
-	vistos := map[string]bool{}
-	for _, s := range repo.tentados {
-		if vistos[s] {
-			t.Fatalf("o slug %q foi tentado duas vezes: %v", s, repo.tentados)
-		}
-
-		vistos[s] = true
+	if primeiro.Slug == segundo.Slug {
+		t.Errorf("os dois ficaram com o slug %q", primeiro.Slug)
 	}
 
-	// A base continua derivada do nome; só o sufixo muda.
-	base := concurso.BaseSlug("Polícia Federal")
-	for _, s := range repo.tentados {
-		if len(s) <= len(base) || s[:len(base)] != base {
+	base := concurso.BaseSlug("Polícia Federal") + "-"
+	for _, s := range []string{primeiro.Slug, segundo.Slug} {
+		if !strings.HasPrefix(s, base) {
 			t.Errorf("slug %q não deriva de %q", s, base)
 		}
 	}
-
-	if resumo.Slug != repo.tentados[len(repo.tentados)-1] {
-		t.Errorf("resumo.Slug = %q, quer o slug que finalmente entrou", resumo.Slug)
-	}
 }
 
-// Colidir sempre não pode virar laço infinito nem 500: depois das tentativas o
-// erro que sobe é o de conflito, que o adapter traduz em 409.
-func TestConcursoService_Criar_desisteDepoisDasTentativas(t *testing.T) {
+// Colidir sempre não pode virar laço infinito nem 500: com todos os sufixos
+// ocupados no banco, o erro que sobe é o de conflito, que o adapter traduz em 409.
+func TestConcursoService_Criar_desisteQuandoTodosOsSlugsEstaoEmUso(t *testing.T) {
 	t.Parallel()
 
-	repo := &repoQueColide{recusas: 99}
-	svc := service.NewConcursoService(repo, nil)
+	ce := novoCenario(t)
 
-	_, _, err := svc.Criar(t.Context(), uuid.New(), comandoValido())
+	// Os 65.536 sufixos de dois bytes, todos tomados.
+	if _, err := ce.pool.Exec(t.Context(), `
+		INSERT INTO concursos (dono_id, slug, nome, prova_padrao)
+		SELECT $1, $2 || lpad(to_hex(g), 4, '0'), 'Ocupado', DATE '2026-12-15'
+		  FROM generate_series(0, 65535) AS g`,
+		ce.usuario, concurso.BaseSlug("Polícia Federal")+"-",
+	); err != nil {
+		t.Fatalf("ocupando os slugs: %v", err)
+	}
 
+	_, _, err := NewConcursoService(ce.deps.Concursos, nil).Criar(t.Context(), ce.usuario, comandoValido())
 	if !errors.Is(err, concurso.ErrSlugEmUso) {
 		t.Fatalf("erro = %v, quer ErrSlugEmUso", err)
 	}
-
-	if repo.tentativa != 3 {
-		t.Errorf("tentativas = %d, quer parar em 3", repo.tentativa)
-	}
 }
 
-// Erro que não é colisão sobe na primeira: repetir uma falha de infraestrutura
-// só multiplicaria o dano.
-func TestConcursoService_Criar_naoRepeteOutroErro(t *testing.T) {
+// Falha do banco que não é colisão não vira conflito: o estudante veria "esse
+// nome já existe" para um problema que não é dele.
+func TestConcursoService_Criar_falhaDoBancoNaoViraConflito(t *testing.T) {
 	t.Parallel()
 
-	falha := errors.New("conexão caiu")
-	repo := &repoQueFalha{err: falha}
-	svc := service.NewConcursoService(repo, nil)
+	ce := novoCenario(t)
+	ce.travarEscrita(t, "concursos")
 
-	_, _, err := svc.Criar(t.Context(), uuid.New(), comandoValido())
-
-	if !errors.Is(err, falha) {
-		t.Fatalf("erro = %v, quer o erro original", err)
+	_, _, err := NewConcursoService(ce.deps.Concursos, nil).Criar(t.Context(), ce.usuario, comandoValido())
+	if err == nil {
+		t.Fatal("o banco recusou e o Criar respondeu como se tivesse gravado")
 	}
 
-	if repo.tentativa != 1 {
-		t.Errorf("tentativas = %d, quer 1", repo.tentativa)
+	if errors.Is(err, concurso.ErrSlugEmUso) {
+		t.Errorf("erro = %v: uma falha do banco virou conflito de slug", err)
 	}
-}
-
-type repoQueFalha struct {
-	port.ConcursoRepository
-
-	err       error
-	tentativa int
-}
-
-func (r *repoQueFalha) Criar(context.Context, concurso.Concurso) (concurso.Concurso, error) {
-	r.tentativa++
-
-	return concurso.Concurso{}, r.err
 }

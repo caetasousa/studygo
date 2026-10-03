@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -23,8 +25,8 @@ import (
 //	E5  trazer o tópico para hoje perde o registro dele
 //
 // O estado de partida não se produz pela API — a conclusão já arruma —, então
-// o registro entra direto no fake: é o que o banco tinha depois do 500 de
-// atividades_plano_data_posicao_key (cenário C21).
+// o registro entra direto pelo repository: é o que o banco tinha depois do 500
+// de atividades_plano_data_posicao_key (cenário C21).
 func TestFluxo_RefazerOCronogramaPoeEmDiaOEstudadoAntesDaHora(t *testing.T) {
 	t.Parallel()
 
@@ -54,7 +56,10 @@ func TestFluxo_RefazerOCronogramaPoeEmDiaOEstudadoAntesDaHora(t *testing.T) {
 			p := ce.obter(t)
 
 			alvo := primeiraPassadaAdiante(t, p, ce.hoje.Format(formatoISO))
-			ce.cronograma.registros[alvo.ID] = plano.RegistroAtividade{AtividadeID: alvo.ID, Concluido: true}
+			if err := ce.deps.Cronograma.SalvarRegistro(t.Context(), ce.plano(t).ID,
+				plano.RegistroAtividade{AtividadeID: alvo.ID, Concluido: true}); err != nil {
+				t.Fatalf("registrando o tópico: %v", err)
+			}
 
 			p, err := faz(ce)
 			if err != nil {

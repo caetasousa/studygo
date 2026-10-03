@@ -134,12 +134,24 @@ não repetem o que ele faz.
 
 ## 🧪 Testes
 
-- **NUNCA** escreva testes unitários depois de escrever o código.
-- Prefira altamente testes E2E como o único mecanismo de teste. Use-os para
-  verificar se recursos complexos funcionam. No final dos testes E2E, produza
-  um artefato verificável e repetível.
-- Se for necessário testar um sistema em isolamento, **PRIMEIRO** escreva todas
-  as maneiras pelas quais ele poderia falhar, **DEPOIS** escreva o código.
+- Um teste confere o que o usuário vê ou o que fica gravado — nunca a ordem
+  das chamadas a uma porta.
+- **E2E primeiro**, para o que passa pela tela. No final, produza um artefato
+  verificável e repetível.
+- **Integração** (tag `integration`, PostgreSQL efêmero do Testcontainers) para
+  o resto do backend: casos de uso ligados aos repositories reais
+  (`internal/service/cenario_test.go`) e o servidor inteiro por HTTP, com a
+  mesma montagem da produção (`cmd/server/servidor_test.go`).
+- **Teste sem Docker só para** função pura de domínio ou de parser cujo
+  resultado o usuário vê (o planejador, a sigla, o CSV do TEC, o recorte da
+  lei, as heurísticas de texto do frontend) e para os guarda-corpos estruturais
+  (snapshot do contrato HTTP, lint das migrations, golden do plano).
+- **Proibido fake ou mock de port nosso no lugar do banco.** Dublê só na
+  fronteira de fora: relógio, processador de edital, envio de lembrete. Falha
+  de gravação se provoca no próprio banco (`travarEscrita`).
+- **NUNCA** escreva o teste depois do código: **PRIMEIRO** escreva como a
+  funcionalidade pode quebrar (em `e2e/CENARIOS.md` ou no comentário do teste),
+  **DEPOIS** o código.
 
 A suíte E2E vive em `e2e/`: o catálogo de falhas em `e2e/CENARIOS.md` (cada
 teste cita o id que cobre) e o relatório de cada execução em
@@ -184,10 +196,6 @@ uma mudança transversal, rode `make check`, `make check-db` e `make e2e`.
 (Testcontainers) e **nunca** toca no banco local — não há `TEST_DATABASE_URL`,
 URL montada à mão nem porta fixa. Teste que precisa de banco leva a build tag
 `integration`.
-
-Os fakes de `internal/service` testam orquestração e NÃO reproduzem constraints
-do PostgreSQL; para provocar falha de persistência num teste unitário, injete o
-erro do contrato da porta. Constraint, transação e join se testam no banco real.
 
 Mudou o contrato HTTP? O snapshot em
 `backend/internal/adapter/httpapi/testdata` falha e aponta o que mudou. Regrave

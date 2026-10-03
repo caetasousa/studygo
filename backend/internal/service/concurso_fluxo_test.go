@@ -1,3 +1,5 @@
+//go:build integration
+
 package service
 
 import (
@@ -6,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"studygo/internal/adapter/postgres"
 	"studygo/internal/domain/concurso"
+	"studygo/internal/platform/pgtest"
+	"studygo/internal/port"
 
 	"github.com/google/uuid"
 )
@@ -17,7 +22,8 @@ import (
 
 type edicao struct {
 	svc  *ConcursoService
-	repo *fakeConcursos
+	repo port.ConcursoRepository
+	id   uuid.UUID
 	dono uuid.UUID
 	ctx  context.Context //nolint:containedctx // é um cenário de teste, não uma struct de produção
 }
@@ -25,41 +31,63 @@ type edicao struct {
 func novaEdicao(t *testing.T) *edicao {
 	t.Helper()
 
-	dono := uuid.New()
+	pool := pgtest.Novo(t)
+	dono := novoDono(t, pool)
+
 	c := concurso.Concurso{
-		ID: uuid.New(), DonoID: dono, Slug: "tce-go", Nome: "TCE-GO",
+		DonoID: dono, Slug: "tce-go", Nome: "TCE-GO",
 		ProvaPadrao:    time.Date(2026, time.December, 15, 0, 0, 0, 0, time.UTC),
 		RetaPadraoDias: 30,
 		Disciplinas: []concurso.Disciplina{
 			{
-				ID: uuid.New(), Codigo: "MATRA", Nome: "Matemática e Raciocínio Lógico",
+				Codigo: "MATRA", Nome: "Matemática e Raciocínio Lógico",
 				Bloco: concurso.BlocoGeral, Peso: 1, QuestoesPadrao: 10, Ordem: 0,
 			},
 			{
-				ID: uuid.New(), Codigo: "LINPO", Nome: "Língua Portuguesa",
+				Codigo: "LINPO", Nome: "Língua Portuguesa",
 				Bloco: concurso.BlocoGeral, Peso: 1, QuestoesPadrao: 15, Ordem: 1,
 			},
 		},
 	}
 
-	repo := &fakeConcursos{c: c}
+	repo := postgres.NewConcursoRepo(pool)
+
+	c, err := repo.Criar(t.Context(), c)
+	if err != nil {
+		t.Fatalf("criando concurso: %v", err)
+	}
 
 	return &edicao{
 		svc: NewConcursoService(repo, nil), repo: repo,
-		dono: dono, ctx: context.Background(),
+		id: c.ID, dono: dono, ctx: context.Background(),
 	}
+}
+
+// gravado é o concurso como ficou no banco.
+func (e *edicao) gravado(t *testing.T) concurso.Concurso {
+	t.Helper()
+
+	c, err := e.repo.PorID(e.ctx, e.id)
+	if err != nil {
+		t.Fatalf("lendo o concurso: %v", err)
+	}
+
+	return c
 }
 
 // comando devolve o formulário como a tela o preenche: as matérias que já
 // existem voltam com id e tag.
-func (e *edicao) comando() ConcursoCommand {
+func (e *edicao) comando(t *testing.T) ConcursoCommand {
+	t.Helper()
+
+	c := e.gravado(t)
 	cmd := ConcursoCommand{
-		Nome:          e.repo.c.Nome,
-		Prova:         e.repo.c.ProvaPadrao.Format("2006-01-02"),
-		RetaFinalDias: e.repo.c.RetaPadraoDias,
+		Nome:          c.Nome,
+		Prova:         c.ProvaPadrao.Format("2006-01-02"),
+		RetaFinalDias: c.RetaPadraoDias,
 	}
 
-	for _, d := range e.repo.c.Disciplinas {
+	for _, d := range c.Disciplinas {
 		cmd.Disciplinas = append(cmd.Disciplinas, DisciplinaCommand{
 			ID:       d.ID.String(),
 			Codigo:   d.Codigo,
@@ -86,13 +114,13 @@ func TestConcurso_TagEscolhidaPeloUsuarioVale(t *testing.T) {
 	t.Parallel()
 
 	e := novaEdicao(t)
-	antes := e.repo.c.Disciplinas[0].ID
+	antes := e.gravado(t).Disciplinas[0].ID
 
-	cmd := e.comando()
+	cmd := e.comando(t)
 	cmd.Disciplinas[0].Codigo = "rlm"
 	e.salvar(t, cmd)
 
-	d := e.repo.c.Disciplinas[0]
+	d := e.gravado(t).Disciplinas[0]
 	if d.Codigo != "RLM" {
 		t.Errorf("tag = %q, quer RLM", d.Codigo)
 	}
@@ -109,7 +137,7 @@ func TestConcurso_SemTagAMateriaMantemAQueTinha(t *testing.T) {
 
 	e := novaEdicao(t)
 
-	cmd := e.comando()
+	cmd := e.comando(t)
 	for i := range cmd.Disciplinas {
 		cmd.Disciplinas[i].Codigo = ""
 	}
@@ -117,7 +145,7 @@ func TestConcurso_SemTagAMateriaMantemAQueTinha(t *testing.T) {
 	cmd.Disciplinas[0].Nome = "Raciocínio Lógico-Matemático"
 	e.salvar(t, cmd)
 
-	if got := e.repo.c.Disciplinas[0].Codigo; got != "MATRA" {
+	if got := e.gravado(t).Disciplinas[0].Codigo; got != "MATRA" {
 		t.Errorf("tag depois de renomear = %q, quer MATRA", got)
 	}
 }
@@ -129,7 +157,7 @@ func TestConcurso_RecusaDuasMateriasComAMesmaTag(t *testing.T) {
 
 	e := novaEdicao(t)
 
-	cmd := e.comando()
+	cmd := e.comando(t)
 	cmd.Disciplinas[0].Codigo = "RLM"
 	cmd.Disciplinas[1].Codigo = "RLM"
 
@@ -152,14 +180,14 @@ func TestConcurso_MateriaNovaEstreiaComATagEscolhida(t *testing.T) {
 
 	e := novaEdicao(t)
 
-	cmd := e.comando()
+	cmd := e.comando(t)
 	cmd.Disciplinas = append(cmd.Disciplinas, DisciplinaCommand{
 		Codigo: "SEG", Nome: "Segurança da Informação",
 		Bloco: string(concurso.BlocoEspecifico), Questoes: 10,
 	})
 	e.salvar(t, cmd)
 
-	nova := e.repo.c.Disciplinas[2]
+	nova := e.gravado(t).Disciplinas[2]
 	if nova.Codigo != "SEG" {
 		t.Errorf("tag da matéria nova = %q, quer SEG", nova.Codigo)
 	}

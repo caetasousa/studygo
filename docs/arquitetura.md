@@ -443,19 +443,19 @@ Comentários e godoc em português.
 |---|---|---|
 | 💎 | `domain/plano` | motor (golden test), cronograma, registros, replanejamento |
 | 💎 | `domain/concurso` | sigla, slug, invariantes do cadastro |
-| ⚙️ | `service` | orquestração, contra repositories em memória |
-| 🔌 | `adapter/httpapi` | contrato HTTP (snapshot), auth, handlers do edital |
+| 🔌 | `adapter/httpapi` | contrato HTTP (snapshot) |
 | 🐘 | `adapter/postgres` | repositories contra PostgreSQL efêmero (tag `integration`) |
 | 📜 | `platform/db` | migrations em banco vazio, idempotência, advisory lock (tag `integration`) |
-| 🔀 | `service` (fluxo) | services reais + repositories reais (tag `integration`) |
-| 🧡 | `frontend` | as regras puras de `estudo.ts` |
+| 🔀 | `service` | casos de uso ligados aos repositories reais (tag `integration`) |
+| 🌐 | `cmd/server` | o servidor inteiro por HTTP — sessão, tetos, edital, health (tag `integration`) |
+| 🧡 | `frontend` | as heurísticas de texto e de movimento (`estudo.ts`, `mover.ts`) |
 
 ### Duas suítes
 
 | | Comando | O que roda | Docker? | Tempo |
 |---|---|---|---|---|
-| ⚡ | `make check` | domínio, aplicação (com fakes), contrato HTTP | não | < 1 s |
-| 🐘 | `make check-db` | migrations, repositories e fluxos verticais | **sim** | ~4 s |
+| ⚡ | `make check` | domínio, parsers, contrato HTTP | não | < 1 s |
+| 🐘 | `make check-db` | migrations, repositories, casos de uso e o servidor | **sim** | ~10 s |
 
 A separação é a build tag `integration`. Um teste que não precise de banco fica
 FORA da tag — `TestMigrations_NaoContemLogicaDeNegocio`, por exemplo, só lê os
@@ -480,17 +480,17 @@ mesmo schema.
 > fixa. O harness anterior fazia as três coisas — e **apagou o banco de
 > desenvolvimento de verdade**. Nenhum teste deve conseguir isso.
 
-### Por que ainda existem fakes
+### Por que não há fakes
 
-Os dublês de `internal/service` cobrem ORQUESTRAÇÃO: o que a aplicação decide,
-em que ordem chama as portas, como propaga erro. São rápidos e não precisam de
-Docker.
+Os casos de uso já foram testados contra repositories em memória. Eles ficavam
+mais verdes que a produção: não tinham a FK RESTRICT, a unique diferível nem a
+transação, e era justamente nelas que as regressões do cronograma moravam. Uma
+versão chegou a devolver nomes internos de constraint para fingir equivalência
+com o banco.
 
-Eles **não** reproduzem constraint, ordenação ou semântica relacional. Uma versão
-anterior devolvia erros com nomes internos de constraint para fingir equivalência
-com o banco — ilusão de cobertura: sem uma suíte de contrato rodando contra as
-duas implementações, não há paridade a afirmar.
-
-Quando um teste de aplicação precisa provocar falha de persistência, ele injeta
-o erro do contrato da porta (`erroAoGravar`). PK, FK, UNIQUE, CHECK, RESTRICT,
-transação, join, upsert e `ORDER BY` são verificados no PostgreSQL real.
+Hoje o caso de uso roda contra o PostgreSQL de verdade (`service/cenario_test.go`),
+e o teste afirma o que ficou gravado. Dublê só na fronteira de fora — relógio,
+processador de edital, envio de lembrete. Falha de gravação se provoca no
+próprio banco: uma `CHECK (false) NOT VALID` recusa toda escrita nova e deixa a
+leitura intacta (`travarEscrita`); que um GET não escreve se prova pelo `xmin`
+das linhas.

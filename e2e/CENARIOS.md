@@ -29,7 +29,7 @@ um banco vazio. Nada aqui toca no banco de quem desenvolve.
 | B2 | o formulário aceita concurso sem disciplina ou sem data | plano inválido, erro 500 |
 | B3 | a tag escolhida ("RLM") é ignorada, ou duas matérias ficam com a mesma | chip errado no cronograma, matérias indistinguíveis |
 | B4 | renomear a disciplina desliga o histórico (identidade por valor) | o estudo registrado some depois de editar o concurso |
-| B5 | os tópicos cadastrados não chegam ao conteúdo programático nem ao dia | ementa vazia, dia sem tema |
+| B5 | os tópicos cadastrados não chegam ao conteúdo programático nem ao dia, ou o conteúdo programático sai fora da ordem do edital (específicas antes das gerais) ou com a numeração errada | ementa vazia, dia sem tema; não acho o item do edital pelo número |
 | B6 | as datas do edital não aparecem, ou "cumprido" não fica gravado | lembrete de inscrição perdido |
 | B7 | dois concursos se misturam, ou trocar de plano não troca a tela | o registro de um aparece no outro |
 | B8 | excluir o concurso não pede confirmação, ou cancelar exclui mesmo assim | perda de dados por um clique |
