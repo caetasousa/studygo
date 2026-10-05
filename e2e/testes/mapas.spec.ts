@@ -1171,6 +1171,28 @@ test.describe('imagens dos mapas', () => {
 	const enviar = (request: APIRequestContext, token: string, slug: string, arquivo: { name: string; mimeType: string; buffer: Buffer }) =>
 		request.post(`/api/mapas/${slug}/imagens`, { headers: cabecalho(token), multipart: { imagens: arquivo } });
 
+	// A política de segurança que a borda do servidor manda (ansible), aplicada
+	// aqui a cada página: o stack do E2E não tem a borda, e a imagem que ela
+	// bloqueia passaria no teste e ficaria em branco no ar.
+	const CSP_DA_BORDA = /Content-Security-Policy "([^"]+)"/.exec(
+		readFileSync(new URL('../../ansible/templates/app.conf.j2', import.meta.url), 'utf-8')
+	)![1];
+
+	// Aplicada como <meta>, e não reescrevendo o cabeçalho da resposta: a
+	// página servida pelo route.fulfill não carregava os próprios módulos JS
+	// (ERR_FAILED) quando o app vinha de http://frontend:5173, como na pipeline.
+	// A política vale para tudo o que carrega depois de inserida, e as imagens
+	// do mapa só carregam ao abrir o ramo.
+	const comACspDaBorda = (page: Page) =>
+		page.addInitScript((csp) => {
+			document.addEventListener('DOMContentLoaded', () => {
+				const meta = document.createElement('meta');
+				meta.httpEquiv = 'Content-Security-Policy';
+				meta.content = csp;
+				document.head.prepend(meta);
+			});
+		}, CSP_DA_BORDA);
+
 	const larguraDa = (page: Page, legenda: string) =>
 		topicosDo(page).getByRole('img', { name: legenda }).evaluate((img: HTMLImageElement) => img.naturalWidth);
 
@@ -1180,6 +1202,7 @@ test.describe('imagens dos mapas', () => {
 		// Outro mapa da mesma conta cita o mesmo nome de arquivo: a imagem é do mapa.
 		expect((await importar(page.request, conta.token, variante(comImagens(exemplo()), 'b'))).status).toBe(201);
 
+		await comACspDaBorda(page);
 		await page.goto('/mapas/ciclo-da-agua');
 		const topicos = topicosDo(page);
 
@@ -1196,6 +1219,13 @@ test.describe('imagens dos mapas', () => {
 		await expect(page.getByText('Faltam 1 de 2: nuvem.png.')).toBeVisible();
 		await expect(topicos.getByRole('img', { name: 'Fluxo da evaporação' })).toBeVisible();
 		expect(await larguraDa(page, 'Fluxo da evaporação')).toBe(1);
+
+		// Tocar na imagem a abre em tela cheia, na própria página; tocar de novo fecha.
+		await topicos.getByRole('button', { name: 'Ampliar: Fluxo da evaporação' }).click();
+		const telaCheia = page.getByRole('dialog', { name: 'Fluxo da evaporação' });
+		await expect(telaCheia.getByRole('img', { name: 'Fluxo da evaporação' })).toBeVisible();
+		await telaCheia.click();
+		await expect(telaCheia).toBeHidden();
 
 		// No tópico dela, e não no vizinho: a da Condensação continua faltando.
 		const evaporacao = topicos.getByRole('listitem').filter({ has: page.getByRole('button', { name: /^Evaporação/ }) });

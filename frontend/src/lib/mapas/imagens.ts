@@ -23,17 +23,28 @@ export function imagensDoMapa(): ImagensDoMapa | undefined {
 	return getContext<ImagensDoMapa | undefined>(CHAVE);
 }
 
+// A imagem vira um endereço data:, e não blob:: a política de segurança da
+// borda (img-src 'self' data:) bloqueia blob:, e a tela ficava em branco no ar.
 // Abrir e fechar o ramo remonta a imagem: o arquivo baixado fica guardado
 // enquanto a versão do envio for a mesma.
-const baixadas = new Map<string, Promise<Blob>>();
+const baixadas = new Map<string, Promise<string>>();
 
-export function baixarImagem(slug: string, nome: string, versao: number): Promise<Blob> {
+function paraDataURL(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const leitor = new FileReader();
+		leitor.onload = () => resolve(leitor.result as string);
+		leitor.onerror = () => reject(leitor.error);
+		leitor.readAsDataURL(blob);
+	});
+}
+
+export function baixarImagem(slug: string, nome: string, versao: number): Promise<string> {
 	const chave = `${slug}\n${nome}\n${versao}`;
-	let blob = baixadas.get(chave);
-	if (!blob) {
-		blob = api.imagemDoMapa(slug, nome);
-		blob.catch(() => baixadas.delete(chave));
-		baixadas.set(chave, blob);
+	let url = baixadas.get(chave);
+	if (!url) {
+		url = api.imagemDoMapa(slug, nome).then(paraDataURL);
+		url.catch(() => baixadas.delete(chave));
+		baixadas.set(chave, url);
 	}
-	return blob;
+	return url;
 }

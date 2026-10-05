@@ -209,7 +209,7 @@ export const api = {
 
 	/**
 	 * Os bytes de uma imagem do mapa. O `<img>` não manda o token, então ela
-	 * vem por aqui e vira um endereço `blob:` na tela.
+	 * vem por aqui e vira um endereço `data:` na tela (ver lib/mapas/imagens.ts).
 	 */
 	imagemDoMapa: async (slug: string, nome: string): Promise<Blob> => {
 		const res = await fetchAutenticado(`/api/mapas/${encodeURIComponent(slug)}/imagens/${encodeURIComponent(nome)}`);

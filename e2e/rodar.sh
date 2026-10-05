@@ -94,6 +94,8 @@ if [ "${E2E_EM_CONTAINER:-0}" = 1 ]; then
 		-e E2E_BASE_URL=http://frontend:5173 -e E2E_COMMIT -e E2E_IMAGENS -e CI \
 		"$imagem_pw" bash -c "npm ci --no-audit --no-fund --silent && npx playwright test ${E2E_ARGS:-}; r=\$?; node resumo.mjs; exit \$r" >/dev/null
 	tar -C e2e --exclude node_modules --exclude relatorio -cf - . | docker cp - "$runner:/e2e"
+	# A política de segurança da borda, que o teste das imagens aplica (M26).
+	tar -cf - ansible/templates/app.conf.j2 | docker cp - "$runner:/"
 	docker start -a "$runner"
 	resultado=$?
 	docker cp "$runner:/e2e/relatorio" e2e/relatorio

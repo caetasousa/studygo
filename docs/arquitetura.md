@@ -255,7 +255,9 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   dos bytes (PNG, JPEG, WebP; SVG não, que carrega script), 2 MB cada, 100 por
   mapa, com o teto contado sob o lock do mapa. A leitura passa pelo token como o
   resto da API, então a tela a busca com `fetch` e a mostra num endereço
-  `blob:`; o servidor a devolve com `nosniff`.
+  `data:` — não `blob:`, que a CSP da borda (`img-src 'self' data:`) bloqueia;
+  o E2E aplica essa mesma CSP, lida do template do ansible. O servidor a
+  devolve com `nosniff`.
 - **O vínculo mapa ↔ matéria é pelo id da disciplina**, como o da lei. Importando
   com um concurso aberto, o mapa é vinculado às matérias que o texto indica
   (`materia:` bate com o nome; `reconhecer:` aparece num tópico) sem perguntar —
