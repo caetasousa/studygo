@@ -871,6 +871,8 @@ export interface MapaLido {
 	arvore: ItemDoMapa[];
 	/** As questões ativas, na ordem do arquivo; vazio quando o mapa não tem. */
 	questoes: QuestaoDoMapa[];
+	/** Os arquivos de imagem que já foram enviados para o mapa. */
+	imagens: string[];
 }
 
 /** A correção de uma resposta: só daqui a tela conhece gabarito e comentário. */

@@ -87,6 +87,11 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, questoes.Error()
 	}
 
+	var imagens mapa.ErrImagensInvalidas
+	if errors.As(err, &imagens) {
+		return http.StatusUnprocessableEntity, imagens.Error()
+	}
+
 	var pendentes lei.ErrAvisosPendentes
 	if errors.As(err, &pendentes) {
 		return http.StatusUnprocessableEntity, pendentes.Error()
@@ -136,7 +141,8 @@ func classificar(err error) (int, string) {
 		errors.Is(err, lei.ErrCapturaNaoEncontrada),
 		errors.Is(err, lei.ErrFonteNaoEncontrada),
 		errors.Is(err, mapa.ErrNaoEncontrado),
-		errors.Is(err, mapa.ErrQuestaoNaoEncontrada):
+		errors.Is(err, mapa.ErrQuestaoNaoEncontrada),
+		errors.Is(err, mapa.ErrImagemNaoEncontrada):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),

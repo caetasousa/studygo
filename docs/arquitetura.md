@@ -119,6 +119,7 @@ erDiagram
     usuarios  ||--o{ mapas : "importa"
     mapas     ||--o{ mapas_itens : "árvore em pré-ordem"
     mapas     ||--o{ mapas_questoes : "questões da aula"
+    mapas     ||--o{ mapas_imagens : "figuras citadas"
     mapas_questoes ||--o{ mapas_respostas : "cada tentativa"
     disciplinas }o--o{ mapas : "disciplinas_mapas"
 ```
@@ -222,11 +223,12 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   trechos de `reconhecer` ("16.168") nos tópicos da matéria; o estudante
   confirma e o vínculo vai para `disciplinas_leis`, pelo id da disciplina.
 
-### Mapas mentais (000012, e as questões na 000013)
+### Mapas mentais (000012, as questões na 000013, as imagens na 000015)
 
 ```
 mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore em pré-ordem)
         ├── mapas_questoes ──── mapas_respostas   (as questões da aula e cada tentativa)
+        ├── mapas_imagens      (nome, tipo, bytes — as figuras que o texto cita)
         └── disciplinas_mapas ──► disciplinas
 ```
 
@@ -246,6 +248,14 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   SELECT ordenado, e a árvore se monta em Go.
 - **Importar o mesmo slug troca o conteúdo e mantém o id** — e, com ele, os
   vínculos: o mapa se corrige e se reimporta sem perder a matéria.
+- **A imagem é citada pelo texto e chega à parte.** O item `![legenda](arquivo.png)`
+  mostra a figura (um fluxo de BPMN); o arquivo é enviado na página do mapa e
+  guardado no banco, por `(mapa_id, nome)`: é da conta como o mapa, não vai ao
+  git, e reimportar o texto não a apaga — sai com o mapa, em cascata. O tipo sai
+  dos bytes (PNG, JPEG, WebP; SVG não, que carrega script), 2 MB cada, 100 por
+  mapa, com o teto contado sob o lock do mapa. A leitura passa pelo token como o
+  resto da API, então a tela a busca com `fetch` e a mostra num endereço
+  `blob:`; o servidor a devolve com `nosniff`.
 - **O vínculo mapa ↔ matéria é pelo id da disciplina**, como o da lei. Importando
   com um concurso aberto, o mapa é vinculado às matérias que o texto indica
   (`materia:` bate com o nome; `reconhecer:` aparece num tópico) sem perguntar —

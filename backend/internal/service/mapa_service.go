@@ -105,7 +105,12 @@ func (s *MapaService) Ler(ctx context.Context, usuarioID uuid.UUID, slug string)
 		return MapaLido{}, err
 	}
 
-	return MapaLido{Mapa: m, Questoes: qs}, nil
+	imagens, err := s.mapas.NomesDasImagens(ctx, m.ID)
+	if err != nil {
+		return MapaLido{}, err
+	}
+
+	return MapaLido{Mapa: m, Questoes: qs, Imagens: imagens}, nil
 }
 
 // MapaLido é o mapa aberto, com as questões ativas dele. O gabarito vai junto
@@ -113,6 +118,69 @@ func (s *MapaService) Ler(ctx context.Context, usuarioID uuid.UUID, slug string)
 type MapaLido struct {
 	Mapa     mapa.Mapa
 	Questoes []mapa.QuestaoComResposta
+	// Imagens são os nomes das imagens já enviadas: a tela diz quais das
+	// citadas no mapa ainda faltam.
+	Imagens []string
+}
+
+// ArquivoDeImagem é um arquivo como chegou do envio, ainda não conferido.
+type ArquivoDeImagem struct {
+	Nome  string
+	Dados []byte
+}
+
+// EnviarImagens grava as imagens do mapa da conta. Todas são conferidas antes
+// (nome, tamanho, tipo pelos bytes): o envio entra inteiro ou não entra.
+// Devolve quantas foram gravadas.
+func (s *MapaService) EnviarImagens(ctx context.Context, usuarioID uuid.UUID, slug string, arquivos []ArquivoDeImagem) (int, error) {
+	r, err := s.mapas.ResumoPorSlug(ctx, usuarioID, slug)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(arquivos) == 0 {
+		return 0, mapa.ErrImagensInvalidas{Problemas: []string{"nenhum arquivo enviado"}}
+	}
+
+	var (
+		imagens   []mapa.Imagem
+		problemas []string
+		vistos    = map[string]bool{}
+	)
+
+	for _, a := range arquivos {
+		img, problema := mapa.NovaImagem(a.Nome, a.Dados)
+
+		switch {
+		case problema != "":
+			problemas = append(problemas, problema)
+		case vistos[img.Nome]:
+			problemas = append(problemas, img.Nome+": enviado duas vezes")
+		default:
+			vistos[img.Nome] = true
+			imagens = append(imagens, img)
+		}
+	}
+
+	if len(problemas) > 0 {
+		return 0, mapa.ErrImagensInvalidas{Problemas: problemas}
+	}
+
+	if err := s.mapas.GravarImagens(ctx, r.ID, imagens, mapa.MaxImagens); err != nil {
+		return 0, err
+	}
+
+	return len(imagens), nil
+}
+
+// Imagem devolve uma imagem do mapa da conta.
+func (s *MapaService) Imagem(ctx context.Context, usuarioID uuid.UUID, slug, nome string) (mapa.Imagem, error) {
+	r, err := s.mapas.ResumoPorSlug(ctx, usuarioID, slug)
+	if err != nil {
+		return mapa.Imagem{}, err
+	}
+
+	return s.mapas.Imagem(ctx, r.ID, nome)
 }
 
 // QuestoesImportadas diz o que a importação fez com cada questão do arquivo.

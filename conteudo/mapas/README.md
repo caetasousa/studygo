@@ -46,10 +46,26 @@ reconhecer: ITIL
   é aceita, para não recusar mapa antigo, mas as questões agora vão no arquivo de
   questões, abaixo.)
 - **Negrito**: `**termo**`. Nada além disso é interpretado.
+- **Imagem**: um item que é só `![legenda](arquivo.png)` mostra a imagem, com a
+  legenda embaixo (é a legenda que o filtro acha). O nome do arquivo usa
+  minúsculas, números e hífen, terminando em `.png`, `.jpg`/`.jpeg` ou `.webp`.
+  O item pode ter marca na frente, mas não texto além da imagem.
 - Linhas em branco são ignoradas.
 
 Limites: até 5.000 itens, 10 níveis, 500 caracteres por item. Um item longo vira
 um item curto com filhos: o mapa é para ser lido de relance.
+
+## Imagens
+
+O texto só cita a imagem; o arquivo chega pela página do mapa (**Manter este
+mapa → Imagens**), com o mesmo nome que o texto cita. Vários de uma vez; PNG,
+JPEG ou WebP (o tipo é conferido pelo conteúdo, não pelo nome), até 2 MB cada e
+100 por mapa. A seção lista as citadas que ainda faltam. Enviar de novo um nome
+troca a imagem, e reimportar o texto não as apaga: elas saem com o mapa.
+
+As imagens ficam ao lado do mapa, em `<slug>/` nesta pasta, fora do git como o
+resto. Recorte só a figura: nada do rodapé da página (o nome e o CPF do
+comprador vêm como marca d'água nele), nem do cabeçalho.
 
 ## Questões
 

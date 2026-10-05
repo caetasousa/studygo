@@ -62,6 +62,21 @@ O padrão é o mesmo com um PDF ou com dez — o usuário pediu isso expressamen
   `[cai]` o que a aula avisa que cai ("gravem isso", "aparece toda hora");
   `[ex]` exemplo. Não use `[questao]`: questão não entra no mapa.
 
+## Figuras
+
+O que a aula ensina pelo desenho — um fluxo de BPMN, um diagrama de camadas —
+entra como imagem, num item `![legenda](arquivo.png)` no lugar em que a teoria o
+apresenta, e com o que ele mostra também escrito em itens (a legenda e o texto
+são o que o filtro acha; a imagem, não). Formato e envio em
+`conteudo/mapas/README.md`.
+
+- Recorte a figura do PDF com PyMuPDF (`page.get_pixmap(clip=…, dpi=150)`),
+  só o desenho: **nunca** o rodapé, onde vêm o nome e o CPF do comprador, nem o
+  cabeçalho com a marca da plataforma. Abra cada PNG e confira antes de enviar.
+- Salve em `conteudo/mapas/<slug>/`, fora do git, com nomes curtos e estáveis
+  (`gateway-exclusivo.png`): reenviar o mesmo nome troca a imagem.
+- Imagem decorativa (capa, foto do professor, ícone) não entra.
+
 ## O que todo mapa de aula leva, além da teoria
 
 - **Números e nomes**: as contagens para decorar ("7 princípios, 4 dimensões"),

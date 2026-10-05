@@ -4,7 +4,8 @@
 	import { api } from '$lib/api';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { tagStyle } from '$lib/format';
-	import { indexar, paraBusca, type NoDoMapa } from '$lib/mapas/arvore';
+	import { imagensCitadas, indexar, paraBusca, textoVisivel, type NoDoMapa } from '$lib/mapas/arvore';
+	import { fornecerImagens } from '$lib/mapas/imagens';
 	import Mapa from '$lib/mapas/Mapa.svelte';
 	import Questoes from '$lib/mapas/Questoes.svelte';
 	import { descreverPlacar, placar, porBanca, porRamo } from '$lib/mapas/questoes';
@@ -51,6 +52,50 @@
 	});
 
 	const nos = $derived(lido ? indexar(lido.arvore) : []);
+
+	// --- imagens -----------------------------------------------------------
+	// O outline cita a imagem pelo nome; o arquivo chega à parte, aqui. O que o
+	// mapa cita e ainda não chegou fica listado, para não se perder no meio dos
+	// ramos recolhidos.
+	let versaoDasImagens = $state(0);
+	let enviandoImagens = $state(false);
+	let avisoImagens = $state<string | null>(null);
+	let erroImagens = $state<string | null>(null);
+
+	const citadas = $derived(lido ? imagensCitadas(lido.arvore) : []);
+	const faltando = $derived(citadas.filter((n) => !lido?.imagens.includes(n)));
+
+	fornecerImagens({
+		get slug() {
+			return slug;
+		},
+		get enviadas() {
+			return lido?.imagens ?? [];
+		},
+		get versao() {
+			return versaoDasImagens;
+		}
+	});
+
+	async function enviarImagens(e: Event & { currentTarget: HTMLInputElement }) {
+		const arquivos = [...(e.currentTarget.files ?? [])];
+		e.currentTarget.value = '';
+		if (arquivos.length === 0) return;
+		enviandoImagens = true;
+		avisoImagens = null;
+		erroImagens = null;
+		try {
+			const r = await api.enviarImagensDoMapa(slug, arquivos);
+			avisoImagens = r.gravadas === 1 ? '1 imagem enviada.' : `${r.gravadas} imagens enviadas.`;
+			const novo = await api.lerMapa(slug);
+			if (lido) lido.imagens = novo.imagens;
+			versaoDasImagens++;
+		} catch (err) {
+			erroImagens = err instanceof Error ? err.message : 'O envio das imagens falhou';
+		} finally {
+			enviandoImagens = false;
+		}
+	}
 
 	// --- matérias ---------------------------------------------------------
 	const vinculadas = $derived(mapasStore.disciplinas.filter((d) => d.mapas.some((m) => m.slug === slug)));
@@ -222,7 +267,7 @@
 	let pendente = $state.raw<Pendente | null>(null);
 	const JANELA_DE_DESFAZER = 6000;
 
-	const semNegrito = (t: string) => t.replaceAll('**', '');
+	const semNegrito = textoVisivel;
 
 	function irmaosDe(caminho: number[]): ItemDoMapa[] {
 		let lista = lido!.arvore;
@@ -540,6 +585,34 @@
 			<input type="file" accept=".json,application/json" disabled={importandoQuestoes} onchange={importarQuestoes} />
 		</label>
 		{#if importandoQuestoes}<p class="page-sub">Importando…</p>{/if}
+
+		<h2 class="sec">Imagens</h2>
+		<p class="page-sub">
+			O item <code>![legenda](arquivo.png)</code> do texto mostra a imagem com esse nome. Envie os arquivos (PNG,
+			JPEG ou WEBP, até 2 MB cada) com o mesmo nome que o texto cita; enviar de novo um nome troca a imagem.
+		</p>
+		{#if citadas.length > 0}
+			<p class="page-sub">
+				{#if faltando.length === 0}
+					{citadas.length === 1 ? 'A imagem que o mapa cita já chegou.' : `As ${citadas.length} imagens que o mapa cita já chegaram.`}
+				{:else}
+					Faltam {faltando.length} de {citadas.length}: {#each faltando as n, i (n)}{i > 0 ? ', ' : ''}<code>{n}</code>{/each}.
+				{/if}
+			</p>
+		{/if}
+		{#if avisoImagens}<p class="ok" role="status">{avisoImagens}</p>{/if}
+		{#if erroImagens}<div class="form-error" role="alert">{erroImagens}</div>{/if}
+		<label class="arquivo">
+			<span>Imagens do mapa</span>
+			<input
+				type="file"
+				accept="image/png,image/jpeg,image/webp"
+				multiple
+				disabled={enviandoImagens}
+				onchange={enviarImagens}
+			/>
+		</label>
+		{#if enviandoImagens}<p class="page-sub">Enviando…</p>{/if}
 
 		<h2 class="sec">Excluir</h2>
 		<button type="button" class="btn danger" onclick={excluir}>Excluir mapa</button>

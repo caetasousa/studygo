@@ -54,6 +54,15 @@ type MapaRepository interface {
 	// QuestaoDoDono carrega a questão ativa de um mapa da conta; a de outra
 	// conta, ou retirada, responde ErrQuestaoNaoEncontrada.
 	QuestaoDoDono(ctx context.Context, usuarioID, questaoID uuid.UUID) (mapa.QuestaoComResposta, error)
+	// NomesDasImagens lista as imagens que o mapa guarda, em ordem de nome.
+	NomesDasImagens(ctx context.Context, mapaID uuid.UUID) ([]string, error)
+	// GravarImagens grava as imagens numa transação, trocando a de mesmo nome.
+	// Se com elas o mapa passaria de `teto` imagens, nada é gravado e o
+	// retorno é mapa.ErrImagensInvalidas.
+	GravarImagens(ctx context.Context, mapaID uuid.UUID, imagens []mapa.Imagem, teto int) error
+	// Imagem carrega uma imagem do mapa, ou mapa.ErrImagemNaoEncontrada.
+	Imagem(ctx context.Context, mapaID uuid.UUID, nome string) (mapa.Imagem, error)
+
 	// Responder grava uma tentativa; as anteriores ficam.
 	Responder(ctx context.Context, questaoID uuid.UUID, r mapa.Resposta) (mapa.Resposta, error)
 }

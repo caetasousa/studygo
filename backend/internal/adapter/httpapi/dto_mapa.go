@@ -32,6 +32,13 @@ type mapaLidoDTO struct {
 	Mapa     mapaResumoDTO      `json:"mapa"`
 	Arvore   []itemDoMapaDTO    `json:"arvore"`
 	Questoes []questaoDoMapaDTO `json:"questoes"`
+	// Imagens são os nomes das imagens já enviadas para o mapa.
+	Imagens []string `json:"imagens"`
+}
+
+// imagensEnviadasDTO diz quantas imagens o envio gravou.
+type imagensEnviadasDTO struct {
+	Gravadas int `json:"gravadas"`
 }
 
 // questaoDoMapaDTO é a questão como a tela a recebe: sem gabarito nem
@@ -157,6 +164,7 @@ func mapaLidoParaDTO(l service.MapaLido) mapaLidoDTO {
 		},
 		Arvore:   itensDoMapaParaDTO(m.Ramos),
 		Questoes: questoes,
+		Imagens:  naoNula(l.Imagens),
 	}
 }
 

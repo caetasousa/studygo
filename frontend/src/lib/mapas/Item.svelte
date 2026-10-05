@@ -3,7 +3,7 @@
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import Self from './Item.svelte';
 	import Texto from './Texto.svelte';
-	import { casa, type NoDoMapa } from './arvore';
+	import { casa, textoVisivel, type NoDoMapa } from './arvore';
 	import type { Placar } from './questoes';
 
 	/**
@@ -45,7 +45,7 @@
 	} = $props();
 
 	const placarDoRamo = $derived(no.nivel === 0 && !editando ? (questoesDoRamo?.(no) ?? null) : null);
-	const textoPuro = $derived(no.item.texto.replaceAll('**', ''));
+	const textoPuro = $derived(textoVisivel(no.item.texto));
 
 	const achado = $derived(filtro !== '' && no.busca.includes(filtro));
 	const visivel = $derived(filtro === '' || dentroDeAchado || casa(no, filtro));
@@ -61,7 +61,7 @@
 			{#if no.filhos.length > 0}
 				<button type="button" class="linha" aria-expanded={aberto} onclick={() => alternar(no.id)}>
 					<span class="seta" class:aberta={aberto}><NavIcon name="proximo" size="sm" /></span>
-					<span class="txt"><Texto texto={no.item.texto} marca={no.item.marca} /></span>
+					<span class="txt"><Texto texto={no.item.texto} marca={no.item.marca} ampliavel={false} /></span>
 					{#if !aberto}<span class="conta" aria-hidden="true" title="{no.total} itens recolhidos">{no.total}</span>{/if}
 				</button>
 			{:else}

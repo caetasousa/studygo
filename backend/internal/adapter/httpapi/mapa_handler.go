@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"studygo/internal/service"
 
@@ -227,4 +229,85 @@ func (h *MapaHandler) Responder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, h.logger, http.StatusCreated, correcaoDoMapaParaDTO(c))
+}
+
+// maxCorpoImagens cobre um envio de várias imagens de até 2 MiB cada, com folga
+// para o envelope do multipart. Quem tem mais manda em mais de uma vez.
+const maxCorpoImagens = 24 << 20 // 24 MiB
+
+// EnviarImagens recebe as imagens do mapa num multipart, no campo "imagens".
+func (h *MapaHandler) EnviarImagens(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxCorpoImagens)
+
+	if err := r.ParseMultipartForm(maxCorpoImagens); err != nil {
+		var grande *http.MaxBytesError
+		if errors.As(err, &grande) {
+			writeError(w, r, h.logger, errCorpoGrandeDemais)
+			return
+		}
+
+		writeError(w, r, h.logger, errRequisicaoInvalida)
+		return
+	}
+	defer r.MultipartForm.RemoveAll() //nolint:errcheck // limpeza de temporário
+
+	var arquivos []service.ArquivoDeImagem
+
+	for _, cab := range r.MultipartForm.File["imagens"] {
+		f, err := cab.Open()
+		if err != nil {
+			writeError(w, r, h.logger, errRequisicaoInvalida)
+			return
+		}
+
+		dados, err := io.ReadAll(f)
+		f.Close() //nolint:errcheck,gosec // leitura de arquivo já recebido
+
+		if err != nil {
+			writeError(w, r, h.logger, errRequisicaoInvalida)
+			return
+		}
+
+		arquivos = append(arquivos, service.ArquivoDeImagem{Nome: cab.Filename, Dados: dados})
+	}
+
+	n, err := h.mapas.EnviarImagens(r.Context(), id, r.PathValue("slug"), arquivos)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusOK, imagensEnviadasDTO{Gravadas: n})
+}
+
+// Imagem devolve os bytes de uma imagem do mapa. O tipo é o que o envio
+// conferiu nos bytes, e o nosniff impede o navegador de achar outro.
+func (h *MapaHandler) Imagem(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	img, err := h.mapas.Imagem(r.Context(), id, r.PathValue("slug"), r.PathValue("nome"))
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", img.Tipo)
+	w.Header().Set("Content-Length", strconv.Itoa(len(img.Dados)))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write(img.Dados); err != nil {
+		h.logger.DebugContext(r.Context(), "escrevendo imagem do mapa", "erro", err)
+	}
 }

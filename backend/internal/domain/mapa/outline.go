@@ -214,6 +214,10 @@ func lerItem(texto string) (Item, string) {
 		item.Texto = strings.TrimSpace(achado[2])
 	}
 
+	if problema := problemaDaImagemDoItem(item.Texto); problema != "" {
+		return Item{}, problema
+	}
+
 	switch {
 	case item.Texto == "":
 		return Item{}, "item vazio"

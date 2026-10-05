@@ -1,18 +1,27 @@
 <script lang="ts">
-	import { partesDoTexto, ROTULO_MARCA } from './arvore';
+	import ImagemDoMapa from './ImagemDoMapa.svelte';
+	import { imagemDoItem, partesDoTexto, ROTULO_MARCA } from './arvore';
 	import type { MarcaDoItem } from '$lib/types';
 
 	/**
 	 * O texto de um item do mapa: a marca (definição, pegadinha…) como uma
 	 * etiqueta na frente e o **negrito** em pedaços de texto — nunca como HTML.
 	 * O tópico que abre e a folha o mostram do mesmo jeito, com a regra num lugar só.
+	 * O item `![legenda](arquivo.png)` mostra a imagem; dentro do botão que abre
+	 * o tópico, ela não vira link (`ampliavel`).
 	 */
-	let { texto, marca = '' }: { texto: string; marca?: MarcaDoItem } = $props();
+	let { texto, marca = '', ampliavel = true }: { texto: string; marca?: MarcaDoItem; ampliavel?: boolean } =
+		$props();
 
+	const imagem = $derived(imagemDoItem(texto));
 	const partes = $derived(partesDoTexto(texto));
 </script>
 
-{#if marca}<span class="marca {marca}">{ROTULO_MARCA[marca]}</span>{/if}{#each partes as p, i (i)}{#if p.negrito}<strong>{p.texto}</strong>{:else}{p.texto}{/if}{/each}
+{#if marca}<span class="marca {marca}">{ROTULO_MARCA[marca]}</span>{/if}{#if imagem}<ImagemDoMapa
+		legenda={imagem.legenda}
+		nome={imagem.nome}
+		{ampliavel}
+	/>{:else}{#each partes as p, i (i)}{#if p.negrito}<strong>{p.texto}</strong>{:else}{p.texto}{/if}{/each}{/if}
 
 <style>
 	/* Uma etiqueta discreta, no tom do resto do app: o que cai em prova se vê de

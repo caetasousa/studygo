@@ -1155,3 +1155,90 @@ test.describe('questões dos mapas no celular', () => {
 		expect(await semRolagemLateral(page)).toBe(true);
 	});
 });
+
+test.describe('imagens dos mapas', () => {
+	// Duas imagens de verdade, pequenas e de larguras diferentes: a troca se vê
+	// pela largura da que a tela mostra.
+	const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNwaDgAAAKEAYEml6crAAAAAElFTkSuQmCC', 'base64');
+	const PNG_2x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGNwaDgARAAJhwMBFKhZ+wAAAABJRU5ErkJggg==', 'base64');
+
+	/** O exemplo com uma imagem na Evaporação e outra, que nunca chega, na Condensação. */
+	const comImagens = (texto: string) =>
+		texto
+			.replace('  - [ex] Uma poça que seca ao sol', '  - [ex] Uma poça que seca ao sol\n  - ![Fluxo da evaporação](fluxo.png)')
+			.replace('  - Forma as nuvens', '  - ![Nuvem que falta](nuvem.png)\n  - Forma as nuvens');
+
+	const enviar = (request: APIRequestContext, token: string, slug: string, arquivo: { name: string; mimeType: string; buffer: Buffer }) =>
+		request.post(`/api/mapas/${slug}/imagens`, { headers: cabecalho(token), multipart: { imagens: arquivo } });
+
+	const larguraDa = (page: Page, legenda: string) =>
+		topicosDo(page).getByRole('img', { name: legenda }).evaluate((img: HTMLImageElement) => img.naturalWidth);
+
+	test('[M26] a imagem citada aparece no tópico dela depois de enviada, a que falta avisa, o filtro acha pela legenda e enviar de novo troca', async ({ page, api, conta, baseURL }) => {
+		await api.concurso('Imagens E2E', MATERIAS);
+		expect((await importar(page.request, conta.token, comImagens(exemplo()))).status).toBe(201);
+		// Outro mapa da mesma conta cita o mesmo nome de arquivo: a imagem é do mapa.
+		expect((await importar(page.request, conta.token, variante(comImagens(exemplo()), 'b'))).status).toBe(201);
+
+		await page.goto('/mapas/ciclo-da-agua');
+		const topicos = topicosDo(page);
+
+		// Antes do envio, o tópico diz o que falta — e a página segue de pé.
+		await topicos.getByRole('button', { name: /^Evaporação/ }).click();
+		await expect(topicos.getByText('Imagem não enviada: fluxo.png')).toBeVisible();
+		await expect(topicos.getByText('Fluxo da evaporação', { exact: true })).toBeVisible();
+		await page.getByText('Manter este mapa').click();
+		await expect(page.getByText('Faltam 2 de 2: fluxo.png, nuvem.png.')).toBeVisible();
+
+		// Pela tela, em "Manter este mapa".
+		await page.getByLabel('Imagens do mapa').setInputFiles({ name: 'fluxo.png', mimeType: 'image/png', buffer: PNG_1x1 });
+		await expect(page.getByText('1 imagem enviada.')).toBeVisible();
+		await expect(page.getByText('Faltam 1 de 2: nuvem.png.')).toBeVisible();
+		await expect(topicos.getByRole('img', { name: 'Fluxo da evaporação' })).toBeVisible();
+		expect(await larguraDa(page, 'Fluxo da evaporação')).toBe(1);
+
+		// No tópico dela, e não no vizinho: a da Condensação continua faltando.
+		const evaporacao = topicos.getByRole('listitem').filter({ has: page.getByRole('button', { name: /^Evaporação/ }) });
+		await expect(evaporacao.getByRole('img', { name: 'Fluxo da evaporação' })).toBeVisible();
+		await topicos.getByRole('button', { name: /^Condensação/ }).click();
+		await expect(topicos.getByText('Imagem não enviada: nuvem.png')).toBeVisible();
+
+		// O filtro acha o tópico pela legenda, sem acento.
+		await page.getByLabel('Filtrar itens do mapa').fill('fluxo da evaporacao');
+		await expect(page.locator('main').getByRole('status').first()).toHaveText('1 item traz “fluxo da evaporacao”.');
+		await page.getByLabel('Filtrar itens do mapa').fill('');
+
+		// O arquivo que não é imagem é recusado com o motivo, e nada muda.
+		await page.getByLabel('Imagens do mapa').setInputFiles({ name: 'nuvem.png', mimeType: 'image/png', buffer: Buffer.from('<svg onload="alert(1)"/>') });
+		await expect(page.getByRole('alert')).toContainText('nuvem.png: não é uma imagem PNG, JPEG ou WebP');
+		await expect(page.getByText('Faltam 1 de 2: nuvem.png.')).toBeVisible();
+
+		// Enviar de novo o mesmo nome troca a imagem, sem duplicar.
+		await page.getByLabel('Imagens do mapa').setInputFiles({ name: 'fluxo.png', mimeType: 'image/png', buffer: PNG_2x1 });
+		await expect(page.getByText('1 imagem enviada.')).toBeVisible();
+		await expect.poll(() => larguraDa(page, 'Fluxo da evaporação')).toBe(2);
+		expect((await (await ler(page.request, conta.token, 'ciclo-da-agua')).json()).imagens).toEqual(['fluxo.png']);
+
+		// O PNG com nome de JPEG e o arquivo grande demais também ficam de fora.
+		const jpgFalso = await enviar(page.request, conta.token, 'ciclo-da-agua', { name: 'foto.jpg', mimeType: 'image/jpeg', buffer: PNG_1x1 });
+		expect(jpgFalso.status()).toBe(422);
+		expect((await jpgFalso.json()).erro).toContain('o conteúdo é png, mas a extensão diz outra coisa');
+		const grande = Buffer.concat([PNG_1x1, Buffer.alloc(2 << 20)]);
+		const enorme = await enviar(page.request, conta.token, 'ciclo-da-agua', { name: 'grande.png', mimeType: 'image/png', buffer: grande });
+		expect(enorme.status()).toBe(422);
+		expect((await enorme.json()).erro).toContain('grande.png: maior que 2 MiB');
+
+		// O outro mapa, que cita o mesmo nome, não a mostra…
+		await page.goto('/mapas/ciclo-da-agua-b');
+		await topicosDo(page).getByRole('button', { name: /^Evaporação/ }).click();
+		await expect(topicosDo(page).getByText('Imagem não enviada: fluxo.png')).toBeVisible();
+
+		// …e outra conta não a alcança.
+		const outra = await outraSessao(baseURL!);
+		const alheia = await outra.request.get('/api/mapas/ciclo-da-agua/imagens/fluxo.png', { headers: cabecalho(outra.token) });
+		expect(alheia.status()).toBe(404);
+		const envioAlheio = await enviar(outra.request, outra.token, 'ciclo-da-agua', { name: 'fluxo.png', mimeType: 'image/png', buffer: PNG_1x1 });
+		expect(envioAlheio.status()).toBe(404);
+		await outra.request.dispose();
+	});
+});

@@ -33,7 +33,7 @@ export interface NoDoMapa {
 	filhos: NoDoMapa[];
 	/** Quantos itens há abaixo deste. */
 	total: number;
-	/** O texto como a busca o compara (ver `paraBusca`). */
+	/** O texto como a busca o compara (ver `paraBusca`); da imagem, a legenda. */
 	busca: string;
 }
 
@@ -44,6 +44,43 @@ export interface NoDoMapa {
  */
 export function paraBusca(texto: string): string {
 	return texto.replaceAll('**', '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/** A imagem que um item mostra: `![legenda](arquivo.png)`, sozinha no item. */
+export interface ImagemDoItem {
+	legenda: string;
+	nome: string;
+}
+
+// A mesma regra do servidor (domain/mapa/imagem.go), que recusa na importação
+// o item de imagem mal escrito: o que chega aqui ou é imagem inteira ou é texto.
+const ITEM_IMAGEM = /^!\[([^\]]*)\]\(([^)]*)\)$/;
+
+export function imagemDoItem(texto: string): ImagemDoItem | null {
+	const achado = ITEM_IMAGEM.exec(texto);
+	return achado ? { legenda: achado[1].trim(), nome: achado[2] } : null;
+}
+
+/**
+ * O texto que quem lê vê no item: a legenda, se ele é uma imagem; sem o `**`
+ * do negrito, se não. É o que a busca compara e o que os botões anunciam.
+ */
+export function textoVisivel(texto: string): string {
+	return imagemDoItem(texto)?.legenda ?? texto.replaceAll('**', '');
+}
+
+/** Os arquivos que o mapa cita, cada um uma vez, na ordem em que aparecem. */
+export function imagensCitadas(ramos: ItemDoMapa[]): string[] {
+	const nomes = new Set<string>();
+	const descer = (itens: ItemDoMapa[]) => {
+		for (const item of itens) {
+			const imagem = imagemDoItem(item.texto);
+			if (imagem) nomes.add(imagem.nome);
+			descer(item.filhos);
+		}
+	};
+	descer(ramos);
+	return [...nomes];
 }
 
 // O id de cada item, pela identidade do objeto: o mesmo item, relido depois de
@@ -75,7 +112,7 @@ export function indexar(ramos: ItemDoMapa[]): NoDoMapa[] {
 				item,
 				filhos,
 				total: filhos.reduce((n, f) => n + 1 + f.total, 0),
-				busca: paraBusca(item.texto)
+				busca: paraBusca(textoVisivel(item.texto))
 			};
 		});
 

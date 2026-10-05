@@ -194,6 +194,29 @@ export const api = {
 			body: conteudo
 		}),
 
+	/**
+	 * Envia as imagens que o mapa cita. O nome do arquivo é o do outline, e um
+	 * nome que já existe troca a imagem. O envio entra inteiro ou não entra.
+	 */
+	enviarImagensDoMapa: (slug: string, arquivos: File[]) => {
+		const form = new FormData();
+		for (const a of arquivos) form.append('imagens', a);
+		return request<{ gravadas: number }>(`/api/mapas/${encodeURIComponent(slug)}/imagens`, {
+			method: 'POST',
+			body: form
+		});
+	},
+
+	/**
+	 * Os bytes de uma imagem do mapa. O `<img>` não manda o token, então ela
+	 * vem por aqui e vira um endereço `blob:` na tela.
+	 */
+	imagemDoMapa: async (slug: string, nome: string): Promise<Blob> => {
+		const res = await fetchAutenticado(`/api/mapas/${encodeURIComponent(slug)}/imagens/${encodeURIComponent(nome)}`);
+		if (!res.ok) throw new ApiError(res.status, mensagemHTTP(res.status));
+		return res.blob();
+	},
+
 	/** Responde uma questão do mapa: a letra, ou CERTO/ERRADO. */
 	responderQuestaoDoMapa: (id: string, resposta: string) =>
 		request<CorrecaoDoMapa>(`/api/mapas/questoes/${encodeURIComponent(id)}/respostas`, {

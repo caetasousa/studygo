@@ -807,3 +807,77 @@ func TestServidor_ExcluirTopicoDeMapaQueMudouE409(t *testing.T) {
 	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/ciclo/itens/excluir", outra.token,
 		`{"caminho":[0],"texto":"Evaporação"}`), http.StatusNotFound)
 }
+
+func multipartDeImagens(t *testing.T, arquivos map[string][]byte) (io.Reader, string) {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	mw := multipart.NewWriter(&buf)
+
+	for nome, dados := range arquivos {
+		fw, err := mw.CreateFormFile("imagens", nome)
+		if err != nil {
+			t.Fatalf("montando o envio: %v", err)
+		}
+
+		if _, err := fw.Write(dados); err != nil {
+			t.Fatalf("montando o envio: %v", err)
+		}
+	}
+
+	if err := mw.Close(); err != nil {
+		t.Fatalf("montando o envio: %v", err)
+	}
+
+	return &buf, mw.FormDataContentType()
+}
+
+// A imagem do mapa vai e volta pelo servidor: o envio multipart grava, a
+// leitura devolve os mesmos bytes com o tipo conferido e o nosniff, o arquivo
+// que não é imagem é recusado com o motivo, e outra conta não alcança nada.
+func TestServidor_ImagemDoMapaVaiEVolta(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+
+	mapaTexto, _ := json.Marshal(map[string]string{"texto": "# Fluxos\nslug: fluxos\n\n- Gateways\n  - ![Gateway exclusivo](gateway.png)\n"})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(mapaTexto)), http.StatusCreated)
+
+	png := append([]byte("\x89PNG\r\n\x1a\n"), []byte("dados")...)
+
+	corpo, tipo := multipartDeImagens(t, map[string][]byte{"gateway.png": png})
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/fluxos/imagens", token: c.token, corpo: corpo, tipo: tipo}), http.StatusOK)
+
+	resp := s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/gateway.png", token: c.token})
+	esperarStatus(t, resp, http.StatusOK)
+
+	if got := resp.Header.Get("Content-Type"); got != "image/png" {
+		t.Errorf("Content-Type = %q", got)
+	}
+
+	if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q", got)
+	}
+
+	if dados, _ := io.ReadAll(resp.Body); !bytes.Equal(dados, png) {
+		t.Errorf("a imagem voltou diferente: %q", dados)
+	}
+
+	var lido struct{ Imagens []string }
+	lerJSON(t, s.json(t, http.MethodGet, "/api/mapas/fluxos", c.token, ""), &lido)
+
+	if len(lido.Imagens) != 1 || lido.Imagens[0] != "gateway.png" {
+		t.Errorf("a leitura do mapa lista %q", lido.Imagens)
+	}
+
+	corpo, tipo = multipartDeImagens(t, map[string][]byte{"falsa.png": []byte("<svg onload=alert(1)>")})
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/fluxos/imagens", token: c.token, corpo: corpo, tipo: tipo}), http.StatusUnprocessableEntity)
+
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/falta.png", token: c.token}), http.StatusNotFound)
+
+	outra := s.cadastrar(t)
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/gateway.png", token: outra.token}), http.StatusNotFound)
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/gateway.png"}), http.StatusUnauthorized)
+}
