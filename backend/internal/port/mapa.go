@@ -36,10 +36,14 @@ type MapaRepository interface {
 	// Excluir apaga o mapa, os itens e os vínculos.
 	Excluir(ctx context.Context, usuarioID uuid.UUID, slug string) error
 
-	// Vinculos devolve, por disciplina do concurso, os mapas vinculados a ela.
-	Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]mapa.Resumo, error)
-	// Vincular é idempotente: vincular de novo não muda nada.
-	Vincular(ctx context.Context, disciplinaID, mapaID uuid.UUID) error
+	// Vinculos devolve, por disciplina do concurso, os mapas vinculados a ela
+	// e os tópicos que cada um cobre, como gravados.
+	Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]mapa.Vinculo, error)
+	// Vincular grava o vínculo com estes tópicos; se já existe, troca os tópicos.
+	Vincular(ctx context.Context, disciplinaID, mapaID uuid.UUID, temas []string) error
+	// SugerirVinculo grava o vínculo só se ele ainda não existe: importar o
+	// mapa de novo não desfaz os tópicos escolhidos na tela.
+	SugerirVinculo(ctx context.Context, disciplinaID, mapaID uuid.UUID, temas []string) error
 	Desvincular(ctx context.Context, disciplinaID, mapaID uuid.UUID) error
 
 	// QuestoesGravadas devolve todas as questões do mapa, ativas ou não: é

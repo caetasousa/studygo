@@ -148,7 +148,18 @@ func (h *MapaHandler) vincular(w http.ResponseWriter, r *http.Request, ligar boo
 		return
 	}
 
-	if err := h.mapas.Vincular(r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("mapa"), ligar); err != nil {
+	// Sem corpo é a matéria inteira: é o que a tela mandava antes de escolher tópicos.
+	var req vinculoDoMapaRequest
+	if ligar && r.ContentLength != 0 {
+		if err := decode(w, r, &req); err != nil {
+			writeError(w, r, h.logger, err)
+			return
+		}
+	}
+
+	if err := h.mapas.Vincular(
+		r.Context(), id, r.PathValue("slug"), disciplina, r.PathValue("mapa"), ligar, req.Temas,
+	); err != nil {
 		writeError(w, r, h.logger, err)
 		return
 	}

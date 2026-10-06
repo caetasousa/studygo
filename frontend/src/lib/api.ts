@@ -241,10 +241,11 @@ export const api = {
 	mapasDoConcurso: (slug: string) =>
 		request<{ disciplinas: MapasDaMateria[] }>(`/api/concursos/${encodeURIComponent(slug)}/mapas`),
 
-	vincularMapa: (slug: string, disciplinaId: string, mapa: string, ligar: boolean) =>
+	/** Liga o mapa à matéria nestes tópicos (nenhum: a matéria inteira), ou o desliga. */
+	vincularMapa: (slug: string, disciplinaId: string, mapa: string, ligar: boolean, temas: string[] = []) =>
 		request<void>(
 			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/mapas/${encodeURIComponent(mapa)}`,
-			{ method: ligar ? 'PUT' : 'DELETE' }
+			ligar ? { method: 'PUT', body: JSON.stringify({ temas }) } : { method: 'DELETE' }
 		),
 
 	// ---- legislação ----

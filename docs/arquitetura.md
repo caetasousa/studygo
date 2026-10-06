@@ -263,6 +263,14 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   (`materia:` bate com o nome; `reconhecer:` aparece num tópico) sem perguntar —
   diferente da lei, porque um vínculo de mapa errado não custa nada e se desfaz
   num clique. O cronograma só oferece o mapa a quem o vinculou.
+- **O vínculo leva os tópicos que o mapa cobre** (`disciplinas_mapas.temas`,
+  000016), e o cronograma mostra o mapa só na atividade desses assuntos; a
+  ementa os marca. Os tópicos vão pelo **texto**, como a atividade os grava: a
+  ementa não tem id estável (editar o concurso regrava os tópicos). Vazio é a
+  matéria inteira — o que eram os vínculos de antes. A importação sugere os
+  tópicos que citam um termo de `reconhecer`, mas só no vínculo novo: o que foi
+  escolhido na página do mapa não volta à sugestão ao reimportar. O tópico
+  renomeado sai da lista sozinho.
 - **A tela é uma só: a página de tópicos recolhíveis, no jeito do Notion**
   (escolha de 28/09/2026, entre quatro modelos testados). O motivo foi o
   aparelho: boa parte do estudo é no celular e no tablet, e uma página que se lê

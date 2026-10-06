@@ -101,10 +101,11 @@ rollback automático pelos `.down.sql`.
   (`TestMigrations_NaoContemLogicaDeNegocio`).
 - Trate migrations que podem ter sido aplicadas como imutáveis; corrija com uma
   migration nova.
-- A próxima migration é a **000015** (a 000008 criou a legislação, a 000009 o
+- A próxima migration é a **000017** (a 000008 criou a legislação, a 000009 o
   recorte do edital no vínculo, a 000010 o recorte guardado na versão, a 000011
   a marca de atividade antecipada, a 000012 os mapas mentais, a 000013 as
-  questões deles, a 000014 a matéria só na reta final). Migration nova também
+  questões deles, a 000014 a matéria só na reta final, a 000015 as imagens dos
+  mapas, a 000016 os tópicos que cada mapa cobre). Migration nova também
   atualiza o rebobinamento de `TestMigrate_AplicaSomenteAsPendentes`. As
   000004–000007 (catálogo de provas, hoje no provasGo) saíram do bundle mas
   estão registradas em staging e em bancos locais: reusar um desses números

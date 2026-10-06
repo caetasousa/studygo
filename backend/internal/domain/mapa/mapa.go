@@ -205,20 +205,7 @@ func (m Mapa) SugereMateria(nome string, temas []string) bool {
 		return true
 	}
 
-	for _, termo := range m.Reconhecer {
-		agulha := dobrar(termo)
-		if agulha == "" {
-			continue
-		}
-
-		for _, t := range temas {
-			if strings.Contains(" "+dobrar(t)+" ", " "+agulha+" ") {
-				return true
-			}
-		}
-	}
-
-	return false
+	return len(m.TemasCitados(temas)) > 0
 }
 
 // palavrasMiudas não distinguem uma matéria de outra: "Governança de TI" e

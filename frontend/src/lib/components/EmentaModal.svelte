@@ -3,7 +3,14 @@
 	import NavIcon from './NavIcon.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
-	import { pareceEmentaCorrida, ROTULO_BLOCO, semNumeroInicial } from '$lib/estudo';
+	import {
+		assuntosDaLinha,
+		chaveDoAssunto as chave,
+		pareceEmentaCorrida,
+		ROTULO_BLOCO,
+		ROTULOS_DO_MOTOR as ROTULOS,
+		semNumeroInicial
+	} from '$lib/estudo';
 	import { nf0, partesTema, tagStyle } from '$lib/format';
 	import type { Atividade } from '$lib/types';
 
@@ -43,32 +50,17 @@
 	const nome = $derived(disc?.nome ?? codigo);
 	const temas = $derived(disc?.temas ?? []);
 	const slug = $derived(plano?.concurso.slug ?? '');
-	// Os mapas mentais da matéria: o que se revê antes de abrir a ementa.
+	// Os mapas mentais da matéria: o que se revê antes de abrir a ementa. Cada
+	// tópico com mapa escolhido o mostra na própria linha.
 	const mapas = $derived(mapasStore.doCodigo(codigo));
+	const comMapa = $derived(temas.filter((t) => mapasStore.doTopico(codigo, t).length > 0).length);
 
-	/** Comparação de assunto: sem a numeração da frente, sem caixa, sem espaço sobrando. */
-	const chave = (t: string) => semNumeroInicial(t).toLowerCase().replace(/\s+/g, ' ').trim();
-
-	/**
-	 * Os assuntos da linha clicada.
-	 *
-	 * O motor põe um rótulo na frente ("Reforço — ") e junta vários assuntos num
-	 * bloco só na reta final; ler através disso é o que faz a ementa marcar a
-	 * linha certa em vez de nenhuma.
-	 */
-	const doBloco = $derived.by(() => {
-		let t = tema;
-		for (const p of ['Reforço — ', 'Revisão dirigida — ']) {
-			if (t.startsWith(p)) t = t.slice(p.length);
-		}
-
-		return new Set(partesTema(t).map(chave));
-	});
+	/** Os assuntos da linha clicada, através do rótulo e do bloco que o motor junta. */
+	const doBloco = $derived(new Set(assuntosDaLinha(tema)));
 
 	const marcado = (t: string) => doBloco.has(chave(t));
 
 	// --- já estudei ------------------------------------------------------------
-	const ROTULOS = ['Reforço — ', 'Revisão dirigida — '];
 
 	/** As 1ª passadas desta matéria, na ordem do cronograma, com o que cada uma cobre. */
 	const passadas = $derived(
@@ -184,7 +176,11 @@
 								<a href="/mapas/{m.slug}">
 									<NavIcon name="mapa" size="sm" />
 									<span class="m-titulo">{m.titulo}</span>
-									<span class="m-conta">{m.ramos} ramos · {nf0.format(m.itens)} itens</span>
+									<span class="m-conta"
+										>{m.materiaInteira
+											? 'a matéria inteira'
+											: `${m.temas.length} ${m.temas.length === 1 ? 'tópico' : 'tópicos'}`}</span
+									>
 								</a>
 							</li>
 						{/each}
@@ -198,14 +194,29 @@
 					<a href="/concursos/{slug}/editar">editar o concurso</a>.
 				</p>
 			{:else}
-				<p class="dica">Marque o que você já estudou: o tópico vem para hoje e o cronograma se reorganiza.</p>
+				<p class="dica">
+					Marque o que você já estudou: o tópico vem para hoje e o cronograma se reorganiza.
+					{#if comMapa > 0}
+						<span class="dica-mapa"
+							><NavIcon name="mapa" size="sm" />
+							{comMapa} de {temas.length} tópicos com mapa mental</span
+						>
+					{/if}
+				</p>
 				{#if erroMarca}<div class="form-error" role="alert">{erroMarca}</div>{/if}
 				<ol class="topicos">
 					{#each temas as t, i (i)}
 						{@const aqui = marcado(t)}
 						{@const atividades = doTopico(t)}
 						{@const estudado = atividades.some((a) => a.concluido)}
-						<li class:marcado={aqui} class:estudado data-marcado={aqui ? '1' : '0'} aria-current={aqui}>
+						{@const mapasDoTopico = mapasStore.doTopico(codigo, t)}
+						<li
+							class:marcado={aqui}
+							class:estudado
+							class:com-mapa={mapasDoTopico.length > 0}
+							data-marcado={aqui ? '1' : '0'}
+							aria-current={aqui}
+						>
 							<input
 								type="checkbox"
 								class="estudei"
@@ -216,7 +227,18 @@
 								onchange={(e) => marcarEstudado(t, e.currentTarget.checked)}
 							/>
 							<span class="num">{i + 1}</span>
-							<span class="txt">{semNumeroInicial(t)}</span>
+							<span class="txt">
+								{semNumeroInicial(t)}
+								{#if mapasDoTopico.length > 0}
+									<span class="t-mapas">
+										{#each mapasDoTopico as m (m.slug)}
+											<a href="/mapas/{m.slug}" title="Abrir o mapa mental: {m.titulo}">
+												<NavIcon name="mapa" size="sm" />{m.titulo}
+											</a>
+										{/each}
+									</span>
+								{/if}
+							</span>
 							{#if pareceEmentaCorrida(t)}
 								<a
 									class="dividir"
@@ -413,6 +435,34 @@
 		margin: 8px 8px 4px;
 		font-size: 12.5px;
 		color: var(--text-muted);
+	}
+	.dica-mapa {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-left: 6px;
+		color: var(--accent);
+		white-space: nowrap;
+	}
+	/* Os mapas do tópico, debaixo do texto dele: o atalho para rever o assunto. */
+	.t-mapas {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2px 12px;
+		margin-top: 2px;
+	}
+	.t-mapas a {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 28px;
+		font-size: 12.5px;
+		font-weight: 500;
+		color: var(--accent);
+		text-decoration: none;
+	}
+	.t-mapas a:hover {
+		text-decoration: underline;
 	}
 	.dividir {
 		font-family: var(--font-mono);

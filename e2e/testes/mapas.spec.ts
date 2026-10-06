@@ -82,7 +82,7 @@ async function catalogo(request: APIRequestContext, token: string): Promise<{ sl
 interface MateriaComMapas {
 	disciplinaId: string;
 	codigo: string;
-	mapas: { slug: string }[];
+	mapas: { slug: string; materiaInteira: boolean; temas: string[] }[];
 }
 
 async function materiasDo(request: APIRequestContext, token: string, concurso: string): Promise<MateriaComMapas[]> {
@@ -401,24 +401,85 @@ test.describe('mapas mentais', () => {
 		const concurso = await concursoComMapa(api, conta, page, 'Dois mapas E2E');
 		expect((await importar(page.request, conta.token, variante(exemplo(), 'revisao'), concurso)).status).toBe(201);
 
+		// Dois mapas no assunto da linha: o ícone abre a ementa, que lista os dois.
 		await page.goto('/cronograma');
 		await expect(page.getByRole('heading', { name: 'Semana 01' })).toBeVisible();
-		await linhaDa(page, 'GEO').first().getByRole('link', { name: 'Mapas mentais de Geografia Física (2)' }).click();
+		await linhaDa(page, 'GEO').first().getByRole('button', { name: /^Mapas mentais de .* \(2\)$/ }).click();
+		const dialogo = page.getByRole('dialog');
+		await expect(dialogo.getByRole('link', { name: /^Ciclo da Água\b(?! revisao)/ })).toBeVisible();
+		await expect(dialogo.getByRole('link', { name: /^Ciclo da Água revisao/ })).toBeVisible();
+		await expect(dialogo.getByRole('link')).toHaveCount(2);
 
-		await expect(page).toHaveURL(/\/mapas\?materia=GEO$/);
+		// A lista da matéria também tem os dois.
+		await page.goto('/mapas?materia=GEO');
 		const geo = page.getByRole('region', { name: 'Geografia Física' });
 		await expect(geo.getByRole('link', { name: /^Ciclo da Água\b(?! revisao)/ })).toBeVisible();
 		await expect(geo.getByRole('link', { name: /^Ciclo da Água revisao/ })).toBeVisible();
 
-		// Pelo diálogo da matéria, os dois também.
-		await page.goto('/cronograma');
-		await linhaDa(page, 'GEO').first().getByRole('button', { name: /Ver o conteúdo programático da matéria/ }).click();
-		const dialogo = page.getByRole('dialog');
-		await expect(dialogo.getByRole('link')).toHaveCount(2);
-
 		// A matéria sem mapa não tem lista.
 		await page.goto('/mapas?materia=DIR');
 		await expect(page.getByText('Nenhum mapa vinculado a DIR.')).toBeVisible();
+	});
+
+	test('[M27] o mapa aparece só nos tópicos dele: a importação marca o que ele cita, a ementa mostra, e a escolha na página fica gravada', async ({ page, api, conta }) => {
+		const concurso = await api.concurso('Tópicos E2E', MATERIAS);
+		const relevo = '# Relevo\nslug: relevo\nreconhecer: Relevo\n\n- Formas\n  - Planalto\n';
+		expect((await importar(page.request, conta.token, relevo, concurso)).status).toBe(201);
+
+		const abrir = { name: 'Abrir o mapa mental: Relevo' };
+
+		// No cronograma, só a linha do tópico que o mapa cita tem o mapa.
+		await page.goto('/cronograma');
+		await expect(page.getByRole('heading', { name: 'Semana 01' })).toBeVisible();
+		const comRelevo = linhaDa(page, 'GEO').filter({ hasText: 'Relevo e solos' });
+		const semRelevo = linhaDa(page, 'GEO').filter({ hasNotText: 'Relevo e solos' });
+		expect(await comRelevo.count()).toBeGreaterThan(0);
+		expect(await semRelevo.count()).toBeGreaterThan(0);
+		await expect(comRelevo.first().getByRole('link', abrir)).toBeVisible();
+		await expect(semRelevo.getByRole('link', abrir)).toHaveCount(0);
+		await expect(page.getByRole('link', abrir)).toHaveCount(await comRelevo.count());
+
+		// A ementa marca o tópico com mapa, e só ele.
+		await semRelevo.first().getByRole('button', { name: /Ver o conteúdo programático da matéria/ }).click();
+		const dialogo = page.getByRole('dialog');
+		await expect(dialogo.getByText('1 de 2 tópicos com mapa mental')).toBeVisible();
+		const topico = (t: string) => dialogo.getByRole('listitem').filter({ hasText: t });
+		await expect(topico('Relevo e solos').getByRole('link', { name: 'Relevo' })).toBeVisible();
+		await expect(topico('Ciclo hidrológico').getByRole('link')).toHaveCount(0);
+		await topico('Relevo e solos').getByRole('link', { name: 'Relevo' }).click();
+		await expect(page).toHaveURL(/\/mapas\/relevo$/);
+
+		// Na página do mapa, a escolha dos tópicos fica gravada.
+		await expect(page.getByText('Relevo e solos', { exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Escolher tópicos' }).click();
+		await page.getByRole('checkbox', { name: 'Ciclo hidrológico' }).check();
+		await expect(page.getByText('Ciclo hidrológico · Relevo e solos')).toBeVisible();
+		await page.reload();
+		await expect(page.getByText('Ciclo hidrológico · Relevo e solos')).toBeVisible();
+
+		// Importar o mapa de novo não desfaz a escolha.
+		expect((await importar(page.request, conta.token, relevo, concurso)).status).toBe(200);
+		const geo = (await materiasDo(page.request, conta.token, concurso)).find((d) => d.codigo === 'GEO');
+		expect(geo?.mapas.find((m) => m.slug === 'relevo')).toMatchObject({
+			materiaInteira: false,
+			temas: ['Ciclo hidrológico', 'Relevo e solos']
+		});
+
+		// E agora a linha do ciclo hidrológico também tem o mapa.
+		await page.goto('/cronograma');
+		await expect(page.getByRole('heading', { name: 'Semana 01' })).toBeVisible();
+		await expect(semRelevo.first().getByRole('link', abrir)).toBeVisible();
+
+		// Desmarcar tudo volta à matéria inteira, e o vínculo continua.
+		await page.goto('/mapas/relevo');
+		await page.getByRole('button', { name: 'Escolher tópicos' }).click();
+		await page.getByRole('checkbox', { name: 'Ciclo hidrológico' }).uncheck();
+		await expect(page.getByRole('checkbox', { name: 'Ciclo hidrológico' })).toBeEnabled();
+		await page.getByRole('checkbox', { name: 'Relevo e solos' }).uncheck();
+		await expect(page.getByText('a matéria inteira')).toBeVisible();
+		await page.reload();
+		await expect(page.getByText('a matéria inteira')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Desvincular Geografia Física' })).toBeVisible();
 	});
 
 	test('[M11] excluir o mapa pede confirmação e tira o acesso do cronograma', async ({ page, api, conta }) => {

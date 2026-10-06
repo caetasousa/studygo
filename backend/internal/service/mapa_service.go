@@ -49,6 +49,10 @@ type MapaImportado struct {
 // cita (`reconhecer:`). Diferente da lei, o vínculo é feito sem perguntar: um
 // vínculo errado não estraga nada e se desfaz num clique, e o cronograma só
 // oferece o mapa a quem já o vinculou.
+//
+// O vínculo novo leva os tópicos que citam um termo de `reconhecer`; casar só
+// pelo nome é a matéria inteira. O vínculo que já existe fica como está: a
+// escolha feita na tela vale mais que a sugestão.
 func (s *MapaService) Importar(ctx context.Context, usuarioID uuid.UUID, texto, concursoSlug string) (MapaImportado, error) {
 	m, err := mapa.Ler(texto)
 	if err != nil {
@@ -78,7 +82,7 @@ func (s *MapaService) Importar(ctx context.Context, usuarioID uuid.UUID, texto, 
 			continue
 		}
 
-		if err := s.mapas.Vincular(ctx, d.ID, resumo.ID); err != nil {
+		if err := s.mapas.SugerirVinculo(ctx, d.ID, resumo.ID, m.TemasCitados(d.Temas)); err != nil {
 			return MapaImportado{}, err
 		}
 
@@ -324,12 +328,24 @@ func (s *MapaService) Excluir(ctx context.Context, usuarioID uuid.UUID, slug str
 	return s.mapas.Excluir(ctx, usuarioID, slug)
 }
 
-// MapasDaMateria são os mapas vinculados a uma matéria do concurso.
+// MapasDaMateria são os mapas vinculados a uma matéria do concurso, com a
+// ementa dela: é dela que a tela escolhe os tópicos de cada mapa.
 type MapasDaMateria struct {
 	DisciplinaID uuid.UUID
 	Codigo       string
 	Nome         string
-	Mapas        []mapa.Resumo
+	Temas        []string
+	Mapas        []MapaDaMateria
+}
+
+// MapaDaMateria é um mapa vinculado e os tópicos da matéria que ele cobre.
+type MapaDaMateria struct {
+	Resumo mapa.Resumo
+	// MateriaInteira: o vínculo não escolheu tópico — o mapa vale para todos.
+	MateriaInteira bool
+	// Temas são os tópicos escolhidos que a ementa ainda tem, na ordem dela. O
+	// que foi renomeado ou tirado na edição do concurso sai daqui sozinho.
+	Temas []string
 }
 
 // DoConcurso devolve TODAS as matérias do concurso, com os mapas de cada uma
@@ -349,16 +365,26 @@ func (s *MapaService) DoConcurso(ctx context.Context, usuarioID uuid.UUID, concu
 	out := make([]MapasDaMateria, 0, len(c.Disciplinas))
 
 	for _, d := range c.Disciplinas {
+		mapas := make([]MapaDaMateria, 0, len(vinculos[d.ID]))
+		for _, v := range vinculos[d.ID] {
+			mapas = append(mapas, MapaDaMateria{
+				Resumo:         v.Mapa,
+				MateriaInteira: len(v.Temas) == 0,
+				Temas:          vivos(v.Temas, d.Temas),
+			})
+		}
+
 		out = append(out, MapasDaMateria{
-			DisciplinaID: d.ID, Codigo: d.Codigo, Nome: d.Nome, Mapas: vinculos[d.ID],
+			DisciplinaID: d.ID, Codigo: d.Codigo, Nome: d.Nome, Temas: append([]string{}, d.Temas...), Mapas: mapas,
 		})
 	}
 
 	return out, nil
 }
 
-// Vincular liga (ou desliga) o mapa a uma matéria do concurso. Tanto o mapa
-// quanto o concurso têm de ser da conta, e a matéria, do concurso.
+// Vincular liga (ou desliga) o mapa a uma matéria do concurso, cobrindo os
+// tópicos escolhidos — nenhum é a matéria inteira. Tanto o mapa quanto o
+// concurso têm de ser da conta, a matéria, do concurso, e os tópicos, dela.
 func (s *MapaService) Vincular(
 	ctx context.Context,
 	usuarioID uuid.UUID,
@@ -366,14 +392,21 @@ func (s *MapaService) Vincular(
 	disciplinaID uuid.UUID,
 	mapaSlug string,
 	ligar bool,
+	temas []string,
 ) error {
 	c, err := s.concursoDoDono(ctx, usuarioID, concursoSlug)
 	if err != nil {
 		return err
 	}
 
-	if !slices.ContainsFunc(c.Disciplinas, func(d concurso.Disciplina) bool { return d.ID == disciplinaID }) {
+	i := slices.IndexFunc(c.Disciplinas, func(d concurso.Disciplina) bool { return d.ID == disciplinaID })
+	if i < 0 {
 		return concurso.ErrNaoEncontrado
+	}
+
+	escolhidos, err := mapa.EscolherTemas(temas, c.Disciplinas[i].Temas)
+	if err != nil {
+		return err
 	}
 
 	resumo, err := s.mapas.ResumoPorSlug(ctx, usuarioID, mapaSlug)
@@ -385,7 +418,20 @@ func (s *MapaService) Vincular(
 		return s.mapas.Desvincular(ctx, disciplinaID, resumo.ID)
 	}
 
-	return s.mapas.Vincular(ctx, disciplinaID, resumo.ID)
+	return s.mapas.Vincular(ctx, disciplinaID, resumo.ID, escolhidos)
+}
+
+// vivos são os tópicos do vínculo que a ementa ainda tem, na ordem dela.
+func vivos(doVinculo, daMateria []string) []string {
+	out := []string{}
+
+	for _, t := range daMateria {
+		if slices.Contains(doVinculo, t) {
+			out = append(out, t)
+		}
+	}
+
+	return out
 }
 
 func (s *MapaService) concursoDoDono(ctx context.Context, usuarioID uuid.UUID, slug string) (concurso.Concurso, error) {

@@ -139,6 +139,14 @@ O repositório é público e o mapa deriva de material pago, de uso pessoal.
   pegar outra matéria de nome parecido ("Engenharia de Software" também casa
   com "Engenharia de Software Assistida por IA"). Nesse caso, omita `materia` e
   vincule só por `reconhecer`, com o termo que o tópico do edital cita.
+- **Os tópicos do mapa.** O cronograma mostra o mapa só nos tópicos que ele
+  cobre (pedido de 05/10/2026: "marque os assuntos que já possuem mapa mental;
+  os relacionados você pode agrupar"). A importação marca os que citam um termo
+  de `reconhecer`; confira na página do mapa (**Tópicos**) e marque também os
+  tópicos relacionados que a aula cobre de fato — inclusive em outra matéria
+  (o mapa de PLN serve aos tópicos de prompts e RAG da ENGIA). Um tópico só
+  entra se o mapa tiver ramo sobre ele: a marca é promessa de que o assunto
+  está lá. Matéria inteira só quando o mapa cobre todos os tópicos dela.
 
 ## Fechar
 

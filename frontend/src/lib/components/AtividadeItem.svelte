@@ -75,14 +75,15 @@
 	const cor = $derived(disc[item.disciplina]?.cor ?? 0);
 	const tema = $derived(semNumeroInicial(item.tema));
 
-	// Os mapas mentais da matéria. Com um só, o ícone abre o mapa; com vários,
-	// abre a lista da matéria — nenhum fica fora de alcance.
-	const mapas = $derived(mapasStore.doCodigo(item.disciplina));
+	// Os mapas mentais do assunto desta linha (e os da matéria inteira). Com um
+	// só, o ícone abre o mapa; com vários, abre a ementa neste assunto, que lista
+	// os mapas de cada tópico — nenhum fica fora de alcance.
+	const mapas = $derived(mapasStore.doTema(item.disciplina, item.tema));
 	const mapaUrl = $derived(
 		mapas.length === 1 ? `/mapas/${mapas[0].slug}` : `/mapas?materia=${encodeURIComponent(item.disciplina)}`
 	);
 	const mapaRotulo = $derived(
-		mapas.length === 1 ? `Abrir o mapa mental: ${mapas[0].titulo}` : `Mapas mentais de ${nome} (${mapas.length})`
+		mapas.length === 1 ? `Abrir o mapa mental: ${mapas[0].titulo}` : `Mapas mentais de ${tema} (${mapas.length})`
 	);
 
 	// An activity the backend has not given an id to cannot be addressed yet, and
@@ -119,7 +120,17 @@
 	</button>
 
 	<span class="acoes">
-		{#if mapas.length > 0}
+		{#if mapas.length > 1 && onAbrirMateria}
+			<button
+				type="button"
+				class="tec"
+				title={mapaRotulo}
+				aria-label={mapaRotulo}
+				onclick={() => onAbrirMateria(item.disciplina, item.tema)}
+			>
+				<NavIcon name="mapa" size="sm" />
+			</button>
+		{:else if mapas.length > 0}
 			<a class="tec" href={mapaUrl} title={mapaRotulo} aria-label={mapaRotulo}>
 				<NavIcon name="mapa" size="sm" />
 			</a>
@@ -272,6 +283,12 @@
 	}
 	.tec:hover {
 		color: var(--accent);
+	}
+	button.tec {
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
 	}
 	.feito-marca {
 		display: grid;

@@ -3,6 +3,7 @@
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { api } from '$lib/api';
 	import NavIcon from '$lib/components/NavIcon.svelte';
+	import { semNumeroInicial } from '$lib/estudo';
 	import { tagStyle } from '$lib/format';
 	import { imagensCitadas, indexar, paraBusca, textoVisivel, type NoDoMapa } from '$lib/mapas/arvore';
 	import { fornecerImagens } from '$lib/mapas/imagens';
@@ -13,7 +14,15 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import type { CorrecaoDoMapa, ItemDoMapa, MapaLido, QuestaoDoMapa, QuestoesImportadas } from '$lib/types';
+	import type {
+		CorrecaoDoMapa,
+		ItemDoMapa,
+		MapaDaMateria,
+		MapaLido,
+		MapasDaMateria,
+		QuestaoDoMapa,
+		QuestoesImportadas
+	} from '$lib/types';
 
 	/**
 	 * Um mapa mental aberto: o cabeçalho com as propriedades (matérias, fonte,
@@ -101,17 +110,47 @@
 	const vinculadas = $derived(mapasStore.disciplinas.filter((d) => d.mapas.some((m) => m.slug === slug)));
 	const livres = $derived(mapasStore.disciplinas.filter((d) => !vinculadas.includes(d)));
 	let erroVinculo = $state<string | null>(null);
+	let gravandoVinculo = $state(false);
 
-	async function vincular(disciplinaId: string, ligar: boolean) {
+	/** O vínculo deste mapa numa matéria vinculada. */
+	const vinculoEm = (d: MapasDaMateria): MapaDaMateria => d.mapas.find((m) => m.slug === slug)!;
+
+	async function vincular(disciplinaId: string, ligar: boolean, temas: string[] = []) {
 		const concurso = concursoStore.ativoSlug;
 		if (!concurso) return;
 		erroVinculo = null;
+		gravandoVinculo = true;
 		try {
-			await api.vincularMapa(concurso, disciplinaId, slug, ligar);
+			await api.vincularMapa(concurso, disciplinaId, slug, ligar, temas);
 			await mapasStore.carregar(true);
 		} catch (e) {
 			erroVinculo = e instanceof Error ? e.message : 'Não foi possível gravar o vínculo';
+		} finally {
+			gravandoVinculo = false;
 		}
+	}
+
+	// --- tópicos ------------------------------------------------------------
+	// A matéria cuja lista de tópicos está aberta para escolher.
+	let escolhendo = $state<string | null>(null);
+
+	/**
+	 * Marca ou desmarca um tópico do mapa e grava na hora. Desmarcar o último
+	 * volta à matéria inteira: o vínculo continua, só deixa de ter recorte.
+	 */
+	function marcarTema(d: MapasDaMateria, tema: string, marcado: boolean) {
+		const v = vinculoEm(d);
+		const atuais = v.materiaInteira ? [] : v.temas;
+		const novos = marcado ? [...atuais, tema] : atuais.filter((t) => t !== tema);
+		void vincular(d.disciplinaId, true, novos);
+	}
+
+	/** O que o mapa cobre na matéria, numa linha. */
+	function cobertura(d: MapasDaMateria): string {
+		const v = vinculoEm(d);
+		if (v.materiaInteira) return 'a matéria inteira';
+		if (v.temas.length === 0) return 'nenhum tópico da ementa atual';
+		return v.temas.map(semNumeroInicial).join(' · ');
 	}
 
 	const cor = (codigo: string) => planoStore.discIndex[codigo]?.cor ?? 0;
@@ -416,7 +455,11 @@
 						onchange={(e) => {
 							const escolhida = e.currentTarget.value;
 							e.currentTarget.value = '';
-							if (escolhida) void vincular(escolhida, true);
+							if (!escolhida) return;
+							void vincular(escolhida, true);
+							// Recém-vinculado vale para a matéria inteira; a lista abre
+							// para escolher os tópicos, se for o caso.
+							escolhendo = escolhida;
 						}}
 					>
 						<option value="">{vinculadas.length === 0 ? 'Vincular a uma matéria…' : '+ outra matéria'}</option>
@@ -430,6 +473,51 @@
 				{/if}
 			</dd>
 		</div>
+		{#if vinculadas.length > 0}
+			<div class="linha">
+				<dt>Tópicos</dt>
+				<dd class="cobertura">
+					{#each vinculadas as d (d.disciplinaId)}
+						{@const v = vinculoEm(d)}
+						{@const aberta = escolhendo === d.disciplinaId}
+						<div class="cobre">
+							<span class="chip" style={tagStyle(cor(d.codigo))}>{d.codigo}</span>
+							<span class="cobre-txt" class:inteira={v.materiaInteira}>{cobertura(d)}</span>
+							{#if d.temas.length > 0}
+								<button
+									type="button"
+									class="escolher"
+									aria-expanded={aberta}
+									aria-controls="topicos-{d.disciplinaId}"
+									onclick={() => (escolhendo = aberta ? null : d.disciplinaId)}
+								>
+									{aberta ? 'Pronto' : 'Escolher tópicos'}
+								</button>
+							{/if}
+						</div>
+						{#if aberta}
+							<fieldset class="escolha" id="topicos-{d.disciplinaId}">
+								<legend>Tópicos de {d.nome} que este mapa cobre</legend>
+								<p class="escolha-dica">
+									O cronograma mostra o mapa só nestes tópicos. Nenhum marcado: vale para a matéria inteira.
+								</p>
+								{#each d.temas as t, i (i)}
+									<label>
+										<input
+											type="checkbox"
+											checked={!v.materiaInteira && v.temas.includes(t)}
+											disabled={gravandoVinculo}
+											onchange={(e) => marcarTema(d, t, e.currentTarget.checked)}
+										/>
+										<span>{semNumeroInicial(t)}</span>
+									</label>
+								{/each}
+							</fieldset>
+						{/if}
+					{/each}
+				</dd>
+			</div>
+		{/if}
 		{#if lido.mapa.fonte}
 			<div class="linha">
 				<dt>Fonte</dt>
@@ -735,6 +823,74 @@
 	.indicada {
 		font-size: 12.5px;
 		color: var(--text-faint);
+	}
+	/* O que o mapa cobre em cada matéria: uma linha por matéria, e a lista de
+	   tópicos abre embaixo dela. */
+	.cobertura {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.cobre {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		min-width: 0;
+	}
+	.cobre-txt {
+		flex: 1;
+		min-width: 0;
+		font-size: 13px;
+		line-height: 1.5;
+	}
+	.cobre-txt.inteira {
+		color: var(--text-muted);
+	}
+	.escolher {
+		flex: none;
+		min-height: 28px;
+		padding: 2px 8px;
+		border: 1px dashed var(--border-strong);
+		border-radius: 7px;
+		background: transparent;
+		color: var(--text-muted);
+		font: inherit;
+		font-size: 12.5px;
+		cursor: pointer;
+	}
+	.escolher:hover {
+		background: var(--bg-hover);
+	}
+	.escolha {
+		margin: 0 0 6px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg-soft);
+	}
+	.escolha legend {
+		padding: 0 4px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-muted);
+	}
+	.escolha-dica {
+		margin: 0 0 6px;
+		font-size: 12px;
+		color: var(--text-faint);
+	}
+	.escolha label {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		min-height: 32px;
+		padding: 4px 0;
+		font-size: 13.5px;
+		line-height: 1.45;
+		cursor: pointer;
+	}
+	.escolha input {
+		margin: 3px 0 0;
+		flex: none;
 	}
 
 	.mapa {

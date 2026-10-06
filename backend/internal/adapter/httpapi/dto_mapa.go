@@ -126,10 +126,25 @@ type mapaImportadoDTO struct {
 
 // mapasDaMateriaDTO é uma matéria do concurso com os mapas vinculados a ela.
 type mapasDaMateriaDTO struct {
-	DisciplinaID string          `json:"disciplinaId"`
-	Codigo       string          `json:"codigo"`
-	Nome         string          `json:"nome"`
-	Mapas        []mapaResumoDTO `json:"mapas"`
+	DisciplinaID string `json:"disciplinaId"`
+	Codigo       string `json:"codigo"`
+	Nome         string `json:"nome"`
+	// Temas é a ementa da matéria: de onde a tela escolhe os tópicos do mapa.
+	Temas []string           `json:"temas"`
+	Mapas []mapaDaMateriaDTO `json:"mapas"`
+}
+
+// mapaDaMateriaDTO é o mapa vinculado e os tópicos da matéria que ele cobre.
+type mapaDaMateriaDTO struct {
+	mapaResumoDTO
+	// MateriaInteira: nenhum tópico escolhido, o mapa vale para todos.
+	MateriaInteira bool     `json:"materiaInteira"`
+	Temas          []string `json:"temas"`
+}
+
+// vinculoDoMapaRequest são os tópicos escolhidos; nenhum é a matéria inteira.
+type vinculoDoMapaRequest struct {
+	Temas []string `json:"temas"`
 }
 
 func mapaResumoParaDTO(r mapa.Resumo) mapaResumoDTO {
@@ -212,10 +227,16 @@ func mapaImportadoParaDTO(r service.MapaImportado) mapaImportadoDTO {
 }
 
 func mapasDaMateriaParaDTO(m service.MapasDaMateria) mapasDaMateriaDTO {
-	mapas := make([]mapaResumoDTO, 0, len(m.Mapas))
+	mapas := make([]mapaDaMateriaDTO, 0, len(m.Mapas))
 	for _, r := range m.Mapas {
-		mapas = append(mapas, mapaResumoParaDTO(r))
+		mapas = append(mapas, mapaDaMateriaDTO{
+			mapaResumoDTO:  mapaResumoParaDTO(r.Resumo),
+			MateriaInteira: r.MateriaInteira,
+			Temas:          naoNula(r.Temas),
+		})
 	}
 
-	return mapasDaMateriaDTO{DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome, Mapas: mapas}
+	return mapasDaMateriaDTO{
+		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome, Temas: naoNula(m.Temas), Mapas: mapas,
+	}
 }

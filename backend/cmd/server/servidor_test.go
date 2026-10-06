@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -880,4 +881,74 @@ func TestServidor_ImagemDoMapaVaiEVolta(t *testing.T) {
 	outra := s.cadastrar(t)
 	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/gateway.png", token: outra.token}), http.StatusNotFound)
 	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/imagens/gateway.png"}), http.StatusUnauthorized)
+}
+
+// O mapa nos tópicos da matéria (M27), pela rota: a escolha vai no corpo do PUT,
+// volta na lista do concurso, o tópico de fora é 422 e o PUT sem corpo — o que
+// a tela mandava antes — continua sendo a matéria inteira.
+func TestServidor_MapaNosTopicosDaMateria(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+
+	resp := s.json(t, http.MethodPost, "/api/concursos", c.token,
+		`{"nome":"TCE-GO","prova":"2026-12-15","disciplinas":[{"nome":"Banco de Dados","bloco":"esp","questoes":20,"temas":["Modelagem","SQL","Índices"]}]}`)
+	esperarStatus(t, resp, http.StatusCreated)
+
+	var criado struct{ Slug string }
+	lerJSON(t, resp, &criado)
+
+	mapaTexto, _ := json.Marshal(map[string]string{"texto": "# Consultas\nslug: consultas\nreconhecer: SQL\n\n- SELECT\n  - Colunas\n", "concurso": criado.Slug})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(mapaTexto)), http.StatusCreated)
+
+	type doMapa struct {
+		Slug           string
+		MateriaInteira bool
+		Temas          []string
+	}
+
+	var lista struct {
+		Disciplinas []struct {
+			DisciplinaID string
+			Temas        []string
+			Mapas        []doMapa
+		}
+	}
+
+	ler := func() doMapa {
+		t.Helper()
+
+		lerJSON(t, s.json(t, http.MethodGet, "/api/concursos/"+criado.Slug+"/mapas", c.token, ""), &lista)
+
+		if len(lista.Disciplinas) != 1 || len(lista.Disciplinas[0].Mapas) != 1 {
+			t.Fatalf("lista = %+v", lista)
+		}
+
+		return lista.Disciplinas[0].Mapas[0]
+	}
+
+	if m := ler(); m.MateriaInteira || !slices.Equal(m.Temas, []string{"SQL"}) {
+		t.Fatalf("depois de importar: %+v; quer só SQL", m)
+	}
+
+	if !slices.Equal(lista.Disciplinas[0].Temas, []string{"Modelagem", "SQL", "Índices"}) {
+		t.Fatalf("a ementa veio %q", lista.Disciplinas[0].Temas)
+	}
+
+	rota := "/api/concursos/" + criado.Slug + "/disciplinas/" + lista.Disciplinas[0].DisciplinaID + "/mapas/consultas"
+
+	esperarStatus(t, s.json(t, http.MethodPut, rota, c.token, `{"temas":["Índices","Modelagem"]}`), http.StatusNoContent)
+
+	if m := ler(); !slices.Equal(m.Temas, []string{"Modelagem", "Índices"}) {
+		t.Fatalf("depois de escolher: %+v", m)
+	}
+
+	esperarStatus(t, s.json(t, http.MethodPut, rota, c.token, `{"temas":["Crase"]}`), http.StatusUnprocessableEntity)
+
+	esperarStatus(t, s.json(t, http.MethodPut, rota, c.token, ""), http.StatusNoContent)
+
+	if m := ler(); !m.MateriaInteira || len(m.Temas) != 0 {
+		t.Fatalf("PUT sem corpo: %+v; quer a matéria inteira", m)
+	}
 }

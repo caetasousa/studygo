@@ -39,6 +39,10 @@ reconhecer: ITIL
     concurso, indicam a matéria.
   - Ao importar com um concurso aberto, o mapa é vinculado às matérias dele cujo
     nome bate com `materia` ou cujo tópico cita algum termo de `reconhecer`.
+    Os tópicos que citam o termo ficam marcados, e o cronograma mostra o mapa
+    só neles; casar só pelo nome vale para a matéria inteira. Os tópicos se
+    escolhem depois na página do mapa (**Tópicos → Escolher tópicos**), e
+    importar de novo não desfaz a escolha.
 - **Itens**: `- texto`, com recuo de **2 espaços por nível**. Um item pode
   descer no máximo um nível de cada vez. Sem tabulação.
 - **Marcas**, opcionais, no começo do item: `[def]` definição, `[pegadinha]` o que

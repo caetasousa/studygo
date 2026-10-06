@@ -150,7 +150,8 @@ func classificar(err error) (int, string) {
 		errors.Is(err, lei.ErrCapturaFalhou),
 		errors.Is(err, errQuestoesIlegiveis),
 		errors.Is(err, errQuestoesDoMapaIlegiveis),
-		errors.Is(err, mapa.ErrRespostaInvalida):
+		errors.Is(err, mapa.ErrRespostaInvalida),
+		errors.Is(err, mapa.ErrTemaForaDaMateria):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	case errors.Is(err, lei.ErrCapturaEmAndamento),

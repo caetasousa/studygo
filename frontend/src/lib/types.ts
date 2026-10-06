@@ -923,5 +923,15 @@ export interface MapasDaMateria {
 	disciplinaId: string;
 	codigo: string;
 	nome: string;
-	mapas: MapaResumo[];
+	/** A ementa da matéria: de onde se escolhem os tópicos de cada mapa. */
+	temas: string[];
+	mapas: MapaDaMateria[];
+}
+
+/** Um mapa vinculado à matéria e os tópicos dela que ele cobre. */
+export interface MapaDaMateria extends MapaResumo {
+	/** Nenhum tópico escolhido: o mapa vale para a matéria inteira. */
+	materiaInteira: boolean;
+	/** Os tópicos escolhidos, na ordem da ementa. */
+	temas: string[];
 }

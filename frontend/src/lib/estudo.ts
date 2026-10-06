@@ -80,6 +80,34 @@ export function semNumeroInicial(texto: string): string {
 	return limpo.trim() || texto.trim();
 }
 
+/** Comparação de assunto: sem a numeração da frente, sem caixa, sem espaço sobrando. */
+export function chaveDoAssunto(t: string): string {
+	return semNumeroInicial(t).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Os rótulos que o motor põe na frente do assunto na reta final. */
+export const ROTULOS_DO_MOTOR = ['Reforço — ', 'Revisão dirigida — '];
+
+/**
+ * Os assuntos de uma linha do cronograma, como chaves.
+ *
+ * O motor põe um rótulo na frente ("Reforço — ") e junta vários assuntos num
+ * bloco só ("A  ·  B"); ler através disso é o que acha, na ementa e no mapa, o
+ * assunto certo em vez de nenhum.
+ */
+export function assuntosDaLinha(tema: string): string[] {
+	let t = tema;
+	for (const p of ROTULOS_DO_MOTOR) {
+		if (t.startsWith(p)) t = t.slice(p.length);
+	}
+
+	return t
+		.split('·')
+		.map((p) => p.trim())
+		.filter(Boolean)
+		.map(chaveDoAssunto);
+}
+
 /** Abaixo disto um pedaço não é um assunto: é abreviação, número de lei, sobra. */
 const MIN_TOPICO = 24;
 

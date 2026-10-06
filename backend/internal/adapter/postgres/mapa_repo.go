@@ -314,10 +314,10 @@ func (r *MapaRepo) Excluir(ctx context.Context, usuarioID uuid.UUID, slug string
 	return nil
 }
 
-func (r *MapaRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]mapa.Resumo, error) {
+func (r *MapaRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid.UUID][]mapa.Vinculo, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT dm.disciplina_id, `+colunasDoResumo+`
+		`SELECT dm.disciplina_id, dm.temas, `+colunasDoResumo+`
 		   FROM disciplinas_mapas dm
 		   JOIN disciplinas d ON d.id = dm.disciplina_id
 		   JOIN mapas m ON m.id = dm.mapa_id
@@ -330,32 +330,46 @@ func (r *MapaRepo) Vinculos(ctx context.Context, concursoID uuid.UUID) (map[uuid
 	}
 	defer rows.Close()
 
-	out := map[uuid.UUID][]mapa.Resumo{}
+	out := map[uuid.UUID][]mapa.Vinculo{}
 
 	for rows.Next() {
 		var (
 			disciplina uuid.UUID
+			temas      []string
 			resumo     mapa.Resumo
 		)
 
 		if err := rows.Scan(
-			&disciplina, &resumo.ID, &resumo.Slug, &resumo.Titulo, &resumo.Fonte, &resumo.Materia,
+			&disciplina, &temas, &resumo.ID, &resumo.Slug, &resumo.Titulo, &resumo.Fonte, &resumo.Materia,
 			&resumo.ImportadoEm, &resumo.Ramos, &resumo.Itens,
 		); err != nil {
 			return nil, fmt.Errorf("lendo vínculo do mapa: %w", err)
 		}
 
-		out[disciplina] = append(out[disciplina], resumo)
+		out[disciplina] = append(out[disciplina], mapa.Vinculo{Mapa: resumo, Temas: temas})
 	}
 
 	return out, rows.Err()
 }
 
-func (r *MapaRepo) Vincular(ctx context.Context, disciplinaID, mapaID uuid.UUID) error {
+func (r *MapaRepo) Vincular(ctx context.Context, disciplinaID, mapaID uuid.UUID, temas []string) error {
 	if _, err := r.pool.Exec(
 		ctx,
-		`INSERT INTO disciplinas_mapas (disciplina_id, mapa_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-		disciplinaID, mapaID,
+		`INSERT INTO disciplinas_mapas (disciplina_id, mapa_id, temas) VALUES ($1,$2,$3)
+		 ON CONFLICT (disciplina_id, mapa_id) DO UPDATE SET temas = EXCLUDED.temas`,
+		disciplinaID, mapaID, naoNulo(temas),
+	); err != nil {
+		return fmt.Errorf("vinculando mapa: %w", err)
+	}
+
+	return nil
+}
+
+func (r *MapaRepo) SugerirVinculo(ctx context.Context, disciplinaID, mapaID uuid.UUID, temas []string) error {
+	if _, err := r.pool.Exec(
+		ctx,
+		`INSERT INTO disciplinas_mapas (disciplina_id, mapa_id, temas) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+		disciplinaID, mapaID, naoNulo(temas),
 	); err != nil {
 		return fmt.Errorf("vinculando mapa: %w", err)
 	}
