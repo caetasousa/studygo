@@ -65,6 +65,12 @@ ignore_missing_imports = true
 module = ["app.services.extraction", "app.services.validation", "app.services.ocr", "app.leis.captura"]
 disallow_untyped_calls = false
 
+[[tool.mypy.overrides]]
+# As ferramentas dos mapas são scripts que o Claude roda na linha de comando,
+# não código do serviço: ficam de fora da checagem estrita.
+module = ["app.mapas.ferramentas.*"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

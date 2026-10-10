@@ -6,7 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"studygo/internal/adapter/postgres"
 	"studygo/internal/domain/plano"
+
+	"github.com/google/uuid"
 )
 
 // A faxina periódica: o que a varredura diária apaga e o que ela se recusa a
@@ -169,5 +172,50 @@ func TestPlanoRepo_ComAtraso_ignoraODiaDaProva(t *testing.T) {
 
 	if got := r.slugsComAtraso(t, hoje); len(got) != 0 {
 		t.Errorf("com atraso = %v, quer vazio no dia da prova", got)
+	}
+}
+
+// O PDF de um pedido que falhou é material pago: depois da guarda, a faxina o
+// apaga — e só ele. O pedido recente, o que está na fila e o pronto ficam como
+// estão.
+func TestMapaRepo_DescartarPDFsDeFalhas(t *testing.T) {
+	t.Parallel()
+
+	r := novoRepos(t)
+	u := r.criarUsuario(t, "faxina-pdf@b.c")
+	mapas := postgres.NewMapaRepo(r.pool)
+	agora := time.Now()
+
+	criar := func(situacao string, idade time.Duration) uuid.UUID {
+		t.Helper()
+
+		p, err := mapas.CriarPedido(t.Context(), u.ID, uuid.NullUUID{}, "aula.pdf", []byte("%PDF-1.4"))
+		if err != nil {
+			t.Fatalf("CriarPedido: %v", err)
+		}
+
+		if _, err := r.pool.Exec(t.Context(),
+			`UPDATE mapas_pedidos SET situacao = $2, atualizado_em = $3 WHERE id = $1`,
+			p.ID, situacao, agora.Add(-idade)); err != nil {
+			t.Fatalf("ajustando o pedido: %v", err)
+		}
+
+		return p.ID
+	}
+
+	velho := criar("falhou", 8*24*time.Hour)
+	recente := criar("falhou", time.Hour)
+	naFila := criar("na_fila", 30*24*time.Hour)
+
+	n, err := mapas.DescartarPDFsDeFalhas(t.Context(), agora.Add(-7*24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("DescartarPDFsDeFalhas = %d, %v; quer 1", n, err)
+	}
+
+	for id, quer := range map[uuid.UUID]bool{velho: false, recente: true, naFila: true} {
+		p, err := mapas.Pedido(t.Context(), u.ID, id)
+		if err != nil || p.TemPDF != quer {
+			t.Errorf("pedido %s: TemPDF = %v (%v), quer %v", p.Situacao, p.TemPDF, err, quer)
+		}
 	}
 }

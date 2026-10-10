@@ -11,9 +11,12 @@ import (
 // Config holds every value the process reads from the environment. It is loaded
 // once in the composition root and passed down explicitly.
 type Config struct {
-	ServerAddr  string
-	DatabaseURL string
-	CORSOrigin  string
+	ServerAddr string
+	// InternalAddr é a porta das rotas que só o processador chama: não é
+	// publicada nem passa pelo nginx — só a rede dos containers a alcança.
+	InternalAddr string
+	DatabaseURL  string
+	CORSOrigin   string
 
 	JWTSecret     string
 	AccessTTL     time.Duration
@@ -47,6 +50,7 @@ type Argon2Params struct {
 func Load() (Config, error) {
 	cfg := Config{
 		ServerAddr:           getEnv("SERVER_ADDR", ":8080"),
+		InternalAddr:         getEnv("INTERNAL_ADDR", ":8081"),
 		DatabaseURL:          os.Getenv("DATABASE_URL"),
 		CORSOrigin:           getEnv("CORS_ORIGIN", "http://localhost:5173"),
 		JWTSecret:            os.Getenv("JWT_SECRET"),

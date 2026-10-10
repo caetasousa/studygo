@@ -45,11 +45,17 @@ Pense num restaurante:
 | **frontend** | o salão | a tela que você vê e clica |
 | **backend** | a cozinha | onde as decisões acontecem |
 | **PostgreSQL** | a despensa | onde tudo fica guardado |
-| **edital-processor** | um especialista contratado | lê o PDF do edital e devolve as matérias |
+| **edital-processor** | um especialista contratado | lê o PDF do edital e devolve as matérias; e faz o mapa mental do PDF de uma aula |
 
 Existe ainda o **worker**: um ajudante que roda sozinho de tempos em tempos para
 enviar lembretes. Ninguém pede nada a ele; ele acorda, faz o trabalho e volta a
 dormir.
+
+O especialista também faz **mapas mentais**: você envia o PDF de uma aula pela
+tela, a cozinha o repassa a ele na hora, e ele — com o Claude, sem ninguém
+olhando — escreve o mapa e o devolve à cozinha por uma porta dos fundos que só
+os funcionários usam. A cozinha confere o mapa como conferiria o que você
+importa pela tela e o guarda na sua conta.
 
 ```
 Você → tela (frontend) → cozinha (backend) → despensa (PostgreSQL)

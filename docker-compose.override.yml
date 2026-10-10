@@ -5,8 +5,14 @@
 # Frontend: vite dev server with the source bind-mounted, so a save in the
 # editor reaches the browser without a rebuild.
 # Backend:  `go run` under a file watcher, so a .go save restarts the server.
+#
+# Os nomes dos containers dizem o que cada um é (e que é a stack local): o
+# padrão do compose, studygo-backend-1, não diz nada a quem vê a lista. Ficam
+# só aqui, e não no docker-compose.yml, porque o E2E sobe aquele arquivo noutro
+# projeto ao mesmo tempo — um nome fixo lá colidiria.
 services:
   frontend:
+    container_name: studygo-local-tela
     build:
       context: ./frontend
       target: dev
@@ -28,6 +34,7 @@ services:
     restart: unless-stopped
 
   backend:
+    container_name: studygo-local-api
     build:
       context: ./backend
       target: dev
@@ -38,6 +45,21 @@ services:
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     restart: unless-stopped
+
+  postgres:
+    container_name: studygo-local-banco
+
+  worker:
+    container_name: studygo-local-tarefas-diarias
+
+  edital-processor:
+    container_name: studygo-local-leitor-de-edital
+    # O export do provasGo, se existir nesta máquina: dá aos mapas as questões
+    # do banco de provas (app/mapas/ferramentas/provas.py).
+    environment:
+      EP_PROVASGO_DIR: /dados/provasgo
+    volumes:
+      - ${HOME}/.local/share/studygo/provasgo:/dados/provasgo:ro
 
 volumes:
   go_mod_cache:

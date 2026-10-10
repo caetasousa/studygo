@@ -63,3 +63,39 @@ func TestEscolherTemas_NenhumEAMateriaInteira(t *testing.T) {
 		t.Fatalf("EscolherTemas(nil) = %q, %v; quer vazio, sem erro", got, err)
 	}
 }
+
+// O tópico que volta de uma exportação noutra ementa (M34). Como pode quebrar:
+//   - a mesma ementa cortada de outro jeito ("A; B" num tópico só aqui, dois
+//     tópicos lá) faz o vínculo se perder;
+//   - um ponto final ou a caixa diferente basta para não achar;
+//   - o tópico curto casa com dois da ementa, e o mapa vai para o errado.
+func TestTemaCorrespondente_NaEmentaCortadaDeOutroJeito(t *testing.T) {
+	daMateria := []string{
+		"Testes de software: unitários, de integração; testes automatizados",
+		"Revisão de código e refatoração",
+		"dívida técnica.",
+		"princípios SOLID, DRY, KISS e YAGNI",
+		"Redes: DNS e DHCP",
+		"Serviços de diretório: DNS interno",
+	}
+
+	casos := []struct {
+		tema, quer string
+		acha       bool
+	}{
+		{"Revisão de código e refatoração", "Revisão de código e refatoração", true},
+		{"testes automatizados", "Testes de software: unitários, de integração; testes automatizados", true},
+		{"Dívida técnica", "dívida técnica.", true},
+		{"principais princípios SOLID, DRY, KISS e YAGNI", "princípios SOLID, DRY, KISS e YAGNI", true},
+		// "DNS" está em dois tópicos: nenhum é escolhido no chute.
+		{"DNS", "", false},
+		{"Crase", "", false},
+	}
+
+	for _, c := range casos {
+		got, ok := TemaCorrespondente(c.tema, daMateria)
+		if got != c.quer || ok != c.acha {
+			t.Errorf("TemaCorrespondente(%q) = %q, %v; quer %q, %v", c.tema, got, ok, c.quer, c.acha)
+		}
+	}
+}

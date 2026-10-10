@@ -9,6 +9,9 @@ persistence, the deterministic plan engine, spaced review, TEC import,
 statistics. This service reads documents and proposes an extraction; Go persists
 nothing until the user confirms.
 
+It also turns a **lesson PDF into a mind map**, with Claude Code — see
+[`app/mapas/README.md`](app/mapas/README.md).
+
 ## Status
 
 ### Phases 1–3 — complete and verified
@@ -109,6 +112,8 @@ Environment, prefix `EP_`. See `.env.example`. Key ones:
 - `EP_WORK_DIR`, `EP_ARTIFACT_TTL_SECONDS` — temporary document store.
 - `EP_MIN_TEXT_SCORE`, `EP_MIN_TEXT_CHARS` — the OCR trigger.
 - `EP_OCR_DPI`, `EP_OCR_TIMEOUT_SECONDS`, `EP_OCR_MAX_CONCURRENCY` — OCR limits.
+- `EP_BACKEND_INTERNAL_URL`, `EP_MAPAS_*`, `EP_PROVASGO_DIR`,
+  `EP_MAPA_COMPRADOR` — mind maps (`app/mapas/README.md`).
 
 ## Future: async jobs
 

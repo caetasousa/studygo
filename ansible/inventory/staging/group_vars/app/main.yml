@@ -38,14 +38,16 @@ nginx_porta: 8480
 # Recursos: o servidor divide a VM do WSL (6 GB, .wslconfig do Windows) com a
 # distro de desenvolvimento. Tetos com folga sobre o uso medido em 26/09/2026
 # (parado: backend 11 MB, worker 3 MB, frontend 11 MB, postgres 33 MB,
-# processador 132 MB); o processador sobe mais ao capturar a Constituição.
+# processador 132 MB); o processador sobe mais ao capturar a Constituição, e
+# mais ainda com o Claude Code fazendo um mapa (Node, ~500 MB). O backend
+# segura o PDF da aula (até 40 MB) enquanto o entrega ao processador.
 mem_limit_frontend: 64m
-mem_limit_backend: 192m
-go_mem_limit_backend: 150MiB
+mem_limit_backend: 256m
+go_mem_limit_backend: 200MiB
 mem_limit_worker: 96m
 go_mem_limit_worker: 64MiB
 mem_limit_postgres: 256m
-mem_limit_processor: 1g
+mem_limit_processor: 1536m
 # backend e worker abrem até 10 conexões cada (platform/db).
 postgres_args:
   - shared_buffers=32MB

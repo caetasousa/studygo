@@ -1,5 +1,8 @@
 import { auth } from '$lib/stores/auth.svelte';
+import type { PacoteDoZip } from '$lib/mapas/pacote';
 import type {
+	ConexaoDoClaude,
+	PacoteImportado,
 	Caderno,
 	AnaliseResposta,
 	ConcursoDetalhe,
@@ -28,6 +31,7 @@ import type {
 	MapaLido,
 	MapaResumo,
 	MapasDaMateria,
+	PedidoDeMapa,
 	QuestoesImportadas,
 	PedidoDeCaptura,
 	PedidoDePublicacao,
@@ -217,6 +221,17 @@ export const api = {
 		return res.blob();
 	},
 
+	/**
+	 * O mapa (ou todos, sem slug) num .zip, no arranjo que a importação aceita:
+	 * o texto, as questões e as imagens. É a saída do banco para fora do app.
+	 */
+	exportarMapas: async (slug?: string): Promise<Blob> => {
+		const caminho = slug ? `/api/mapas/${encodeURIComponent(slug)}/exportacao` : '/api/exportacao-de-mapas';
+		const res = await fetchAutenticado(caminho);
+		if (!res.ok) throw new ApiError(res.status, mensagemHTTP(res.status));
+		return res.blob();
+	},
+
 	/** Responde uma questão do mapa: a letra, ou CERTO/ERRADO. */
 	responderQuestaoDoMapa: (id: string, resposta: string) =>
 		request<CorrecaoDoMapa>(`/api/mapas/questoes/${encodeURIComponent(id)}/respostas`, {
@@ -247,6 +262,66 @@ export const api = {
 			`/api/concursos/${encodeURIComponent(slug)}/disciplinas/${encodeURIComponent(disciplinaId)}/mapas/${encodeURIComponent(mapa)}`,
 			ligar ? { method: 'PUT', body: JSON.stringify({ temas }) } : { method: 'DELETE' }
 		),
+
+	// ---- pedidos de mapa (o PDF da aula que o processador transforma em mapa) ----
+	pedidosDeMapa: () => request<{ pedidos: PedidoDeMapa[] }>('/api/pedidos-de-mapa'),
+
+	/** Põe o PDF na fila; com a matéria, o mapa nasce vinculado a ela. */
+	/**
+	 * Um mapa do .zip exportado, de volta inteiro: texto, questões, imagens,
+	 * vínculos e respostas. O concurso aberto recebe o vínculo cujo concurso de
+	 * origem a conta não tem.
+	 */
+	importarPacote: (p: PacoteDoZip, concurso?: string | null) => {
+		const form = new FormData();
+		form.append('mapa', p.mapa);
+		if (p.questoes) form.append('questoes', p.questoes);
+		if (p.conta) form.append('conta', p.conta);
+		if (concurso) form.append('concurso', concurso);
+		for (const img of p.imagens) form.append('imagens', new Blob([img.dados as BlobPart]), img.nome);
+		return request<PacoteImportado>('/api/mapas/pacote', { method: 'POST', body: form });
+	},
+
+	pedirMapa: (pdf: File, concurso?: string | null, disciplina?: string | null) => {
+		const form = new FormData();
+		form.append('pdf', pdf);
+		if (concurso && disciplina) {
+			form.append('concurso', concurso);
+			form.append('disciplina', disciplina);
+		}
+		return request<PedidoDeMapa>('/api/pedidos-de-mapa', { method: 'POST', body: form });
+	},
+
+	/** Devolve à fila o pedido que falhou ou que travou processando. */
+	reenfileirarPedido: (id: string) =>
+		request<void>(`/api/pedidos-de-mapa/${encodeURIComponent(id)}/fila`, { method: 'POST' }),
+
+	/** O que a tela sabe do token do Claude guardado: se há, e só o fim dele. */
+	situacaoDoTokenDoClaude: () => request<{ configurado: boolean; fim: string }>('/api/conta/token-do-claude'),
+
+	/** Guarda (cifrado) o token do Claude que o processador de mapas usa. */
+	guardarTokenDoClaude: (token: string) =>
+		request<void>('/api/conta/token-do-claude', { method: 'PUT', body: JSON.stringify({ token }) }),
+
+	removerTokenDoClaude: () => request<void>('/api/conta/token-do-claude', { method: 'DELETE' }),
+
+	/** A conta do Claude conectada ao processador de mapas, se houver. */
+	conexaoDoClaude: () => request<ConexaoDoClaude>('/api/conta/claude'),
+
+	/** Começa a conexão: devolve o link da página de autorização do Claude. */
+	conectarClaude: () => request<{ url: string }>('/api/conta/claude/conexao', { method: 'POST' }),
+
+	/** Entrega o código que a página de autorização mostrou. */
+	concluirConexaoDoClaude: (codigo: string) =>
+		request<ConexaoDoClaude>('/api/conta/claude/conexao/codigo', {
+			method: 'POST',
+			body: JSON.stringify({ codigo })
+		}),
+
+	desconectarClaude: () => request<void>('/api/conta/claude', { method: 'DELETE' }),
+
+	excluirPedido: (id: string) =>
+		request<void>(`/api/pedidos-de-mapa/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
 	// ---- legislação ----
 	catalogoDeLeis: () => request<{ leis: LeiResumo[] }>('/api/leis'),

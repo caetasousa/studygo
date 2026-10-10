@@ -274,6 +274,13 @@ func (c *Client) do(ctx context.Context, method, path, ownerRef, contentType str
 		return c.registrar(mapError(resp.StatusCode, payload))
 	}
 
+	// Sem corpo (204) é sucesso sem nada a ler.
+	if resp.StatusCode == http.StatusNoContent || out == nil {
+		c.disjuntor.Sucesso()
+
+		return nil
+	}
+
 	if err := json.Unmarshal(payload, out); err != nil {
 		c.disjuntor.Falha()
 

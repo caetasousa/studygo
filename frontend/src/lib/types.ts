@@ -918,6 +918,30 @@ export interface MapaImportado {
 	vinculadas: { codigo: string; nome: string }[];
 }
 
+/** Onde o pedido está: na fila (o processador não o recebeu), sendo feito, pronto ou falhou. */
+export type SituacaoDoPedido = 'na_fila' | 'processando' | 'pronto' | 'falhou';
+
+/**
+ * O PDF de uma aula na fila, à espera de virar mapa. Quem o atende é o
+ * edital-processor, com o Claude Code.
+ */
+export interface PedidoDeMapa {
+	id: string;
+	arquivo: string;
+	situacao: SituacaoDoPedido;
+	/** O concurso e a matéria em que o mapa vai morar; vazios se nenhuma. */
+	concurso: string;
+	disciplina: string;
+	materia: string;
+	/** O slug do mapa que o pedido gerou, quando pronto. */
+	mapa: string;
+	/** O que o processador achou: avisos, divergências, o motivo da falha. */
+	relatorio: string;
+	temPdf: boolean;
+	criadoEm: string;
+	atualizadoEm: string;
+}
+
 /** Uma matéria do concurso com os mapas vinculados a ela (vazio se nenhum). */
 export interface MapasDaMateria {
 	disciplinaId: string;
@@ -934,4 +958,22 @@ export interface MapaDaMateria extends MapaResumo {
 	materiaInteira: boolean;
 	/** Os tópicos escolhidos, na ordem da ementa. */
 	temas: string[];
+}
+
+/** A conta do Claude conectada ao processador de mapas (pela tela, por conta). */
+export interface ConexaoDoClaude {
+	conectado: boolean;
+	email: string;
+	plano: string;
+}
+
+/** Um mapa que voltou de uma exportação, e o que dele não achou lugar (avisos). */
+export interface PacoteImportado {
+	mapa: MapaResumo;
+	novo: boolean;
+	questoes: number;
+	imagens: number;
+	respostas: number;
+	vinculadas: { codigo: string; nome: string }[];
+	avisos: string[];
 }

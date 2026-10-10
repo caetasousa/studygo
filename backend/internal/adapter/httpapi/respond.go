@@ -70,6 +70,11 @@ func classificar(err error) (int, string) {
 		return http.StatusUnprocessableEntity, pacote.Error()
 	}
 
+	var recusado usuario.ErrCodigoDoClaudeRecusado
+	if errors.As(err, &recusado) {
+		return http.StatusUnprocessableEntity, recusado.Error()
+	}
+
 	var link lei.ErrLinkInvalido
 	if errors.As(err, &link) {
 		return http.StatusUnprocessableEntity, link.Error()
@@ -85,6 +90,11 @@ func classificar(err error) (int, string) {
 	var questoes mapa.ErrQuestoesInvalidas
 	if errors.As(err, &questoes) {
 		return http.StatusUnprocessableEntity, questoes.Error()
+	}
+
+	var slugAlheio mapa.ErrSlugDeOutroMapa
+	if errors.As(err, &slugAlheio) {
+		return http.StatusUnprocessableEntity, slugAlheio.Error()
 	}
 
 	var imagens mapa.ErrImagensInvalidas
@@ -116,8 +126,18 @@ func classificar(err error) (int, string) {
 
 	case errors.Is(err, usuario.ErrEmailInvalido),
 		errors.Is(err, usuario.ErrSenhaFraca),
-		errors.Is(err, usuario.ErrNomeObrigatorio):
+		errors.Is(err, usuario.ErrNomeObrigatorio),
+		errors.Is(err, usuario.ErrTokenDoClaudeInvalido),
+		errors.Is(err, usuario.ErrCodigoDoClaudeInvalido):
 		return http.StatusUnprocessableEntity, err.Error()
+
+	case errors.Is(err, usuario.ErrConexaoDoClaudeNaoIniciada):
+		return http.StatusConflict, err.Error()
+
+	// Antes do ErrProvedorIndisponivel, que ele embrulha: a mensagem genérica
+	// fala do cadastro de concurso.
+	case errors.Is(err, usuario.ErrClaudeIndisponivel):
+		return http.StatusServiceUnavailable, usuario.ErrClaudeIndisponivel.Error()
 
 	// As invariantes do cadastro de concurso são validação de entrada do ponto
 	// de vista de quem chama, não falha do servidor.
@@ -142,7 +162,8 @@ func classificar(err error) (int, string) {
 		errors.Is(err, lei.ErrFonteNaoEncontrada),
 		errors.Is(err, mapa.ErrNaoEncontrado),
 		errors.Is(err, mapa.ErrQuestaoNaoEncontrada),
-		errors.Is(err, mapa.ErrImagemNaoEncontrada):
+		errors.Is(err, mapa.ErrImagemNaoEncontrada),
+		errors.Is(err, mapa.ErrPedidoNaoEncontrado):
 		return http.StatusNotFound, err.Error()
 
 	case errors.Is(err, lei.ErrAlternativaInvalida),
@@ -151,11 +172,15 @@ func classificar(err error) (int, string) {
 		errors.Is(err, errQuestoesIlegiveis),
 		errors.Is(err, errQuestoesDoMapaIlegiveis),
 		errors.Is(err, mapa.ErrRespostaInvalida),
-		errors.Is(err, mapa.ErrTemaForaDaMateria):
+		errors.Is(err, mapa.ErrTemaForaDaMateria),
+		errors.Is(err, mapa.ErrPDFInvalido),
+		errors.Is(err, mapa.ErrRelatorioGrandeDemais):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	case errors.Is(err, lei.ErrCapturaEmAndamento),
 		errors.Is(err, mapa.ErrItemMudou),
+		errors.Is(err, mapa.ErrPedidoForaDeHora),
+		errors.Is(err, mapa.ErrPedidoSemPDF),
 		errors.Is(err, lei.ErrLeiJaExiste):
 		return http.StatusConflict, err.Error()
 

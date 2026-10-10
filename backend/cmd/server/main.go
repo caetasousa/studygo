@@ -56,18 +56,31 @@ func run(logger *slog.Logger) error {
 		logger.Info("migrations applied")
 	}
 
-	// O mesmo processador lê editais e captura leis.
+	// O mesmo processador lê editais, captura leis e faz os mapas mentais.
 	var (
-		editalProc port.EditalProcessor  = editalproc.Indisponivel{}
-		capturador port.CapturadorDeLeis = editalproc.Indisponivel{}
+		editalProc port.EditalProcessor    = editalproc.Indisponivel{}
+		capturador port.CapturadorDeLeis   = editalproc.Indisponivel{}
+		mapas      port.ProcessadorDeMapas = editalproc.Indisponivel{}
 	)
 	if cfg.EditalProcessorURL != "" {
 		cliente := editalproc.New(cfg.EditalProcessorURL, cfg.EditalProcessorToken)
-		editalProc, capturador = cliente, cliente
+		editalProc, capturador, mapas = cliente, cliente, cliente
 		logger.Info("edital import enabled", slog.String("processor", cfg.EditalProcessorURL))
 	}
 
-	handler := montarHandler(pool, cfg, editalProc, capturador, logger)
+	handler, interno := montarHandler(pool, cfg, editalProc, capturador, mapas, logger)
+
+	// As rotas por onde o processador devolve o mapa: porta própria, que não é
+	// publicada nem passa pelo nginx. O resultado traz as imagens do mapa; o
+	// prazo de leitura é o da rede interna, sem pressa.
+	srvInterno := httpserver.New(cfg.InternalAddr, httpserver.WithHandler(interno))
+
+	go func() {
+		if err := srvInterno.Run(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("internal server exited", slog.Any("error", err))
+			cancel()
+		}
+	}()
 
 	srv := httpserver.New(
 		cfg.ServerAddr,
@@ -102,8 +115,9 @@ func montarHandler(
 	cfg config.Config,
 	editalProc port.EditalProcessor,
 	capturador port.CapturadorDeLeis,
+	processadorDeMapas port.ProcessadorDeMapas,
 	logger *slog.Logger,
-) http.Handler {
+) (http.Handler, http.Handler) {
 	clock := port.SystemClock{}
 	hasher := crypto.NewArgon2Hasher(cfg.Argon2)
 	tokens := crypto.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTTL)
@@ -117,6 +131,16 @@ func montarHandler(
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
 	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo, capturador)
 	mapaService := service.NewMapaService(postgres.NewMapaRepo(pool), concursoRepo)
+
+	cifra, err := crypto.NewCifra(cfg.JWTSecret)
+	if err != nil {
+		panic(err) // só falha sem fonte de entropia ou com AES quebrado: não há o que servir
+	}
+
+	tokensDoClaude := service.NewTokenDoClaudeService(usuarioRepo, cifra)
+	pedidosHandler := httpapi.NewPedidosDeMapaHandler(service.NewPedidosDeMapaService(
+		postgres.NewMapaRepo(pool), concursoRepo, mapaService, processadorDeMapas, tokensDoClaude,
+	), logger)
 
 	// Os seis casos de uso do plano compartilham as mesmas dependências.
 	deps := service.Dependencias{
@@ -147,8 +171,10 @@ func montarHandler(
 			service.NewImportacaoTECService(deps),
 			logger,
 		),
-		Lei:  httpapi.NewLeiHandler(leiService, logger),
-		Mapa: httpapi.NewMapaHandler(mapaService, logger),
+		Lei:         httpapi.NewLeiHandler(leiService, logger),
+		Mapa:        httpapi.NewMapaHandler(mapaService, logger),
+		Processador: httpapi.NewProcessadorHandler(tokensDoClaude, service.NewConexaoDoClaudeService(processadorDeMapas), logger),
+		Pedidos:     pedidosHandler,
 	}
 
 	router := httpapi.NewRouter(handlers, tokens, authService, httpapi.LimitesPadrao(logger), logger)
@@ -159,7 +185,7 @@ func montarHandler(
 	// intenso de um laço automatizado.
 	global := middleware.NovoLimitador(240, 120, logger)
 
-	return middleware.Chain(
+	publico := middleware.Chain(
 		router,
 		middleware.RequestID,
 		middleware.Recover(logger),
@@ -167,4 +193,13 @@ func montarHandler(
 		middleware.CORS(cfg.CORSOrigin),
 		global.Middleware,
 	)
+
+	interno := middleware.Chain(
+		httpapi.NewRouterInterno(pedidosHandler, cfg.EditalProcessorToken, logger),
+		middleware.RequestID,
+		middleware.Recover(logger),
+		middleware.Logger(logger),
+	)
+
+	return publico, interno
 }

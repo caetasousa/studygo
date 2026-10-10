@@ -13,6 +13,9 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       SERVER_ADDR: ":8080"
+      # A porta interna: por ela o edital-processor devolve o mapa mental
+      # pronto. Não é publicada nem passa pelo nginx.
+      INTERNAL_ADDR: ":8081"
       DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
@@ -23,15 +26,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Internal-only: turns edital PDFs into a reviewable structured preview.
-  # No host port — the backend reaches it over the compose network.
+  # Internal-only: turns edital PDFs into a reviewable structured preview, and
+  # a lesson PDF into a mind map (Claude Code). No host port — the backend
+  # reaches it over the compose network, and it answers on the backend's
+  # internal port.
   edital-processor:
     build: ./edital-processor
     environment:
       EP_SERVICE_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
       EP_GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      EP_BACKEND_INTERNAL_URL: "http://backend:8081"
+      # O nome do comprador que o material pago traz no rodapé, para a
+      # ferramenta de texto tirar também (CPF e e-mail ela já tira). Só no .env.
+      EP_MAPA_COMPRADOR: "${MAPA_COMPRADOR:-}"
     volumes:
       - edital_work:/var/lib/edital-processor/work
+      # A conexão do Claude de cada conta, feita pela tela; sobrevive ao rebuild.
+      - edital_claude:/var/lib/edital-processor/claude
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
       interval: 15s
@@ -74,3 +85,4 @@ services:
 volumes:
   postgres_data:
   edital_work:
+  edital_claude:

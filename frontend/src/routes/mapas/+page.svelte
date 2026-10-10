@@ -2,7 +2,10 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { api } from '$lib/api';
+	import { salvarArquivo } from '$lib/download';
 	import PageHead from '$lib/components/PageHead.svelte';
+	import PedidosDePDF from '$lib/mapas/PedidosDePDF.svelte';
+	import ImportarExportacao from '$lib/mapas/ImportarExportacao.svelte';
 	import { tagStyle } from '$lib/format';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
@@ -13,7 +16,8 @@
 	 * Os mapas mentais da conta, por matéria: os que já estão vinculados às
 	 * matérias do concurso aberto e, à parte, os que ainda esperam uma.
 	 *
-	 * O mapa é escrito fora do app (conteudo/mapas/README.md) e entra por aqui.
+	 * O mapa é escrito fora do app (conteudo/mapas/README.md) e entra por aqui —
+	 * pelo texto, ou pelo PDF da aula, que o processador transforma em mapa.
 	 * Importar de novo o mesmo mapa troca o conteúdo e mantém os vínculos.
 	 */
 	let catalogo = $state<MapaResumo[]>([]);
@@ -54,7 +58,23 @@
 
 	const nf = new Intl.NumberFormat('pt-BR');
 
+	// --- exportar todos ----------------------------------------------------------
+	let exportando = $state(false);
+
+	async function exportarTodos() {
+		erro = null;
+		exportando = true;
+		try {
+			salvarArquivo(await api.exportarMapas(), `mapas-${new Date().toISOString().slice(0, 10)}.zip`);
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'Não foi possível exportar os mapas';
+		} finally {
+			exportando = false;
+		}
+	}
+
 	// --- importar ----------------------------------------------------------
+	let restaurar = $state<ReturnType<typeof ImportarExportacao>>();
 	let texto = $state('');
 	let importando = $state(false);
 	let resultado = $state<MapaImportado | null>(null);
@@ -84,7 +104,25 @@
 	async function aoEscolherArquivo(e: Event & { currentTarget: HTMLInputElement }) {
 		const arquivo = e.currentTarget.files?.[0];
 		e.currentTarget.value = '';
-		if (arquivo) await importar(await arquivo.text());
+		if (!arquivo) return;
+
+		// O PDF da aula vai para a fila, não aqui: lido como texto, ele virava um
+		// "mapa" ilegível ou um 413 sem explicação.
+		if (arquivo.type === 'application/pdf' || arquivo.name.toLowerCase().endsWith('.pdf')) {
+			resultado = null;
+			erro = `“${arquivo.name}” é o PDF da aula: envie-o em “Criar mapa a partir do PDF da aula”, logo acima, e ele vira mapa sozinho. Aqui entra só o texto de um mapa já pronto (.md).`;
+			return;
+		}
+
+		// O .zip exportado tem o seu lugar, que traz também as questões, as
+		// imagens, os vínculos e as respostas.
+		if (arquivo.name.toLowerCase().endsWith('.zip')) {
+			resultado = null;
+			await restaurar?.importar(arquivo);
+			return;
+		}
+
+		await importar(await arquivo.text());
 	}
 </script>
 
@@ -116,6 +154,8 @@
 			</div>
 		</div>
 	{/if}
+
+	<PedidosDePDF aoFicarPronto={carregar} />
 
 	<details class="importar" bind:open={painelAberto}>
 		<summary>Importar mapa</summary>
@@ -149,6 +189,8 @@
 			</button>
 		</div>
 	</details>
+
+	<ImportarExportacao bind:this={restaurar} aoTerminar={carregar} />
 
 	{#if carregado}
 		{#if filtro !== ''}
@@ -196,6 +238,18 @@
 					{/each}
 				</ul>
 			</section>
+		{/if}
+
+		{#if catalogo.length > 0 && filtro === ''}
+			<p class="exportar">
+				<button type="button" class="btn" onclick={exportarTodos} disabled={exportando}>
+					{exportando ? 'Exportando…' : '⬇ Exportar todos os mapas'}
+				</button>
+				<span
+					>Um .zip com o texto, as questões, as imagens, os vínculos e as respostas de cada mapa: a cópia de segurança do
+					que está aqui. Ele volta em “Importar uma exportação (.zip)”.</span
+				>
+			</p>
 		{/if}
 
 		{#if estantes.length === 0 && semMateria.length === 0}
@@ -374,6 +428,16 @@
 		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+	}
+
+	.exportar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		margin: 28px 0 0;
+		font-size: 12.5px;
+		color: var(--text-muted);
 	}
 
 	.vazia {

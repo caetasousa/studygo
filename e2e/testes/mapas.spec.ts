@@ -476,9 +476,9 @@ test.describe('mapas mentais', () => {
 		await page.getByRole('checkbox', { name: 'Ciclo hidrológico' }).uncheck();
 		await expect(page.getByRole('checkbox', { name: 'Ciclo hidrológico' })).toBeEnabled();
 		await page.getByRole('checkbox', { name: 'Relevo e solos' }).uncheck();
-		await expect(page.getByText('a matéria inteira')).toBeVisible();
+		await expect(page.getByText('a matéria inteira', { exact: true })).toBeVisible();
 		await page.reload();
-		await expect(page.getByText('a matéria inteira')).toBeVisible();
+		await expect(page.getByText('a matéria inteira', { exact: true })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Desvincular Geografia Física' })).toBeVisible();
 	});
 
@@ -1331,5 +1331,337 @@ test.describe('imagens dos mapas', () => {
 		const envioAlheio = await enviar(outra.request, outra.token, 'ciclo-da-agua', { name: 'fluxo.png', mimeType: 'image/png', buffer: PNG_1x1 });
 		expect(envioAlheio.status()).toBe(404);
 		await outra.request.dispose();
+	});
+});
+
+// O PDF da aula que vira mapa: a tela envia o PDF, o backend o entrega ao
+// edital-processor e o mapa volta pela porta interna do backend. No E2E o
+// processador é o dublê (e2e/duble-processador), que devolve um mapa sintético
+// em dois segundos — o Claude não entra no E2E.
+test.describe('mapas a partir do PDF da aula', () => {
+	const PDF = { name: 'aula-01.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n% aula sintética do E2E\n') };
+
+	async function enviar(page: Page, materia: string | null, arquivo = PDF) {
+		await page.goto('/mapas');
+		// O painel do PDF já vem aberto: é o caminho principal para criar mapa.
+		await expect(page.getByLabel('PDF da aula')).toBeVisible();
+		if (materia) await page.getByLabel('Matéria do mapa').selectOption({ label: materia });
+		await page.getByLabel('PDF da aula').setInputFiles(arquivo);
+	}
+
+	const pedido = (page: Page, arquivo = 'aula-01.pdf') =>
+		page.getByRole('region', { name: 'PDFs na fila' }).getByRole('listitem').filter({ hasText: arquivo });
+
+	// O processamento termina em segundo plano: a tela recarregada mostra quando.
+	async function esperarSituacao(page: Page, arquivo: string, situacao: string) {
+		await expect(async () => {
+			await page.reload();
+			await expect(pedido(page, arquivo)).toContainText(situacao, { timeout: 1_000 });
+		}).toPass({ timeout: 20_000 });
+	}
+
+	// A conexão do Claude pela API da tela, com o código que o dublê aceita.
+	async function conectarClaude(request: APIRequestContext, token: string) {
+		expect((await request.post('/api/conta/claude/conexao', { headers: cabecalho(token) })).status()).toBe(200);
+		const r = await request.post('/api/conta/claude/conexao/codigo', { headers: cabecalho(token), data: { codigo: 'codigo-do-e2e' } });
+		expect(r.status()).toBe(200);
+	}
+
+	async function pedidos(request: APIRequestContext, token: string) {
+		const r = await request.get('/api/pedidos-de-mapa', { headers: cabecalho(token) });
+		return (await r.json()).pedidos as { id: string; arquivo: string; situacao: string; temPdf: boolean; mapa: string }[];
+	}
+
+	test('[M28] [M29] o PDF vai ao processador com a matéria, e a tela mostra o mapa pronto, vinculado, e o relatório', async ({ page, api, conta, baseURL }) => {
+		await api.concurso('PDF E2E', MATERIAS);
+		await conectarClaude(page.request, conta.token);
+
+		// Um arquivo que só tem o nome de PDF é recusado, dizendo qual foi.
+		await enviar(page, null, { name: 'falso.pdf', mimeType: 'application/pdf', buffer: Buffer.from('<html></html>') });
+		await expect(page.getByRole('alert')).toContainText('falso.pdf: o arquivo precisa ser um PDF de até 40 MB');
+
+		// O PDF escolhido no painel de importar o texto aponta o painel certo.
+		await page.getByText('Importar mapa', { exact: true }).click();
+		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles(PDF);
+		await expect(page.getByRole('alert').filter({ hasText: 'é o PDF da aula' })).toContainText(
+			'envie-o em “Criar mapa a partir do PDF da aula”'
+		);
+
+		await enviar(page, 'GEO — Geografia Física');
+		await expect(pedido(page)).toContainText('Processando');
+		await expect(pedido(page)).toContainText('Geografia Física');
+
+		// Outra conta não vê o pedido.
+		const outra = await outraSessao(baseURL!);
+		expect(await pedidos(outra.request, outra.token)).toEqual([]);
+		await outra.request.dispose();
+
+		await esperarSituacao(page, 'aula-01.pdf', 'Pronto');
+		await pedido(page).getByText('Relatório do processador').click();
+		await expect(pedido(page)).toContainText('A questão 3 traz um gabarito que diverge da tabela da aula.');
+		// Sem token guardado, o processador usou a conexão da conta.
+		await expect(pedido(page)).toContainText('Token do Claude: a conexão da conta.');
+
+		// O PDF sai do servidor assim que o mapa fica pronto.
+		const [pronto] = await pedidos(page.request, conta.token);
+		expect(pronto.temPdf).toBe(false);
+
+		await pedido(page).getByRole('link', { name: 'Abrir o mapa' }).click();
+		await expect(page).toHaveURL(new RegExp(`/mapas/${pronto.mapa}$`));
+		await expect(page.getByRole('heading', { name: 'Aula aula-01.pdf', level: 1 })).toBeVisible();
+		// O mapa ficou na matéria do pedido.
+		await page.goto('/mapas');
+		await expect(page.getByRole('region', { name: 'Geografia Física' }).getByRole('link', { name: /Aula aula-01\.pdf/ })).toBeVisible();
+	});
+
+	test('[M30] o pedido que falhou volta para a fila, e o excluído sai dela com confirmação', async ({ page, api, conta }) => {
+		await api.concurso('PDF E2E', MATERIAS);
+		await conectarClaude(page.request, conta.token);
+		const FALHA = { ...PDF, name: 'aula-falha.pdf' };
+		await enviar(page, null, FALHA);
+
+		await esperarSituacao(page, 'aula-falha.pdf', 'Falhou');
+		await expect(pedido(page, 'aula-falha.pdf')).toContainText('O PDF é só imagem: não há texto para ler.');
+
+		// Volta ao processador sem reenviar o PDF.
+		await pedido(page, 'aula-falha.pdf').getByRole('button', { name: 'Pôr na fila de novo' }).click();
+		await expect(pedido(page, 'aula-falha.pdf')).toContainText('Processando');
+
+		// Cancelar não exclui.
+		await pedido(page, 'aula-falha.pdf').getByRole('button', { name: 'Excluir' }).click();
+		const dialogo = page.getByRole('alertdialog');
+		await expect(dialogo).toContainText('O PDF sai do servidor e o mapa não será feito.');
+		await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+		await expect(pedido(page, 'aula-falha.pdf')).toBeVisible();
+
+		await pedido(page, 'aula-falha.pdf').getByRole('button', { name: 'Excluir' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Excluir' }).click();
+		await expect(pedido(page, 'aula-falha.pdf')).toHaveCount(0);
+
+		// O que o processador ainda devolver do excluído não traz o pedido de volta.
+		await page.waitForTimeout(3_000);
+		await page.reload();
+		await expect(pedido(page, 'aula-falha.pdf')).toHaveCount(0);
+	});
+
+	test('[M31] o token do Claude entra em Configurações, volta só pelo fim e sai com confirmação', async ({ page, api }) => {
+		await api.concurso('Token E2E', MATERIAS);
+		await page.goto('/config');
+		const cartao = page.locator('.card').filter({ hasText: 'Processador de mapas' });
+		// O token é a alternativa à conexão: fica recolhido.
+		const abrirToken = () => cartao.getByText('Usar um token do Claude em vez da conexão').click();
+		await abrirToken();
+		await expect(cartao).toContainText('Nenhum token guardado');
+
+		// Com espaço no meio (dois tokens colados), recusa e diz o que fazer.
+		await cartao.getByLabel('Token do Claude').fill('sk-ant-oat01-um sk-ant-oat01-dois');
+		await cartao.getByRole('button', { name: 'Guardar token' }).click();
+		await expect(cartao.getByRole('alert')).toContainText('cole só o token');
+
+		await cartao.getByLabel('Token do Claude').fill('sk-ant-oat01-token-do-e2e-ABCD');
+		await cartao.getByRole('button', { name: 'Guardar token' }).click();
+		await expect(cartao).toContainText('Token guardado, terminado em …ABCD');
+		await expect(cartao.getByLabel('Token do Claude')).toHaveValue('');
+
+		// Recarregada a página, o token não volta inteiro.
+		await page.reload();
+		await abrirToken();
+		await expect(cartao).toContainText('…ABCD');
+		await expect(page.getByText('token-do-e2e')).toHaveCount(0);
+
+		// O processador usa o token da conta, e o relatório diz qual usou.
+		await enviar(page, null, { ...PDF, name: 'aula-token.pdf' });
+		await esperarSituacao(page, 'aula-token.pdf', 'Pronto');
+		await pedido(page, 'aula-token.pdf').getByText('Relatório do processador').click();
+		await expect(pedido(page, 'aula-token.pdf')).toContainText('Token do Claude: o token guardado (…ABCD).');
+		await page.goto('/config');
+		await abrirToken();
+
+		await cartao.getByRole('button', { name: 'Remover' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Cancelar' }).click();
+		await expect(cartao).toContainText('…ABCD');
+		await cartao.getByRole('button', { name: 'Remover' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Remover' }).click();
+		await expect(cartao).toContainText('Nenhum token guardado');
+	});
+
+	test('[M33] o Claude se conecta pela tela, com o link e o código, só para esta conta, e o PDF sem conexão diz o que falta', async ({ page, api, conta, baseURL }) => {
+		await api.concurso('Conexão E2E', MATERIAS);
+
+		// Sem conexão, o PDF falha dizendo o que fazer.
+		await enviar(page, null, { ...PDF, name: 'aula-sem-claude.pdf' });
+		await esperarSituacao(page, 'aula-sem-claude.pdf', 'Falhou');
+		await expect(pedido(page, 'aula-sem-claude.pdf')).toContainText('Conecte-o em Configurações → Processador de mapas');
+
+		await page.goto('/config');
+		const cartao = page.locator('.card').filter({ hasText: 'Processador de mapas' });
+		await expect(cartao.getByRole('status').first()).toContainText('Claude não conectado');
+
+		await cartao.getByRole('button', { name: 'Conectar o Claude' }).click();
+		const link = cartao.getByRole('link', { name: /Abrir a página de autorização/ });
+		await expect(link).toHaveAttribute('href', /^https:\/\/claude\.com\/cai\/oauth\/authorize\?/);
+		await expect(link).toHaveAttribute('target', '_blank');
+
+		// O código errado é recusado com o que fazer, e o mesmo link continua valendo.
+		await cartao.getByLabel('Código de autorização do Claude').fill('codigo-errado');
+		await cartao.getByRole('button', { name: 'Concluir conexão' }).click();
+		await expect(cartao.getByRole('alert')).toContainText('cole de novo');
+
+		await cartao.getByLabel('Código de autorização do Claude').fill('codigo-do-e2e');
+		await cartao.getByRole('button', { name: 'Concluir conexão' }).click();
+		await expect(cartao).toContainText('Claude conectado como quem@estuda.e2e (plano Max).');
+		await page.reload();
+		await expect(cartao).toContainText('Claude conectado como quem@estuda.e2e');
+
+		// A conexão é desta conta: a outra continua sem.
+		const outra = await outraSessao(baseURL!);
+		const daOutra = await outra.request.get('/api/conta/claude', { headers: cabecalho(outra.token) });
+		expect((await daOutra.json()).conectado).toBe(false);
+		await outra.request.dispose();
+
+		// Conectado, o mesmo pedido volta à fila e vira mapa.
+		await page.goto('/mapas');
+		await pedido(page, 'aula-sem-claude.pdf').getByRole('button', { name: 'Pôr na fila de novo' }).click();
+		await esperarSituacao(page, 'aula-sem-claude.pdf', 'Pronto');
+
+		// Desconectar pede confirmação; cancelar não desconecta.
+		await page.goto('/config');
+		await cartao.getByRole('button', { name: 'Desconectar' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Cancelar' }).click();
+		await expect(cartao).toContainText('Claude conectado');
+		await cartao.getByRole('button', { name: 'Desconectar' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Desconectar' }).click();
+		await expect(cartao).toContainText('Claude não conectado');
+		expect((await (await page.request.get('/api/conta/claude', { headers: cabecalho(conta.token) })).json()).conectado).toBe(false);
+	});
+
+	test('[M32] exportar baixa o mapa (e todos) num .zip com o texto, as questões e as imagens', async ({ page, api, conta }) => {
+		await concursoComMapa(api, conta, page, 'Exportar E2E');
+		const nomesNoZip = (b: Buffer) => b.toString('latin1');
+
+		await page.goto('/mapas/ciclo-da-agua');
+		await page.getByText('Manter este mapa').click();
+		const [um] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '⬇ Exportar mapa' }).click()]);
+		expect(um.suggestedFilename()).toBe('ciclo-da-agua.zip');
+		const zipDoMapa = readFileSync((await um.path())!);
+		expect(nomesNoZip(zipDoMapa)).toContain('ciclo-da-agua.md');
+
+		await page.goto('/mapas');
+		const [todos] = await Promise.all([
+			page.waitForEvent('download'),
+			page.getByRole('button', { name: '⬇ Exportar todos os mapas' }).click()
+		]);
+		expect(todos.suggestedFilename()).toMatch(/^mapas-\d{4}-\d{2}-\d{2}\.zip$/);
+		expect(nomesNoZip(readFileSync((await todos.path())!))).toContain('ciclo-da-agua.md');
+	});
+});
+
+// O .zip exportado volta por um lugar só e volta inteiro (M34).
+test.describe('importar a exportação dos mapas', () => {
+	const TEXTO = '# Restauro\nslug: restauro\nfonte: Aula sintética do E2E\n\n- Evaporação\n  - [def] A **água** sobe\n  - ![O ciclo](ciclo.png)\n- Chuva\n  - Cai das nuvens\n';
+	const ARQUIVO_DE_QUESTOES = {
+		mapa: 'restauro',
+		questoes: [
+			{ id: 'q1', ramo: 'Evaporação', origem: 'FGV · 2024', enunciado: 'A água sobe ao evaporar.', gabarito: 'Certo', comentario: 'Certo.' },
+			{ id: 'q2', ramo: 'Chuva', origem: 'FCC · 2023', enunciado: 'De onde cai a chuva?', alternativas: ['Do solo', 'Das nuvens'], gabarito: 'B', comentario: 'Das nuvens.' }
+		]
+	};
+	const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNwaDgAAAKEAYEml6crAAAAAElFTkSuQmCC', 'base64');
+
+	/** Um .zip sem compressão, com o que o teste quiser dentro (a tela não confere o CRC). */
+	function zipSimples(arquivos: Record<string, Buffer>): Buffer {
+		const locais: Buffer[] = [];
+		const central: Buffer[] = [];
+		let offset = 0;
+		for (const [n, dados] of Object.entries(arquivos)) {
+			const nome = Buffer.from(n, 'utf-8');
+			const local = Buffer.alloc(30 + nome.length);
+			local.writeUInt32LE(0x04034b50, 0);
+			local.writeUInt16LE(0x0800, 6);
+			local.writeUInt32LE(dados.length, 18);
+			local.writeUInt32LE(dados.length, 22);
+			local.writeUInt16LE(nome.length, 26);
+			nome.copy(local, 30);
+			const c = Buffer.alloc(46 + nome.length);
+			c.writeUInt32LE(0x02014b50, 0);
+			c.writeUInt16LE(0x0800, 8);
+			c.writeUInt32LE(dados.length, 20);
+			c.writeUInt32LE(dados.length, 24);
+			c.writeUInt16LE(nome.length, 28);
+			c.writeUInt32LE(offset, 42);
+			nome.copy(c, 46);
+			locais.push(local, dados);
+			central.push(c);
+			offset += local.length + dados.length;
+		}
+		const tam = central.reduce((t, c) => t + c.length, 0);
+		const fim = Buffer.alloc(22);
+		fim.writeUInt32LE(0x06054b50, 0);
+		fim.writeUInt16LE(central.length, 8);
+		fim.writeUInt16LE(central.length, 10);
+		fim.writeUInt32LE(tam, 12);
+		fim.writeUInt32LE(offset, 16);
+		return Buffer.concat([...locais, ...central, fim]);
+	}
+
+	test('[M34] o .zip exportado volta inteiro por um lugar só — questões, imagens, vínculos com os tópicos e respostas — sem repetir nada', async ({ page, api, conta }) => {
+		const concurso = await api.concurso('Restauro E2E', MATERIAS);
+		expect((await importar(page.request, conta.token, TEXTO)).status).toBe(201);
+		expect((await importarQuestoes(page.request, conta.token, ARQUIVO_DE_QUESTOES, 'restauro')).status).toBe(200);
+		const img = await page.request.post('/api/mapas/restauro/imagens', {
+			headers: cabecalho(conta.token),
+			multipart: { imagens: { name: 'ciclo.png', mimeType: 'image/png', buffer: PNG } }
+		});
+		expect(img.ok(), await img.text()).toBeTruthy();
+		const geo = (await materiasDo(page.request, conta.token, concurso)).find((d) => d.codigo === 'GEO')!;
+		const vinculo = await page.request.put(`/api/concursos/${concurso}/disciplinas/${geo.disciplinaId}/mapas/restauro`, {
+			headers: cabecalho(conta.token),
+			data: { temas: ['Ciclo hidrológico'] }
+		});
+		expect(vinculo.status()).toBe(204);
+		const [q1, q2] = await questoesDo(page.request, conta.token, 'restauro');
+		expect((await responderQuestao(page.request, conta.token, q1.id, 'ERRADO')).status).toBe(201);
+		expect((await responderQuestao(page.request, conta.token, q2.id, 'B')).status).toBe(201);
+
+		// Exportado pela página do mapa…
+		await page.goto('/mapas/restauro');
+		await page.getByText('Manter este mapa').click();
+		const [baixado] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '⬇ Exportar mapa' }).click()]);
+		const zip = readFileSync((await baixado.path())!);
+		expect(zip.toString('latin1')).toContain('restauro.conta.json');
+
+		// …e excluído: tudo some da conta.
+		expect((await page.request.delete('/api/mapas/restauro', { headers: cabecalho(conta.token) })).status()).toBe(204);
+
+		// Volta por um lugar só, inteiro.
+		await page.goto('/mapas');
+		await page.getByText('Importar uma exportação (.zip)').click();
+		await page.getByLabel('Arquivo exportado (.zip)').setInputFiles({ name: 'restauro.zip', mimeType: 'application/zip', buffer: zip });
+		const lista = page.getByRole('list', { name: 'Mapas importados' });
+		await expect(page.getByText('1 de 1 mapa importado.')).toBeVisible();
+		await expect(lista).toContainText('2 questões, 1 imagem, 2 respostas; vinculado a GEO — Geografia Física.');
+
+		const voltou = await questoesDo(page.request, conta.token, 'restauro');
+		expect(voltou.map((q) => q.resposta?.escolhida)).toEqual(['ERRADO', 'B']);
+		expect((await (await ler(page.request, conta.token, 'restauro')).json()).imagens).toEqual(['ciclo.png']);
+		const geoDepois = (await materiasDo(page.request, conta.token, concurso)).find((d) => d.codigo === 'GEO')!;
+		expect(geoDepois.mapas).toEqual([expect.objectContaining({ slug: 'restauro', materiaInteira: false, temas: ['Ciclo hidrológico'] })]);
+
+		// Importar o mesmo .zip de novo não repete as respostas.
+		await page.getByLabel('Arquivo exportado (.zip)').setInputFiles({ name: 'restauro.zip', mimeType: 'application/zip', buffer: zip });
+		await expect(lista).toContainText('2 questões, 1 imagem, 0 respostas');
+
+		// O .zip escolhido no painel do texto vai para o lugar certo; e um mapa
+		// com problema não para os outros — a lista diz qual foi.
+		const misto = zipSimples({
+			'quebrado.md': Buffer.from('isto não é um mapa'),
+			'restauro.md': Buffer.from(TEXTO),
+			'restauro/ciclo.png': PNG
+		});
+		await page.getByText('Importar mapa', { exact: true }).click();
+		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles({ name: 'misto.zip', mimeType: 'application/zip', buffer: misto });
+		await expect(page.getByText('1 de 2 mapas importados; 1 com problema.')).toBeVisible();
+		await expect(lista.getByRole('listitem').filter({ hasText: 'quebrado' }).getByRole('alert')).toBeVisible();
+		await expect(lista.getByRole('listitem').filter({ hasText: 'Restauro' })).toContainText('1 imagem');
 	});
 });

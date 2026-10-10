@@ -1,0 +1,22 @@
+{
+  "respostas": [
+    {
+      "acertou": "bool",
+      "em": "string",
+      "questao": "string",
+      "resposta": "string"
+    }
+  ],
+  "versao": "number",
+  "vinculos": [
+    {
+      "concurso": "string",
+      "concursoNome": "string",
+      "disciplina": "string",
+      "nome": "string",
+      "temas": [
+        "string"
+      ]
+    }
+  ]
+}

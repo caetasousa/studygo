@@ -14,6 +14,7 @@ import (
 
 	"studygo/internal/adapter/notifier"
 	"studygo/internal/adapter/postgres"
+	"studygo/internal/domain/mapa"
 	"studygo/internal/platform/config"
 	"studygo/internal/platform/db"
 	"studygo/internal/port"
@@ -98,7 +99,9 @@ func run(logger *slog.Logger) error {
 
 	// Uma passada agora, antes de esperar a virada: se o processo ficou fora do
 	// ar durante uma meia-noite, o atraso daquele dia continua lá esperando.
-	tick(ctx, logger, svc, replanejamento, usuarios, time.Now)
+	pedidos := postgres.NewMapaRepo(pool)
+
+	tick(ctx, logger, svc, replanejamento, usuarios, pedidos, time.Now)
 
 	for {
 		espera := proximaVirada(time.Now().In(port.Fuso))
@@ -120,7 +123,7 @@ func run(logger *slog.Logger) error {
 
 			return nil
 		case <-timer.C:
-			tick(ctx, logger, svc, replanejamento, usuarios, time.Now)
+			tick(ctx, logger, svc, replanejamento, usuarios, pedidos, time.Now)
 		}
 	}
 }
@@ -155,6 +158,7 @@ func tick(
 	svc *service.NotificacaoService,
 	replanejamento *service.CronogramaService,
 	sessoes port.SessaoManutencao,
+	pedidos port.FaxinaDosPedidos,
 	agora func() time.Time,
 ) {
 	replanejados, err := replanejamento.AbsorverAtrasosDoDia(ctx)
@@ -175,6 +179,22 @@ func tick(
 	}
 
 	limparSessoes(ctx, logger, sessoes, agora())
+	descartarPDFs(ctx, logger, pedidos, agora())
+}
+
+// descartarPDFs apaga o PDF dos pedidos de mapa que falharam há mais de uma
+// semana: é material pago, e ninguém o pôs de volta na fila. O pedido fica,
+// com o motivo; para tentar de novo, envia-se o PDF outra vez.
+func descartarPDFs(ctx context.Context, logger *slog.Logger, pedidos port.FaxinaDosPedidos, agora time.Time) {
+	n, err := pedidos.DescartarPDFsDeFalhas(ctx, agora.Add(-mapa.GuardaDoPDFQueFalhou))
+	if err != nil {
+		logger.ErrorContext(ctx, "descartando PDFs de pedidos que falharam", slog.Any("error", err))
+		return
+	}
+
+	if n > 0 {
+		logger.InfoContext(ctx, "PDFs de pedidos que falharam descartados", slog.Int64("pedidos", n))
+	}
 }
 
 // limparSessoes varre os refresh tokens que não valem mais. Erro aqui é ruído

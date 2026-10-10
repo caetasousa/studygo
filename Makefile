@@ -59,6 +59,14 @@ help: ## Lista os alvos disponíveis
 
 up: ## Sobe o stack local (hot reload)
 	$(COMPOSE) up -d
+	@echo
+	@printf '  %-34s %s\n' \
+		'studygo-local-tela'             'a tela (SvelteKit)            http://localhost:5173' \
+		'studygo-local-api'              'a API (Go)                    http://localhost:8080' \
+		'studygo-local-banco'            'o banco (PostgreSQL)          localhost:5432' \
+		'studygo-local-tarefas-diarias'  'o worker: replanejamento, lembretes e faxina' \
+		'studygo-local-leitor-de-edital' 'o edital-processor: lê o edital e faz os mapas mentais'
+	@echo
 
 down: ## Para o stack local
 	$(COMPOSE) down

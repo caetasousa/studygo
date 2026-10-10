@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"studygo/internal/domain/lei"
+	"studygo/internal/domain/usuario"
 	"studygo/internal/port"
 )
 
@@ -43,4 +44,26 @@ func (Indisponivel) IniciarCaptura(context.Context, string, string, []string) (s
 
 func (Indisponivel) Captura(context.Context, string, string) (lei.Captura, error) {
 	return lei.Captura{}, lei.ErrCapturaIndisponivel
+}
+
+var _ port.ProcessadorDeMapas = Indisponivel{}
+
+func (Indisponivel) Processar(context.Context, port.TrabalhoDeMapa) error {
+	return port.ErrImportacaoIndisponivel
+}
+
+func (Indisponivel) ConectarClaude(context.Context, string) (string, error) {
+	return "", usuario.ErrClaudeIndisponivel
+}
+
+func (Indisponivel) ConcluirConexaoDoClaude(context.Context, string, string) (port.ConexaoDoClaude, error) {
+	return port.ConexaoDoClaude{}, usuario.ErrClaudeIndisponivel
+}
+
+func (Indisponivel) ConexaoDoClaude(context.Context, string) (port.ConexaoDoClaude, error) {
+	return port.ConexaoDoClaude{}, nil
+}
+
+func (Indisponivel) DesconectarClaude(context.Context, string) error {
+	return usuario.ErrClaudeIndisponivel
 }

@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { api } from '$lib/api';
+	import { salvarArquivo } from '$lib/download';
 	import NavIcon from '$lib/components/NavIcon.svelte';
 	import { semNumeroInicial } from '$lib/estudo';
 	import { tagStyle } from '$lib/format';
@@ -66,6 +67,21 @@
 	// O outline cita a imagem pelo nome; o arquivo chega à parte, aqui. O que o
 	// mapa cita e ainda não chegou fica listado, para não se perder no meio dos
 	// ramos recolhidos.
+	let exportando = $state(false);
+	let erroExportar = $state<string | null>(null);
+
+	async function exportar() {
+		exportando = true;
+		erroExportar = null;
+		try {
+			salvarArquivo(await api.exportarMapas(slug), `${slug}.zip`);
+		} catch (e) {
+			erroExportar = e instanceof Error ? e.message : 'Não foi possível exportar o mapa';
+		} finally {
+			exportando = false;
+		}
+	}
+
 	let versaoDasImagens = $state(0);
 	let enviandoImagens = $state(false);
 	let avisoImagens = $state<string | null>(null);
@@ -701,6 +717,16 @@
 			/>
 		</label>
 		{#if enviandoImagens}<p class="page-sub">Enviando…</p>{/if}
+
+		<h2 class="sec">Exportar</h2>
+		<p class="page-sub">
+			Um .zip com o texto, as questões, as imagens, os vínculos com as matérias e as suas respostas, como o mapa está
+			agora. Ele volta inteiro em <a href="/mapas">Mapas mentais</a> → “Importar uma exportação (.zip)”.
+		</p>
+		{#if erroExportar}<div class="form-error" role="alert">{erroExportar}</div>{/if}
+		<button type="button" class="btn" onclick={exportar} disabled={exportando}>
+			{exportando ? 'Exportando…' : '⬇ Exportar mapa'}
+		</button>
 
 		<h2 class="sec">Excluir</h2>
 		<button type="button" class="btn danger" onclick={excluir}>Excluir mapa</button>

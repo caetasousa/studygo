@@ -240,3 +240,33 @@ func mapasDaMateriaParaDTO(m service.MapasDaMateria) mapasDaMateriaDTO {
 		DisciplinaID: m.DisciplinaID.String(), Codigo: m.Codigo, Nome: m.Nome, Temas: naoNula(m.Temas), Mapas: mapas,
 	}
 }
+
+// pedidoDeMapaDTO é um pedido da fila como a tela o vê. O PDF não vem aqui:
+// só se ainda está guardado.
+type pedidoDeMapaDTO struct {
+	ID       string `json:"id"`
+	Arquivo  string `json:"arquivo"`
+	Situacao string `json:"situacao"`
+	// Concurso e Disciplina vêm vazios quando o pedido não escolheu matéria.
+	Concurso     string    `json:"concurso"`
+	Disciplina   string    `json:"disciplina"`
+	Materia      string    `json:"materia"`
+	Mapa         string    `json:"mapa"`
+	Relatorio    string    `json:"relatorio"`
+	TemPDF       bool      `json:"temPdf"`
+	CriadoEm     time.Time `json:"criadoEm"`
+	AtualizadoEm time.Time `json:"atualizadoEm"`
+}
+
+func pedidoDeMapaParaDTO(p mapa.Pedido) pedidoDeMapaDTO {
+	d := pedidoDeMapaDTO{
+		ID: p.ID.String(), Arquivo: p.Arquivo, Situacao: string(p.Situacao),
+		Concurso: p.ConcursoSlug, Materia: p.DisciplinaNome, Mapa: p.Mapa, Relatorio: p.Relatorio,
+		TemPDF: p.TemPDF, CriadoEm: p.CriadoEm, AtualizadoEm: p.AtualizadoEm,
+	}
+	if p.DisciplinaID.Valid {
+		d.Disciplina = p.DisciplinaID.UUID.String()
+	}
+
+	return d
+}

@@ -1,0 +1,5 @@
+{
+  "conectado": "bool",
+  "email": "string",
+  "plano": "string"
+}

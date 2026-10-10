@@ -6,7 +6,10 @@
 
 - `backend/`: API Go e worker.
 - `frontend/`: SPA SvelteKit/Svelte 5.
-- `edital-processor/`: serviço interno Python/FastAPI para processar editais.
+- `edital-processor/`: serviço interno Python/FastAPI para processar editais e
+  transformar o PDF de uma aula em mapa mental, com o Claude Code
+  (`app/mapas/`). Os mapas vivem no banco; `conteudo/mapas/` é só a referência
+  do formato, e a saída é a exportação.
 - `ansible/`: provisionamento e deploy do servidor (WSL + túnel da Cloudflare).
 
 O backend utiliza um único hexágono. Não introduza bounded contexts, ORM,
@@ -69,7 +72,10 @@ Regras que valem sem exceção:
 - Mappers só onde os dois lados da fronteira são de fato diferentes.
 
 O `edital-processor` produz uma prévia revisável e nunca escreve no PostgreSQL.
-A persistência acontece no backend após confirmação do usuário.
+A persistência acontece no backend após confirmação do usuário. O mapa mental
+segue a mesma regra: o processador devolve o resultado à porta interna do
+backend (`INTERNAL_ADDR`, só na rede dos containers), e é o backend que o
+importa na conta.
 
 ## ⚠️ Invariantes importantes
 
@@ -101,11 +107,14 @@ rollback automático pelos `.down.sql`.
   (`TestMigrations_NaoContemLogicaDeNegocio`).
 - Trate migrations que podem ter sido aplicadas como imutáveis; corrija com uma
   migration nova.
-- A próxima migration é a **000017** (a 000008 criou a legislação, a 000009 o
+- A próxima migration é a **000020** (a 000008 criou a legislação, a 000009 o
   recorte do edital no vínculo, a 000010 o recorte guardado na versão, a 000011
   a marca de atividade antecipada, a 000012 os mapas mentais, a 000013 as
   questões deles, a 000014 a matéria só na reta final, a 000015 as imagens dos
-  mapas, a 000016 os tópicos que cada mapa cobre). Migration nova também
+  mapas, a 000016 os tópicos que cada mapa cobre, a 000017 a fila de PDFs que
+  viram mapa, a 000019 o token do Claude cifrado na conta). A **000018** não
+  existe: saiu antes de publicar, mas está aplicada em bancos locais — como as
+  000004–000007, o número não se reusa. Migration nova também
   atualiza o rebobinamento de `TestMigrate_AplicaSomenteAsPendentes`. As
   000004–000007 (catálogo de provas, hoje no provasGo) saíram do bundle mas
   estão registradas em staging e em bancos locais: reusar um desses números

@@ -25,7 +25,8 @@ flowchart LR
     N --> F["🧡 Frontend<br/>SPA"]
     F -- "/api" --> B["🐹 Backend Go<br/>hexágono único"]
     B --> P[("🐘 PostgreSQL")]
-    B -. edital .-> E["🐍 edital-processor"]
+    B -. "edital, PDF da aula" .-> E["🐍 edital-processor<br/>(+ Claude Code)"]
+    E -. "mapa pronto<br/>(porta interna)" .-> B
     W["🔔 worker"] --> P
 ```
 
@@ -223,13 +224,15 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   trechos de `reconhecer` ("16.168") nos tópicos da matéria; o estudante
   confirma e o vínculo vai para `disciplinas_leis`, pelo id da disciplina.
 
-### Mapas mentais (000012, as questões na 000013, as imagens na 000015)
+### Mapas mentais (000012, as questões na 000013, as imagens na 000015, a fila de PDFs na 000017)
 
 ```
 mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore em pré-ordem)
         ├── mapas_questoes ──── mapas_respostas   (as questões da aula e cada tentativa)
         ├── mapas_imagens      (nome, tipo, bytes — as figuras que o texto cita)
         └── disciplinas_mapas ──► disciplinas
+
+mapas_pedidos (o PDF na fila, a situação, o mapa que saiu e o relatório) ──► disciplinas
 ```
 
 - **O mapa é da conta que o importou.** Deriva de material de estudo pessoal (uma
@@ -271,6 +274,51 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
   tópicos que citam um termo de `reconhecer`, mas só no vínculo novo: o que foi
   escolhido na página do mapa não volta à sugestão ao reimportar. O tópico
   renomeado sai da lista sozinho.
+- **O mapa também nasce do PDF da aula** (`mapas_pedidos`, 000017), no
+  `edital-processor` (`app/mapas/`), que a esteira constrói e implanta como o
+  resto. É por evento, sem fila consultada: a tela envia o PDF, o backend o
+  guarda e o entrega na hora ao processador (`POST
+  /internal/mapas/processamentos`, 202), que roda o Claude Code (`claude -p`,
+  versão fixada na imagem) com a skill `mapa-mental` e as ferramentas, um PDF
+  de cada vez. O resultado volta pela **porta interna do backend**
+  (`INTERNAL_ADDR`, `:8081`): fora do nginx, não publicada, só a rede dos
+  containers a alcança, e com o mesmo token de serviço no sentido contrário. O
+  backend o importa pelas mesmas regras da tela; se recusa, o motivo volta (422)
+  e o processador o repassa ao Claude na mesma sessão (`--resume`), até três
+  vezes. Como no edital, o processador nunca toca no banco. A fila dele é em
+  memória: ao subir, pede ao backend o que estava "processando" (redespacho), e
+  um pedido que o processador não recebeu fica "na fila", para quem estuda pôr
+  de novo. O Claude usa a assinatura que a conta conectou pela tela
+  (Configurações → **Conectar o Claude**: o processador roda o `claude auth
+  login` num pseudo-terminal, numa pasta só da conta, mostra o link e recebe o
+  código colado), ou o token de `claude setup-token` guardado ali. Sem nenhum
+  dos dois, o pedido falha dizendo para conectar. O PDF é
+  material pago e só vive enquanto serve — o pedido pronto o descarta (`pdf
+  NULL`), e o processador apaga a pasta do pedido ao terminar. Teto de 40 MB,
+  que os dois nginx do caminho acompanham.
+- **O banco é a fonte do mapa; a saída é a exportação.** `mapa.Texto()` escreve
+  o mapa de volta no formato do outline (o inverso de `mapa.Ler`, com teste de
+  ida e volta), e `GET /api/mapas/{slug}/exportacao` (um) e
+  `GET /api/exportacao-de-mapas` (todos) devolvem um `.zip` no arranjo que a
+  importação aceita — texto, questões ativas, imagens e o estudo da conta
+  (`<slug>.conta.json`: os vínculos com os tópicos e as respostas, pelo que se
+  reconhece fora da conta — slug do concurso, código da matéria, `id` da
+  questão —, nunca por id do banco). O de todos é escrito mapa a mapa direto
+  na resposta, sem juntar as imagens na memória. Volta por `POST
+  /api/mapas/pacote`, um mapa por envio: a tela abre o `.zip` (sem biblioteca,
+  `lib/mapas/pacote.ts`) porque o de todos (~125 MB) passa dos 100 MB que o
+  túnel aceita num envio. O vínculo sem o concurso de origem cai no concurso
+  aberto; o que não acha lugar vira aviso; a resposta já gravada (mesma
+  questão, mesma hora) não se repete. O `reconhecer:` não sai: o banco não o
+  guarda, porque ele só sugere o vínculo na importação.
+- **O token do Claude da conta** (`usuarios.token_claude`, 000019) é o que o
+  processador usa para trabalhar com a assinatura de quem estuda. Guarda-se
+  cifrado (AES-256-GCM, chave derivada do segredo do JWT pelo HKDF — sem
+  segredo novo no deploy); a tela vê só o fim, e só o backend o lê inteiro, ao
+  entregar o PDF ao processador. Trocar o segredo do JWT o torna ilegível, e
+  quem estuda cola de novo.
+- **A faxina da fila**: o worker apaga, na virada do dia, o PDF dos pedidos que
+  falharam há mais de uma semana.
 - **A tela é uma só: a página de tópicos recolhíveis, no jeito do Notion**
   (escolha de 28/09/2026, entre quatro modelos testados). O motivo foi o
   aparelho: boa parte do estudo é no celular e no tablet, e uma página que se lê

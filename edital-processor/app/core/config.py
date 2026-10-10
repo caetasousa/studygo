@@ -77,6 +77,25 @@ class Settings(BaseSettings):
     # quanto ele fica ocupando disco depois de morto.
     artifact_sweep_seconds: int = 900
 
+    # --- mapas mentais ----------------------------------------------------------
+    # O PDF de uma aula vira mapa com o Claude Code, em segundo plano; o
+    # resultado volta ao backend pela porta interna dele (ver app/mapas).
+    backend_internal_url: str = ""
+    claude_bin: str = "claude"
+    # O login do Claude de cada conta (uma pasta por conta), feito pela tela.
+    claude_contas_dir: Path = Path("/var/lib/edital-processor/claude")
+    # Quantas vezes o Claude corrige o que a importação recusou antes de desistir.
+    mapas_tentativas: int = 3
+    # Uma aula longa leva dezenas de minutos; isto só corta o que travou.
+    mapas_timeout_seconds: float = 3 * 3600
+    mapas_max_pdf_bytes: int = 40 * 1024 * 1024
+    # O export do provasGo descompactado, se montado: dá ao mapa as questões
+    # de prova sobre o assunto, com o gabarito oficial.
+    provasgo_dir: Path | None = None
+    # Nomes que a ferramenta de texto apaga do PDF, além de CPF, e-mail e marca
+    # escondida (separados por "|"): o rodapé traz o nome de quem comprou.
+    mapa_comprador: str = ""
+
     # --- ops -----------------------------------------------------------------
     debug_endpoint_enabled: bool = False
 

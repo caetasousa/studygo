@@ -178,6 +178,71 @@ function responder(res, status, corpo) {
 	res.end(JSON.stringify(corpo));
 }
 
+// --- mapas mentais ------------------------------------------------------------
+// O processador real roda o Claude por dezenas de minutos; o dublê responde o
+// mesmo 202 e, um instante depois, devolve ao backend pela porta interna dele
+// um mapa sintético — ou a falha, se o nome do PDF pedir. O relatório diz de
+// onde veio o token do Claude, que é o que a tela não teria como mostrar.
+const BACKEND = (process.env.EP_BACKEND_INTERNAL_URL ?? '').replace(/\/$/, '');
+
+// A conexão do Claude de cada conta, como o processador real a faz pela tela:
+// um link de autorização e o código que a página mostra. O dublê aceita só
+// CODIGO_CERTO; outro código é recusado e o mesmo link continua valendo.
+const CODIGO_CERTO = 'codigo-do-e2e';
+const linksPedidos = new Set();
+const conectados = new Set();
+const conexao = (dono) =>
+	conectados.has(dono) ? { conectado: true, email: 'quem@estuda.e2e', plano: 'max' } : { conectado: false, email: '', plano: '' };
+const ESPERA_DO_MAPA = 2000;
+
+function mapaDoPedido(d) {
+	const slug = `aula-${d.pedido.slice(0, 8)}`;
+	return {
+		slug,
+		texto: `# Aula ${d.arquivo}\nslug: ${slug}\nfonte: Aula sintética do E2E\n\n- Introdução\n  - [def] A **aula** de teste\n- Conclusão\n  - [cai] O que mais cai\n`
+	};
+}
+
+async function devolver(d) {
+	await new Promise((r) => setTimeout(r, ESPERA_DO_MAPA));
+	const auth = { authorization: `Bearer ${TOKEN}` };
+	const token = d.tokenClaude ? `o token guardado (…${d.tokenClaude.slice(-4)})` : 'a conexão da conta';
+	try {
+		if (!d.tokenClaude && !conectados.has(d.dono)) {
+			await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/falha`, {
+				method: 'POST',
+				headers: { ...auth, 'content-type': 'application/json' },
+				body: JSON.stringify({
+					relatorio: 'O Claude desta conta não está conectado. Conecte-o em Configurações → Processador de mapas e use "Pôr na fila de novo".'
+				})
+			});
+			return;
+		}
+		if (/falha/i.test(d.arquivo)) {
+			await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/falha`, {
+				method: 'POST',
+				headers: { ...auth, 'content-type': 'application/json' },
+				body: JSON.stringify({ relatorio: 'O PDF é só imagem: não há texto para ler.' })
+			});
+			return;
+		}
+		const { texto } = mapaDoPedido(d);
+		const form = new FormData();
+		form.set(
+			'dados',
+			JSON.stringify({
+				mapa: texto,
+				questoes: null,
+				temas: d.temas.slice(0, 1),
+				relatorio: `A questão 3 traz um gabarito que diverge da tabela da aula. Token do Claude: ${token}.`
+			})
+		);
+		await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/resultado`, { method: 'POST', headers: auth, body: form });
+	} catch (e) {
+		console.error('o backend não recebeu o mapa', e);
+	}
+}
+
 function recusar(res, status, code, message) {
 	responder(res, status, { code, message, transient: false, requestId: null });
 }
@@ -244,6 +309,36 @@ createServer((req, res) => {
 			const achada = pesquisa(tema, link);
 			if (!achada) return recusar(res, 404, 'fonte_nao_encontrada', 'não achei a fonte oficial desta norma pelo tópico: cole o link dela');
 			return responder(res, 200, achada);
+		}
+
+		if (req.method === 'POST' && req.url === '/internal/mapas/processamentos') {
+			const dados = corpo.match(/name="dados"\r\n\r\n([\s\S]*?)\r\n--/);
+			if (!dados) return recusar(res, 400, 'invalid_pdf', 'dados do pedido inválidos');
+			const d = JSON.parse(dados[1]);
+			devolver({ ...d, dono: req.headers['x-owner-ref'], temas: d.temas ?? [], tokenClaude: d.tokenClaude ?? '' });
+			return responder(res, 202, { pedido: d.pedido });
+		}
+
+		const dono = req.headers['x-owner-ref'];
+		if (req.method === 'GET' && req.url === '/internal/claude') return responder(res, 200, conexao(dono));
+		if (req.method === 'POST' && req.url === '/internal/claude/conexao') {
+			linksPedidos.add(dono);
+			return responder(res, 200, { url: `https://claude.com/cai/oauth/authorize?code=true&e2e=${encodeURIComponent(dono)}` });
+		}
+		if (req.method === 'POST' && req.url === '/internal/claude/conexao/codigo') {
+			const { codigo = '' } = JSON.parse(corpo || '{}');
+			if (!linksPedidos.has(dono)) return recusar(res, 409, 'conexao_nao_iniciada', 'peça o link de novo');
+			if (codigo !== CODIGO_CERTO) {
+				return recusar(res, 422, 'codigo_recusado', 'o Claude não aceitou o código. Copie o código inteiro da página de autorização e cole de novo. (Invalid code.)');
+			}
+			linksPedidos.delete(dono);
+			conectados.add(dono);
+			return responder(res, 200, conexao(dono));
+		}
+		if (req.method === 'DELETE' && req.url === '/internal/claude') {
+			conectados.delete(dono);
+			res.writeHead(204);
+			return res.end();
 		}
 
 		const consulta = req.method === 'GET' && req.url.match(/^\/internal\/leis\/capturas\/([\w-]+)$/);

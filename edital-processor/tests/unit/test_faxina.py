@@ -116,9 +116,7 @@ async def test_analisar_nao_bloqueia_o_event_loop(
     monkeypatch.setattr(routes, "analyse", analyse_lenta)
 
     def _settings() -> Settings:
-        return Settings(
-            service_token="s3cr3t", gemini_api_key="", work_dir=tmp_path / "work"
-        )
+        return Settings(service_token="s3cr3t", gemini_api_key="", work_dir=tmp_path / "work")
 
     aplicativo = create_app()
     aplicativo.dependency_overrides[get_settings] = _settings

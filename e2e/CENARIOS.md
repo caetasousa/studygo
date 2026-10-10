@@ -137,6 +137,13 @@ recolhíveis, no jeito do Notion (escolha de 28/09/2026): cada ramo é uma seç�
 colorida, e a página tem de ler bem no celular e no tablet, onde boa parte do
 estudo acontece.
 
+O mapa também pode nascer do PDF da aula: a tela envia o PDF, o backend o
+entrega ao `edital-processor` (o Claude Code, com a skill `mapa-mental`), e o
+mapa volta pela porta interna do backend, que o importa como a tela
+importaria. No E2E o processador é o dublê (`e2e/duble-processador`), que
+devolve um mapa sintético — ou a falha, se o nome do PDF pedir — e diz no
+relatório de onde veio o token do Claude.
+
 As questões das aulas não ficam no mapa: vêm num arquivo à parte
 (`<slug>.questoes.json`, fora do git como o mapa), importado na página do mapa,
 e são resolvidas ali, como as da lei — cada uma presa a um ramo, múltipla
@@ -171,6 +178,13 @@ escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
 | M25 | as questões ficam soterradas embaixo do mapa (no celular, várias telas abaixo); escolher ver por conteúdo ou por banca não reagrupa, ou a escolha não fica lembrada; o filtro (sem resposta, que errei) traz outra coisa; "Resolver" abre questões fora do filtro; ou o ramo do mapa não diz quantas questões tem nem leva a elas | não acho as questões; treino o que não queria |
 | M26 | a imagem citada no mapa (`![legenda](arquivo.png)`) não aparece no tópico depois de enviada, aparece no tópico errado, a de um mapa aparece em outro ou em outra conta, a que ainda não foi enviada quebra a página em vez de dizer que falta, o filtro não acha o tópico pela legenda, um arquivo que não é imagem (ou PNG com nome .jpg, ou grande demais) é aceito, mandar de novo a mesma imagem duplica em vez de trocar, ou a política de segurança (CSP) que a borda do servidor manda bloqueia a imagem — no E2E não há a borda, e a tela passava aqui e ficava em branco no ar | estudo o fluxo do BPMN sem o desenho; vejo a figura de outra aula; o mapa quebra |
 | M27 | o mapa vinculado a alguns tópicos aparece em toda atividade da matéria (ou some de todas); a atividade que junta dois tópicos ("A · B") ou que traz o rótulo "Reforço — " não acha o mapa do tópico; a ementa não marca os tópicos com mapa, ou marca o tópico errado; escolher os tópicos na página do mapa não fica gravado ao recarregar, aceita um tópico que não é da matéria, ou desligar todos apaga o vínculo; importar o mapa de novo desfaz a escolha; o vínculo antigo, sem tópicos, deixa de valer para a matéria inteira | o mapa não aparece onde se estuda o assunto, ou aparece onde não ajuda — o cronograma vira uma fileira de ícones iguais |
+| M28 | enviar o PDF da aula não cria o pedido na fila, aceita um arquivo que não é PDF (ou com nome .pdf e outro conteúdo, ou grande demais), perde a matéria escolhida, o PDF escolhido no painel de importar o texto do mapa vira um erro sem explicação (413) em vez de apontar o painel certo, ou o pedido aparece, é baixado ou mexido por outra conta | envio a aula e nada acontece; ou o material pago de um vaza para o outro |
+| M29 | o mesmo pedido roda duas vezes no processador (o redespacho ao reiniciar; coberto em `edital-processor/tests/unit/test_mapas.py`) ou o mapa entra noutra conta, ou fora da matéria pedida; o pedido pronto não mostra o mapa nem leva a ele; o relatório do processador (gabarito que diverge, erro da própria prova, o que ficou de fora) ou o motivo da falha não aparece; ou o PDF continua guardado no servidor depois do mapa pronto | dois mapas iguais; não sei o que o processador achou de errado; material pago parado no servidor |
+| M30 | o pedido que falhou (ou que travou processando) não volta para a fila; excluir o pedido não pede confirmação, cancelar exclui mesmo assim, ou o pedido excluído continua sendo processado | tenho de reenviar o PDF; perco o pedido por um clique; aparece um mapa que eu tinha desistido de fazer |
+| M31 | o token do Claude guardado em Configurações volta inteiro para a tela, fica legível no banco, aparece ou é usado por outra conta, um token em branco (ou com espaço no meio) é aceito, remover não remove, ou o processador não o usa e cai no login da máquina sem dizer | o acesso à minha assinatura vaza; o processador falha sem eu saber por quê |
+| M32 | exportar o mapa perde item, marca, questão, imagem, o vínculo com as matérias (e os tópicos de cada uma) ou as respostas — o .zip, reimportado, não dá o mesmo mapa —, exporta o que foi excluído no modo de edição, deixa outra conta baixar o mapa, ou "exportar todos" esquece um mapa | a cópia de segurança não serve; o que tirei volta; meu material vaza |
+| M33 | conectar o Claude pela tela não mostra o link de autorização, aceita um código errado (ou em branco) sem dizer o que fazer, a conexão de uma conta vale para outra, desconectar não desconecta ou não pede confirmação, ou o PDF de quem não conectou fica rodando sem dizer que falta conectar | tenho de abrir um terminal para usar o processador; minha assinatura serve a outra conta; o mapa nunca sai e não sei por quê |
+| M34 | o .zip exportado não tem um lugar só para voltar: importar pede o texto, as questões e as imagens em telas diferentes; ou o .zip volta sem as imagens, sem as questões, sem os vínculos e tópicos, sem as respostas, duplica as respostas ao importar duas vezes, para no primeiro mapa com problema sem dizer qual, ou não cabe no envio (o "exportar todos" passa de 100 MB) | restaurar a cópia vira um trabalho manual de horas, ou volta pela metade sem eu perceber |
 
 ## Fora da suíte, de propósito
 

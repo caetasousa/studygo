@@ -65,3 +65,37 @@ func EscolherTemas(escolhidos, daMateria []string) ([]string, error) {
 
 	return out, nil
 }
+
+// TemaCorrespondente acha na ementa o tópico que corresponde a um que veio de
+// fora (a exportação de outra conta, ou de antes de o concurso ser recriado).
+// O igual vale primeiro, sem caixa, acento nem pontuação; se não há, vale o
+// tópico que contém o de fora, ou que está contido nele — a mesma ementa
+// cortada de outro jeito ("A; B" num tópico só, ou em dois). Com mais de um
+// candidato, nenhum: o mapa não vai para o tópico errado no chute.
+func TemaCorrespondente(tema string, daMateria []string) (string, bool) {
+	alvo := dobrar(tema)
+	if alvo == "" {
+		return "", false
+	}
+
+	for _, t := range daMateria {
+		if dobrar(t) == alvo {
+			return t, true
+		}
+	}
+
+	var achados []string
+
+	for _, t := range daMateria {
+		d := dobrar(t)
+		if d != "" && (strings.Contains(" "+d+" ", " "+alvo+" ") || strings.Contains(" "+alvo+" ", " "+d+" ")) {
+			achados = append(achados, t)
+		}
+	}
+
+	if len(achados) == 1 {
+		return achados[0], true
+	}
+
+	return "", false
+}

@@ -16,6 +16,10 @@ type Handlers struct {
 	Plano    *PlanoHandler
 	Lei      *LeiHandler
 	Mapa     *MapaHandler
+	// Processador guarda o token do Claude que o processador de mapas usa.
+	Processador *ProcessadorHandler
+	// Pedidos é a fila de PDFs que viram mapa.
+	Pedidos *PedidosDeMapaHandler
 }
 
 // Limites reúne os limitadores das rotas que merecem um teto próprio.
@@ -160,16 +164,38 @@ func NewRouter(
 	// Mapas mentais: ao contrário da lei, cada mapa é da conta que o importou.
 	protegida("GET /api/mapas", h.Mapa.Catalogo)
 	protegida("POST /api/mapas", h.Mapa.Importar)
+	// O mapa exportado volta inteiro: texto, questões, imagens, vínculos e respostas.
+	protegida("POST /api/mapas/pacote", h.Mapa.ImportarPacote)
 	protegida("GET /api/mapas/{slug}", h.Mapa.Ler)
 	protegida("DELETE /api/mapas/{slug}", h.Mapa.Excluir)
 	protegida("POST /api/mapas/{slug}/questoes", h.Mapa.ImportarQuestoes)
 	protegida("POST /api/mapas/{slug}/itens/excluir", h.Mapa.ExcluirItem)
 	protegida("POST /api/mapas/{slug}/imagens", h.Mapa.EnviarImagens)
 	protegida("GET /api/mapas/{slug}/imagens/{nome}", h.Mapa.Imagem)
+	// A saída do banco para fora do app, no arranjo que a importação aceita.
+	protegida("GET /api/mapas/{slug}/exportacao", h.Mapa.ExportarMapa)
+	protegida("GET /api/exportacao-de-mapas", h.Mapa.ExportarTodos)
 	protegida("POST /api/mapas/questoes/{id}/respostas", h.Mapa.Responder)
 	protegida("GET /api/concursos/{slug}/mapas", h.Mapa.DoConcurso)
 	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Vincular)
 	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Desvincular)
+
+	// O token do Claude que o processador usa: a tela grava e vê só o fim; o
+	// backend o entrega ao processador junto com cada PDF da conta.
+	protegida("GET /api/conta/token-do-claude", h.Processador.Situacao)
+	protegida("PUT /api/conta/token-do-claude", h.Processador.Guardar)
+	protegida("DELETE /api/conta/token-do-claude", h.Processador.Remover)
+	protegida("GET /api/conta/claude", h.Processador.Conexao)
+	protegida("POST /api/conta/claude/conexao", h.Processador.Conectar)
+	protegida("POST /api/conta/claude/conexao/codigo", h.Processador.ConcluirConexao)
+	protegida("DELETE /api/conta/claude", h.Processador.Desconectar)
+
+	// A fila de PDFs que viram mapa: a tela envia e acompanha; o processador
+	// (interno) devolve o resultado pela porta interna (NewRouterInterno).
+	protegida("POST /api/pedidos-de-mapa", h.Pedidos.Pedir)
+	protegida("GET /api/pedidos-de-mapa", h.Pedidos.Pedidos)
+	protegida("POST /api/pedidos-de-mapa/{id}/fila", h.Pedidos.Reenfileirar)
+	protegida("DELETE /api/pedidos-de-mapa/{id}", h.Pedidos.Excluir)
 
 	return mux
 }

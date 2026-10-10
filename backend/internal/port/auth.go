@@ -21,6 +21,17 @@ type UsuarioRepository interface {
 	GuardarRefreshToken(ctx context.Context, usuarioID uuid.UUID, tokenHash string, expiraEm time.Time) error
 	RefreshTokenValido(ctx context.Context, tokenHash string) (uuid.UUID, error)
 	RevogarRefreshToken(ctx context.Context, tokenHash string) error
+
+	// GravarTokenDoClaude guarda o token do Claude já cifrado; nil o apaga.
+	GravarTokenDoClaude(ctx context.Context, id uuid.UUID, cifrado []byte) error
+	// TokenDoClaude devolve o token cifrado da conta, ou nil se não há.
+	TokenDoClaude(ctx context.Context, id uuid.UUID) ([]byte, error)
+}
+
+// Cifra guarda segredos da conta cifrados no banco (AES-GCM).
+type Cifra interface {
+	Cifrar(claro []byte) ([]byte, error)
+	Decifrar(cifrado []byte) ([]byte, error)
 }
 
 // SessaoManutencao é a faxina periódica das sessões. É uma porta SEPARADA de

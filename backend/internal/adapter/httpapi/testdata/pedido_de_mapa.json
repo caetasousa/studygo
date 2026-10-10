@@ -1,0 +1,13 @@
+{
+  "arquivo": "string",
+  "atualizadoEm": "string",
+  "concurso": "string",
+  "criadoEm": "string",
+  "disciplina": "string",
+  "id": "string",
+  "mapa": "string",
+  "materia": "string",
+  "relatorio": "string",
+  "situacao": "string",
+  "temPdf": "bool"
+}

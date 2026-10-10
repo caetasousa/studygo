@@ -3,6 +3,8 @@
 	import Ajuste from '$lib/components/Ajuste.svelte';
 	import { confirmar } from '$lib/stores/confirmacao.svelte';
 	import ImportarCSV from '$lib/components/ImportarCSV.svelte';
+	import TokenDoClaude from '$lib/components/TokenDoClaude.svelte';
+	import ConexaoDoClaude from '$lib/components/ConexaoDoClaude.svelte';
 	import { planoStore, applyTheme, ehTema, type Tema } from '$lib/stores/plano.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -637,10 +639,29 @@
 				<ImportarCSV />
 			</div>
 		</div>
+
+		<div class="card">
+			<div class="card-body">
+				<h2 class="sec" style="margin-top:0">Processador de mapas</h2>
+				<ConexaoDoClaude />
+				<details class="alternativa">
+					<summary>Usar um token do Claude em vez da conexão</summary>
+					<TokenDoClaude />
+				</details>
+			</div>
+		</div>
 	</div>
 {/if}
 
 <style>
+	.alternativa {
+		margin-top: 18px;
+		font-size: 13px;
+	}
+	.alternativa summary {
+		cursor: pointer;
+		color: var(--text-muted);
+	}
 	.modos-t {
 		font-size: 13px;
 		font-weight: 600;

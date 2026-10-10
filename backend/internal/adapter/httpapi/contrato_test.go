@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"studygo/internal/domain/lei"
+	"studygo/internal/domain/mapa"
 	"studygo/internal/domain/usuario"
+	"studygo/internal/port"
 	"studygo/internal/service"
 
 	"github.com/google/uuid"
@@ -334,4 +336,44 @@ func TestContratoHTTP_PesquisaDoTema(t *testing.T) {
 	}
 
 	compararComGolden(t, "pesquisa_lei.json", forma(t, pesquisaParaDTO(p)))
+}
+
+// O pedido de mapa é lido pela tela da fila, que se quebraria em silêncio com
+// uma chave renomeada.
+func TestContratoHTTP_PedidoDeMapa(t *testing.T) {
+	t.Parallel()
+
+	p := mapa.Pedido{
+		ID: uuid.New(), Arquivo: "aula.pdf", Situacao: mapa.Pronto,
+		DisciplinaID:   uuid.NullUUID{UUID: uuid.New(), Valid: true},
+		DisciplinaNome: "Engenharia de Software", ConcursoSlug: "tce-go",
+		Mapa: "testes", Relatorio: "r", CriadoEm: time.Now(), AtualizadoEm: time.Now(),
+	}
+
+	compararComGolden(t, "pedido_de_mapa.json", forma(t, pedidoDeMapaParaDTO(p)))
+}
+
+// A conexão do Claude é lida pelo cartão de Configurações.
+func TestContratoHTTP_ConexaoDoClaude(t *testing.T) {
+	t.Parallel()
+
+	c := port.ConexaoDoClaude{Conectado: true, Email: "quem@estuda.dev", Plano: "max"}
+
+	compararComGolden(t, "conexao_do_claude.json", forma(t, conexaoParaDTO(c)))
+}
+
+// O resultado do pacote é lido pela tela da importação; o estudo vai no .zip
+// exportado e volta por ela — mudar uma chave quebra a volta dos .zip antigos.
+func TestContratoHTTP_PacoteDoMapa(t *testing.T) {
+	t.Parallel()
+
+	compararComGolden(t, "pacote_importado.json", forma(t, pacoteImportadoParaDTO(service.PacoteImportado{
+		Mapa: mapa.Resumo{Slug: "fluxos", Titulo: "Fluxos"}, Questoes: 2, Imagens: 1, Respostas: 3,
+		Vinculadas: []service.MateriaDoMapa{{Codigo: "BD", Nome: "Banco de Dados"}}, Avisos: []string{"a"},
+	})))
+
+	compararComGolden(t, "estudo_do_mapa.json", forma(t, estudoParaDTO(service.ExportacaoDeMapa{
+		Vinculos:  []mapa.VinculoExportado{{ConcursoSlug: "tce", ConcursoNome: "TCE", Codigo: "BD", Disciplina: "Banco de Dados", Temas: []string{"SQL"}}},
+		Respostas: []mapa.RespostaExportada{{Chave: "q1", Resposta: "A", Acertou: true, Em: time.Now()}},
+	})))
 }

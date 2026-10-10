@@ -1,0 +1,24 @@
+{
+  "avisos": [
+    "string"
+  ],
+  "imagens": "number",
+  "mapa": {
+    "fonte": "string",
+    "importadoEm": "string",
+    "itens": "number",
+    "materia": "string",
+    "ramos": "number",
+    "slug": "string",
+    "titulo": "string"
+  },
+  "novo": "bool",
+  "questoes": "number",
+  "respostas": "number",
+  "vinculadas": [
+    {
+      "codigo": "string",
+      "nome": "string"
+    }
+  ]
+}

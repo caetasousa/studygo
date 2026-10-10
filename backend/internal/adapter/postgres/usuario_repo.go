@@ -182,3 +182,31 @@ func (r *UsuarioRepo) LimparRefreshTokens(ctx context.Context, agora time.Time) 
 
 	return ct.RowsAffected(), nil
 }
+
+func (r *UsuarioRepo) GravarTokenDoClaude(ctx context.Context, id uuid.UUID, cifrado []byte) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE usuarios SET token_claude = $2, atualizado_em = now() WHERE id = $1`, id, cifrado)
+	if err != nil {
+		return fmt.Errorf("gravando o token do Claude: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return usuario.ErrNaoEncontrado
+	}
+
+	return nil
+}
+
+func (r *UsuarioRepo) TokenDoClaude(ctx context.Context, id uuid.UUID) ([]byte, error) {
+	var cifrado []byte
+
+	err := r.pool.QueryRow(ctx, `SELECT token_claude FROM usuarios WHERE id = $1`, id).Scan(&cifrado)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, usuario.ErrNaoEncontrado
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("lendo o token do Claude: %w", err)
+	}
+
+	return cifrado, nil
+}

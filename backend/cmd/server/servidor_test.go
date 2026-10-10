@@ -3,8 +3,10 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -49,6 +51,11 @@ func TestMain(m *testing.M) {
 type servidor struct {
 	url  string
 	pool *pgxpool.Pool
+	// interno é a porta que só o processador chama; mapas, o dublê do
+	// processador de mapas, que guarda o que recebeu.
+	interno string
+	mapas   *processadorDeMapasDeMentira
+	token   string
 }
 
 // subir monta o servidor sobre um banco novo. Sem processador, a importação
@@ -77,10 +84,20 @@ func subir(t *testing.T, edital port.EditalProcessor, ajuste func(*config.Config
 	pool := pgtest.Novo(t)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	srv := httptest.NewServer(montarHandler(pool, cfg, edital, editalproc.Indisponivel{}, logger))
+	if cfg.EditalProcessorToken == "" {
+		cfg.EditalProcessorToken = "token-de-servico-do-teste"
+	}
+
+	mapas := &processadorDeMapasDeMentira{}
+	publico, interno := montarHandler(pool, cfg, edital, editalproc.Indisponivel{}, mapas, logger)
+
+	srv := httptest.NewServer(publico)
 	t.Cleanup(srv.Close)
 
-	return &servidor{url: srv.URL, pool: pool}
+	srvInterno := httptest.NewServer(interno)
+	t.Cleanup(srvInterno.Close)
+
+	return &servidor{url: srv.URL, pool: pool, interno: srvInterno.URL, mapas: mapas, token: cfg.EditalProcessorToken}
 }
 
 // pedido é uma requisição ao servidor. O corpo string vai como JSON.
@@ -950,5 +967,284 @@ func TestServidor_MapaNosTopicosDaMateria(t *testing.T) {
 
 	if m := ler(); !m.MateriaInteira || len(m.Temas) != 0 {
 		t.Fatalf("PUT sem corpo: %+v; quer a matéria inteira", m)
+	}
+}
+
+// M32: o .zip exportado, reimportado noutra conta, dá o mesmo mapa — árvore,
+// questões e imagem —; a outra conta não exporta o que não é dela; e
+// "exportar todos" leva cada mapa da conta.
+func TestServidor_ExportarMapaEReimportar(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+	outra := s.cadastrar(t)
+
+	texto := "# Fluxos\nslug: fluxos\nfonte: Aula 03\n\n- Gateways\n  - [def] **Exclusivo**: um caminho\n  - ![O gateway](gateway.png)\n- Eventos\n  - [pegadinha] Início não é fim\n"
+	corpo, _ := json.Marshal(map[string]string{"texto": texto})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(corpo)), http.StatusCreated)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/fluxos/questoes", c.token,
+		`{"mapa":"fluxos","questoes":[{"id":"q1","ramo":"Gateways","origem":"FCC · 2025","enunciado":"Julgue.","gabarito":"Certo","comentario":"Certo."}]}`),
+		http.StatusOK)
+
+	png := append([]byte("\x89PNG\r\n\x1a\n"), []byte("dados")...)
+	img, tipo := multipartDeImagens(t, map[string][]byte{"gateway.png": png})
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/fluxos/imagens", token: c.token, corpo: img, tipo: tipo}), http.StatusOK)
+
+	// O que saiu no modo de edição não volta pela exportação.
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/fluxos/itens/excluir", c.token,
+		`{"caminho":[1,0],"texto":"Início não é fim"}`), http.StatusOK)
+
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/exportacao", token: outra.token}), http.StatusNotFound)
+
+	resp := s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/exportacao", token: c.token})
+	esperarStatus(t, resp, http.StatusOK)
+
+	arquivos := lerZip(t, resp)
+	if len(arquivos) != 3 || arquivos["fluxos/gateway.png"] == nil || !bytes.Equal(arquivos["fluxos/gateway.png"], png) {
+		t.Fatalf("o zip trouxe %v", nomesDe(arquivos))
+	}
+
+	if strings.Contains(string(arquivos["fluxos.md"]), "Início não é fim") {
+		t.Fatalf("o exportado trouxe o item excluído:\n%s", arquivos["fluxos.md"])
+	}
+
+	// Reimportado na outra conta, é o mesmo mapa.
+	corpo, _ = json.Marshal(map[string]string{"texto": string(arquivos["fluxos.md"])})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", outra.token, string(corpo)), http.StatusCreated)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/fluxos/questoes", outra.token, string(arquivos["fluxos.questoes.json"])), http.StatusOK)
+	img, tipo = multipartDeImagens(t, map[string][]byte{"gateway.png": arquivos["fluxos/gateway.png"]})
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/fluxos/imagens", token: outra.token, corpo: img, tipo: tipo}), http.StatusOK)
+
+	ler := func(token string) string {
+		t.Helper()
+
+		var lido struct {
+			Mapa     struct{ Titulo, Fonte string }
+			Arvore   any
+			Questoes []struct{ Ramo, Enunciado string }
+			Imagens  []string
+		}
+		lerJSON(t, s.json(t, http.MethodGet, "/api/mapas/fluxos", token, ""), &lido)
+		b, _ := json.Marshal(lido)
+
+		return string(b)
+	}
+
+	if a, b := ler(c.token), ler(outra.token); a != b {
+		t.Fatalf("o mapa reimportado difere\noriginal:   %s\nreimportado: %s", a, b)
+	}
+
+	// Exportar todos leva cada mapa da conta.
+	corpo, _ = json.Marshal(map[string]string{"texto": "# Outro\nslug: outro\n\n- Ramo\n"})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(corpo)), http.StatusCreated)
+
+	resp = s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/exportacao-de-mapas", token: c.token})
+	esperarStatus(t, resp, http.StatusOK)
+
+	todos := lerZip(t, resp)
+	if todos["fluxos.md"] == nil || todos["outro.md"] == nil || todos["fluxos/gateway.png"] == nil {
+		t.Fatalf("exportar todos trouxe %v", nomesDe(todos))
+	}
+}
+
+func lerZip(t *testing.T, resp *http.Response) map[string][]byte {
+	t.Helper()
+
+	corpo, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("lendo o zip: %v", err)
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(corpo), int64(len(corpo)))
+	if err != nil {
+		t.Fatalf("abrindo o zip: %v", err)
+	}
+
+	out := map[string][]byte{}
+
+	for _, f := range zr.File {
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("abrindo %s: %v", f.Name, err)
+		}
+
+		b, _ := io.ReadAll(rc)
+		rc.Close() //nolint:errcheck,gosec // leitura em memória
+		out[f.Name] = b
+	}
+
+	return out
+}
+
+func nomesDe(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+
+	return out
+}
+
+// M34: o .zip exportado volta por um lugar só (POST /api/mapas/pacote, um mapa
+// por envio) e volta inteiro — texto, questões, imagens, os vínculos com os
+// tópicos e as respostas. O que pode quebrar: a exportação não leva os vínculos
+// ou as respostas; o pacote volta sem eles; importar duas vezes duplica as
+// respostas; o vínculo de um concurso que a outra conta não tem se perde em
+// silêncio, em vez de cair no concurso aberto ou virar aviso.
+func TestServidor_PacoteDoMapaVoltaInteiro(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+	outra := s.cadastrar(t)
+
+	criar := func(conta conta, temas string) (slug, disciplina string) {
+		t.Helper()
+
+		resp := s.json(t, http.MethodPost, "/api/concursos", conta.token,
+			`{"nome":"TCE-GO","prova":"2026-12-15","disciplinas":[{"nome":"Banco de Dados","bloco":"esp","questoes":20,"temas":`+temas+`}]}`)
+		esperarStatus(t, resp, http.StatusCreated)
+
+		var criado struct{ Slug string }
+		lerJSON(t, resp, &criado)
+
+		var lista struct{ Disciplinas []struct{ DisciplinaID string } }
+		lerJSON(t, s.json(t, http.MethodGet, "/api/concursos/"+criado.Slug+"/mapas", conta.token, ""), &lista)
+
+		return criado.Slug, lista.Disciplinas[0].DisciplinaID
+	}
+
+	concursoA, bdA := criar(c, `["Modelagem","SQL","Índices"]`)
+
+	texto := "# Fluxos\nslug: fluxos\nfonte: Aula 03\n\n- Gateways\n  - [def] **Exclusivo**: um caminho\n  - ![O gateway](gateway.png)\n- Eventos\n  - Início\n"
+	corpo, _ := json.Marshal(map[string]string{"texto": texto})
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas", c.token, string(corpo)), http.StatusCreated)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/fluxos/questoes", c.token,
+		`{"mapa":"fluxos","questoes":[`+
+			`{"id":"q1","ramo":"Gateways","origem":"FCC · 2025","enunciado":"Julgue.","gabarito":"Certo","comentario":"Certo."},`+
+			`{"id":"q2","ramo":"Eventos","origem":"FGV · 2024","enunciado":"Qual?","alternativas":["um","dois"],"gabarito":"B","comentario":"B."}]}`),
+		http.StatusOK)
+
+	png := append([]byte("\x89PNG\r\n\x1a\n"), []byte("dados")...)
+	img, tipo := multipartDeImagens(t, map[string][]byte{"gateway.png": png})
+	esperarStatus(t, s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/fluxos/imagens", token: c.token, corpo: img, tipo: tipo}), http.StatusOK)
+	esperarStatus(t, s.json(t, http.MethodPut, "/api/concursos/"+concursoA+"/disciplinas/"+bdA+"/mapas/fluxos", c.token, `{"temas":["SQL","Índices"]}`), http.StatusNoContent)
+
+	var lido struct {
+		Questoes []struct{ ID, Ramo string }
+	}
+	lerJSON(t, s.json(t, http.MethodGet, "/api/mapas/fluxos", c.token, ""), &lido)
+
+	for _, q := range lido.Questoes {
+		for _, r := range []string{"ERRADO", "CERTO", "A"} {
+			// q1 (Gateways) é de julgar; q2, de alternativas.
+			if (q.Ramo == "Gateways") == (r == "A") {
+				continue
+			}
+
+			esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas/questoes/"+q.ID+"/respostas", c.token, `{"resposta":"`+r+`"}`), http.StatusCreated)
+		}
+	}
+
+	resp := s.fazer(t, pedido{metodo: http.MethodGet, rota: "/api/mapas/fluxos/exportacao", token: c.token})
+	esperarStatus(t, resp, http.StatusOK)
+
+	arquivos := lerZip(t, resp)
+	if arquivos["fluxos.conta.json"] == nil {
+		t.Fatalf("a exportação não levou os vínculos e as respostas: %v", nomesDe(arquivos))
+	}
+
+	pacote := func(conta conta, concursoAberto string) map[string]any {
+		t.Helper()
+
+		var buf bytes.Buffer
+
+		mw := multipart.NewWriter(&buf)
+		_ = mw.WriteField("mapa", string(arquivos["fluxos.md"]))
+		_ = mw.WriteField("questoes", string(arquivos["fluxos.questoes.json"]))
+		_ = mw.WriteField("conta", string(arquivos["fluxos.conta.json"]))
+		_ = mw.WriteField("concurso", concursoAberto)
+		fw, _ := mw.CreateFormFile("imagens", "gateway.png")
+		_, _ = fw.Write(arquivos["fluxos/gateway.png"])
+		_ = mw.Close()
+
+		resp := s.fazer(t, pedido{metodo: http.MethodPost, rota: "/api/mapas/pacote", token: conta.token, corpo: &buf, tipo: mw.FormDataContentType()})
+		esperarStatus(t, resp, http.StatusOK)
+
+		var out map[string]any
+		lerJSON(t, resp, &out)
+
+		return out
+	}
+
+	// Na outra conta, o concurso de origem não existe: o vínculo cai no
+	// concurso aberto, e o tópico que ele não tem vira aviso.
+	concursoB, _ := criar(outra, `["Modelagem","SQL"]`)
+
+	res := pacote(outra, concursoB)
+	if res["questoes"] != float64(2) || res["imagens"] != float64(1) || res["respostas"] != float64(3) {
+		t.Fatalf("o pacote voltou %v", res)
+	}
+
+	if avisos := fmt.Sprint(res["avisos"]); !strings.Contains(avisos, "Índices") {
+		t.Fatalf("o tópico que o concurso aberto não tem sumiu sem aviso: %v", res["avisos"])
+	}
+
+	type doMapa struct {
+		Slug  string
+		Temas []string
+	}
+
+	var lista struct{ Disciplinas []struct{ Mapas []doMapa } }
+	lerJSON(t, s.json(t, http.MethodGet, "/api/concursos/"+concursoB+"/mapas", outra.token, ""), &lista)
+
+	if len(lista.Disciplinas[0].Mapas) != 1 || !slices.Equal(lista.Disciplinas[0].Mapas[0].Temas, []string{"SQL"}) {
+		t.Fatalf("o vínculo voltou %+v", lista.Disciplinas[0].Mapas)
+	}
+
+	ler := func(token string) string {
+		t.Helper()
+
+		var m struct {
+			Mapa     struct{ Titulo, Fonte string }
+			Arvore   any
+			Questoes []struct {
+				Ramo, Enunciado string
+				Resposta        any
+			}
+			Imagens []string
+		}
+		lerJSON(t, s.json(t, http.MethodGet, "/api/mapas/fluxos", token, ""), &m)
+		b, _ := json.Marshal(m)
+
+		return string(b)
+	}
+
+	if a, b := ler(c.token), ler(outra.token); a != b {
+		t.Fatalf("o mapa restaurado difere\noriginal:   %s\nrestaurado: %s", a, b)
+	}
+
+	// Importar o mesmo pacote de novo não duplica as respostas.
+	if res := pacote(outra, concursoB); res["respostas"] != float64(0) {
+		t.Fatalf("a segunda importação gravou %v respostas", res["respostas"])
+	}
+
+	var n int
+	if err := s.pool.QueryRow(t.Context(),
+		`SELECT count(*) FROM mapas_respostas r JOIN mapas_questoes q ON q.id = r.questao_id JOIN mapas m ON m.id = q.mapa_id WHERE m.usuario_id = $1`,
+		outra.id).Scan(&n); err != nil || n != 3 {
+		t.Fatalf("a outra conta tem %d respostas (%v); quer 3", n, err)
+	}
+
+	// Na própria conta, o vínculo volta ao concurso de origem, com os tópicos dele.
+	esperarStatus(t, s.json(t, http.MethodDelete, "/api/mapas/fluxos", c.token, ""), http.StatusNoContent)
+	pacote(c, "")
+
+	var deA struct{ Disciplinas []struct{ Mapas []doMapa } }
+	lerJSON(t, s.json(t, http.MethodGet, "/api/concursos/"+concursoA+"/mapas", c.token, ""), &deA)
+
+	if len(deA.Disciplinas[0].Mapas) != 1 || !slices.Equal(deA.Disciplinas[0].Mapas[0].Temas, []string{"SQL", "Índices"}) {
+		t.Fatalf("na própria conta o vínculo voltou %+v", deA.Disciplinas[0].Mapas)
 	}
 }

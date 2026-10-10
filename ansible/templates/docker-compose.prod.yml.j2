@@ -36,6 +36,9 @@ services:
       GOMEMLIMIT: "{{ go_mem_limit_backend }}"
 {% endif %}
       SERVER_ADDR: ":8080"
+      # A porta interna: por ela o edital-processor devolve o mapa mental
+      # pronto. Não é publicada nem passa pelo nginx.
+      INTERNAL_ADDR: ":8081"
       DATABASE_URL: "postgres://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}?sslmode=disable"
       JWT_SECRET: "{{ jwt_secret }}"
       CORS_ORIGIN: "https://{{ app_domain }}"
@@ -60,8 +63,12 @@ services:
     environment:
       EP_SERVICE_TOKEN: "{{ edital_processor_token }}"
       EP_GEMINI_API_KEY: "{{ gemini_api_key | default('') }}"
+      EP_BACKEND_INTERNAL_URL: "http://backend:8081"
+      EP_MAPA_COMPRADOR: "{{ mapa_comprador | default('') }}"
     volumes:
       - edital_work:/var/lib/edital-processor/work
+      # A conexão do Claude de cada conta, feita pela tela; sobrevive ao deploy.
+      - edital_claude:/var/lib/edital-processor/claude
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
       interval: 15s
@@ -122,3 +129,4 @@ services:
 volumes:
   postgres_data:
   edital_work:
+  edital_claude:
