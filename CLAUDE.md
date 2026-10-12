@@ -246,6 +246,25 @@ desligados no `.gitlab-ci.yml` — não os religue.
 > privadas, arquivos `.env`, inventários privados, IPs de acesso ou artefatos
 > pessoais. O domínio público da aplicação pode ser versionado.
 
+### Acesso ao servidor
+
+> [!CAUTION]
+> **Em hipótese alguma acesse o servidor sem ser por SSH, e nunca sem o
+> usuário saber.** Ele precisa saber tudo o que foi feito lá.
+>
+> - A única via é `ssh -p 2222 studygo@127.0.0.1` (chave `studygo_ci`), ou o
+>   que passa por ela: `make servidor-*`, `make provision`, Ansible. Nada de
+>   `wsl.exe -d ubuntu-server`, `/mnt/wsl`, `\\wsl$\ubuntu-server` ou conexão
+>   direta a porta do servidor.
+> - **Antes** de cada acesso, diga na conversa o que vai fazer lá e por quê;
+>   **depois**, o que de fato fez e o que ficou para trás (arquivos, containers).
+>   Leitura também conta.
+> - O hook `.claude/hooks/acesso-servidor.sh` faz valer a regra: nega os
+>   caminhos que não são SSH e mostra na tela cada comando que chega ao
+>   servidor (avisa, sem pedir aprovação). Não o contorne nem o desligue.
+> - O deploy continua sendo só da esteira; esta regra não abre um caminho
+>   manual.
+
 No servidor, o usuário de deploy é `studygo` — um por projeto, com o seu
 Docker rootless; um projeto novo ganha o seu usuário. A chave da esteira é
 `~/.ssh/studygo_ci`: nunca a sobrescreva. Não instale firewall nem o Docker de
