@@ -5,16 +5,17 @@ README descreve o formato em que ele entra e sai do app: um outline de texto
 (`<slug>.md`), as questões ao lado (`<slug>.questoes.json`) e as imagens numa
 pasta `<slug>/`.
 
-- **Entra** pela tela — **Mapas mentais → Importar mapa**, e as questões e
-  imagens pela página do mapa — ou pelo PDF da aula, que o processador de
-  mapas do `edital-processor` transforma em mapa (`edital-processor/app/mapas/`).
+- **Entra** pela tela — **Mapas mentais → Importar e exportar → Importar
+  mapa**, e as questões e imagens pela página do mapa — ou pelo PDF da aula,
+  que o processador de mapas do `edital-processor` transforma em mapa
+  (`edital-processor/app/mapas/`).
 - **Sai** pela exportação — o botão **Exportar mapa** na página do mapa, ou
-  **Exportar todos os mapas** na lista —, num `.zip` com esse mesmo arranjo e
-  mais o estudo da conta em `<slug>.conta.json`: os vínculos com as matérias
+  **Exportar todos os mapas** em Importar e exportar —, num `.zip` com esse
+  mesmo arranjo e mais o estudo da conta em `<slug>.conta.json`: os vínculos com as matérias
   (concurso pelo slug, matéria pelo código e pelo nome, e os tópicos) e as
   respostas às questões (pela `id` da questão, com a hora).
-- **Volta** por **Mapas mentais → Importar uma exportação (.zip)**, inteiro e
-  num lugar só: a tela abre o `.zip` e manda mapa a mapa (o de todos passa do
+- **Volta** por **Mapas mentais → Importar e exportar → Importar uma
+  exportação (.zip)**, inteiro e num lugar só: a tela abre o `.zip` e manda mapa a mapa (o de todos passa do
   que o túnel aceita num envio). O vínculo cujo concurso a conta não tem vai
   para o concurso aberto, na matéria de mesmo código ou nome; o que não acha
   lugar vira aviso. Importar o mesmo `.zip` de novo não repete as respostas.

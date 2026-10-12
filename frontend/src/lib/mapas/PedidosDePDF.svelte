@@ -13,7 +13,7 @@
 	 * que está sendo feito, o que ficou pronto, o relatório do processador e o que
 	 * falhou.
 	 */
-	let { aoFicarPronto }: { aoFicarPronto: () => void } = $props();
+	let { aoFicarPronto, materia = '' }: { aoFicarPronto: () => void; materia?: string } = $props();
 
 	let pedidos = $state<PedidoDeMapa[]>([]);
 	/** O que falhou no envio, ao pôr de volta na fila ou ao excluir: fica até a próxima ação. */
@@ -22,6 +22,18 @@
 	let erroDaFila = $state<string | null>(null);
 	let enviando = $state<string | null>(null);
 	let disciplina = $state('');
+
+	// `materia` (o código) vem de quem mandou enviar a aula de uma matéria: a
+	// lista do que falta virar mapa. As matérias chegam depois da tela.
+	let escolhidaDeFora = false;
+	$effect(() => {
+		if (escolhidaDeFora || materia === '') return;
+		const d = mapasStore.disciplinas.find((x) => x.codigo === materia);
+		if (d) {
+			disciplina = d.disciplinaId;
+			escolhidaDeFora = true;
+		}
+	});
 
 	const rotulo: Record<SituacaoDoPedido, string> = {
 		na_fila: 'Na fila',

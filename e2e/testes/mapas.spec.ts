@@ -142,8 +142,8 @@ const FUNDO = [
 test.describe('mapas mentais', () => {
 	test('[M1] o texto importado pela tela vira um mapa fiel, com cada item no seu lugar', async ({ page, api, conta }) => {
 		await api.concurso('Importar E2E', MATERIAS);
-		await page.goto('/mapas');
-		await expect(page.getByRole('heading', { name: 'Mapas mentais', level: 1 })).toBeVisible();
+		await page.goto('/mapas/importar');
+		await expect(page.getByRole('heading', { name: 'Importar e exportar', level: 1 })).toBeVisible();
 
 		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles(caminhoDoExemplo);
 		await expect(page.getByRole('status')).toContainText('Ciclo da Água importado: 4 ramos, 15 itens');
@@ -224,10 +224,11 @@ test.describe('mapas mentais', () => {
 		expect(await catalogo(page.request, conta.token)).toEqual([]);
 
 		// Pela tela, o mesmo aviso, com a linha.
-		await page.goto('/mapas');
+		await page.goto('/mapas/importar');
 		await page.getByLabel('Texto do mapa').fill('# T\n- a\n    - c\n');
 		await page.getByRole('button', { name: 'Importar', exact: true }).click();
 		await expect(page.getByRole('alert')).toContainText('linha 3: o item pula do nível 1 para o 2');
+		await page.goto('/mapas');
 		await expect(page.getByText('Nenhum mapa mental ainda.')).toBeVisible();
 	});
 
@@ -1342,7 +1343,7 @@ test.describe('mapas a partir do PDF da aula', () => {
 	const PDF = { name: 'aula-01.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n% aula sintética do E2E\n') };
 
 	async function enviar(page: Page, materia: string | null, arquivo = PDF) {
-		await page.goto('/mapas');
+		await page.goto('/mapas/importar');
 		// O painel do PDF já vem aberto: é o caminho principal para criar mapa.
 		await expect(page.getByLabel('PDF da aula')).toBeVisible();
 		if (materia) await page.getByLabel('Matéria do mapa').selectOption({ label: materia });
@@ -1381,7 +1382,6 @@ test.describe('mapas a partir do PDF da aula', () => {
 		await expect(page.getByRole('alert')).toContainText('falso.pdf: o arquivo precisa ser um PDF de até 40 MB');
 
 		// O PDF escolhido no painel de importar o texto aponta o painel certo.
-		await page.getByText('Importar mapa', { exact: true }).click();
 		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles(PDF);
 		await expect(page.getByRole('alert').filter({ hasText: 'é o PDF da aula' })).toContainText(
 			'envie-o em “Criar mapa a partir do PDF da aula”'
@@ -1520,7 +1520,7 @@ test.describe('mapas a partir do PDF da aula', () => {
 		await outra.request.dispose();
 
 		// Conectado, o mesmo pedido volta à fila e vira mapa.
-		await page.goto('/mapas');
+		await page.goto('/mapas/importar');
 		await pedido(page, 'aula-sem-claude.pdf').getByRole('button', { name: 'Pôr na fila de novo' }).click();
 		await esperarSituacao(page, 'aula-sem-claude.pdf', 'Pronto');
 
@@ -1546,7 +1546,7 @@ test.describe('mapas a partir do PDF da aula', () => {
 		const zipDoMapa = readFileSync((await um.path())!);
 		expect(nomesNoZip(zipDoMapa)).toContain('ciclo-da-agua.md');
 
-		await page.goto('/mapas');
+		await page.goto('/mapas/importar');
 		const [todos] = await Promise.all([
 			page.waitForEvent('download'),
 			page.getByRole('button', { name: '⬇ Exportar todos os mapas' }).click()
@@ -1634,8 +1634,8 @@ test.describe('importar a exportação dos mapas', () => {
 		expect((await page.request.delete('/api/mapas/restauro', { headers: cabecalho(conta.token) })).status()).toBe(204);
 
 		// Volta por um lugar só, inteiro.
-		await page.goto('/mapas');
-		await page.getByText('Importar uma exportação (.zip)').click();
+		await page.goto('/mapas/importar');
+		await page.getByText('Importar uma exportação (.zip)', { exact: true }).click();
 		await page.getByLabel('Arquivo exportado (.zip)').setInputFiles({ name: 'restauro.zip', mimeType: 'application/zip', buffer: zip });
 		const lista = page.getByRole('list', { name: 'Mapas importados' });
 		await expect(page.getByText('1 de 1 mapa importado.')).toBeVisible();
@@ -1658,10 +1658,99 @@ test.describe('importar a exportação dos mapas', () => {
 			'restauro.md': Buffer.from(TEXTO),
 			'restauro/ciclo.png': PNG
 		});
-		await page.getByText('Importar mapa', { exact: true }).click();
 		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles({ name: 'misto.zip', mimeType: 'application/zip', buffer: misto });
 		await expect(page.getByText('1 de 2 mapas importados; 1 com problema.')).toBeVisible();
 		await expect(lista.getByRole('listitem').filter({ hasText: 'quebrado' }).getByRole('alert')).toBeVisible();
 		await expect(lista.getByRole('listitem').filter({ hasText: 'Restauro' })).toContainText('1 imagem');
+	});
+});
+
+// Ler e manter em páginas separadas, e o que da ementa ainda falta virar mapa
+// (M35, M36).
+test.describe('o que falta virar mapa', () => {
+	const painelSemMapa = (page: Page) => page.getByRole('tabpanel', { name: /Sem mapa/ });
+
+	test('[M35] "Sem mapa" lista os tópicos da ementa que nenhum mapa cobre, com a conta e o caminho para enviar a aula', async ({ page, api, conta }) => {
+		const concurso = await api.concurso('Cobertura E2E', MATERIAS);
+		const relevo = '# Relevo\nslug: relevo\nreconhecer: Relevo\n\n- Formas\n  - Planalto\n';
+		expect((await importar(page.request, conta.token, relevo, concurso)).status).toBe(201);
+
+		await page.goto('/mapas');
+		await page.getByRole('tab', { name: /Sem mapa/ }).click();
+		await expect(page).toHaveURL(/\?aba=sem-mapa$/);
+		const painel = painelSemMapa(page);
+		await expect(painel.getByText('1 de 4 tópicos com mapa mental')).toBeVisible();
+
+		// O tópico que o mapa cobre sai da lista; os outros ficam, na ordem da ementa.
+		const geo = painel.getByRole('region', { name: 'Geografia Física' });
+		await expect(geo.getByText('1 de 2 tópicos com mapa')).toBeVisible();
+		await expect(geo.getByRole('list', { name: 'Tópicos sem mapa' }).getByRole('listitem')).toHaveText(['Ciclo hidrológico']);
+		const dir = painel.getByRole('region', { name: 'Direito Constitucional' });
+		await expect(dir.getByRole('list', { name: 'Tópicos sem mapa' }).getByRole('listitem')).toHaveText([
+			'Princípios fundamentais',
+			'Poderes da União'
+		]);
+
+		// Daqui, o envio do PDF já vem com a matéria escolhida.
+		await geo.getByRole('link', { name: 'Enviar o PDF de uma aula' }).click();
+		await expect(page).toHaveURL(/\/mapas\/importar\?materia=GEO$/);
+		await expect(page.getByLabel('Matéria do mapa').locator('option:checked')).toHaveText('GEO — Geografia Física');
+
+		// Com o outro tópico escolhido, a matéria sai das pendentes e é dada por coberta.
+		const geoId = (await materiasDo(page.request, conta.token, concurso)).find((d) => d.codigo === 'GEO')!.disciplinaId;
+		const vinculo = await page.request.put(`/api/concursos/${concurso}/disciplinas/${geoId}/mapas/relevo`, {
+			headers: cabecalho(conta.token),
+			data: { temas: ['Ciclo hidrológico', 'Relevo e solos'] }
+		});
+		expect(vinculo.status()).toBe(204);
+		await page.goto('/mapas?aba=sem-mapa');
+		await expect(painel.getByText('2 de 4 tópicos com mapa mental')).toBeVisible();
+		await expect(painel.getByRole('region', { name: 'Geografia Física' })).toHaveCount(0);
+		await expect(painel).toContainText('Com todos os tópicos cobertos: GEO — Geografia Física');
+
+		// O mapa que vale para a matéria inteira não dá a matéria por coberta
+		// calado: os tópicos continuam pendentes, e a lista diz por quê.
+		const constituicao = '# Constituição\nslug: constituicao\nmateria: Direito Constitucional\n\n- Fundamentos\n';
+		expect((await importar(page.request, conta.token, constituicao, concurso)).status).toBe(201);
+		const dirMapas = (await materiasDo(page.request, conta.token, concurso)).find((d) => d.codigo === 'DIR')!.mapas;
+		expect(dirMapas).toEqual([expect.objectContaining({ slug: 'constituicao', materiaInteira: true })]);
+		await page.reload();
+		await expect(painel.getByText('2 de 4 tópicos com mapa mental')).toBeVisible();
+		await expect(dir.getByRole('list', { name: 'Tópicos sem mapa' }).getByRole('listitem')).toHaveCount(2);
+		await expect(dir).toContainText('vale para a matéria inteira');
+		await dir.getByRole('link', { name: 'Constituição' }).click();
+		await expect(page).toHaveURL(/\/mapas\/constituicao$/);
+	});
+
+	test('[M36] a lista dos mapas só lê: importar, enviar o PDF e exportar ficam numa página própria, alcançável da lista', async ({ page, api, conta }) => {
+		await concursoComMapa(api, conta, page, 'Separação E2E');
+
+		// No celular, o primeiro mapa está na primeira tela, sem formulário antes.
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto('/mapas');
+		await expect(page.getByRole('link', { name: /Ciclo da Água/ })).toBeInViewport();
+		await expect(page.getByLabel('Texto do mapa')).toHaveCount(0);
+		await expect(page.getByLabel('Arquivo do mapa (.md)')).toHaveCount(0);
+		await expect(page.getByLabel('PDF da aula')).toHaveCount(0);
+		await expect(page.getByText('Importar uma exportação (.zip)', { exact: true })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: /Exportar todos/ })).toHaveCount(0);
+
+		// Todos os caminhos de entrada e saída estão na outra página.
+		await page.getByRole('link', { name: 'Importar e exportar' }).click();
+		await expect(page).toHaveURL(/\/mapas\/importar$/);
+		await expect(page.getByRole('heading', { name: 'Importar e exportar', level: 1 })).toBeVisible();
+		await expect(page.getByLabel('PDF da aula')).toBeAttached();
+		await expect(page.getByLabel('Arquivo do mapa (.md)')).toBeAttached();
+		await expect(page.getByLabel('Texto do mapa')).toBeVisible();
+		await expect(page.getByText('Importar uma exportação (.zip)', { exact: true })).toBeVisible();
+		await expect(page.getByRole('button', { name: '⬇ Exportar todos os mapas' })).toBeVisible();
+	});
+
+	test('[M36] a lista vazia leva à página de importar', async ({ page, api }) => {
+		await api.concurso('Vazia E2E', MATERIAS);
+		await page.goto('/mapas');
+		await expect(page.getByText('Nenhum mapa mental ainda.')).toBeVisible();
+		await page.getByRole('link', { name: 'Importar o primeiro mapa' }).click();
+		await expect(page).toHaveURL(/\/mapas\/importar$/);
 	});
 });

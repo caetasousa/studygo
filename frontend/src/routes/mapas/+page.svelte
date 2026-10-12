@@ -1,24 +1,23 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '$lib/api';
-	import { salvarArquivo } from '$lib/download';
 	import PageHead from '$lib/components/PageHead.svelte';
-	import PedidosDePDF from '$lib/mapas/PedidosDePDF.svelte';
-	import ImportarExportacao from '$lib/mapas/ImportarExportacao.svelte';
+	import { cobertura } from '$lib/mapas/cobertura';
 	import { tagStyle } from '$lib/format';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import type { MapaImportado, MapaResumo } from '$lib/types';
+	import type { MapaResumo } from '$lib/types';
 
 	/**
-	 * Os mapas mentais da conta, por matéria: os que já estão vinculados às
-	 * matérias do concurso aberto e, à parte, os que ainda esperam uma.
+	 * Os mapas mentais da conta, para ler: por matéria — os vinculados às
+	 * matérias do concurso aberto e, à parte, os que ainda esperam uma — e o que
+	 * da ementa ainda não tem mapa.
 	 *
-	 * O mapa é escrito fora do app (conteudo/mapas/README.md) e entra por aqui —
-	 * pelo texto, ou pelo PDF da aula, que o processador transforma em mapa.
-	 * Importar de novo o mesmo mapa troca o conteúdo e mantém os vínculos.
+	 * Importar e exportar ficam em /mapas/importar: aqui eles vinham antes das
+	 * estantes, e no celular o primeiro mapa ficava telas abaixo.
 	 */
 	let catalogo = $state<MapaResumo[]>([]);
 	let erro = $state<string | null>(null);
@@ -54,75 +53,33 @@
 	const vinculados = $derived(new Set(materias.flatMap((d) => d.mapas.map((m) => m.slug))));
 	const semMateria = $derived(filtro === '' ? catalogo.filter((m) => !vinculados.has(m.slug)) : []);
 
-	const materiasDo = (slug: string) => materias.filter((d) => d.mapas.some((m) => m.slug === slug));
-
 	const nf = new Intl.NumberFormat('pt-BR');
 
-	// --- exportar todos ----------------------------------------------------------
-	let exportando = $state(false);
+	// --- o que falta ---------------------------------------------------------
+	const cob = $derived(cobertura(materias.filter((d) => filtro === '' || d.codigo === filtro)));
+	const pendentes = $derived(cob.materias.filter((m) => m.faltam.length > 0));
+	const cobertas = $derived(cob.materias.filter((m) => m.faltam.length === 0));
+	const faltam = $derived(cob.topicos - cob.cobertos);
 
-	async function exportarTodos() {
-		erro = null;
-		exportando = true;
-		try {
-			salvarArquivo(await api.exportarMapas(), `mapas-${new Date().toISOString().slice(0, 10)}.zip`);
-		} catch (e) {
-			erro = e instanceof Error ? e.message : 'Não foi possível exportar os mapas';
-		} finally {
-			exportando = false;
-		}
+	// --- abas -------------------------------------------------------------
+	// A aba fica no endereço: voltar, recarregar ou mandar o link abre onde estava.
+	type Aba = 'materias' | 'sem-mapa';
+	const aba = $derived<Aba>(page.url.searchParams.get('aba') === 'sem-mapa' ? 'sem-mapa' : 'materias');
+
+	function escolherAba(a: Aba) {
+		const url = new URL(page.url);
+		if (a === 'materias') url.searchParams.delete('aba');
+		else url.searchParams.set('aba', a);
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
 	}
 
-	// --- importar ----------------------------------------------------------
-	let restaurar = $state<ReturnType<typeof ImportarExportacao>>();
-	let texto = $state('');
-	let importando = $state(false);
-	let resultado = $state<MapaImportado | null>(null);
-	let painelAberto = $state(false);
-
-	// Sem nenhum mapa ainda, o painel de importar já vem aberto.
-	$effect(() => {
-		if (carregado && catalogo.length === 0) painelAberto = true;
-	});
-
-	async function importar(conteudo: string) {
-		erro = null;
-		resultado = null;
-		importando = true;
-		try {
-			resultado = await api.importarMapa(conteudo, concursoStore.ativoSlug);
-			texto = '';
-			await carregar();
-		} catch (e) {
-			erro = e instanceof Error ? e.message : 'A importação falhou';
-		} finally {
-			importando = false;
-		}
-	}
-
-	/** Escolher o arquivo já importa: importar de novo é seguro, e é um passo a menos. */
-	async function aoEscolherArquivo(e: Event & { currentTarget: HTMLInputElement }) {
-		const arquivo = e.currentTarget.files?.[0];
-		e.currentTarget.value = '';
-		if (!arquivo) return;
-
-		// O PDF da aula vai para a fila, não aqui: lido como texto, ele virava um
-		// "mapa" ilegível ou um 413 sem explicação.
-		if (arquivo.type === 'application/pdf' || arquivo.name.toLowerCase().endsWith('.pdf')) {
-			resultado = null;
-			erro = `“${arquivo.name}” é o PDF da aula: envie-o em “Criar mapa a partir do PDF da aula”, logo acima, e ele vira mapa sozinho. Aqui entra só o texto de um mapa já pronto (.md).`;
-			return;
-		}
-
-		// O .zip exportado tem o seu lugar, que traz também as questões, as
-		// imagens, os vínculos e as respostas.
-		if (arquivo.name.toLowerCase().endsWith('.zip')) {
-			resultado = null;
-			await restaurar?.importar(arquivo);
-			return;
-		}
-
-		await importar(await arquivo.text());
+	// As setas trocam de aba, como em toda lista de abas.
+	function teclasDasAbas(e: KeyboardEvent) {
+		if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+		e.preventDefault();
+		const outra: Aba = aba === 'materias' ? 'sem-mapa' : 'materias';
+		escolherAba(outra);
+		document.getElementById(`aba-${outra}`)?.focus();
 	}
 </script>
 
@@ -140,208 +97,206 @@
 <div class="page">
 	{#if erro}<div class="form-error" role="alert">{erro}</div>{/if}
 
-	{#if resultado}
-		<div class="callout aviso-ok" role="status">
-			<div>
-				<b>{resultado.mapa.titulo}</b>
-				{resultado.novo ? 'importado' : 'atualizado'}: {resultado.mapa.ramos} ramos, {nf.format(resultado.mapa.itens)} itens.
-				{#if resultado.vinculadas.length > 0}
-					Vinculado a {resultado.vinculadas.map((v) => `${v.codigo} — ${v.nome}`).join(', ')}.
-				{:else}
-					Nenhuma matéria do concurso aberto bate com ele: vincule na página do mapa.
-				{/if}
-				<a href="/mapas/{resultado.mapa.slug}">Abrir o mapa</a>
-			</div>
-		</div>
-	{/if}
-
-	<PedidosDePDF aoFicarPronto={carregar} />
-
-	<details class="importar" bind:open={painelAberto}>
-		<summary>Importar mapa</summary>
-		<div class="painel">
-			<p class="ajuda">
-				Um outline de texto: <code># Título</code>, metadados opcionais (<code>materia:</code>,
-				<code>fonte:</code>) e os itens como <code>- texto</code>, com 2 espaços por nível. Importar de novo o mesmo
-				mapa troca o conteúdo e mantém os vínculos.
-			</p>
-			<label class="arquivo">
-				<span>Arquivo do mapa (.md)</span>
-				<input
-					type="file"
-					accept=".md,.markdown,.txt,text/markdown,text/plain"
-					aria-label="Arquivo do mapa (.md)"
-					disabled={importando}
-					onchange={aoEscolherArquivo}
-				/>
-			</label>
-			<label class="colar">
-				<span>Ou cole o texto do mapa</span>
-				<textarea rows="6" spellcheck="false" aria-label="Texto do mapa" bind:value={texto}></textarea>
-			</label>
+	<div class="barra">
+		<div class="abas" role="tablist" aria-label="Mapas mentais">
 			<button
 				type="button"
-				class="btn primary"
-				disabled={importando || texto.trim() === ''}
-				onclick={() => importar(texto)}
+				role="tab"
+				id="aba-materias"
+				aria-selected={aba === 'materias'}
+				aria-controls="painel-materias"
+				tabindex={aba === 'materias' ? 0 : -1}
+				onclick={() => escolherAba('materias')}
+				onkeydown={teclasDasAbas}
 			>
-				{importando ? 'Importando…' : 'Importar'}
+				Por matéria
+			</button>
+			<button
+				type="button"
+				role="tab"
+				id="aba-sem-mapa"
+				aria-selected={aba === 'sem-mapa'}
+				aria-controls="painel-sem-mapa"
+				tabindex={aba === 'sem-mapa' ? 0 : -1}
+				onclick={() => escolherAba('sem-mapa')}
+				onkeydown={teclasDasAbas}
+			>
+				Sem mapa {#if carregado}<span class="contagem">{faltam}</span>{/if}
 			</button>
 		</div>
-	</details>
+		<a class="btn manter" href="/mapas/importar">Importar e exportar</a>
+	</div>
 
-	<ImportarExportacao bind:this={restaurar} aoTerminar={carregar} />
-
-	{#if carregado}
-		{#if filtro !== ''}
-			<p class="filtro">
-				Mostrando só os mapas de <b>{filtro}</b>. <a href="/mapas">Ver todos</a>
-			</p>
-		{/if}
-
-		{#each estantes as m (m.disciplinaId)}
-			<section class="estante" aria-labelledby="est-{m.disciplinaId}">
-				<div class="estante-cabeca">
-					<span class="chip" style={tagStyle(cor(m.codigo))}>{m.codigo}</span>
-					<h2 id="est-{m.disciplinaId}">{m.nome}</h2>
-					<span class="meta">{m.mapas.length} {m.mapas.length === 1 ? 'mapa' : 'mapas'}</span>
-				</div>
-				<ul class="cartoes">
-					{#each m.mapas as mapa (mapa.slug)}
-						<li>
-							<a class="cartao" href="/mapas/{mapa.slug}">
-								<span class="titulo">{mapa.titulo}</span>
-								<span class="conta">{mapa.ramos} ramos · {nf.format(mapa.itens)} itens</span>
-								{#if mapa.fonte}<span class="fonte">{mapa.fonte}</span>{/if}
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/each}
-
-		{#if semMateria.length > 0}
-			<section class="estante" aria-labelledby="sem-materia">
-				<div class="estante-cabeca">
-					<h2 id="sem-materia">Sem matéria vinculada</h2>
-					<span class="meta">abra o mapa para vinculá-lo a uma matéria</span>
-				</div>
-				<ul class="cartoes">
-					{#each semMateria as mapa (mapa.slug)}
-						<li>
-							<a class="cartao" href="/mapas/{mapa.slug}">
-								<span class="titulo">{mapa.titulo}</span>
-								<span class="conta">{mapa.ramos} ramos · {nf.format(mapa.itens)} itens</span>
-								{#if mapa.materia}<span class="fonte">a fonte indica: {mapa.materia}</span>{/if}
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
-		{#if catalogo.length > 0 && filtro === ''}
-			<p class="exportar">
-				<button type="button" class="btn" onclick={exportarTodos} disabled={exportando}>
-					{exportando ? 'Exportando…' : '⬇ Exportar todos os mapas'}
-				</button>
-				<span
-					>Um .zip com o texto, as questões, as imagens, os vínculos e as respostas de cada mapa: a cópia de segurança do
-					que está aqui. Ele volta em “Importar uma exportação (.zip)”.</span
-				>
-			</p>
-		{/if}
-
-		{#if estantes.length === 0 && semMateria.length === 0}
-			<div class="vazia">
-				{#if filtro !== ''}
-					<p>Nenhum mapa vinculado a {filtro}.</p>
-				{:else}
-					<p>Nenhum mapa mental ainda.</p>
-					<p>Importe o primeiro acima: o mapa de uma aula, escrito como um outline de texto.</p>
-				{/if}
-			</div>
-		{/if}
-	{:else if !erro}
-		<p class="page-sub">Carregando…</p>
+	{#if filtro !== ''}
+		<p class="filtro">
+			Mostrando só <b>{filtro}</b>. <a href={aba === 'sem-mapa' ? '/mapas?aba=sem-mapa' : '/mapas'}>Ver todas</a>
+		</p>
 	{/if}
+
+	<div id="painel-materias" role="tabpanel" aria-labelledby="aba-materias" hidden={aba !== 'materias'}>
+		{#if carregado}
+			{#each estantes as m (m.disciplinaId)}
+				<section class="estante" aria-labelledby="est-{m.disciplinaId}">
+					<div class="estante-cabeca">
+						<span class="chip" style={tagStyle(cor(m.codigo))}>{m.codigo}</span>
+						<h2 id="est-{m.disciplinaId}">{m.nome}</h2>
+						<span class="meta">{m.mapas.length} {m.mapas.length === 1 ? 'mapa' : 'mapas'}</span>
+					</div>
+					<ul class="cartoes">
+						{#each m.mapas as mapa (mapa.slug)}
+							<li>
+								<a class="cartao" href="/mapas/{mapa.slug}">
+									<span class="titulo">{mapa.titulo}</span>
+									<span class="conta">{mapa.ramos} ramos · {nf.format(mapa.itens)} itens</span>
+									{#if mapa.fonte}<span class="fonte">{mapa.fonte}</span>{/if}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+
+			{#if semMateria.length > 0}
+				<section class="estante" aria-labelledby="sem-materia">
+					<div class="estante-cabeca">
+						<h2 id="sem-materia">Sem matéria vinculada</h2>
+						<span class="meta">abra o mapa para vinculá-lo a uma matéria</span>
+					</div>
+					<ul class="cartoes">
+						{#each semMateria as mapa (mapa.slug)}
+							<li>
+								<a class="cartao" href="/mapas/{mapa.slug}">
+									<span class="titulo">{mapa.titulo}</span>
+									<span class="conta">{mapa.ramos} ramos · {nf.format(mapa.itens)} itens</span>
+									{#if mapa.materia}<span class="fonte">a fonte indica: {mapa.materia}</span>{/if}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+
+			{#if estantes.length === 0 && semMateria.length === 0}
+				<div class="vazia">
+					{#if filtro !== ''}
+						<p>Nenhum mapa vinculado a {filtro}.</p>
+					{:else}
+						<p>Nenhum mapa mental ainda.</p>
+						<p>
+							Envie o PDF de uma aula, ou o texto de um mapa pronto:
+							<a href="/mapas/importar">Importar o primeiro mapa</a>
+						</p>
+					{/if}
+				</div>
+			{/if}
+		{:else if !erro}
+			<p class="page-sub">Carregando…</p>
+		{/if}
+	</div>
+
+	<div id="painel-sem-mapa" role="tabpanel" aria-labelledby="aba-sem-mapa" hidden={aba !== 'sem-mapa'}>
+		{#if carregado}
+			{#if cob.topicos === 0}
+				<div class="vazia">
+					<p>A ementa do concurso aberto não tem tópicos para conferir.</p>
+				</div>
+			{:else}
+				<p class="resumo">
+					<b>{cob.cobertos} de {cob.topicos} tópicos com mapa mental</b>
+					<span>— coberto é o tópico escolhido na página de algum mapa, como a ementa marca.</span>
+				</p>
+
+				{#each pendentes as m (m.disciplinaId)}
+					<section class="estante" aria-labelledby="falta-{m.disciplinaId}">
+						<div class="estante-cabeca">
+							<span class="chip" style={tagStyle(cor(m.codigo))}>{m.codigo}</span>
+							<h2 id="falta-{m.disciplinaId}">{m.nome}</h2>
+							<span class="meta">{m.cobertos} de {m.topicos} tópicos com mapa</span>
+							<a class="enviar" href="/mapas/importar?materia={encodeURIComponent(m.codigo)}">Enviar o PDF de uma aula</a>
+						</div>
+						{#if m.daMateriaInteira.length > 0}
+							<p class="inteira">
+								{#each m.daMateriaInteira as mapa, i (mapa.slug)}{#if i > 0},
+									{/if}<a href="/mapas/{mapa.slug}">{mapa.titulo}</a>{/each}
+								{m.daMateriaInteira.length === 1 ? 'vale' : 'valem'} para a matéria inteira: escolha, na página do mapa, os
+								tópicos que ele cobre.
+							</p>
+						{/if}
+						<ul class="faltam" aria-label="Tópicos sem mapa">
+							{#each m.faltam as t (t)}
+								<li>{t}</li>
+							{/each}
+						</ul>
+					</section>
+				{/each}
+
+				{#if cobertas.length > 0}
+					<p class="cobertas">
+						Com todos os tópicos cobertos: {cobertas.map((m) => `${m.codigo} — ${m.nome}`).join(', ')}.
+					</p>
+				{/if}
+			{/if}
+		{:else if !erro}
+			<p class="page-sub">Carregando…</p>
+		{/if}
+	</div>
 </div>
 
 <style>
-	.aviso-ok {
-		margin-bottom: 14px;
+	.barra {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-top: 4px;
+		border-bottom: 1px solid var(--border);
 	}
-	.aviso-ok a {
-		margin-left: 6px;
-		font-weight: 600;
+	.abas {
+		display: flex;
+		gap: 4px;
 	}
-
-	.importar {
-		margin-bottom: 8px;
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		background: var(--bg-card);
-	}
-	.importar summary {
-		padding: 11px 14px;
+	.abas button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: -1px;
+		padding: 8px 12px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--text-muted);
+		font: inherit;
 		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;
 	}
-	.importar summary:focus-visible {
+	.abas button[aria-selected='true'] {
+		border-bottom-color: var(--text);
+		color: var(--text);
+	}
+	@media (hover: hover) {
+		.abas button:hover {
+			color: var(--text);
+		}
+	}
+	.abas button:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: -2px;
-		border-radius: 10px;
 	}
-	.painel {
-		display: grid;
-		gap: 12px;
-		padding: 0 14px 14px;
-	}
-	.ajuda {
-		margin: 0;
-		font-size: 13px;
-		line-height: 1.55;
-		color: var(--text-muted);
-		max-width: 76ch;
-	}
-	.ajuda code {
-		font-family: var(--font-mono);
-		font-size: 12px;
-		padding: 1px 5px;
-		border-radius: 4px;
+	.contagem {
+		padding: 1px 7px;
+		border-radius: 999px;
 		background: var(--bg-soft);
+		font-size: 11.5px;
+		font-variant-numeric: tabular-nums;
 	}
-	.arquivo,
-	.colar {
-		display: grid;
-		gap: 5px;
-		font-size: 12.5px;
-		color: var(--text-muted);
-	}
-	textarea {
-		box-sizing: border-box;
-		width: 100%;
-		padding: 9px 11px;
-		border: 1px solid var(--border-strong);
-		border-radius: 7px;
-		background: var(--bg);
-		color: var(--text);
-		font-family: var(--font-mono);
-		font-size: 12px;
-		line-height: 1.5;
-		resize: vertical;
-	}
-	textarea:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 1px;
-	}
-	.painel .btn {
-		justify-self: start;
+	.manter {
+		margin-bottom: 6px;
 	}
 	@media (pointer: coarse) {
-		textarea {
-			font-size: 16px;
+		.abas button {
+			min-height: 44px;
 		}
 	}
 
@@ -430,13 +385,35 @@
 		overflow: hidden;
 	}
 
-	.exportar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 10px;
-		margin: 28px 0 0;
-		font-size: 12.5px;
+	.resumo {
+		margin: 18px 0 0;
+		font-size: 14px;
+	}
+	.resumo span {
+		color: var(--text-muted);
+		font-size: 13px;
+	}
+	.enviar {
+		margin-left: auto;
+		font-size: 13px;
+		font-weight: 600;
+	}
+	.inteira {
+		margin: 0 0 10px;
+		font-size: 13px;
+		color: var(--text-muted);
+	}
+	.faltam {
+		margin: 0;
+		padding-left: 20px;
+		display: grid;
+		gap: 4px;
+		font-size: 14px;
+		line-height: 1.45;
+	}
+	.cobertas {
+		margin: 26px 0 0;
+		font-size: 13px;
 		color: var(--text-muted);
 	}
 

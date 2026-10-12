@@ -254,7 +254,8 @@ liberar a publicação, está em `edital-processor/app/leis/README.md`.
    segue `.claude/skills/mapa-mental` e grava `conteudo/mapas/<slug>.md`,
    cobrindo o material inteiro. O texto **não vai para o git** — deriva de aula
    paga e o repositório é público; só o README da pasta é versionado.
-2. **Importar.** **Mapas mentais → Importar mapa**: escolher o arquivo já
+2. **Importar.** **Mapas mentais → Importar e exportar → Importar
+   mapa**: escolher o arquivo já
    importa. Com o concurso aberto, o mapa é vinculado às matérias que o texto
    indica (`materia:` ou `reconhecer:`) e o cronograma passa a oferecê-lo nelas.
    Texto com problema é recusado inteiro, e a mensagem diz a linha; importar de

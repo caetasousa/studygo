@@ -129,7 +129,10 @@ Planalto terminados em `e2e/…`.
 
 O mapa mental é escrito fora do app, a partir de uma aula, como um outline de
 texto (`# título`, metadados `chave: valor` e itens `- texto` com recuo de dois
-espaços), e entra pela tela: **Mapas mentais → Importar mapa**. Ele é da conta
+espaços), e entra pela tela: **Mapas mentais → Importar e exportar → Importar
+mapa**. Ler e manter são páginas separadas (pedido de 12/10/2026): a lista dos
+mapas só lê, e o que entra ou sai (o texto, o PDF da aula, o .zip) fica em
+`/mapas/importar`. Ele é da conta
 que importou: é material de estudo pessoal, e não há catálogo compartilhado
 como o das leis. O vínculo com a matéria é pelo id da disciplina, e é por ele
 que o cronograma oferece o mapa. O mapa abre como uma página de tópicos
@@ -185,6 +188,8 @@ escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
 | M32 | exportar o mapa perde item, marca, questão, imagem, o vínculo com as matérias (e os tópicos de cada uma) ou as respostas — o .zip, reimportado, não dá o mesmo mapa —, exporta o que foi excluído no modo de edição, deixa outra conta baixar o mapa, ou "exportar todos" esquece um mapa | a cópia de segurança não serve; o que tirei volta; meu material vaza |
 | M33 | conectar o Claude pela tela não mostra o link de autorização, aceita um código errado (ou em branco) sem dizer o que fazer, a conexão de uma conta vale para outra, desconectar não desconecta ou não pede confirmação, ou o PDF de quem não conectou fica rodando sem dizer que falta conectar | tenho de abrir um terminal para usar o processador; minha assinatura serve a outra conta; o mapa nunca sai e não sei por quê |
 | M34 | o .zip exportado não tem um lugar só para voltar: importar pede o texto, as questões e as imagens em telas diferentes; ou o .zip volta sem as imagens, sem as questões, sem os vínculos e tópicos, sem as respostas, duplica as respostas ao importar duas vezes, para no primeiro mapa com problema sem dizer qual, ou não cabe no envio (o "exportar todos" passa de 100 MB) | restaurar a cópia vira um trabalho manual de horas, ou volta pela metade sem eu perceber |
+| M35 | a lista "Sem mapa" deixa de fora um tópico da ementa que nenhum mapa cobre, mostra como faltando um tópico que um mapa já cobre (escolhido na página do mapa), a conta "X de Y tópicos com mapa" não bate com a ementa, a matéria toda coberta continua aparecendo como pendente, o mapa que vale para a matéria inteira (sem tópicos escolhidos) dá a matéria por coberta sem dizer que os tópicos dele não foram escolhidos, ou "Enviar o PDF" não leva ao envio já com a matéria do tópico | não sei qual aula ainda falta virar mapa; acho que a matéria está coberta e não está |
+| M36 | a página de ler os mapas volta a misturar os painéis de importar o texto, enviar o PDF e exportar com as estantes (no celular, telas de formulário antes do primeiro mapa), a página de importar e exportar não é alcançável pela lista (nem pela lista vazia), ou lá falta um dos caminhos de entrada e saída (texto, PDF, .zip, exportar todos) | rolo por formulários para chegar ao que quero ler; ou não acho onde importar |
 
 ## Fora da suíte, de propósito
 

@@ -5,8 +5,8 @@ description: Monta o mapa mental de uma aula em PDF (ou de um assunto) como outl
 
 # Mapa mental de uma aula
 
-O mapa é escrito aqui, fora do app, e entra nele pela tela (**Mapas mentais →
-Importar mapa**, ou `POST /api/mapas` com `{"texto": "<o arquivo>", "concurso":
+O mapa é escrito aqui, fora do app, e entra nele pela tela (**Mapas mentais → Importar
+e exportar → Importar mapa**, ou `POST /api/mapas` com `{"texto": "<o arquivo>", "concurso":
 "<slug>"}`). O app não gera mapa nenhum. Quem confere o texto é a importação:
 o que passa na stack local, passa no servidor.
 
@@ -163,7 +163,7 @@ O repositório é público e o mapa deriva de material pago, de uso pessoal.
 ## Fechar
 
 1. Valide o texto importando-o na stack local (`make up` e **Mapas mentais →
-   Importar mapa**): a mensagem lista todos os problemas com a linha de cada um
+   Importar e exportar → Importar mapa**): a mensagem lista todos os problemas com a linha de cada um
    — recuo que pula nível, marca desconhecida, item vazio. As questões, em
    **Manter este mapa → Importar questões**: a mensagem diz a questão e o
    problema (ramo que o mapa não tem, gabarito fora das alternativas…).

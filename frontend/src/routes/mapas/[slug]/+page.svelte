@@ -721,7 +721,7 @@
 		<h2 class="sec">Exportar</h2>
 		<p class="page-sub">
 			Um .zip com o texto, as questões, as imagens, os vínculos com as matérias e as suas respostas, como o mapa está
-			agora. Ele volta inteiro em <a href="/mapas">Mapas mentais</a> → “Importar uma exportação (.zip)”.
+			agora. Ele volta inteiro em <a href="/mapas/importar">Importar e exportar</a> → “Importar uma exportação (.zip)”.
 		</p>
 		{#if erroExportar}<div class="form-error" role="alert">{erroExportar}</div>{/if}
 		<button type="button" class="btn" onclick={exportar} disabled={exportando}>
