@@ -9,5 +9,5 @@ tests/
 .git/
 *.md
 # As instruções do Claude para os mapas são código, não documentação.
-!app/mapas/instrucoes/*.md
+!app/service/mapas/instrucoes/*.md
 .env

@@ -13,14 +13,14 @@ from typing import Any
 
 import pytest
 
-from app.core.config import Settings
-from app.core.errors import (
+from app.platform.config import Settings
+from app.platform.errors import (
     InvalidProviderResponse,
     ProviderRateLimited,
     ProviderTimeout,
     ProviderUnavailable,
 )
-from app.providers.base import StructuredRequest
+from app.port.llm import StructuredRequest
 
 
 class _FakeClientError(Exception):
@@ -98,7 +98,7 @@ def _request() -> StructuredRequest:
 
 @pytest.fixture
 def provider(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
-    from app.providers.gemini import GeminiProvider
+    from app.adapter.llm.gemini import GeminiProvider
 
     return lambda behaviour: (
         _install_fake_genai(monkeypatch, behaviour),
@@ -202,7 +202,7 @@ async def test_non_object_json_is_invalid(provider: Any) -> None:
 
 
 async def test_no_key_reports_unavailable() -> None:
-    from app.providers.gemini import GeminiProvider
+    from app.adapter.llm.gemini import GeminiProvider
 
     gp = GeminiProvider(Settings(gemini_api_key=""))
     assert gp.available() is False

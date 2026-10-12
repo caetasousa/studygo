@@ -55,7 +55,7 @@ services:
   edital-processor:
     container_name: studygo-local-leitor-de-edital
     # O export do provasGo, se existir nesta máquina: dá aos mapas as questões
-    # do banco de provas (app/mapas/ferramentas/provas.py).
+    # do banco de provas (app/service/mapas/ferramentas/provas.py).
     environment:
       EP_PROVASGO_DIR: /dados/provasgo
     volumes:

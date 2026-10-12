@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from app.domain.blocos import Bloco
-from app.schemas.document import NormalizedDocument, PageText
-from app.services.chunking import (
+from app.domain.edital.blocos import Bloco
+from app.domain.edital.chunking import (
     build_chunks,
     chunks_for_blocks,
     render_for_prompt,
 )
+from app.domain.edital.document import NormalizedDocument, PageText
 
 
 def _doc(pages: list[PageText]) -> NormalizedDocument:

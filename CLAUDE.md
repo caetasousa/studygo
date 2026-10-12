@@ -8,7 +8,7 @@
 - `frontend/`: SPA SvelteKit/Svelte 5.
 - `edital-processor/`: serviço interno Python/FastAPI para processar editais e
   transformar o PDF de uma aula em mapa mental, com o Claude Code
-  (`app/mapas/`). Os mapas vivem no banco; `conteudo/mapas/` é só a referência
+  (`app/service/mapas/`). Os mapas vivem no banco; `conteudo/mapas/` é só a referência
   do formato, e a saída é a exportação.
 - `ansible/`: provisionamento e deploy do servidor (WSL + túnel da Cloudflare).
 
@@ -70,6 +70,13 @@ Regras que valem sem exceção:
 - Repositories persistem; não decidem política. Atribuir código de disciplina,
   por exemplo, é decisão do domínio.
 - Mappers só onde os dois lados da fronteira são de fato diferentes.
+
+O `edital-processor` segue as mesmas camadas em `app/` (`domain`, `service`,
+`port`, `adapter`, `platform`; `main.py` é a composition root), com edital,
+leis e mapas lado a lado em cada uma. Chamada para fora — Gemini, PDF, OCR,
+disco, fontes de lei, backend, Claude — só em `adapter/`, atrás de uma porta.
+A exceção: os modelos pydantic do edital ficam no domínio com os aliases do
+contrato (`docs/arquitetura.md`).
 
 O `edital-processor` produz uma prévia revisável e nunca escreve no PostgreSQL.
 A persistência acontece no backend após confirmação do usuário. O mapa mental

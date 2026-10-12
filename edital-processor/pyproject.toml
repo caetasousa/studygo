@@ -44,7 +44,7 @@ known-first-party = ["app"]
 "tests/*" = ["N806"]
 # Texto de lei usa travessão e meia-risca de verdade ("IV – julgar"): o aviso
 # de caractere ambíguo seria sobre o próprio dado.
-"app/leis/*" = ["RUF001", "RUF002", "RUF003"]
+"app/domain/leis/*" = ["RUF001", "RUF002", "RUF003"]
 "tests/unit/test_leis_*" = ["N806", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
@@ -61,14 +61,19 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # PyMuPDF ships type hints but they are incomplete: nearly every method comes
 # back as untyped, so strict mode's no-untyped-call fires on ordinary use.
-# Scope the relaxation to the two modules that touch it directly.
-module = ["app.services.extraction", "app.services.validation", "app.services.ocr", "app.leis.captura"]
+# Scope the relaxation to the adapters that touch it directly.
+module = [
+    "app.adapter.pdf.extracao",
+    "app.adapter.pdf.validacao",
+    "app.adapter.pdf.leitor",
+    "app.adapter.ocr.tesseract",
+]
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # As ferramentas dos mapas são scripts que o Claude roda na linha de comando,
 # não código do serviço: ficam de fora da checagem estrita.
-module = ["app.mapas.ferramentas.*"]
+module = ["app.service.mapas.ferramentas.*"]
 ignore_errors = true
 
 [tool.pytest.ini_options]

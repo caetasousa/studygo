@@ -12,8 +12,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from app.core.config import Settings
-from app.services.artifacts import ArtifactStore
+from app.adapter.disco.artefatos import ArtifactStore
+from app.platform.config import Settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REAL_PDF = FIXTURES / "edital_real.pdf"

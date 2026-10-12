@@ -15,7 +15,7 @@ import (
 
 // Os mapas mentais também moram no mesmo processador: o PDF da aula vai por
 // aqui, e o mapa volta pela rota interna do backend quando o Claude termina.
-// Ver edital-processor/app/mapas/README.md.
+// Ver edital-processor/app/service/mapas/README.md.
 
 var _ port.ProcessadorDeMapas = (*Client)(nil)
 

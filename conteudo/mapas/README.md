@@ -8,7 +8,7 @@ pasta `<slug>/`.
 - **Entra** pela tela — **Mapas mentais → Importar e exportar → Importar
   mapa**, e as questões e imagens pela página do mapa — ou pelo PDF da aula,
   que o processador de mapas do `edital-processor` transforma em mapa
-  (`edital-processor/app/mapas/`).
+  (`edital-processor/app/service/mapas/`).
 - **Sai** pela exportação — o botão **Exportar mapa** na página do mapa, ou
   **Exportar todos os mapas** em Importar e exportar —, num `.zip` com esse
   mesmo arranjo e mais o estudo da conta em `<slug>.conta.json`: os vínculos com as matérias

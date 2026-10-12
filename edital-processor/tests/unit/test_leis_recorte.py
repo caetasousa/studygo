@@ -13,9 +13,16 @@ from typing import Any
 
 import pytest
 
-from app.leis.captura import capturar
-from app.leis.fontes import Resposta, descobrir_fonte, fonte_do_link
-from app.leis.pesquisa import pesquisar
+from app.adapter.pdf.leitor import LeitorPyMuPDF
+from app.domain.leis.fontes import fonte_do_link
+from app.platform.config import Settings
+from app.port.fontes import Resposta
+from app.service.leis.captura import capturar
+from app.service.leis.fontes import descobrir_fonte
+from app.service.leis.pesquisa import pesquisar
+
+# O leitor de PDF de verdade: a lei em PDF é lida como em produção.
+PDF = LeitorPyMuPDF(Settings())
 
 PLANALTO = "https://www.planalto.gov.br/ccivil_03"
 CF = f"{PLANALTO}/constituicao/constituicao.htm"
@@ -154,7 +161,7 @@ def test_k39_sem_fonte_conhecida_e_nao_achei(tema: str) -> None:
 
 def test_pesquisa_devolve_a_estrutura_para_ler_o_topico() -> None:
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
-    p = asyncio.run(pesquisar("Lei nº 1: controle", link, _http({link: LEI})))
+    p = asyncio.run(pesquisar("Lei nº 1: controle", link, _http({link: LEI}), pdf=PDF))
     assert p.fonte == link
     assert p.epigrafe.startswith("LEI Nº 1")
     assert p.estrutura[0]["texto"].startswith("LEI Nº 1")  # a epígrafe vai inteira
@@ -177,7 +184,7 @@ def test_pesquisa_devolve_a_estrutura_para_ler_o_topico() -> None:
 def _capturar(recorte: list[str] | None, provider: object = None) -> Any:
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
     return asyncio.run(
-        capturar(fonte_do_link(link), _http({link: LEI}), provider, recorte=recorte)  # type: ignore[arg-type]
+        capturar(fonte_do_link(link), _http({link: LEI}), provider, recorte=recorte, pdf=PDF)  # type: ignore[arg-type]
     )
 
 
@@ -239,9 +246,11 @@ def _tipo(texto: str) -> str:
 def test_k44_aviso_de_fora_do_recorte_nao_aparece() -> None:
     lei = LEI.replace("Art. 1º Esta Lei", "Art. 5º Esta Lei")  # salto no capítulo I
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
-    fora = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap3"]))
+    fora = asyncio.run(
+        capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap3"], pdf=PDF)
+    )
     assert not [a for a in fora.avisos if a.id.startswith("salto")]
-    inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, pdf=PDF))
     assert [a for a in inteira.avisos if a.id.startswith("salto")]
 
 
@@ -263,7 +272,9 @@ RESOLUCAO_COM_ANEXO = """<html><body>
 
 def test_k45_anexo_que_recomeca_a_numeracao_tem_refs_proprias() -> None:
     link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/1"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: RESOLUCAO_COM_ANEXO}), None))
+    c = asyncio.run(
+        capturar(fonte_do_link(link), _http({link: RESOLUCAO_COM_ANEXO}), None, pdf=PDF)
+    )
     assert c.bloqueios == []
     refs = [d["ref"] for d in c.dispositivos or []]
     # O regimento é o texto que se estuda: fica com as refs limpas (art1…);
@@ -281,12 +292,16 @@ def test_k46_problema_fora_do_recorte_nao_bloqueia() -> None:
         "<p>Art. 4º Esta Lei entra em vigor.</p><p>a) na data da publicação.</p>",
     )
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
-    fora = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap2"]))
+    fora = asyncio.run(
+        capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap2"], pdf=PDF)
+    )
     assert fora.bloqueios == [], fora.bloqueios
     assert fora.publicavel
-    inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    inteira = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, pdf=PDF))
     assert inteira.bloqueios
-    dentro = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap3"]))
+    dentro = asyncio.run(
+        capturar(fonte_do_link(link), _http({link: lei}), None, recorte=["cap3"], pdf=PDF)
+    )
     assert dentro.bloqueios
 
 
@@ -307,14 +322,14 @@ RESOLUCAO_COM_DOIS_ANEXOS = """<html><body>
 def test_k45b_dois_anexos_tem_refs_proprias() -> None:
     link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/2"
     http = _http({link: RESOLUCAO_COM_DOIS_ANEXOS})
-    c = asyncio.run(capturar(fonte_do_link(link), http, None))
+    c = asyncio.run(capturar(fonte_do_link(link), http, None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
     refs = [d["ref"] for d in c.dispositivos or []]
     assert {"resolucao.art1", "anexo1.cap1", "anexo1.art1", "anexo2.cap1", "anexo2.art1"} <= set(
         refs
     )
     # O Anexo II sozinho, como o edital pede.
-    so = asyncio.run(capturar(fonte_do_link(link), http, None, recorte=["anexo2.cap1"]))
+    so = asyncio.run(capturar(fonte_do_link(link), http, None, recorte=["anexo2.cap1"], pdf=PDF))
     assert [d["ref"] for d in so.dispositivos or []] == [
         "preambulo1",
         "anexo2.cap1",
@@ -339,7 +354,7 @@ def test_k47_descartado_com_o_mesmo_texto_de_um_paragrafo_do_corpo() -> None:
 <p>Art. 2º Esta Resolução entra em vigor na data de sua publicação.</p>
 </body></html>""".replace("{VIDE}", vide)
     link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/3"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
 
 
@@ -352,7 +367,7 @@ def test_k48_rotulo_repetido_na_fonte_vira_aviso_e_ref_propria() -> None:
         "<p>Seção I<br>Da frequência</p><p>Art. 3º O controle é externo.</p>",
     )
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0002.htm"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
     por_ref = {d["ref"]: d for d in c.dispositivos or []}
     assert por_ref["cap2.sec1"]["nome"] == "Da jornada"
@@ -369,7 +384,7 @@ def test_k49_alineas_sob_o_caput_que_as_anuncia() -> None:
         "<p>a) de ser representado;</p><p>b) de se associar.</p>",
     )
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0003.htm"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
     por_ref = {d["ref"]: d for d in c.dispositivos or []}
     assert por_ref["art3.alia"]["pai"] == "art3" and por_ref["art3.alib"]["pai"] == "art3"
@@ -379,7 +394,7 @@ def test_k49_alineas_sob_o_caput_que_as_anuncia() -> None:
         "<p>Art. 3º O controle é externo.</p>",
         "<p>Art. 3º O controle é externo.</p><p>a) de ser representado.</p>",
     )
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: torta}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: torta}), None, pdf=PDF))
     assert c.bloqueios
 
 
@@ -397,7 +412,7 @@ def test_k50_incisos_separados_por_br_no_mesmo_paragrafo() -> None:
 <br />publicação.</p>
 </body></html>"""
     link = "https://gnoi.tce.go.gov.br/atoNormativo/Publicado/5"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: ato}), None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
     por_ref = {d["ref"]: d for d in c.dispositivos or []}
     assert por_ref["art1"]["texto"] == "Art. 1º Constituem objetivos desta Resolução:"
@@ -413,7 +428,7 @@ def test_k50_incisos_separados_por_br_no_mesmo_paragrafo() -> None:
 def test_k48b_inciso_repetido_na_fonte_vira_aviso_e_artigo_repetido_bloqueia() -> None:
     lei = LEI.replace("<p>II - apreciar.</p>", "<p>II - apreciar;</p><p>II - fiscalizar.</p>")
     link = "https://www.planalto.gov.br/ccivil_03/leis/l0004.htm"
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: lei}), None, pdf=PDF))
     assert c.bloqueios == [], c.bloqueios
     por_ref = {d["ref"]: d for d in c.dispositivos or []}
     assert por_ref["art2.inc2-2"]["texto"] == "II - fiscalizar."
@@ -421,7 +436,7 @@ def test_k48b_inciso_repetido_na_fonte_vira_aviso_e_artigo_repetido_bloqueia() -
     artigo = LEI.replace(
         "<p>Art. 3º O controle é externo.</p>", "<p>Art. 2º O controle é externo.</p>"
     )
-    c = asyncio.run(capturar(fonte_do_link(link), _http({link: artigo}), None))
+    c = asyncio.run(capturar(fonte_do_link(link), _http({link: artigo}), None, pdf=PDF))
     assert any("ref repetida art2" in b for b in c.bloqueios), c.bloqueios
 
 

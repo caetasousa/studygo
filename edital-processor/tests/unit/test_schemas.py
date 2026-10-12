@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.alerts import Alert, AlertCode, AlertSeverity
-from app.schemas.evidence import Evidence, ExtractionMethod
-from app.schemas.extraction import (
+from app.domain.edital.alerts import Alert, AlertCode, AlertSeverity
+from app.domain.edital.evidence import Evidence, ExtractionMethod
+from app.domain.edital.extraction import (
     DisciplinaExtraida,
     DocumentInfo,
     ExtractionResult,

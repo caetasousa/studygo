@@ -246,7 +246,7 @@ Tudo pela tela, sem comando:
    questões continuam; as das unidades cujo texto mudou ficam para revisar.
 
 Como a pesquisa e a captura podem errar, e o que elas conferem antes de
-liberar a publicação, está em `edital-processor/app/leis/README.md`.
+liberar a publicação, está em `edital-processor/app/domain/leis/README.md`.
 
 ## 🧠 Mapas mentais: montar e importar
 

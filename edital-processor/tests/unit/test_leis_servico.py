@@ -14,9 +14,15 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.leis.captura import capturar
-from app.leis.fontes import FonteInvalida, Resposta, fonte_do_link, redirecionamento_permitido
-from app.leis.servico import CapturaNaoEncontrada, Capturas, CapturasDemais
+from app.adapter.pdf.leitor import LeitorPyMuPDF
+from app.domain.leis.fontes import FonteInvalida, fonte_do_link, redirecionamento_permitido
+from app.platform.config import Settings
+from app.port.fontes import Resposta
+from app.service.leis.captura import capturar
+from app.service.leis.capturas import CapturaNaoEncontrada, Capturas, CapturasDemais
+
+# O leitor de PDF de verdade: a lei em PDF é lida como em produção.
+PDF = LeitorPyMuPDF(Settings())
 
 LEI = """<html><body>
 <p>LEI Nº 1, DE 1º DE JANEIRO DE 2020</p>
@@ -93,18 +99,20 @@ def test_k34_captura_com_bloqueio_nao_e_publicavel() -> None:
     corpo = "<html><body><p>Art. 1º A.</p><p>Art. 3º C.</p><p>Texto solto</p></body></html>"
     # Salto de numeração é aviso; o que torna o bloqueio certo é a fonte sem
     # artigo nenhum, que não deixa nem montar a lei.
-    vazia = asyncio.run(capturar(fonte_do_link(PLANALTO), _http("<html><p>Erro</p></html>"), None))
+    vazia = asyncio.run(
+        capturar(fonte_do_link(PLANALTO), _http("<html><p>Erro</p></html>"), None, pdf=PDF)
+    )
     assert vazia.bloqueios and not vazia.publicavel
     assert vazia.dispositivos is None
 
-    com_salto = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None))
+    com_salto = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None, pdf=PDF))
     assert not com_salto.bloqueios
     assert com_salto.dispositivos is not None
 
 
 def test_k35_salto_de_numeracao_e_aviso_para_revisar() -> None:
     corpo = "<html><body><p>Art. 1º A.</p><p>Art. 3º C.</p></body></html>"
-    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None))
+    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None, pdf=PDF))
     saltos = [a for a in c.avisos if "art1 → art3" in a.texto]
     assert len(saltos) == 1
     assert c.publicavel
@@ -123,7 +131,7 @@ def test_k35_divergencia_do_gemini_e_aviso_com_o_trecho() -> None:
                 itens.append({"id": pid, "tipo": tipo})
             return {"itens": itens}
 
-    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(), Discorda()))  # type: ignore[arg-type]
+    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(), Discorda(), pdf=PDF))  # type: ignore[arg-type]
     assert not c.bloqueios
     divergencias = [a for a in c.avisos if "o Gemini diz solto" in a.texto]
     assert len(divergencias) == 1
@@ -148,7 +156,7 @@ def _regra(texto: str) -> str:
 
 
 def test_k36_sem_gemini_vira_aviso() -> None:
-    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(), None))
+    c = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(), None, pdf=PDF))
     assert not c.gemini
     assert any("Gemini" in a.texto for a in c.avisos)
     assert c.publicavel
@@ -156,8 +164,8 @@ def test_k36_sem_gemini_vira_aviso() -> None:
 
 def test_k26_ids_dos_avisos_sao_estaveis_entre_capturas() -> None:
     corpo = "<html><body><p>Art. 1º A.</p><p>Art. 3º C.</p></body></html>"
-    a = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None))
-    b = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None))
+    a = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None, pdf=PDF))
+    b = asyncio.run(capturar(fonte_do_link(PLANALTO), _http(corpo), None, pdf=PDF))
     assert [x.id for x in a.avisos] == [x.id for x in b.avisos]
     assert a.versao == b.versao
 
@@ -167,7 +175,7 @@ def test_k26_ids_dos_avisos_sao_estaveis_entre_capturas() -> None:
 
 def test_k31_outra_conta_nao_ve_a_captura() -> None:
     async def cenario() -> None:
-        capturas = Capturas(http=_http(), provider=None)
+        capturas = Capturas(http=_http(), provider=None, pdf=PDF)
         cid = capturas.iniciar(PLANALTO, "u1")
         await _esperar(capturas, cid)
         with pytest.raises(CapturaNaoEncontrada):
@@ -182,7 +190,7 @@ def test_k32_excecao_no_meio_vira_falha_e_nao_fica_rodando() -> None:
         raise RuntimeError("conexão caiu")
 
     async def cenario() -> None:
-        capturas = Capturas(http=explode, provider=None)
+        capturas = Capturas(http=explode, provider=None, pdf=PDF)
         cid = capturas.iniciar(PLANALTO, "u1")
         estado = await _esperar(capturas, cid)
         assert estado["estado"] == "falhou"
@@ -206,7 +214,7 @@ def test_k33_limita_capturas_simultaneas() -> None:
                 await liberar.wait()
                 return {"itens": []}
 
-        capturas = Capturas(http=_http(), provider=Lento(), simultaneas=1)  # type: ignore[arg-type]
+        capturas = Capturas(http=_http(), provider=Lento(), simultaneas=1, pdf=PDF)  # type: ignore[arg-type]
         primeira = capturas.iniciar(PLANALTO, "u1")
         await asyncio.sleep(0.05)
         # A segunda é recusada, não enfileirada: quem espera é a tela, que
@@ -225,7 +233,9 @@ def test_k37_captura_pronta_expira() -> None:
     agora = [1000.0]
 
     async def cenario() -> None:
-        capturas = Capturas(http=_http(), provider=None, validade=60, relogio=lambda: agora[0])
+        capturas = Capturas(
+            http=_http(), provider=None, validade=60, relogio=lambda: agora[0], pdf=PDF
+        )
         cid = capturas.iniciar(PLANALTO, "u1")
         await _esperar(capturas, cid)
         agora[0] += 61
@@ -239,19 +249,15 @@ def test_k37_captura_pronta_expira() -> None:
 
 
 def test_rotas_exigem_token_e_devolvem_a_previa(tmp_path: object) -> None:
-    from app.api.leis import get_capturas
-    from app.core.config import Settings, get_settings
-    from app.main import create_app
+    from app.main import Componentes, create_app
 
-    capturas = Capturas(http=_http(), provider=None)
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: Settings(
+    settings = Settings(
         service_token="t",
         gemini_api_key="",
         work_dir=tmp_path / "work",  # type: ignore[operator]
     )
-    app.dependency_overrides[get_capturas] = lambda: capturas
-    with TestClient(app) as cliente:
+    # A fronteira de fora é o site oficial: o resto é o de verdade.
+    with TestClient(create_app(Componentes(settings, http_leis=_http()))) as cliente:
         sem_token = cliente.post("/internal/leis/capturas", json={"link": PLANALTO})
         assert sem_token.status_code == 401
 

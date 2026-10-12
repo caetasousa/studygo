@@ -29,10 +29,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api import mapas as rota
-from app.core.config import Settings, get_settings
-from app.main import create_app
-from app.mapas.servico import INSTRUCOES, Mapas, Resposta, Saida, Trabalho, ler_saida
+from app.domain.mapas.pedido import Resposta, Saida, Trabalho
+from app.main import Componentes, create_app
+from app.platform.config import Settings
+from app.service.mapas.fila import Mapas
+from app.service.mapas.sessao import INSTRUCOES, ler_saida
 
 RAIZ = Path(__file__).resolve().parents[3]
 
@@ -176,23 +177,32 @@ def test_sem_mapa_md_e_erro_para_o_claude(tmp_path: Path) -> None:
 
 @pytest.fixture
 def cliente(tmp_path: Path) -> Iterator[tuple[TestClient, Claude, Backend]]:
-    settings = Settings(service_token="s3cr3t", gemini_api_key="", work_dir=tmp_path / "work")
+    settings = Settings(
+        service_token="s3cr3t",
+        gemini_api_key="",
+        work_dir=tmp_path / "work",
+        claude_contas_dir=tmp_path / "contas",
+    )
     claude, backend = Claude(), Backend()
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: settings
-    app.dependency_overrides[rota.get_mapas] = lambda: _mapas
-    with TestClient(app) as c:
-        # A fila nasce no loop do TestClient, como no servidor.
-        _mapas = Mapas(settings, backend.entregar, backend.avisar_falha, claude)
+    componentes = Componentes(
+        settings, entregar=backend.entregar, avisar_falha=backend.avisar_falha, claude=claude
+    )
+    # A fila nasce no primeiro pedido, dentro do loop do TestClient, como no servidor.
+    with TestClient(create_app(componentes)) as c:
         yield c, claude, backend
-    app.dependency_overrides.clear()
 
 
-def _post(c: TestClient, token: str = "s3cr3t", pdf: bytes = b"%PDF-1.7 aula") -> int:
+def _post(
+    c: TestClient,
+    token: str = "s3cr3t",
+    pdf: bytes = b"%PDF-1.7 aula",
+    token_claude: str = "tok-da-conta",
+) -> int:
+    dados = {"pedido": "p9", "arquivo": "a.pdf", "temas": None, "tokenClaude": token_claude}
     r = c.post(
         "/internal/mapas/processamentos",
         # Sem matéria, o Go manda os tópicos como null.
-        data={"dados": json.dumps({"pedido": "p9", "arquivo": "a.pdf", "temas": None})},
+        data={"dados": json.dumps(dados)},
         files={"pdf": ("a.pdf", io.BytesIO(pdf), "application/pdf")},
         headers={"authorization": f"Bearer {token}", "x-owner-ref": "u1"},
     )
@@ -222,6 +232,22 @@ def test_rota_aceita_e_processa(cliente: tuple[TestClient, Claude, Backend]) -> 
     assert [p for p, _ in backend.entregues] == ["p9"]
 
 
+def test_rota_sem_claude_da_conta_avisa_a_falha(
+    cliente: tuple[TestClient, Claude, Backend],
+) -> None:
+    """Sem token e sem conexão, o pedido falha na hora dizendo o que fazer, sem
+    subir o Claude: a montagem real liga a fila à conexão de cada conta."""
+    c, claude, backend = cliente
+    assert _post(c, token_claude="") == 202
+    for _ in range(100):
+        if backend.falhas:
+            break
+        time.sleep(0.02)
+    assert [p for p, _ in backend.falhas] == ["p9"]
+    assert "não está conectado" in backend.falhas[0][1]
+    assert claude.chamadas == []
+
+
 @pytest.mark.parametrize(
     ("copia", "original"),
     [
@@ -240,7 +266,7 @@ def test_instrucoes_iguais_as_do_repositorio(copia: str, original: str) -> None:
 
 async def test_sem_conexao_nem_token_falha_dizendo_o_que_fazer(tmp_path: Path) -> None:
     """O PDF de quem não conectou o Claude não roda: o pedido diz para conectar."""
-    from app.mapas.conexao import Conexoes
+    from app.adapter.claude.conexao import Conexoes
 
     settings = Settings(
         service_token="",

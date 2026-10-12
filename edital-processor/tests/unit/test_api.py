@@ -6,24 +6,19 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings, get_settings
-from app.main import create_app
+from app.main import Componentes, create_app
+from app.platform.config import Settings
 
 
 @pytest.fixture
 def client(tmp_path: object) -> Iterator[TestClient]:
-    def _settings() -> Settings:
-        return Settings(
-            service_token="s3cr3t",
-            gemini_api_key="",
-            work_dir=tmp_path / "work",  # type: ignore[operator]
-        )
-
-    app = create_app()
-    app.dependency_overrides[get_settings] = _settings
-    with TestClient(app) as c:
+    settings = Settings(
+        service_token="s3cr3t",
+        gemini_api_key="",
+        work_dir=tmp_path / "work",  # type: ignore[operator]
+    )
+    with TestClient(create_app(Componentes(settings))) as c:
         yield c
-    app.dependency_overrides.clear()
 
 
 def test_healthz_ok(client: TestClient) -> None:
@@ -46,16 +41,12 @@ def test_sem_token_configurado_recusa(tmp_path: object, text_pdf: bytes) -> None
     """Serviço sem token não fica aberto: antes, faltar a variável de ambiente
     deixava as rotas internas sem porteiro."""
 
-    def _settings() -> Settings:
-        return Settings(
-            service_token="",
-            gemini_api_key="",
-            work_dir=tmp_path / "work",  # type: ignore[operator]
-        )
-
-    app = create_app()
-    app.dependency_overrides[get_settings] = _settings
-    with TestClient(app) as c:
+    settings = Settings(
+        service_token="",
+        gemini_api_key="",
+        work_dir=tmp_path / "work",  # type: ignore[operator]
+    )
+    with TestClient(create_app(Componentes(settings))) as c:
         r = c.post(
             "/internal/editais/analisar",
             files={"file": ("e.pdf", io.BytesIO(text_pdf), "application/pdf")},
@@ -64,7 +55,6 @@ def test_sem_token_configurado_recusa(tmp_path: object, text_pdf: bytes) -> None
         assert r.status_code == 401
         # A porta pública continua aberta.
         assert c.get("/healthz").status_code == 200
-    app.dependency_overrides.clear()
 
 
 def test_analisar_requires_owner_ref(client: TestClient, text_pdf: bytes) -> None:

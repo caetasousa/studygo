@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.schemas.alerts import AlertCode, AlertSeverity
-from app.schemas.extraction import (
+from app.domain.edital.alerts import AlertCode, AlertSeverity
+from app.domain.edital.extraction import (
     DisciplinaExtraida,
     DocumentInfo,
     ExtractionResult,
@@ -9,7 +9,7 @@ from app.schemas.extraction import (
     GrupoConhecimento,
     WeightScope,
 )
-from app.services.validation_rules import validate
+from app.domain.edital.validation_rules import validate
 
 
 def _result(**kw: object) -> ExtractionResult:
@@ -136,7 +136,7 @@ def test_missing_exam_date_warns() -> None:
 
 
 def test_duplicate_cargo_code_warns() -> None:
-    from app.schemas.extraction import Cargo
+    from app.domain.edital.extraction import Cargo
 
     result = _result(
         cargos=[Cargo(codigo="A01", nome="X"), Cargo(codigo="A01", nome="Y")],

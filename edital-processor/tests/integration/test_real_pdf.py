@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.config import Settings
-from app.services.extraction import extract_native
-from app.services.ocr_decision import pages_needing_ocr
-from app.services.validation import validate_upload
+from app.adapter.pdf.extracao import extract_native
+from app.adapter.pdf.validacao import validate_upload
+from app.domain.edital.ocr_decision import pages_needing_ocr
+from app.platform.config import Settings
 from tests.conftest import REAL_PDF
 
 pytestmark = [
@@ -42,7 +42,9 @@ def test_is_a_fully_scanned_pdf(real_bytes: bytes) -> None:
 def test_every_page_is_flagged_for_ocr(real_bytes: bytes) -> None:
     out = extract_native(real_bytes)
     settings = Settings()
-    assert pages_needing_ocr(out.pages, settings) == list(range(1, 27))
+    assert pages_needing_ocr(out.pages, settings.min_text_chars, settings.min_text_score) == list(
+        range(1, 27)
+    )
 
 
 def test_page_geometry_is_a4_portrait(real_bytes: bytes) -> None:
@@ -57,8 +59,8 @@ def test_page_geometry_is_a4_portrait(real_bytes: bytes) -> None:
 
 @pytest.mark.integration
 def test_ocr_reads_the_scanned_edital(real_bytes: bytes, tmp_path: object) -> None:
-    from app.core.errors import OCRUnavailable
-    from app.services.ocr import run_ocr
+    from app.adapter.ocr.tesseract import run_ocr
+    from app.platform.errors import OCRUnavailable
 
     settings = Settings(ocr_dpi=200)  # lower dpi keeps the test quick
     try:
@@ -76,9 +78,11 @@ def test_ocr_reads_the_scanned_edital(real_bytes: bytes, tmp_path: object) -> No
 
 @pytest.mark.integration
 def test_full_pipeline_classifies_the_real_edital(real_bytes: bytes, tmp_path: object) -> None:
-    from app.domain.blocos import Bloco
-    from app.services.artifacts import ArtifactStore
-    from app.services.pipeline import analyse
+    from app.adapter.disco.artefatos import ArtifactStore
+    from app.adapter.ocr.tesseract import OcrTesseract
+    from app.adapter.pdf.leitor import LeitorPyMuPDF
+    from app.domain.edital.blocos import Bloco
+    from app.service.edital.analise import analyse
 
     settings = Settings(work_dir=tmp_path / "w", ocr_dpi=200)  # type: ignore[operator]
     store = ArtifactStore(settings)
@@ -89,10 +93,12 @@ def test_full_pipeline_classifies_the_real_edital(real_bytes: bytes, tmp_path: o
         owner_ref="u",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     if not outcome.ocr_ran:
         pytest.skip("tesseract not installed on this host")
-    doc = store.load(outcome.document.document_id, "u")
+    doc = store.load(outcome.document.document_id)
 
     def pages_with(block: Bloco) -> list[int]:
         return [p.physical_page for p in doc.pages if block in p.blocks]

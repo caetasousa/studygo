@@ -4,9 +4,14 @@ import time
 
 import pytest
 
-from app.core.errors import DocumentExpired, DocumentNotFound, DocumentOwnerMismatch
-from app.schemas.document import NormalizedDocument, PageText
-from app.services.artifacts import ArtifactStore
+from app.adapter.disco.artefatos import ArtifactStore
+from app.adapter.llm.nulo import NullProvider
+from app.adapter.ocr.tesseract import OcrTesseract
+from app.adapter.pdf.leitor import LeitorPyMuPDF
+from app.domain.edital.document import NormalizedDocument, PageText
+from app.platform.config import Settings
+from app.platform.errors import DocumentExpired, DocumentNotFound, DocumentOwnerMismatch
+from app.service.edital.editais import Editais
 
 
 def _doc(store: ArtifactStore, *, owner: str = "user-1", ttl: int = 3600) -> NormalizedDocument:
@@ -21,39 +26,44 @@ def _doc(store: ArtifactStore, *, owner: str = "user-1", ttl: int = 3600) -> Nor
     )
 
 
+def _editais(settings: Settings, store: ArtifactStore) -> Editais:
+    return Editais(settings, store, LeitorPyMuPDF(settings), OcrTesseract(settings), NullProvider())
+
+
 def test_save_then_load_roundtrips(store: ArtifactStore) -> None:
     doc = _doc(store)
     store.save(doc)
-    loaded = store.load(doc.document_id, "user-1")
+    loaded = store.load(doc.document_id)
     assert loaded.document_id == doc.document_id
     assert loaded.pages[0].text == "x"
 
 
 def test_load_unknown_id_raises(store: ArtifactStore) -> None:
     with pytest.raises(DocumentNotFound):
-        store.load(store.create_id(), "user-1")
+        store.load(store.create_id())
 
 
 def test_malformed_id_is_rejected_before_fs(store: ArtifactStore) -> None:
     with pytest.raises(DocumentNotFound):
-        store.load("../../etc/passwd", "user-1")
+        store.load("../../etc/passwd")
 
 
-def test_owner_mismatch_raises(store: ArtifactStore) -> None:
+def test_owner_mismatch_raises(settings: Settings, store: ArtifactStore) -> None:
     doc = _doc(store, owner="user-1")
     store.save(doc)
     with pytest.raises(DocumentOwnerMismatch):
-        store.load(doc.document_id, "user-2")
+        _editais(settings, store).carregar(doc.document_id, "user-2")
 
 
-def test_expired_artifact_raises_and_is_removed(store: ArtifactStore) -> None:
+def test_expired_artifact_raises_and_is_removed(settings: Settings, store: ArtifactStore) -> None:
     doc = _doc(store, ttl=0)
     store.save(doc)
     time.sleep(0.01)
+    editais = _editais(settings, store)
     with pytest.raises(DocumentExpired):
-        store.load(doc.document_id, "user-1")
+        editais.carregar(doc.document_id, "user-1")
     with pytest.raises(DocumentNotFound):
-        store.load(doc.document_id, "user-1")
+        editais.carregar(doc.document_id, "user-1")
 
 
 def test_sweep_removes_only_expired(store: ArtifactStore) -> None:
@@ -63,7 +73,7 @@ def test_sweep_removes_only_expired(store: ArtifactStore) -> None:
     store.save(stale)
     time.sleep(0.01)
     assert store.sweep_expired() == 1
-    assert store.load(fresh.document_id, "user-1").document_id == fresh.document_id
+    assert store.load(fresh.document_id).document_id == fresh.document_id
 
 
 def test_save_is_atomic_no_partial_file(store: ArtifactStore, tmp_path: object) -> None:

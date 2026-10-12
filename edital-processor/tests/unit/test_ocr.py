@@ -12,9 +12,9 @@ import types
 
 import pytest
 
-from app.core.config import Settings
-from app.core.errors import OCRUnavailable
-from app.services import ocr
+from app.adapter.ocr import tesseract as ocr
+from app.platform.config import Settings
+from app.platform.errors import OCRUnavailable
 
 
 def test_run_ocr_empty_target_list_is_noop() -> None:

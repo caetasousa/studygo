@@ -59,6 +59,26 @@ direto para as entidades de domínio. Nesta escala, structs espelho seriam
 cerimônia sem responsabilidade: o isolamento que importa já é alcançado sem
 elas.
 
+### O processador (Python)
+
+O `edital-processor` segue as mesmas camadas, em `app/`, com as suas três
+funções — edital, leis e mapas — lado a lado em cada uma:
+
+| | Camada | Responsabilidade |
+|---|---|---|
+| 🚀 | `main.py` | composition root: `Componentes` liga cada adapter ao caso de uso, no primeiro uso |
+| 🔌 | `adapter/httpapi/` | as rotas internas (FastAPI), DTOs, autenticação do backend |
+| 🧩 | `adapter/{llm,pdf,ocr,disco,fontes,backend,claude}/` | Gemini, PyMuPDF e pdfplumber, Tesseract, os artefatos em disco, o GET das fontes de lei, a porta interna do backend, o `claude -p` |
+| ⚙️ | `service/{edital,leis,mapas}/` | casos de uso |
+| 🔗 | `port/` | o que os casos de uso pedem de fora |
+| 💎 | `domain/{edital,leis,mapas}/` | regras puras |
+| 🛠️ | `platform/` | config, log, erros tipados |
+
+Os modelos pydantic do edital (`domain/edital`) são, ao mesmo tempo, o
+resultado do domínio e o JSON que volta ao backend — com os aliases camelCase.
+Separá-los em DTO duplicaria uns quinze modelos idênticos; o contrato só da rota
+(`AnalisarResponse`, os requests) fica em `adapter/httpapi/dto.py`.
+
 ---
 
 ## ⭐ A decisão central: o cronograma é materializado
@@ -193,7 +213,7 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   em 25/09/2026, enquanto o app é de teste; volta quando a autenticação estiver
   completa.
 - **A lei é capturada pela tela; as questões, não.** O link vai para o
-  `edital-processor` (`app/leis`), que baixa, organiza e devolve uma prévia
+  `edital-processor` (`app/domain/leis`), que baixa, organiza e devolve uma prévia
   com bloqueios e avisos — sem gravar nada. Quem publica é o backend, buscando
   o texto de novo no processador (nunca do navegador), depois que a pessoa
   marcou cada aviso como revisado. As questões são escritas fora do app e
@@ -275,7 +295,7 @@ mapas_pedidos (o PDF na fila, a situação, o mapa que saiu e o relatório) ─�
   escolhido na página do mapa não volta à sugestão ao reimportar. O tópico
   renomeado sai da lista sozinho.
 - **O mapa também nasce do PDF da aula** (`mapas_pedidos`, 000017), no
-  `edital-processor` (`app/mapas/`), que a esteira constrói e implanta como o
+  `edital-processor` (`app/service/mapas/`), que a esteira constrói e implanta como o
   resto. É por evento, sem fila consultada: a tela envia o PDF, o backend o
   guarda e o entrega na hora ao processador (`POST
   /internal/mapas/processamentos`, 202), que roda o Claude Code (`claude -p`,

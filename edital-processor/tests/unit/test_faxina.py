@@ -11,42 +11,32 @@ import asyncio
 import io
 import json
 import time
-from collections.abc import Iterator
 from pathlib import Path
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-import app.api.routes as routes
-import app.services.pipeline as pipeline
-from app.core.config import Settings, get_settings
-from app.main import _varrer_uma_vez, create_app
-from app.schemas.document import NormalizedDocument
-from app.services.artifacts import ArtifactStore
+import app.service.edital.analise as pipeline
+from app.domain.edital.document import NormalizedDocument
+from app.main import Componentes, _varrer_uma_vez, create_app
+from app.platform.config import Settings
 
 
-@pytest.fixture(autouse=True)
-def store_limpo() -> Iterator[None]:
-    """O store do módulo é global; devolvê-lo ao estado anterior evita que um
-    teste enxergue o artefato do outro."""
-    anterior = routes._store
-    routes._store = None
-    yield
-    routes._store = anterior
+def _componentes(tmp_path: Path, token: str = "") -> Componentes:
+    return Componentes(Settings(service_token=token, gemini_api_key="", work_dir=tmp_path / "work"))
 
 
 async def test_varrer_sem_store_nao_cria_nada(tmp_path: Path) -> None:
     """Sem requisição nenhuma não há artefato, e a faxina não constrói um store
-    só para poder passar — construir criaria o work_dir padrão, fora do tmp."""
-    assert await _varrer_uma_vez() == 0
+    só para poder passar — construir criaria o work_dir, sem nada a varrer."""
+    assert await _varrer_uma_vez(_componentes(tmp_path)) == 0
     assert not (tmp_path / "work").exists()
 
 
 async def test_varrer_remove_o_vencido_e_preserva_o_vivo(tmp_path: Path) -> None:
-    settings = Settings(service_token="", gemini_api_key="", work_dir=tmp_path / "work")
-    store = ArtifactStore(settings)
-    routes._store = store
+    componentes = _componentes(tmp_path)
+    store = componentes.artefatos
 
     vivo = NormalizedDocument(
         document_id=store.create_id(),
@@ -78,24 +68,24 @@ async def test_varrer_remove_o_vencido_e_preserva_o_vivo(tmp_path: Path) -> None
     payload["created_at"] = time.time() - 10
     caminho.write_text(json.dumps(payload), encoding="utf-8")
 
-    assert await _varrer_uma_vez() == 1
+    assert await _varrer_uma_vez(componentes) == 1
 
     restantes = {p.stem for p in (tmp_path / "work").glob("*.json")}
     assert restantes == {vivo.document_id}
 
 
 async def test_varrer_duas_vezes_nao_apaga_o_que_ja_saiu(tmp_path: Path) -> None:
-    settings = Settings(service_token="", gemini_api_key="", work_dir=tmp_path / "work")
-    routes._store = ArtifactStore(settings)
+    componentes = _componentes(tmp_path)
+    assert componentes.artefatos
 
-    assert await _varrer_uma_vez() == 0
-    assert await _varrer_uma_vez() == 0
+    assert await _varrer_uma_vez(componentes) == 0
+    assert await _varrer_uma_vez(componentes) == 0
 
 
 async def test_analisar_nao_bloqueia_o_event_loop(
     tmp_path: Path, text_pdf: bytes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A regressão que motivou o run_in_threadpool.
+    """A regressão que motivou a análise numa thread.
 
     `analyse` é síncrona e demora: PDF, OCR, classificação. Chamada direto de
     dentro de um `async def`, ela segura o event loop e NADA mais é atendido —
@@ -113,13 +103,9 @@ async def test_analisar_nao_bloqueia_o_event_loop(
 
         return real(**kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(routes, "analyse", analyse_lenta)
+    monkeypatch.setattr(pipeline, "analyse", analyse_lenta)
 
-    def _settings() -> Settings:
-        return Settings(service_token="s3cr3t", gemini_api_key="", work_dir=tmp_path / "work")
-
-    aplicativo = create_app()
-    aplicativo.dependency_overrides[get_settings] = _settings
+    aplicativo = create_app(_componentes(tmp_path, token="s3cr3t"))
 
     batidas = 0
 
@@ -150,11 +136,7 @@ def test_o_ciclo_de_vida_sobe_e_desce_limpo(tmp_path: Path) -> None:
     """A tarefa de faxina é cancelada no shutdown — sem exceção vazando e sem
     tarefa órfã."""
 
-    def _settings() -> Settings:
-        return Settings(service_token="", gemini_api_key="", work_dir=tmp_path / "work")
-
-    aplicativo = create_app()
-    aplicativo.dependency_overrides[get_settings] = _settings
+    aplicativo = create_app(_componentes(tmp_path))
 
     with TestClient(aplicativo) as cliente:
         assert cliente.get("/healthz").status_code == 200

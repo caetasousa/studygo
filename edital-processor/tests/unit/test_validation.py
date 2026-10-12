@@ -3,15 +3,15 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from app.core.config import Settings
-from app.core.errors import (
+from app.adapter.pdf.validacao import validate_upload
+from app.platform.config import Settings
+from app.platform.errors import (
     CorruptedPDF,
     EncryptedPDF,
     InvalidPDF,
     PageLimitExceeded,
     UploadTooLarge,
 )
-from app.services.validation import validate_upload
 
 
 def test_accepts_a_real_text_pdf(text_pdf: bytes, settings: Settings) -> None:

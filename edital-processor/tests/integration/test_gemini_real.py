@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from app.core.config import Settings
-from app.services.artifacts import ArtifactStore
-from app.services.extract_llm import extract_cargos, extract_conteudo, extract_estrutura
-from app.services.pipeline import analyse
+from app.adapter.disco.artefatos import ArtifactStore
+from app.platform.config import Settings
+from app.service.edital.analise import analyse
+from app.service.edital.extracao import extract_cargos, extract_conteudo, extract_estrutura
 from tests.conftest import REAL_PDF
 
 pytestmark = [
@@ -50,7 +50,7 @@ async def test_extracts_banca_and_both_cargos(
     analysed: tuple[Settings, ArtifactStore, str],
 ) -> None:
     settings, store, doc_id = analysed
-    from app.providers.gemini import GeminiProvider
+    from app.adapter.llm.gemini import GeminiProvider
 
     doc = store.load(doc_id, "itest")
     banca, cargos = await extract_cargos(doc, GeminiProvider(settings))
@@ -64,7 +64,7 @@ async def test_b02_structure_has_25_45_split_and_estudo_de_caso(
     analysed: tuple[Settings, ArtifactStore, str],
 ) -> None:
     settings, store, doc_id = analysed
-    from app.providers.gemini import GeminiProvider
+    from app.adapter.llm.gemini import GeminiProvider
 
     doc = store.load(doc_id, "itest")
     result = await extract_estrutura(doc, "B02", GeminiProvider(settings))
@@ -88,7 +88,7 @@ async def test_engenharia_de_software_is_b02_specific_content(
     analysed: tuple[Settings, ArtifactStore, str],
 ) -> None:
     settings, store, doc_id = analysed
-    from app.providers.gemini import GeminiProvider
+    from app.adapter.llm.gemini import GeminiProvider
 
     doc = store.load(doc_id, "itest")
     result = await extract_conteudo(

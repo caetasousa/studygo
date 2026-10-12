@@ -1,16 +1,37 @@
 # edital-processor
 
-Internal service that turns a concurso **edital PDF** into a reviewable,
-structured preview for studygo. **Not public**: the Go backend is the only caller,
-over the compose network, authenticated with a shared token.
+Serviço interno do studygo para o trabalho pesado com documentos. **Não é
+público**: só o backend Go o chama, pela rede dos containers, com um token
+compartilhado. Ele nunca escreve no PostgreSQL: devolve uma prévia, e quem
+grava é o backend, depois que a pessoa confirma.
 
-The Go backend keeps everything else — the public `/api`, JWT auth, ownership,
-persistence, the deterministic plan engine, spaced review, TEC import,
-statistics. This service reads documents and proposes an extraction; Go persists
-nothing until the user confirms.
+Faz três coisas:
 
-It also turns a **lesson PDF into a mind map**, with Claude Code — see
-[`app/mapas/README.md`](app/mapas/README.md).
+- **Edital** — o PDF do edital vira a prévia estruturada do assistente
+  (cargos, estrutura da prova, conteúdo programático), com OCR onde o texto
+  falta e o Gemini lendo os trechos certos.
+- **Leis** — o link da fonte oficial vira a lei organizada em dispositivos,
+  conferida pelo Gemini ([`app/domain/leis/README.md`](app/domain/leis/README.md)).
+- **Mapas** — o PDF de uma aula vira mapa mental, com o Claude Code
+  ([`app/service/mapas/README.md`](app/service/mapas/README.md)).
+
+## Arquitetura
+
+As mesmas camadas do backend (`docs/arquitetura.md`), com as três funções lado
+a lado em cada uma:
+
+| Camada | O que tem |
+|---|---|
+| `app/domain/{edital,leis,mapas}` | regra pura: normalizar e classificar o texto do edital, as regras de leitura de lei, o pedido de mapa. Não conhece HTTP, arquivo, processo nem SDK |
+| `app/service/{edital,leis,mapas}` | os casos de uso: a análise do edital, a captura e a pesquisa de lei, a fila de mapas. Só falam com o mundo pelas portas |
+| `app/port` | o que os casos de uso pedem de fora: LLM, leitor de PDF, OCR, artefatos, fontes de lei, backend, Claude |
+| `app/adapter` | as implementações: `httpapi` (FastAPI, a entrada), `llm` (Gemini), `pdf` (PyMuPDF, pdfplumber), `ocr` (Tesseract), `disco` (artefatos), `fontes` (urllib das fontes oficiais), `backend` (a porta interna dele), `claude` (o `claude -p` e o login de cada conta) |
+| `app/platform` | configuração, log e os erros tipados |
+| `app/main.py` | a composition root: a classe `Componentes` liga cada adapter ao seu caso de uso, no primeiro uso |
+
+As rotas autenticam, decodificam, chamam um caso de uso e serializam. Os testes
+trocam só a fronteira de fora — Gemini, fontes oficiais, backend, Claude —
+passando a substituta a `Componentes`; o resto é o de verdade.
 
 ## Status
 
@@ -113,7 +134,7 @@ Environment, prefix `EP_`. See `.env.example`. Key ones:
 - `EP_MIN_TEXT_SCORE`, `EP_MIN_TEXT_CHARS` — the OCR trigger.
 - `EP_OCR_DPI`, `EP_OCR_TIMEOUT_SECONDS`, `EP_OCR_MAX_CONCURRENCY` — OCR limits.
 - `EP_BACKEND_INTERNAL_URL`, `EP_MAPAS_*`, `EP_PROVASGO_DIR`,
-  `EP_MAPA_COMPRADOR` — mind maps (`app/mapas/README.md`).
+  `EP_MAPA_COMPRADOR` — mind maps (`app/service/mapas/README.md`).
 
 ## Future: async jobs
 

@@ -11,9 +11,9 @@ e exportar → Importar mapa**, ou `POST /api/mapas` com `{"texto": "<o arquivo>
 o que passa na stack local, passa no servidor.
 
 Este roteiro serve a dois caminhos: o chat, com o PDF que o usuário manda, e o
-processador de mapas do `edital-processor` (`app/mapas/`), que roda esta skill
+processador de mapas do `edital-processor` (`app/service/mapas/`), que roda esta skill
 sem ninguém olhando para cada PDF enviado pela tela. Nos dois, use as
-ferramentas de `edital-processor/app/mapas/ferramentas/` em vez de reescrever:
+ferramentas de `edital-processor/app/service/mapas/ferramentas/` em vez de reescrever:
 `texto.py` (o texto sem os dados do comprador), `figura.py` (o recorte) e
 `provas.py` (as questões do provasGo, com o gabarito oficial).
 
@@ -120,7 +120,7 @@ da lei, resolvidas na página, com o gabarito só depois da resposta.
   marque entre colchetes no próprio texto e conte ao usuário.
 - `ramo` é o ramo principal do mapa que trata do assunto cobrado.
 - Extrair do texto do PDF é mais fiel que redigitar: o texto das questões é
-  longo. Comece pelo `edital-processor/app/mapas/ferramentas/texto.py` (Python do venv do
+  longo. Comece pelo `edital-processor/app/service/mapas/ferramentas/texto.py` (Python do venv do
   edital-processor), que já tira o cabeçalho, o rodapé e os dados do comprador;
   o que for próprio da aula (separar as questões comentadas) vai num script no
   scratchpad.

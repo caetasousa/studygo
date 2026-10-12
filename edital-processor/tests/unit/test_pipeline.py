@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import pytest
-
-from app.core.config import Settings
-from app.services.artifacts import ArtifactStore
-from app.services.pipeline import analyse
+from app.adapter.disco.artefatos import ArtifactStore
+from app.adapter.ocr.tesseract import OcrTesseract
+from app.adapter.pdf.leitor import LeitorPyMuPDF
+from app.platform.config import Settings
+from app.port.ocr import OCRPage, WordBox
+from app.service.edital.analise import analyse
 
 
 def test_analyse_text_pdf_persists_artifact(
@@ -17,10 +18,12 @@ def test_analyse_text_pdf_persists_artifact(
         owner_ref="user-1",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     assert outcome.document.total_pages == 2
     assert outcome.document.sha256 != ""
-    reloaded = store.load(outcome.document.document_id, "user-1")
+    reloaded = store.load(outcome.document.document_id)
     assert len(reloaded.pages) == 2
     # a text PDF needs no OCR at all
     assert outcome.ocr_page_numbers == []
@@ -38,10 +41,12 @@ def test_analyse_flags_scanned_pages_even_without_tesseract(
         owner_ref="user-1",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     assert outcome.ocr_page_numbers == [1, 2, 3]
     # The document is still stored whether or not OCR could run.
-    assert store.load(outcome.document.document_id, "user-1").total_pages == 3
+    assert store.load(outcome.document.document_id).total_pages == 3
 
 
 def test_analyse_mixed_pdf_flags_only_the_blank_page(
@@ -54,31 +59,28 @@ def test_analyse_mixed_pdf_flags_only_the_blank_page(
         owner_ref="user-1",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     assert outcome.ocr_page_numbers == [2]
 
 
 def test_ocr_merged_into_pages_when_it_runs(
-    monkeypatch: pytest.MonkeyPatch,
     scanned_pdf: bytes,
     settings: Settings,
     store: ArtifactStore,
 ) -> None:
-    from app.services import pipeline
-    from app.services.ocr import OCRPage, WordBox
-
-    def fake_run_ocr(data: bytes, page_numbers: list[int], s: Settings) -> list[OCRPage]:
-        return [
-            OCRPage(
-                physical_page=n,
-                text=f"texto reconhecido da pagina {n} conteudo programatico",
-                words=[WordBox(text="texto", x0=1, y0=2, x1=3, y1=4, conf=0.9)],
-                mean_conf=0.9,
-            )
-            for n in page_numbers
-        ]
-
-    monkeypatch.setattr(pipeline, "run_ocr", fake_run_ocr)
+    class OcrQueReconhece:
+        def reconhecer(self, data: bytes, page_numbers: list[int]) -> list[OCRPage]:
+            return [
+                OCRPage(
+                    physical_page=n,
+                    text=f"texto reconhecido da pagina {n} conteudo programatico",
+                    words=[WordBox(text="texto", x0=1, y0=2, x1=3, y1=4, conf=0.9)],
+                    mean_conf=0.9,
+                )
+                for n in page_numbers
+            ]
 
     outcome = analyse(
         data=scanned_pdf,
@@ -87,9 +89,11 @@ def test_ocr_merged_into_pages_when_it_runs(
         owner_ref="u",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrQueReconhece(),
     )
     assert outcome.ocr_ran is True
-    doc = store.load(outcome.document.document_id, "u")
+    doc = store.load(outcome.document.document_id)
     assert all(p.source == "ocr" for p in doc.pages)
     assert all(p.text for p in doc.pages)
     assert doc.pages[0].ocr_confidence == 0.9
@@ -97,18 +101,15 @@ def test_ocr_merged_into_pages_when_it_runs(
 
 
 def test_ocr_failure_is_swallowed(
-    monkeypatch: pytest.MonkeyPatch,
     scanned_pdf: bytes,
     settings: Settings,
     store: ArtifactStore,
 ) -> None:
-    from app.core.errors import OCRUnavailable
-    from app.services import pipeline
+    from app.platform.errors import OCRUnavailable
 
-    def boom(*args: object, **kwargs: object) -> object:
-        raise OCRUnavailable("no tesseract")
-
-    monkeypatch.setattr(pipeline, "run_ocr", boom)
+    class OcrSemTesseract:
+        def reconhecer(self, data: bytes, page_numbers: list[int]) -> list[OCRPage]:
+            raise OCRUnavailable("no tesseract")
 
     outcome = analyse(
         data=scanned_pdf,
@@ -117,9 +118,11 @@ def test_ocr_failure_is_swallowed(
         owner_ref="u",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrSemTesseract(),
     )
     assert outcome.ocr_ran is False
-    doc = store.load(outcome.document.document_id, "u")
+    doc = store.load(outcome.document.document_id)
     assert all(p.source == "none" for p in doc.pages)
 
 
@@ -133,6 +136,8 @@ def test_sha256_is_stable_for_same_bytes(
         owner_ref="u",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     b = analyse(
         data=text_pdf,
@@ -141,6 +146,8 @@ def test_sha256_is_stable_for_same_bytes(
         owner_ref="u",
         settings=settings,
         store=store,
+        pdf=LeitorPyMuPDF(settings),
+        ocr=OcrTesseract(settings),
     )
     assert a.document.sha256 == b.document.sha256
     assert a.document.document_id != b.document.document_id

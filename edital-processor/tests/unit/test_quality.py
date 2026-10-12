@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.quality import score_page_text
+from app.domain.edital.quality import score_page_text
 
 
 def test_empty_text_scores_zero() -> None:

@@ -14,7 +14,7 @@ import (
 )
 
 // A captura de leis mora no mesmo processador dos editais: mesma rede, mesmo
-// token, mesmo disjuntor. Ver edital-processor/app/leis/README.md.
+// token, mesmo disjuntor. Ver edital-processor/app/domain/leis/README.md.
 
 type wireCapturaIniciada struct {
 	ID string `json:"id"`

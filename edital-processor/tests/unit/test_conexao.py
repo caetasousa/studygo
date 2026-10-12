@@ -24,8 +24,8 @@ from pathlib import Path
 
 import pytest
 
-from app.core.config import Settings
-from app.mapas.conexao import CodigoRecusado, ConexaoNaoIniciada, Conexoes, DonoInvalido
+from app.adapter.claude.conexao import CodigoRecusado, ConexaoNaoIniciada, Conexoes, DonoInvalido
+from app.platform.config import Settings
 
 CLAUDE_DE_MENTIRA = r'''#!PYTHON
 """Faz o papel do `claude auth …`: o link só sai num terminal, como no de verdade."""
@@ -142,8 +142,7 @@ def test_pasta_e_por_conta(conexoes: Conexoes, tmp_path: Path) -> None:
 def test_rotas_exigem_token_e_dono(tmp_path: Path) -> None:
     from fastapi.testclient import TestClient
 
-    from app.core.config import get_settings
-    from app.main import create_app
+    from app.main import Componentes, create_app
 
     settings = Settings(
         service_token="s3cr3t",
@@ -151,9 +150,7 @@ def test_rotas_exigem_token_e_dono(tmp_path: Path) -> None:
         work_dir=tmp_path / "w",
         claude_contas_dir=tmp_path / "contas",
     )
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: settings
-    with TestClient(app) as c:
+    with TestClient(create_app(Componentes(settings))) as c:
         assert c.get("/internal/claude", headers={"x-owner-ref": "u1"}).status_code == 401
         r = c.get(
             "/internal/claude", headers={"authorization": "Bearer s3cr3t", "x-owner-ref": "u1"}
@@ -167,4 +164,3 @@ def test_rotas_exigem_token_e_dono(tmp_path: Path) -> None:
         )
         assert r.status_code == 409
         assert r.json()["code"] == "conexao_nao_iniciada"
-    app.dependency_overrides.clear()

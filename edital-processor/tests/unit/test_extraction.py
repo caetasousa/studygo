@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.extraction import extract_native
+from app.adapter.pdf.extracao import extract_native
 
 
 def test_extracts_text_pages_with_physical_numbers(text_pdf: bytes) -> None:

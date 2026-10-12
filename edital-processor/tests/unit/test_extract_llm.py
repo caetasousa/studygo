@@ -11,10 +11,10 @@ from typing import Any
 
 import pytest
 
-from app.domain.blocos import Bloco
-from app.providers.base import StructuredRequest
-from app.schemas.document import NormalizedDocument, PageText
-from app.services.extract_llm import extract_cargos, extract_conteudo, extract_estrutura
+from app.domain.edital.blocos import Bloco
+from app.domain.edital.document import NormalizedDocument, PageText
+from app.port.llm import StructuredRequest
+from app.service.edital.extracao import extract_cargos, extract_conteudo, extract_estrutura
 
 
 class FakeProvider:

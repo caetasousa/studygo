@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.domain.blocos import Bloco
-from app.services.classification import classify_document, classify_page
+from app.domain.edital.blocos import Bloco
+from app.domain.edital.classification import classify_document, classify_page
 
 
 def test_empty_page_is_irrelevant() -> None:

@@ -21,7 +21,7 @@ FROM python:3.13-slim-trixie AS runtime
 # este serviço não usa — PyMuPDF, pdfplumber e Pillow renderizam por conta.
 #
 # O Claude Code (pacote do npm, versão fixada) faz os mapas mentais das aulas
-# (app/mapas). O npm só serve à instalação e sai em seguida; fica o Node.
+# (app/service/mapas). O npm só serve à instalação e sai em seguida; fica o Node.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-por \

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.normalize import normalize_text, snippet_matches_page
+from app.domain.edital.normalize import normalize_text, snippet_matches_page
 
 
 def test_collapses_whitespace_and_blank_runs() -> None:

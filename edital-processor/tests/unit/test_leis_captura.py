@@ -12,12 +12,21 @@ import json
 
 import pytest
 
-from app.leis.captura import Captura, capturar
-from app.leis.classificar import Classe, combinar, por_gemini, por_regras
-from app.leis.fontes import Fonte, FonteInvalida, Resposta, baixar, decodificar_html, fonte_do_link
-from app.leis.limpeza import paragrafos_de_html, paragrafos_de_pdf, texto_visivel
-from app.leis.montar import montar
-from app.leis.verificar import verificar
+from app.adapter.pdf.leitor import LeitorPyMuPDF
+from app.domain.leis.captura import Captura
+from app.domain.leis.classificar import Classe, combinar, por_regras
+from app.domain.leis.fontes import Fonte, FonteInvalida, decodificar_html, fonte_do_link
+from app.domain.leis.limpeza import paragrafos_de_html, paragrafos_de_pdf, texto_visivel
+from app.domain.leis.montar import montar
+from app.domain.leis.verificar import verificar
+from app.platform.config import Settings
+from app.port.fontes import Resposta
+from app.service.leis.captura import capturar
+from app.service.leis.conferencia import por_gemini
+from app.service.leis.fontes import baixar
+
+# O leitor de PDF de verdade: a lei em PDF é lida como em produção.
+PDF = LeitorPyMuPDF(Settings())
 
 PLANALTO = "https://www.planalto.gov.br/ccivil_03/leis/l0001.htm"
 GOIAS = "https://legisla.casacivil.go.gov.br/pesquisa_legislacao/{id}"
@@ -28,7 +37,7 @@ def _fonte(link: str = PLANALTO) -> Fonte:
 
 
 def _capturar(http: object, provider: object = None) -> Captura:
-    return asyncio.run(capturar(_fonte(), http, provider))  # type: ignore[arg-type]
+    return asyncio.run(capturar(_fonte(), http, provider, pdf=PDF))  # type: ignore[arg-type]
 
 
 def _html(corpo: str) -> str:
