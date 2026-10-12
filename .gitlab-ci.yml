@@ -155,11 +155,13 @@ test:processor:
         http = true
         insecure = true
       EOF
+      # O dind fala TLS, e o buildx só aceita os certificados por um contexto.
       # network=host: o BuildKit usa a rede do dind, de onde o registry do host
       # responde no gateway — o mesmo caminho do docker push do template.
+      docker context create dind >/dev/null
       docker buildx create --name ci --driver docker-container \
         --driver-opt network=host --driver-opt image=moby/buildkit:v0.22.0 \
-        --config /tmp/buildkitd.toml --use
+        --config /tmp/buildkitd.toml --use dind
       docker buildx build \
         --cache-from "type=registry,ref=$LOCAL_REGISTRY/cache/$COMPONENT:buildcache" \
         --cache-to "type=registry,ref=$LOCAL_REGISTRY/cache/$COMPONENT:buildcache,mode=max,image-manifest=true,oci-mediatypes=true" \
