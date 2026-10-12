@@ -1,5 +1,5 @@
 [project]
-name = "edital-processor"
+name = "processador"
 version = "0.1.0"
 description = "studygo internal service: turns a concurso edital PDF into a reviewable structured preview"
 requires-python = ">=3.13"

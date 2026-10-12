@@ -1,10 +1,10 @@
 # Por cima do docker-compose.yml da raiz, só no stack de E2E.
 #
-# Troca o edital-processor pelo dublê de e2e/duble-processador: o assistente do
+# Troca o processador pelo dublê de e2e/duble-processador: o assistente do
 # edital fica testável de ponta a ponta sem Gemini. Todo o resto são as imagens
 # de produção.
 services:
-  edital-processor:
+  processador:
     build:
       context: ./e2e
       dockerfile: duble-processador/Dockerfile

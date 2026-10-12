@@ -8,7 +8,7 @@
 
 	/**
 	 * O PDF da aula que vira mapa. A tela envia o PDF; o backend o entrega ao
-	 * edital-processor, que escreve o mapa com o Claude Code e a skill
+	 * processador, que escreve o mapa com o Claude Code e a skill
 	 * mapa-mental, e o mapa volta importado na conta. Aqui se acompanha a fila: o
 	 * que está sendo feito, o que ficou pronto, o relatório do processador e o que
 	 * falhou.

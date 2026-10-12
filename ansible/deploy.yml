@@ -39,7 +39,7 @@
         that:
           - backend_image is defined and backend_image | length > 0
           - frontend_image is defined and frontend_image | length > 0
-          - edital_processor_image is defined and edital_processor_image | length > 0
+          - processador_image is defined and processador_image | length > 0
         fail_msg: >-
           Faltam os digests das imagens. Este playbook só promove artefatos já
           publicados — rode a pipeline em vez de invocá-lo direto.
@@ -49,7 +49,7 @@
         that:
           - "'@sha256:' in backend_image"
           - "'@sha256:' in frontend_image"
-          - "'@sha256:' in edital_processor_image"
+          - "'@sha256:' in processador_image"
         fail_msg: >-
           As imagens precisam vir por digest (repo@sha256:...). Uma tag como
           :latest não garante que o que sobe é o que foi testado.
@@ -180,7 +180,7 @@
           loop:
             - "{{ backend_image }}"
             - "{{ frontend_image }}"
-            - "{{ edital_processor_image }}"
+            - "{{ processador_image }}"
 
         - name: Instalar o compose desta versão
           ansible.builtin.template:

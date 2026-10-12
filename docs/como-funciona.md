@@ -45,7 +45,7 @@ Pense num restaurante:
 | **frontend** | o salão | a tela que você vê e clica |
 | **backend** | a cozinha | onde as decisões acontecem |
 | **PostgreSQL** | a despensa | onde tudo fica guardado |
-| **edital-processor** | um especialista contratado | lê o PDF do edital e devolve as matérias; e faz o mapa mental do PDF de uma aula |
+| **processador** | um especialista contratado | lê o PDF do edital e devolve as matérias; e faz o mapa mental do PDF de uma aula |
 
 Existe ainda o **worker**: um ajudante que roda sozinho de tempos em tempos para
 enviar lembretes. Ninguém pede nada a ele; ele acorda, faz o trabalho e volta a
@@ -60,7 +60,7 @@ importa pela tela e o guarda na sua conta.
 ```
 Você → tela (frontend) → cozinha (backend) → despensa (PostgreSQL)
                               ↓
-                     especialista (edital-processor)
+                     especialista (processador)
 ```
 
 O frontend nunca fala direto com a despensa. Tudo passa pela cozinha — é ela que

@@ -124,7 +124,7 @@ workflow:
     UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
   cache:
     key:
-      files: [edital-processor/uv.lock]
+      files: [processador/uv.lock]
       prefix: uv
     paths: [.cache/uv]
 
@@ -186,7 +186,7 @@ lint:processor:
   before_script:
     - pip install --quiet uv
   script:
-    - cd edital-processor
+    - cd processador
     - uv run ruff check .
     - uv run mypy --strict app
 
@@ -254,13 +254,13 @@ test:processor:
   before_script:
     - pip install --quiet uv
   script:
-    - cd edital-processor
+    - cd processador
     - uv run pytest --junitxml=report.xml
   artifacts:
     expire_in: 1 week
     when: always
     reports:
-      junit: edital-processor/report.xml
+      junit: processador/report.xml
 
 # --- build ---------------------------------------------------------------------
 # O build não espera os testes: começa junto com eles. A garantia continua — o
@@ -319,8 +319,8 @@ build:frontend:
 build:processor:
   <<: *build
   variables:
-    COMPONENT: edital-processor
-    CONTEXT: edital-processor
+    COMPONENT: processador
+    CONTEXT: processador
 
 # A imagem do job de deploy, guardada no registry-local. Só é construída
 # quando a tag DEPLOY_IMAGE_TAG ainda não existe lá.
@@ -353,7 +353,7 @@ artifact_test:
     - *registry_local
   script:
     - |
-      for c in backend frontend edital-processor; do
+      for c in backend frontend processador; do
         docker pull "$LOCAL_REGISTRY/$c:$IMAGE_TAG"
         docker tag "$LOCAL_REGISTRY/$c:$IMAGE_TAG" "$REGISTRY/$c:$IMAGE_TAG"
       done
@@ -461,14 +461,14 @@ publish:
   script:
     # Única travessia da internet na esteira: daqui para o registry do GitLab.
     - |
-      for c in backend frontend edital-processor; do
+      for c in backend frontend processador; do
         docker pull "$LOCAL_REGISTRY/$c:$IMAGE_TAG"
         docker tag "$LOCAL_REGISTRY/$c:$IMAGE_TAG" "$REGISTRY/$c:$IMAGE_TAG"
       done
 
     - docker push "$REGISTRY/backend:$IMAGE_TAG"
     - docker push "$REGISTRY/frontend:$IMAGE_TAG"
-    - docker push "$REGISTRY/edital-processor:$IMAGE_TAG"
+    - docker push "$REGISTRY/processador:$IMAGE_TAG"
 
     # RepoDigests só existe depois do push: é o registry que atribui o digest.
     # Ele traz UMA ENTRADA POR REGISTRY onde a imagem foi publicada, e aqui ela
@@ -483,9 +483,9 @@ publish:
       }
       BACKEND_DIGEST=$(digest_de backend)
       FRONTEND_DIGEST=$(digest_de frontend)
-      PROCESSOR_DIGEST=$(digest_de edital-processor)
+      PROCESSADOR_DIGEST=$(digest_de processador)
 
-      for par in "backend:$BACKEND_DIGEST" "frontend:$FRONTEND_DIGEST" "edital-processor:$PROCESSOR_DIGEST"; do
+      for par in "backend:$BACKEND_DIGEST" "frontend:$FRONTEND_DIGEST" "processador:$PROCESSADOR_DIGEST"; do
         nome="${par%%:*}"; valor="${par#*:}"
         case "$valor" in
           "$REGISTRY/$nome@sha256:"*) ;;
@@ -496,7 +496,7 @@ publish:
 
       echo "BACKEND_DIGEST=$BACKEND_DIGEST"     >  digests.env
       echo "FRONTEND_DIGEST=$FRONTEND_DIGEST"   >> digests.env
-      echo "PROCESSOR_DIGEST=$PROCESSOR_DIGEST" >> digests.env
+      echo "PROCESSADOR_DIGEST=$PROCESSADOR_DIGEST" >> digests.env
       echo "PIPELINE_ID=$CI_PIPELINE_ID"        >> digests.env
 
       echo "--- digests publicados ---"
@@ -654,7 +654,7 @@ deploy_staging:
         --vault-password-file .vault_pass \
         -e "backend_image=$BACKEND_DIGEST" \
         -e "frontend_image=$FRONTEND_DIGEST" \
-        -e "edital_processor_image=$PROCESSOR_DIGEST" \
+        -e "processador_image=$PROCESSADOR_DIGEST" \
         -e "deploy_pipeline_id=$CI_PIPELINE_ID" \
         -e "registry_user=$CI_DEPLOY_USER" \
         -e "registry_password=$CI_DEPLOY_PASSWORD" \
@@ -724,5 +724,5 @@ seguranca:processor:
   before_script:
     - pip install --quiet uv
   script:
-    - cd edital-processor
+    - cd processador
     - uv run --with pip-audit pip-audit

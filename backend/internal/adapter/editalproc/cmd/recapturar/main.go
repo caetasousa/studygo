@@ -1,7 +1,7 @@
 // Command recapturar refaz a fixture do edital a partir de um PDF real.
 //
 // Ele existe para que a fixture nunca seja editada à mão: quando o contrato do
-// edital-processor muda, a resposta certa é rodar o assistente de novo contra um
+// processador muda, a resposta certa é rodar o assistente de novo contra um
 // edital de verdade e regravar o arquivo inteiro.
 //
 // Uso, com o stack de pé e GEMINI_API_KEY definida:
@@ -34,7 +34,7 @@ func main() {
 
 func executar() error {
 	pdf := flag.String("pdf", "", "caminho do edital em PDF (obrigatório)")
-	url := flag.String("processor", "http://localhost:8000", "URL do edital-processor")
+	url := flag.String("processor", "http://localhost:8000", "URL do processador")
 	token := flag.String("token", "dev-processor-token", "token do processor")
 	saida := flag.String(
 		"saida",

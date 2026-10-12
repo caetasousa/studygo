@@ -1,4 +1,4 @@
-// Package editalproc é o cliente HTTP do edital-processor.
+// Package editalproc é o cliente HTTP do processador.
 //
 // É o ÚNICO lugar que conhece o formato de fio daquele serviço; o resto do
 // backend fala com ele por port.EditalProcessor e não sabe sequer que existe
@@ -27,7 +27,7 @@ var (
 	_ port.CapturadorDeLeis = (*Client)(nil)
 )
 
-// Client fala com o edital-processor pela rede do compose.
+// Client fala com o processador pela rede do compose.
 type Client struct {
 	baseURL   string
 	token     string

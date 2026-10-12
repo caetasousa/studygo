@@ -12,7 +12,7 @@ import (
 )
 
 // Pedido de mapa: o PDF da aula na fila da conta. Quem o atende é o
-// edital-processor, com o Claude Code; o resultado volta ao backend, que o
+// processador, com o Claude Code; o resultado volta ao backend, que o
 // importa como a tela importaria.
 
 // Situacao é onde o pedido está na fila.

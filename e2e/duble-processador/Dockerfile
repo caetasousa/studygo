@@ -1,4 +1,4 @@
-# O dublê do edital-processor, só para o stack de E2E (ver servidor.mjs).
+# O dublê do processador, só para o stack de E2E (ver servidor.mjs).
 FROM node:24-alpine
 WORKDIR /app
 # O contexto é e2e/: a lei que a captura devolve é a mesma fixture dos testes.

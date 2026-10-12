@@ -13,7 +13,7 @@ import (
 )
 
 // PedidosDeMapaService é a fila de PDFs que viram mapa. A tela guarda o PDF;
-// o serviço o entrega na hora ao processador (o edital-processor, interno),
+// o serviço o entrega na hora ao processador (o processador, interno),
 // que faz o mapa em segundo plano com o Claude e devolve o resultado pela
 // rota interna. É aqui que o resultado vira mapa da conta, pela mesma
 // importação da tela — o processador nunca toca no banco.

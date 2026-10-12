@@ -5,7 +5,7 @@
 ![Determinístico](https://img.shields.io/badge/Gemini-não%20chamada-success)
 
 `edital_fcc_tcego.json` é a extração **real** de um edital da FCC (TCE-GO 2026,
-25 páginas, 2 cargos), capturada uma vez contra o `edital-processor` com a
+25 páginas, 2 cargos), capturada uma vez contra o `processador` com a
 Gemini de verdade e congelada aqui.
 
 ---
@@ -32,7 +32,7 @@ inventados à mão não teriam:
 
 ## 🚧 O que ela NÃO substitui
 
-A suíte Python do `edital-processor` continua sendo quem testa PDF, OCR,
+A suíte Python do `processador` continua sendo quem testa PDF, OCR,
 chunking e o contrato com a Gemini. Esta fixture é o degrau seguinte: o backend
 Go consumindo o resultado já extraído.
 

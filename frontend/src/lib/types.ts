@@ -923,7 +923,7 @@ export type SituacaoDoPedido = 'na_fila' | 'processando' | 'pronto' | 'falhou';
 
 /**
  * O PDF de uma aula na fila, à espera de virar mapa. Quem o atende é o
- * edital-processor, com o Claude Code.
+ * processador, com o Claude Code.
  */
 export interface PedidoDeMapa {
 	id: string;

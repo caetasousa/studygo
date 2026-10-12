@@ -1,7 +1,7 @@
 // Package lei é a lei seca interativa: o texto organizado em dispositivos, as
 // questões feitas sobre ele e as regras para publicá-los.
 //
-// O texto chega da captura do edital-processor, revisado na tela; as questões,
+// O texto chega da captura do processador, revisado na tela; as questões,
 // escritas fora do app, chegam depois e valem contra o texto publicado. Aqui
 // eles são validados, versionados e lidos. Nada neste pacote baixa, reescreve
 // ou gera texto de lei.

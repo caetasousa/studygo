@@ -40,7 +40,7 @@ Sobe quatro serviços:
 | 🐹 | `backend` | `8080` | API Go; roda as migrations no boot |
 | 🔔 | `worker` | — | na virada do dia: replaneja quem perdeu dias e manda os lembretes de revisão |
 | 🐘 | `postgres` | `5432` | banco |
-| 🐍 | `edital-processor` | — | PDF → prévia estruturada (interno, sem porta no host) |
+| 🐍 | `processador` | — | PDF → prévia estruturada (interno, sem porta no host) |
 
 Abra **http://localhost:5173**, crie uma conta e cadastre seu primeiro concurso.
 O plano de estudos é gerado na hora.
@@ -65,8 +65,8 @@ docker compose up -d --build      # subir de novo depois de mudar código
 | `SERVER_PORT` / `FRONTEND_PORT` | | `8080` / `5173` | portas expostas no host |
 | `CORS_ORIGIN` | | `http://localhost:5173` | origem liberada na API (só importa se o SPA e a API estiverem em origens diferentes) |
 | `LEMBRETE_INTERVALO` | | `24h` | força intervalo fixo em vez de acordar na virada do dia. Existe para desenvolver sem esperar a meia-noite; em produção fica vazio |
-| `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `edital-processor`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
-| `EDITAL_PROCESSOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `edital-processor` na rede do Compose. Troque em produção |
+| `GEMINI_API_KEY` | | vazio | liga o "importar concurso a partir do PDF do edital". Lida pelo container `processador`, não pelo backend. Sem ela, o cadastro é manual. Chave grátis em <https://aistudio.google.com/apikey> |
+| `PROCESSADOR_TOKEN` | | `dev-processor-token` | segredo que o backend apresenta ao `processador` na rede do Compose. Troque em produção |
 
 ---
 
@@ -98,7 +98,7 @@ go run ./cmd/server
 ## 3️⃣ Checagens
 
 ```bash
-make check      # backend + frontend + edital-processor — sem Docker, < 1 s
+make check      # backend + frontend + processador — sem Docker, < 1 s
 make check-db   # migrations, repositories e fluxos verticais — exige Docker
 ```
 

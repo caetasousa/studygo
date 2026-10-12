@@ -6,7 +6,7 @@
 
 - `backend/`: API Go e worker.
 - `frontend/`: SPA SvelteKit/Svelte 5.
-- `edital-processor/`: serviço interno Python/FastAPI para processar editais e
+- `processador/`: serviço interno Python/FastAPI para processar editais e
   transformar o PDF de uma aula em mapa mental, com o Claude Code
   (`app/service/mapas/`). Os mapas vivem no banco; `conteudo/mapas/` é só a referência
   do formato, e a saída é a exportação.
@@ -71,14 +71,14 @@ Regras que valem sem exceção:
   por exemplo, é decisão do domínio.
 - Mappers só onde os dois lados da fronteira são de fato diferentes.
 
-O `edital-processor` segue as mesmas camadas em `app/` (`domain`, `service`,
+O `processador` segue as mesmas camadas em `app/` (`domain`, `service`,
 `port`, `adapter`, `platform`; `main.py` é a composition root), com edital,
 leis e mapas lado a lado em cada uma. Chamada para fora — Gemini, PDF, OCR,
 disco, fontes de lei, backend, Claude — só em `adapter/`, atrás de uma porta.
 A exceção: os modelos pydantic do edital ficam no domínio com os aliases do
 contrato (`docs/arquitetura.md`).
 
-O `edital-processor` produz uma prévia revisável e nunca escreve no PostgreSQL.
+O `processador` produz uma prévia revisável e nunca escreve no PostgreSQL.
 A persistência acontece no backend após confirmação do usuário. O mapa mental
 segue a mesma regra: o processador devolve o resultado à porta interna do
 backend (`INTERNAL_ADDR`, só na rede dos containers), e é o backend que o

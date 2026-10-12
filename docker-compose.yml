@@ -13,14 +13,14 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       SERVER_ADDR: ":8080"
-      # A porta interna: por ela o edital-processor devolve o mapa mental
+      # A porta interna: por ela o processador devolve o mapa mental
       # pronto. Não é publicada nem passa pelo nginx.
       INTERNAL_ADDR: ":8081"
       DATABASE_URL: "postgres://${POSTGRES_USER:-studygo}:${POSTGRES_PASSWORD:-studygo}@postgres:5432/${POSTGRES_DB:-studygo}?sslmode=disable"
       JWT_SECRET: "${JWT_SECRET:?defina JWT_SECRET no .env}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
-      EDITAL_PROCESSOR_URL: "${EDITAL_PROCESSOR_URL:-http://edital-processor:8000}"
-      EDITAL_PROCESSOR_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
+      PROCESSADOR_URL: "${PROCESSADOR_URL:-http://processador:8000}"
+      PROCESSADOR_TOKEN: "${PROCESSADOR_TOKEN:-dev-processor-token}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,19 +30,19 @@ services:
   # a lesson PDF into a mind map (Claude Code). No host port — the backend
   # reaches it over the compose network, and it answers on the backend's
   # internal port.
-  edital-processor:
-    build: ./edital-processor
+  processador:
+    build: ./processador
     environment:
-      EP_SERVICE_TOKEN: "${EDITAL_PROCESSOR_TOKEN:-dev-processor-token}"
-      EP_GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      EP_BACKEND_INTERNAL_URL: "http://backend:8081"
+      PROCESSADOR_SERVICE_TOKEN: "${PROCESSADOR_TOKEN:-dev-processor-token}"
+      PROCESSADOR_GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      PROCESSADOR_BACKEND_INTERNAL_URL: "http://backend:8081"
       # O nome do comprador que o material pago traz no rodapé, para a
       # ferramenta de texto tirar também (CPF e e-mail ela já tira). Só no .env.
-      EP_MAPA_COMPRADOR: "${MAPA_COMPRADOR:-}"
+      PROCESSADOR_MAPA_COMPRADOR: "${MAPA_COMPRADOR:-}"
     volumes:
-      - edital_work:/var/lib/edital-processor/work
+      - edital_work:/var/lib/processador/work
       # A conexão do Claude de cada conta, feita pela tela; sobrevive ao rebuild.
-      - edital_claude:/var/lib/edital-processor/claude
+      - edital_claude:/var/lib/processador/claude
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
       interval: 15s

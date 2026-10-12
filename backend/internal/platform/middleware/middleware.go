@@ -31,7 +31,7 @@ func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler 
 // RequestID prende um identificador ao contexto e o devolve no cabeçalho.
 //
 // Reaproveita o X-Request-Id que veio, se veio: é o que liga a linha de log do
-// backend à do edital-processor quando um problema atravessa os dois.
+// backend à do processador quando um problema atravessa os dois.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-Id")

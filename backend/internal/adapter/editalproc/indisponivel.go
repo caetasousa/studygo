@@ -13,7 +13,7 @@ var (
 	_ port.CapturadorDeLeis = Indisponivel{}
 )
 
-// Indisponivel is the no-op EditalProcessor used when EDITAL_PROCESSOR_URL is
+// Indisponivel is the no-op EditalProcessor used when PROCESSADOR_URL is
 // unset. Every call reports the importer is unavailable; the rest of the API is
 // unaffected.
 type Indisponivel struct{}

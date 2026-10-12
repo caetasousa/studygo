@@ -25,7 +25,7 @@ flowchart LR
     N --> F["🧡 Frontend<br/>SPA"]
     F -- "/api" --> B["🐹 Backend Go<br/>hexágono único"]
     B --> P[("🐘 PostgreSQL")]
-    B -. "edital, PDF da aula" .-> E["🐍 edital-processor<br/>(+ Claude Code)"]
+    B -. "edital, PDF da aula" .-> E["🐍 processador<br/>(+ Claude Code)"]
     E -. "mapa pronto<br/>(porta interna)" .-> B
     W["🔔 worker"] --> P
 ```
@@ -43,7 +43,7 @@ lidos juntos; separá-los criaria fronteiras que só custariam tradução.
 | 🚀 | `cmd/` | composição e inicialização |
 | 🔌 | `adapter/httpapi/` | HTTP, auth, DTOs (tags JSON), mappers, redação das mensagens |
 | 🐘 | `adapter/postgres/` | repositories e SQL |
-| 🐍 | `adapter/editalproc/` | cliente do edital-processor |
+| 🐍 | `adapter/editalproc/` | cliente do processador |
 | 🔐 | `adapter/crypto/` | argon2id, JWT |
 | 🔔 | `adapter/notifier/` | entrega de lembretes |
 | ⚙️ | `service/` | casos de uso |
@@ -61,7 +61,7 @@ elas.
 
 ### O processador (Python)
 
-O `edital-processor` segue as mesmas camadas, em `app/`, com as suas três
+O `processador` segue as mesmas camadas, em `app/`, com as suas três
 funções — edital, leis e mapas — lado a lado em cada uma:
 
 | | Camada | Responsabilidade |
@@ -213,7 +213,7 @@ leis ──┬── leis_versoes ──┬── leis_dispositivos   (ref, pai,
   em 25/09/2026, enquanto o app é de teste; volta quando a autenticação estiver
   completa.
 - **A lei é capturada pela tela; as questões, não.** O link vai para o
-  `edital-processor` (`app/domain/leis`), que baixa, organiza e devolve uma prévia
+  `processador` (`app/domain/leis`), que baixa, organiza e devolve uma prévia
   com bloqueios e avisos — sem gravar nada. Quem publica é o backend, buscando
   o texto de novo no processador (nunca do navegador), depois que a pessoa
   marcou cada aviso como revisado. As questões são escritas fora do app e
@@ -295,7 +295,7 @@ mapas_pedidos (o PDF na fila, a situação, o mapa que saiu e o relatório) ─�
   escolhido na página do mapa não volta à sugestão ao reimportar. O tópico
   renomeado sai da lista sozinho.
 - **O mapa também nasce do PDF da aula** (`mapas_pedidos`, 000017), no
-  `edital-processor` (`app/service/mapas/`), que a esteira constrói e implanta como o
+  `processador` (`app/service/mapas/`), que a esteira constrói e implanta como o
   resto. É por evento, sem fila consultada: a tela envia o PDF, o backend o
   guarda e o entrega na hora ao processador (`POST
   /internal/mapas/processamentos`, 202), que roda o Claude Code (`claude -p`,

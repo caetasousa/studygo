@@ -1,4 +1,4 @@
-# edital-processor
+# processador
 
 Serviço interno do studygo para o trabalho pesado com documentos. **Não é
 público**: só o backend Go o chama, pela rede dos containers, com um token
@@ -68,8 +68,8 @@ B02-specific content with page evidence.
 ### Phases 4–6 — done
 
 - **4 — Go HTTP client**: `port.EditalProcessor` (documentId-based, 3 methods);
-  `adapter/editalproc` HTTP client + null adapter; `EDITAL_PROCESSOR_URL` /
-  `EDITAL_PROCESSOR_TOKEN`; internal auth (`Authorization` + `X-Owner-Ref`) and
+  `adapter/editalproc` HTTP client + null adapter; `PROCESSADOR_URL` /
+  `PROCESSADOR_TOKEN`; internal auth (`Authorization` + `X-Owner-Ref`) and
   `X-Request-Id` propagation; error-code mapping (transient / 5xx / 429 →
   `ErrProvedorIndisponivel` → 503, others → 4xx). Wizard + edit-screen
   "extract topics" keep their public paths; `arquivoUri`/full-text replaced by
@@ -83,14 +83,14 @@ B02-specific content with page evidence.
   button, sum-vs-group check, `advance` gated until every discipline has a count,
   alert list shown per step, `peso` field in `ConcursoForm`.
 - **6 — Cutover**: `internal/adapter/ai` and `internal/platform/pdftext` deleted;
-  `dslipak/pdf` dropped from `go.mod`; `edital-processor` added to
+  `dslipak/pdf` dropped from `go.mod`; `processador` added to
   `docker-compose.yml` (internal network, no host port, healthcheck, named
   volume) and to `ansible/deploy.yml` + `templates/docker-compose.prod.yml.j2`
   (build/save/copy/load the third image); `GEMINI_API_KEY` moved to the Python
   container; `.env.example`, `CLAUDE.md` and Ansible secrets updated.
 
 **Verified end to end through the compose stack** (all 5 services up,
-`edital-processor` healthy): wizard step 1 (pasted text) → banca "Fundação
+`processador` healthy): wizard step 1 (pasted text) → banca "Fundação
 Carlos Chagas", cargo B02, 10 vagas, `documentoId`; step 2 → groups with totals
 25/45 and weights 1/2, every discipline `questoes: null`, discursiva
 estudo_de_caso, 270 min, alerts `questions_not_broken_down` (blocker) +
@@ -115,9 +115,9 @@ uv pip install --python .venv/bin/python pytest pytest-asyncio httpx ruff mypy
 OCR and real-Gemini tests need the container (Tesseract) and a key:
 
 ```bash
-docker build -t edital-processor:dev .
+docker build -t processador:dev .
 docker run --rm -v "$PWD/tests:/app/tests:ro" -v "$PWD/pyproject.toml:/app/pyproject.toml:ro" \
-  -e GEMINI_API_KEY=... --user root edital-processor:dev sh -c \
+  -e GEMINI_API_KEY=... --user root processador:dev sh -c \
   'pip install -q pytest pytest-asyncio httpx && cd /app && python -m pytest tests -m "integration or gemini"'
 ```
 
@@ -126,15 +126,15 @@ assert facts about the document, never values baked into the code.
 
 ## Configuration
 
-Environment, prefix `EP_`. See `.env.example`. Key ones:
+Environment, prefix `PROCESSADOR_`. See `.env.example`. Key ones:
 
-- `EP_SERVICE_TOKEN` — shared secret from the Go backend. Required when deployed.
-- `EP_GEMINI_API_KEY` — moves here from the Go container in Phase 6.
-- `EP_WORK_DIR`, `EP_ARTIFACT_TTL_SECONDS` — temporary document store.
-- `EP_MIN_TEXT_SCORE`, `EP_MIN_TEXT_CHARS` — the OCR trigger.
-- `EP_OCR_DPI`, `EP_OCR_TIMEOUT_SECONDS`, `EP_OCR_MAX_CONCURRENCY` — OCR limits.
-- `EP_BACKEND_INTERNAL_URL`, `EP_MAPAS_*`, `EP_PROVASGO_DIR`,
-  `EP_MAPA_COMPRADOR` — mind maps (`app/service/mapas/README.md`).
+- `PROCESSADOR_SERVICE_TOKEN` — shared secret from the Go backend. Required when deployed.
+- `PROCESSADOR_GEMINI_API_KEY` — moves here from the Go container in Phase 6.
+- `PROCESSADOR_WORK_DIR`, `PROCESSADOR_ARTIFACT_TTL_SECONDS` — temporary document store.
+- `PROCESSADOR_MIN_TEXT_SCORE`, `PROCESSADOR_MIN_TEXT_CHARS` — the OCR trigger.
+- `PROCESSADOR_OCR_DPI`, `PROCESSADOR_OCR_TIMEOUT_SECONDS`, `PROCESSADOR_OCR_MAX_CONCURRENCY` — OCR limits.
+- `PROCESSADOR_BACKEND_INTERNAL_URL`, `PROCESSADOR_MAPAS_*`, `PROCESSADOR_PROVASGO_DIR`,
+  `PROCESSADOR_MAPA_COMPRADOR` — mind maps (`app/service/mapas/README.md`).
 
 ## Future: async jobs
 

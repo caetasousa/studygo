@@ -6,7 +6,7 @@ nunca toca no banco: o resultado volta ao backend, que o importa na conta pelas
 mesmas regras da tela.
 
 ```
-tela ──PDF──▶ backend ──POST /internal/mapas/processamentos (202)──▶ edital-processor
+tela ──PDF──▶ backend ──POST /internal/mapas/processamentos (202)──▶ processador
                  ▲                                                    │ claude -p
                  └──── POST :8081/internal/pedidos-de-mapa/{id}/… ────┘ (resultado ou falha)
 ```
@@ -17,12 +17,12 @@ tela ──PDF──▶ backend ──POST /internal/mapas/processamentos (202)�
   servidor). Ao subir, o serviço pede ao backend o que estava "processando"
   (`/redespacho`): um reinício não perde pedido.
 - **A porta interna do backend** (`INTERNAL_ADDR`, `:8081`) não é publicada nem
-  passa pelo nginx; o token é o mesmo `EP_SERVICE_TOKEN`, no sentido contrário.
+  passa pelo nginx; o token é o mesmo `PROCESSADOR_SERVICE_TOKEN`, no sentido contrário.
 - **Recusa vira correção.** Se a importação recusa o mapa (422: linha inválida,
   slug de outro mapa…), o motivo volta ao Claude na mesma sessão (`--resume`),
-  até `EP_MAPAS_TENTATIVAS` vezes; depois, o pedido falha com o motivo.
+  até `PROCESSADOR_MAPAS_TENTATIVAS` vezes; depois, o pedido falha com o motivo.
 - **O PDF não fica.** Cada pedido trabalha numa pasta própria em
-  `EP_WORK_DIR/mapas`, apagada ao terminar, dê certo ou não.
+  `PROCESSADOR_WORK_DIR/mapas`, apagada ao terminar, dê certo ou não.
 
 ## A conexão do Claude
 
@@ -32,7 +32,7 @@ atualização automática). Cada conta conecta a sua assinatura **pela tela**, e
 
 1. o backend pede o link (`POST /internal/claude/conexao`); `adapter/claude/conexao.py` roda o
    `claude auth login` num pseudo-terminal, com `CLAUDE_CONFIG_DIR` na pasta da
-   conta (`EP_CLAUDE_CONTAS_DIR/<id da conta>`, no volume `edital_claude`), e
+   conta (`PROCESSADOR_CLAUDE_CONTAS_DIR/<id da conta>`, no volume `edital_claude`), e
    devolve o link que ele imprime;
 2. quem estuda autoriza na página do Claude e cola o código na tela, que chega
    ao processo como se fosse digitado (`POST /internal/claude/conexao/codigo`).
@@ -57,7 +57,7 @@ conectar; um 401 do Claude também vira falha com o que fazer.
 | 📋 | `instrucoes/skill.md`, `instrucoes/formato.md` | cópias da skill e do formato — um teste falha se divergirem dos originais (`.claude/skills/mapa-mental/SKILL.md`, `conteudo/mapas/README.md`) |
 | 🧰 | `ferramentas/` | `texto.py` (o texto sem os dados do comprador), `figura.py` (recorte), `provas.py` (questões do provasGo) |
 
-## Configuração (`EP_`)
+## Configuração (`PROCESSADOR_`)
 
 - `BACKEND_INTERNAL_URL` — onde devolver o mapa (`http://backend:8081`). Vazio
   desliga a entrega (o processamento falha sem ter a quem entregar).

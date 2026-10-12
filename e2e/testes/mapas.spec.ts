@@ -1336,7 +1336,7 @@ test.describe('imagens dos mapas', () => {
 });
 
 // O PDF da aula que vira mapa: a tela envia o PDF, o backend o entrega ao
-// edital-processor e o mapa volta pela porta interna do backend. No E2E o
+// processador e o mapa volta pela porta interna do backend. No E2E o
 // processador é o dublê (e2e/duble-processador), que devolve um mapa sintético
 // em dois segundos — o Claude não entra no E2E.
 test.describe('mapas a partir do PDF da aula', () => {

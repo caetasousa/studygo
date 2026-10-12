@@ -13,7 +13,7 @@ import (
 // Um edital de verdade, congelado.
 //
 // `testdata/edital_fcc_tcego.json` é a extração real de um edital da FCC
-// (TCE-GO, 2 cargos, 25 páginas), capturada UMA vez contra o edital-processor
+// (TCE-GO, 2 cargos, 25 páginas), capturada UMA vez contra o processador
 // com a Gemini de verdade. A partir daí ela é replay: os testes não chamam a
 // API, não gastam cota, não dependem de rede e dão sempre o mesmo resultado.
 //

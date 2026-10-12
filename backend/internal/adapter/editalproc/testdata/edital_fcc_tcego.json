@@ -1,5 +1,5 @@
 {
-  "_sobre": "Extração real de um edital da FCC (TCE-GO 2026), capturada uma vez contra o edital-processor com a Gemini de verdade. Serve de dublê determinístico: os testes não chamam a API, não gastam cota e não dependem de rede.",
+  "_sobre": "Extração real de um edital da FCC (TCE-GO 2026), capturada uma vez contra o processador com a Gemini de verdade. Serve de dublê determinístico: os testes não chamam a API, não gastam cota e não dependem de rede.",
   "_origem": {
     "banca": "Fundação Carlos Chagas",
     "paginas": 25,

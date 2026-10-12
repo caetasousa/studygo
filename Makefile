@@ -3,7 +3,7 @@
 # `make` sozinho lista tudo. A descrição de cada alvo é o comentário `##` na
 # própria linha, então a ajuda nunca sai de sincronia com os alvos de verdade.
 #
-# Os três checks (backend, frontend, edital-processor) são os mesmos que o
+# Os três checks (backend, frontend, processador) são os mesmos que o
 # CLAUDE.md manda rodar, e os mesmos que a pipeline executa. O deploy saiu daqui:
 # quem publica é o GitLab CI, para que o artefato implantado seja sempre o que
 # passou nos testes (ver docs/ci-cd.md).
@@ -65,7 +65,7 @@ up: ## Sobe o stack local (hot reload)
 		'studygo-local-api'              'a API (Go)                    http://localhost:8080' \
 		'studygo-local-banco'            'o banco (PostgreSQL)          localhost:5432' \
 		'studygo-local-tarefas-diarias'  'o worker: replanejamento, lembretes e faxina' \
-		'studygo-local-leitor-de-edital' 'o edital-processor: lê o edital e faz os mapas mentais'
+		'studygo-local-processador' 'o processador: lê o edital e faz os mapas mentais'
 	@echo
 
 down: ## Para o stack local
@@ -93,7 +93,7 @@ prod-local: ## Sobe as imagens de produção aqui (sem hot reload)
 # ------------------------------------------------------------------ qualidade
 
 check: check-backend check-frontend check-processor ## Roda todos os checks
-	@echo "✓ backend, frontend e edital-processor ok"
+	@echo "✓ backend, frontend e processador ok"
 
 check-backend: ## go build + vet + test
 	cd backend && go build ./... && go vet ./... && go test ./...
@@ -102,7 +102,7 @@ check-frontend: ## svelte-check + vitest
 	cd frontend && npm run check && npm test
 
 check-processor: ## ruff + mypy --strict + pytest
-	cd edital-processor && uv run ruff check . && uv run mypy --strict app && uv run pytest
+	cd processador && uv run ruff check . && uv run mypy --strict app && uv run pytest
 
 # Os testes que exigem PostgreSQL de verdade: migrations, repositories e alguns
 # fluxos verticais.
@@ -153,11 +153,11 @@ cobertura: ## Cobertura dos testes, com os de integração (exige Docker)
 seguranca: ## Varredura de vulnerabilidade nas dependências dos três serviços
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 	cd frontend && npm audit --omit=dev
-	cd edital-processor && uv run --with pip-audit pip-audit
+	cd processador && uv run --with pip-audit pip-audit
 
 fmt: ## Formata o código Go e o Python do processor
 	cd backend && gofmt -w .
-	cd edital-processor && uv run ruff format .
+	cd processador && uv run ruff format .
 
 # ------------------------------------------------------------------------ git
 

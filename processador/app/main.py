@@ -205,7 +205,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # O work dir é criado pelo ArtifactStore no primeiro uso; aqui não há o que
     # preparar além do log e da faxina.
     configure_logging()
-    _log.info("edital-processor starting", extra={"stage": "startup"})
+    _log.info("processador starting", extra={"stage": "startup"})
 
     faxina = asyncio.create_task(
         _faxina_periodica(componentes, componentes.settings.artifact_sweep_seconds)
@@ -226,12 +226,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await redespacho
         await componentes.parar()
 
-        _log.info("edital-processor stopping", extra={"stage": "shutdown"})
+        _log.info("processador stopping", extra={"stage": "shutdown"})
 
 
 def create_app(componentes: Componentes | None = None) -> FastAPI:
     app = FastAPI(
-        title="studygo edital-processor",
+        title="studygo processador",
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None,

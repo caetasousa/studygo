@@ -4,7 +4,7 @@
 #
 # O stack é o docker-compose.yml da raiz SEM o override de desenvolvimento —
 # as mesmas imagens que vão para produção, com o frontend servido pelo nginx —,
-# mais e2e/docker-compose.e2e.yml, que troca o edital-processor pelo dublê. Ele
+# mais e2e/docker-compose.e2e.yml, que troca o processador pelo dublê. Ele
 # roda num projeto compose próprio (studygo-e2e), com portas, volumes e .env
 # próprios (e2e/stack.env), nasce com o banco vazio e morre no fim: nada aqui
 # toca no banco de quem desenvolve.
@@ -57,7 +57,7 @@ echo "→ stack de E2E do zero ($projeto)"
 derrubar
 if [ "${E2E_IMAGENS_PRONTAS:-0}" = 1 ]; then
 	# Só o dublê é construído aqui; o resto são as imagens do build.
-	"${compose[@]}" build edital-processor
+	"${compose[@]}" build processador
 	"${compose[@]}" up -d --quiet-pull
 else
 	"${compose[@]}" up -d --build --quiet-pull

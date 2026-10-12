@@ -43,15 +43,15 @@ WORKDIR /app
 COPY app ./app
 
 RUN useradd --system --uid 10001 --create-home --home /home/appuser appuser \
-    && mkdir -p /var/lib/edital-processor/work /var/lib/edital-processor/claude \
-    && chown -R appuser:appuser /var/lib/edital-processor
+    && mkdir -p /var/lib/processador/work /var/lib/processador/claude \
+    && chown -R appuser:appuser /var/lib/processador
 USER appuser
 
 # A conexão do Claude de cada conta (feita pela tela, uma pasta por conta) fica
 # num volume próprio, para sobreviver ao deploy. Sem atualização automática:
 # a versão é a da imagem, que passou pela esteira.
-ENV EP_WORK_DIR=/var/lib/edital-processor/work \
-    CLAUDE_CONFIG_DIR=/var/lib/edital-processor/claude \
+ENV PROCESSADOR_WORK_DIR=/var/lib/processador/work \
+    CLAUDE_CONFIG_DIR=/var/lib/processador/claude \
     DISABLE_AUTOUPDATER=1 \
     DISABLE_TELEMETRY=1
 

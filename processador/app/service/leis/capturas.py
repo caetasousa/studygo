@@ -37,7 +37,7 @@ _log = get_logger("leis")
 
 _ERRO_INTERNO = (
     "A captura falhou por um erro interno do processador. Tente de novo; se "
-    "repetir, veja o log do edital-processor."
+    "repetir, veja o log do processador."
 )
 
 

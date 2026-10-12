@@ -17,7 +17,7 @@ editar código
      │
      ├── make up ............ stack local de pé, hot reload
      │
-     ├── make check ......... backend + frontend + edital-processor
+     ├── make check ......... backend + frontend + processador
      │
      ├── git add <arquivos>
      ├── make commit m="..." . roda os checks de novo e commita
@@ -73,7 +73,7 @@ Roda os três, na ordem, e para no primeiro que falhar:
 |---|---|---|---|
 | 🐹 | `make check-backend` | `go build` · `go vet` · `go test` | `backend/` |
 | 🧡 | `make check-frontend` | `npm run check` · `npm test` | `frontend/` |
-| 🐍 | `make check-processor` | `ruff` · `mypy --strict` · `pytest` | `edital-processor/` |
+| 🐍 | `make check-processor` | `ruff` · `mypy --strict` · `pytest` | `processador/` |
 | 🐘 | `make check-db` | migrations, repositories, casos de uso e o servidor por HTTP (Testcontainers) | `backend/` |
 
 Os testes que precisam de um PostgreSQL de verdade — migrations, repositories,
@@ -119,7 +119,7 @@ Playwright, com o trace de cada falha).
 - `E2E_EM_CONTAINER=1 make e2e` roda o Playwright dentro da imagem oficial,
   como a pipeline — sem depender do node da máquina.
 
-O `edital-processor` desse stack é um dublê (`e2e/duble-processador`) que
+O `processador` desse stack é um dublê (`e2e/duble-processador`) que
 devolve sempre a mesma leitura de edital: é o que deixa o assistente de
 importação ser testado inteiro sem Gemini. O processador de verdade tem a
 suíte dele (`make check-processor`).
@@ -132,7 +132,7 @@ Funcionalidade nova ganha primeiro a linha no catálogo — como ela pode quebra
 
 `make fmt` formata o Go (`gofmt`) e o Python (`ruff format`) antes de commitar.
 
-> Os testes marcados `integration` e `gemini` do `edital-processor` são pulados
+> Os testes marcados `integration` e `gemini` do `processador` são pulados
 > fora do container / sem chave real — é esperado ver `5 skipped`.
 
 ---
@@ -246,7 +246,7 @@ Tudo pela tela, sem comando:
    questões continuam; as das unidades cujo texto mudou ficam para revisar.
 
 Como a pesquisa e a captura podem errar, e o que elas conferem antes de
-liberar a publicação, está em `edital-processor/app/domain/leis/README.md`.
+liberar a publicação, está em `processador/app/domain/leis/README.md`.
 
 ## 🧠 Mapas mentais: montar e importar
 

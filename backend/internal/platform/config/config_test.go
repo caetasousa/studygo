@@ -171,7 +171,7 @@ func TestLoad_ambienteSobrescreveOsPadroes(t *testing.T) {
 	}
 }
 
-// Sem EDITAL_PROCESSOR_URL a importação por IA fica desligada, e o cadastro
+// Sem PROCESSADOR_URL a importação por IA fica desligada, e o cadastro
 // manual continua funcionando — é o que a raiz de composição verifica.
 func TestLoad_semProcessadorDeEdital(t *testing.T) {
 	ambienteMinimo(t)

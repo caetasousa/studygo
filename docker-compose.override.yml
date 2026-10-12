@@ -52,12 +52,12 @@ services:
   worker:
     container_name: studygo-local-tarefas-diarias
 
-  edital-processor:
-    container_name: studygo-local-leitor-de-edital
+  processador:
+    container_name: studygo-local-processador
     # O export do provasGo, se existir nesta máquina: dá aos mapas as questões
     # do banco de provas (app/service/mapas/ferramentas/provas.py).
     environment:
-      EP_PROVASGO_DIR: /dados/provasgo
+      PROCESSADOR_PROVASGO_DIR: /dados/provasgo
     volumes:
       - ${HOME}/.local/share/studygo/provasgo:/dados/provasgo:ro
 

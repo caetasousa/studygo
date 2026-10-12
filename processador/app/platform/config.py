@@ -2,7 +2,7 @@
 
 Every operational limit the pipeline enforces lives here so it can be tuned per
 environment without a code change. Loaded once at import time from the process
-environment (prefix ``EP_``) or an optional ``.env`` file.
+environment (prefix ``PROCESSADOR_``) or an optional ``.env`` file.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="EP_",
+        env_prefix="PROCESSADOR_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     gemini_max_attempts: int = 2
 
     # --- temporary artifacts -----------------------------------------------
-    work_dir: Path = Path("/var/lib/edital-processor/work")
+    work_dir: Path = Path("/var/lib/processador/work")
     artifact_ttl_seconds: int = 3600
     # De quanto em quanto tempo a faxina passa. Bem menor que o TTL de propósito:
     # o que decide quando um artefato morre é o TTL, e o intervalo só define
@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     backend_internal_url: str = ""
     claude_bin: str = "claude"
     # O login do Claude de cada conta (uma pasta por conta), feito pela tela.
-    claude_contas_dir: Path = Path("/var/lib/edital-processor/claude")
+    claude_contas_dir: Path = Path("/var/lib/processador/claude")
     # Quantas vezes o Claude corrige o que a importação recusou antes de desistir.
     mapas_tentativas: int = 3
     # Uma aula longa leva dezenas de minutos; isto só corta o que travou.

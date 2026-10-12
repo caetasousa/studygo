@@ -55,8 +55,8 @@ func Load() (Config, error) {
 		CORSOrigin:           getEnv("CORS_ORIGIN", "http://localhost:5173"),
 		JWTSecret:            os.Getenv("JWT_SECRET"),
 		RunMigrations:        getEnvBool("RUN_MIGRATIONS", true),
-		EditalProcessorURL:   os.Getenv("EDITAL_PROCESSOR_URL"),
-		EditalProcessorToken: os.Getenv("EDITAL_PROCESSOR_TOKEN"),
+		EditalProcessorURL:   os.Getenv("PROCESSADOR_URL"),
+		EditalProcessorToken: os.Getenv("PROCESSADOR_TOKEN"),
 		Versao:               getEnv("APP_VERSAO", "dev"),
 		Deploy:               os.Getenv("APP_DEPLOY"),
 	}

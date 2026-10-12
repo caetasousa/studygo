@@ -57,7 +57,9 @@ class Backend:
         _log.info("redespacho pedido", extra={"stage": "mapas", "status": resposta.status})
 
     async def _com_insistencia(self, caminho: str, corpo: bytes, tipo: str) -> Resposta:
-        ultima = Resposta(0, "o backend interno não está configurado (EP_BACKEND_INTERNAL_URL)")
+        ultima = Resposta(
+            0, "o backend interno não está configurado (PROCESSADOR_BACKEND_INTERNAL_URL)"
+        )
         if not self._url:
             return ultima
         for _ in range(_TENTATIVAS_DE_REDE):

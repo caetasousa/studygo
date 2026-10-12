@@ -1,4 +1,4 @@
-// Dublê do edital-processor para o stack de E2E.
+// Dublê do processador para o stack de E2E.
 //
 // Responde o mesmo contrato HTTP que o backend usa (ver
 // backend/internal/adapter/editalproc/client.go) com uma leitura fixa de
@@ -7,14 +7,14 @@
 // rede e com a mesma resposta a cada execução.
 //
 // O que ele NÃO testa é o processador de verdade (PDF, OCR, IA): isso é da
-// suíte do edital-processor. Aqui só importa que o backend e a tela levem até
+// suíte do processador. Aqui só importa que o backend e a tela levem até
 // o plano o que a leitura trouxe.
 
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
-const TOKEN = process.env.EP_SERVICE_TOKEN ?? '';
+const TOKEN = process.env.PROCESSADOR_SERVICE_TOKEN ?? '';
 
 // Datas relativas ao dia da execução: uma prova fixa no calendário cairia no
 // passado um dia, e o assistente recusaria o concurso.
@@ -183,7 +183,7 @@ function responder(res, status, corpo) {
 // mesmo 202 e, um instante depois, devolve ao backend pela porta interna dele
 // um mapa sintético — ou a falha, se o nome do PDF pedir. O relatório diz de
 // onde veio o token do Claude, que é o que a tela não teria como mostrar.
-const BACKEND = (process.env.EP_BACKEND_INTERNAL_URL ?? '').replace(/\/$/, '');
+const BACKEND = (process.env.PROCESSADOR_BACKEND_INTERNAL_URL ?? '').replace(/\/$/, '');
 
 // A conexão do Claude de cada conta, como o processador real a faz pela tela:
 // um link de autorização e o código que a página mostra. O dublê aceita só
@@ -356,4 +356,4 @@ createServer((req, res) => {
 
 		recusar(res, 404, 'not_found', `${req.method} ${req.url}`);
 	});
-}).listen(8000, () => console.log('dublê do edital-processor na porta 8000'));
+}).listen(8000, () => console.log('dublê do processador na porta 8000'));

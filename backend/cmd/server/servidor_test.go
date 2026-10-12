@@ -59,7 +59,7 @@ type servidor struct {
 }
 
 // subir monta o servidor sobre um banco novo. Sem processador, a importação
-// fica indisponível, como em produção sem EDITAL_PROCESSOR_URL.
+// fica indisponível, como em produção sem PROCESSADOR_URL.
 func subir(t *testing.T, edital port.EditalProcessor, ajuste func(*config.Config)) *servidor {
 	t.Helper()
 
@@ -538,7 +538,7 @@ func (s *servidor) criarConcurso(t *testing.T, c conta) string {
 
 // ---------------------------------------------------------------- edital
 
-// processadorDeMentira responde o contrato HTTP do edital-processor e guarda o
+// processadorDeMentira responde o contrato HTTP do processador e guarda o
 // que recebeu. status diferente de 200 vira a resposta de erro dele.
 type processadorDeMentira struct {
 	mu       sync.Mutex

@@ -20,7 +20,7 @@ import (
 )
 
 // A fila de PDFs que viram mapa, pelo servidor inteiro. O processador de
-// verdade (o edital-processor, com o Claude) é a fronteira de fora: aqui um
+// verdade (o processador, com o Claude) é a fronteira de fora: aqui um
 // dublê guarda o trabalho recebido, e o teste faz o papel dele ao devolver o
 // resultado pela porta interna.
 
