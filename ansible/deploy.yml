@@ -281,3 +281,15 @@
     - name: Encerrar a sessão do Registry
       ansible.builtin.command: "docker logout {{ registry_host }}"
       changed_when: false
+
+    # Cada deploy baixa imagens novas, e as antigas ficavam no disco até o
+    # assert de espaço livre barrar um deploy. Só sai a imagem que nenhum
+    # container usa e que tem mais de uma semana: a da versão anterior, que o
+    # rescue usa para voltar, costuma ficar; se tiver saído, o rollback a
+    # baixa de novo pelo digest. Fora do block de propósito: uma falha aqui
+    # não pode reverter uma versão que já está respondendo.
+    - name: Apagar as imagens antigas que nenhum container usa
+      ansible.builtin.command: docker image prune --all --force --filter until=168h
+      register: prune
+      changed_when: "'Total reclaimed space: 0B' not in prune.stdout"
+      failed_when: false

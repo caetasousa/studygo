@@ -42,7 +42,7 @@ SERVIDOR_DISTRO := ubuntu-server
         check check-backend check-frontend check-processor check-db e2e fmt lint \
         servidor-endereco \
         status commit push deploy provision servidor-status servidor-logs servidor-health \
-        servidor-ligar servidor-desligar
+        servidor-ligar servidor-desligar registry-limpar
 
 help: ## Lista os alvos disponíveis
 	@echo "studygo — make <alvo>"
@@ -151,7 +151,7 @@ cobertura: ## Cobertura dos testes, com os de integração (exige Docker)
 # Fora do `check` porque depende da rede e de banco de vulnerabilidade que muda
 # sozinho: um `check` que falha sem ninguém ter mexido no código vira ruído.
 seguranca: ## Varredura de vulnerabilidade nas dependências dos três serviços
-	cd backend && go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	cd backend && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 	cd frontend && npm audit --omit=dev
 	cd edital-processor && uv run --with pip-audit pip-audit
 
@@ -211,6 +211,11 @@ deploy: ## O deploy é da pipeline — veja docs/ci-cd.md
 	@echo "Motivo: o artefato implantado precisa ser o mesmo que passou nos"
 	@echo "testes. Compilar na máquina de quem publica desfaz essa garantia."
 	@exit 1
+
+# O registry por onde a esteira passa as imagens, na distro de desenvolvimento
+# — não no servidor. Apaga as imagens antigas e libera o disco.
+registry-limpar: ## Apaga do registry-local as imagens com mais de DIAS dias (2; SIMULAR=1 só lista)
+	@DIAS=$(DIAS) SIMULAR=$(SIMULAR) ci/limpar-registry-local.py
 
 # Infra, não aplicação: Docker rootless, nginx, túnel. A aplicação nunca sobe
 # por aqui — quem publica é a pipeline. Um servidor novo começa pelo

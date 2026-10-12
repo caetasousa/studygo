@@ -49,22 +49,24 @@ conteúdo. O servidor recebe esse digest.
 ```
 git push (main)
    │
-   ├── validate ──── sintaxe da pipeline e do Ansible
-   ├── lint ──────── go vet · svelte-check · ruff + mypy --strict
-   ├── unit_test ─── testes dos 3 serviços + integração com Postgres real
-   ├── build ─────── constrói as imagens (ainda não publica)
+   ├── validate ──── sintaxe da pipeline e do Ansible (este só se o Ansible mudou)
+   ├── lint ──────── go vet · svelte-check · ruff + mypy --strict  ┐
+   ├── unit_test ─── testes dos 3 serviços + integração com Postgres │ ao mesmo
+   ├── build ─────── constrói as imagens (ainda não publica)         ┘ tempo
    ├── artifact_test  sobe as imagens e exige resposta em /health
    │   └── e2e ──────  o app inteiro pelo navegador, contra essas imagens
-   ├── publish ───── envia ao Registry e captura o DIGEST
+   ├── publish ───── só com TUDO acima verde: envia ao Registry e captura o DIGEST
    ├── deploy_staging  Ansible promove o digest → servidor
-   └── smoke_test ── o servidor responde
+   └── smoke_test ── o servidor responde, na versão deste commit
 
 Operate → Environments → staging
    └── Rollback environment ── reexecuta o deploy_staging de uma pipeline antiga
 ```
 
-Cada estágio depende do anterior. Um teste vermelho não bloqueia só a si mesmo:
-impede que o build sequer comece, e portanto que qualquer deploy aconteça.
+O build não espera os testes: começa junto com eles, e o e2e roda assim que as
+imagens ficam prontas. A garantia está no `publish`, que espera por todos —
+validate, lint, testes, artifact_test e e2e. Um teste vermelho não impede o
+build, mas impede que a imagem chegue ao Registry, e portanto qualquer deploy.
 
 O job `e2e` é do projeto, não do template (`.gitlab-ci.yml`): roda a mesma
 suíte do `make e2e` (`e2e/ci.sh`) com as imagens que o build acabou de fazer, e
@@ -72,24 +74,45 @@ o `publish` espera por ele — uma imagem que quebra um fluxo do usuário não
 chega ao Registry. O relatório (`e2e/relatorio/`, com o print de cada cenário)
 fica como artefato do job por 30 dias, passe ou falhe. A imagem do Playwright
 (3,5 GB) é guardada no registry do runner na primeira pipeline de cada versão;
-as seguintes a puxam de lá. Ao subir o `ref` do template, confira se o `needs`
-do `publish` dele mudou: o do projeto repete a lista inteira.
+as seguintes a puxam de lá.
 
 ### O que o projeto muda no template
 
 O template (`gitlab-ci-templates`) foi escrito para dois ambientes numa VPS. O
-`.gitlab-ci.yml` do projeto ajusta dois pontos:
+`.gitlab-ci.yml` do projeto ajusta:
 
 - **Um ambiente só.** `deploy_production`, `verify` e `rollback_production`
   estão desligados (`when: never`): o servidor é um, e o nome dele na esteira é
-  `staging`. Não crie tag de versão — não há para onde ela ir.
-- **`smoke_test` sem domínio.** O do template consulta um domínio que não
-  existe mais; o do projeto consulta o nginx do servidor por
-  `172.17.0.1:8480`, o mesmo caminho que o job de deploy usa. O endereço
-  público do túnel muda a cada reinício e não serve para a esteira.
+  `staging`. Não crie tag de versão — não há para onde ela ir. O `url` do
+  ambiente é `https://studygo.d4ffy.com`.
+- **Build em paralelo e com cache.** Os builds têm `needs: []` e usam o
+  BuildKit com cache de camadas no registry-local
+  (`cache/<componente>:buildcache`): uma camada que não mudou — o apt, o
+  tesseract e o Claude Code do processador — sai do cache em segundos e com o
+  mesmo digest, então o publish não a reenvia nem o servidor a baixa de novo.
+  Em compensação, o `needs` do `publish` lista todos os jobs de teste.
+- **`validate:ansible` enxuto.** Só o syntax-check (o `ansible-lint` do template
+  tinha o resultado ignorado) e só quando `ansible/`, a esteira ou a imagem de
+  deploy mudam.
+- **Cache dos testes.** Módulos do Go, pacotes do npm e do uv ficam no cache do
+  runner, com a chave no lockfile de cada serviço.
+- **Imagem de deploy pronta.** O `deploy_staging` roda em
+  `ci/deploy.Dockerfile` (cliente SSH e Ansible já instalados), guardada no
+  registry-local como `ci/deploy-ansible:<DEPLOY_IMAGE_TAG>`. Mudou o
+  Dockerfile? Suba `DEPLOY_IMAGE_TAG` no `.gitlab-ci.yml`: o job
+  `imagem:deploy` só constrói a tag que ainda não existe.
+- **`smoke_test` de verdade.** Exige que o `/health` responda com a `versao`
+  deste commit, pelo nginx do servidor (`172.17.0.1:8480`, o caminho do
+  deploy) e pelo endereço público, pelo túnel. Um deploy que deixasse o
+  container antigo de pé passava no do template.
+- **Segurança semanal.** Os jobs `seguranca:*` (o mesmo `make seguranca`) só
+  rodam na pipeline agendada, que testa tudo mas não publica nem implanta, e
+  avisam sem bloquear. O agendamento é feito uma vez no GitLab: **Build →
+  Pipeline schedules → New schedule**, branch `main`, toda semana.
 
-O `url` do ambiente `staging` no GitLab ainda é o domínio antigo, porque vem do
-template; o endereço da vez sai do `make servidor-endereco`.
+Ao subir o `ref` do template, confira se mudaram o `needs` do `publish`, o
+`before_script` do `.deploy_base` ou o script do `.build_template`: o projeto
+os sobrescreve.
 
 ## Qual versão está no ar
 
@@ -242,12 +265,24 @@ Nada se perde.
 Os jobs trocam as imagens por um registry na distro de desenvolvimento, o
 `registry-local` (porta 5000, dados no volume `registry-data`). Parado, os
 builds falham com "o registry local não respondeu": `docker start
-registry-local`. Se o container sumiu, recrie-o com o mesmo volume:
+registry-local`. Se o container sumiu, recrie-o com o mesmo volume — e com o
+delete ligado, sem o qual a limpeza não funciona:
 
 ```bash
 docker run -d --name registry-local --restart unless-stopped \
-  -p 5000:5000 -v registry-data:/var/lib/registry registry:2
+  -p 5000:5000 -e REGISTRY_STORAGE_DELETE_ENABLED=true \
+  -v registry-data:/var/lib/registry registry:2.8.3
 ```
+
+Ali uma imagem só serve durante a própria pipeline: o deploy e o rollback
+puxam do GitLab, pelo digest. `make registry-limpar` apaga as com mais de 2
+dias (`DIAS=n` muda; `SIMULAR=1` só lista), roda o garbage-collect e reinicia
+o registry; guarda `cache/*` (cache de camadas e Playwright) e `ci/*` (a imagem
+de deploy, que um rollback de pipeline antiga pede). Recusa-se a rodar com job
+em andamento. Em 12/10/2026 levou o volume de 12,1 GB a 1,3 GB.
+
+No servidor, o próprio deploy apaga as imagens que nenhum container usa e que
+têm mais de uma semana (`ansible/deploy.yml`, última tarefa).
 
 ## Variáveis exigidas
 
