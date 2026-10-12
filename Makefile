@@ -132,10 +132,10 @@ ENDERECO_PUBLICO := https://studygo.d4ffy.com
 servidor-endereco: ## Mostra o endereço público do servidor no WSL
 	@echo "$(ENDERECO_PUBLICO)"
 
-# Fora do `check` de propósito: o `check` é o que a pipeline roda, e ela usa um
-# template externo fixado por tag. Acrescentar aqui uma ferramenta que o runner
-# pode não ter quebraria a esteira sem aviso. Quando o lint estiver estável,
-# promovê-lo é uma decisão consciente — e do lado do template.
+# Fora do `check` de propósito: o `check` espelha o que a pipeline roda, e
+# acrescentar aqui uma ferramenta que a imagem do job não tem quebraria a esteira
+# sem aviso. Quando o lint estiver estável, promovê-lo é uma decisão consciente
+# — no .gitlab-ci.yml também.
 lint: ## Lint do backend (golangci-lint; veja backend/.golangci.yml)
 	@command -v golangci-lint >/dev/null 2>&1 || { \
 		echo "golangci-lint não está instalado."; \

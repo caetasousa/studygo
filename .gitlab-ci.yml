@@ -1,73 +1,107 @@
-# A esteira inteira vem do template central, fixado por tag: uma mudança lá só
-# alcança este projeto quando o ref abaixo subir deliberadamente.
+# A esteira do studygo: valida, testa, constrói uma vez e promove o mesmo
+# artefato ao servidor (a distro ubuntu-server do WSL, o único ambiente).
 #
-# Estágios, garantias e variáveis exigidas: veja o README do ci-templates. O
-# que este arquivo muda no template está em docs/ci-cd.md ("O que o projeto
-# muda no template"). Os jobs redefinidos aqui se fundem aos do template: as
-# chaves escritas aqui ganham, e uma lista (needs, rules, script) substitui a
-# do template inteira, não soma.
+# O contrato central é o digest. O `publish` grava o digest de cada imagem num
+# dotenv; o deploy só consome essa variável. Nenhum estágio depois do build
+# reconstrói nada — promover é sempre `docker pull <digest>`.
+#
+# Tudo da esteira mora neste repositório: este arquivo, a imagem do job de
+# deploy, a limpeza do registry e a instalação dos runners (ci/). Como cada
+# passo funciona e por quê: docs/ci-cd.md.
 
-include:
-  - project: 'caetasousa/ci-templates'
-    ref: 'v1.1.8'
-    file: '/templates/app-pipeline.yml'
+stages:
+  - validate
+  - lint
+  - unit_test
+  - build
+  - artifact_test
+  - publish
+  - deploy_staging
+  - smoke_test
 
 variables:
+  # Identidade imutável do build. O SHA nomeia a imagem candidata; o digest,
+  # resolvido no publish, é o que de fato viaja para o servidor.
+  IMAGE_TAG: "$CI_COMMIT_SHA"
+  REGISTRY: "$CI_REGISTRY_IMAGE"
+  # dind expõe TLS na 2376 e escreve os certificados no volume compartilhado.
+  # Usar 2375 sem TLS exigiria --tls=false no serviço e falha com "no route to
+  # host" quando o daemon sobe no modo padrão.
+  DOCKER_HOST: "tcp://docker:2376"
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: "1"
+  DOCKER_CERT_PATH: "/certs/client"
+  # Um clone raso basta: nenhum job aqui lê histórico.
+  GIT_DEPTH: "20"
   # A imagem do job de deploy (ci/deploy.Dockerfile). Mudou o Dockerfile?
   # Suba a tag: o job imagem:deploy só constrói a que ainda não existe.
   DEPLOY_IMAGE_TAG: "ansible-2.21.5-1"
 
-# Não há produção: o único ambiente é o servidor próprio (a distro
-# ubuntu-server do WSL), alimentado pelo push na main. Os jobs de produção do
-# template — que só rodariam numa tag — ficam desligados, para uma tag criada
-# por engano não mandar nada a lugar nenhum.
-deploy_production:
+# Só roda em branch ou MR — evita a pipeline duplicada que o GitLab cria quando
+# um branch com MR aberto recebe push. Tag não dispara nada: não há para onde
+# uma versão ir além do servidor, e ele é alimentado pela main.
+workflow:
   rules:
-    - when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS == null
 
-verify:
-  rules:
-    - when: never
+# --- âncoras -------------------------------------------------------------------
 
-rollback_production:
-  rules:
-    - when: never
+# Todo job carrega tag de runner explícita. Sem isso um job pode cair no runner
+# compartilhado do GitLab.com e consumir a cota de 400 min/mês por acidente.
+.local_runner: &local_runner
+  tags: [local-build]
 
-# O registry do host, como no template (.registry_local do ci-templates).
-# Âncora YAML não atravessa o include, então vai repetida aqui.
-.registry_local_projeto: &registry_local |
+.deploy_runner: &deploy_runner
+  tags: [local-deploy]
+
+.docker_login: &docker_login
+  echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+
+# O docker do job (dind). Os jobs que constroem ou sobem imagem falam com ele.
+.dind: &dind
+  image: docker:27-cli
+  services:
+    - name: docker:27-dind
+      command: ["--insecure-registry=172.16.0.0/12"]
+
+# O runner é local: build, testes de imagem e publish rodam na MESMA máquina.
+# Passar a imagem por artefato do gitlab.com faria cada tarball atravessar a
+# internet três vezes (sobe uma, desce duas) antes do push que realmente
+# importa. O handoff é um registry no host (registry-local, porta 5000). Cada
+# job fala com ele pelo gateway da PRÓPRIA rede docker, que muda a cada job:
+# derivar de `ip route` é mais confiável que fixar um IP.
+.registry_local: &registry_local |
   export LOCAL_REGISTRY="$(ip route | awk '/^default/ {print $3; exit}'):5000"
+  echo "registry local em $LOCAL_REGISTRY"
   for i in $(seq 1 15); do
     wget -qO- "http://$LOCAL_REGISTRY/v2/" >/dev/null 2>&1 && break
     echo "aguardando o registry local ($i)..."
     sleep 2
   done
   wget -qO- "http://$LOCAL_REGISTRY/v2/" >/dev/null 2>&1 || {
-    echo "FALHA - o registry local nao respondeu em $LOCAL_REGISTRY."
+    echo "FALHA - o registry local não respondeu em $LOCAL_REGISTRY."
     echo "No host do runner: docker start registry-local"
     exit 1
   }
 
-# --- validate ----------------------------------------------------------------
-# Só o syntax-check, e só quando o Ansible ou a esteira mudam. O ansible-lint
-# do template rodava a cada push com o resultado ignorado (`|| true`) e era o
-# job mais lento do caminho: 1 min 40 s para nada barrar.
-validate:ansible:
-  before_script:
-    - pip install --quiet ansible-core
-    - ansible-galaxy collection install -r ansible/requirements.yml
-  script:
-    - cd ansible
-    - cp inventory/staging/hosts.ini.example inventory/staging/hosts.ini
-    - ansible-playbook --syntax-check deploy.yml -i inventory/staging/hosts.ini
-  rules:
-    - changes: [ansible/**/*, .gitlab-ci.yml, ci/deploy.Dockerfile]
+# O daemon do dind leva alguns segundos além do healthcheck do runner.
+.esperar_docker: &esperar_docker |
+  for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
+  docker info >/dev/null 2>&1 || { echo "FALHA - o docker do job não subiu"; exit 1; }
 
-# --- caches dos testes ---------------------------------------------------------
+# A pipeline agendada (segurança, no fim) testa tudo mas não publica nem
+# implanta.
+.fora_da_agendada: &fora_da_agendada
+  if: $CI_PIPELINE_SOURCE == "schedule"
+  when: never
+
+# --- caches --------------------------------------------------------------------
 # O runner guarda o cache em volume local: os módulos do Go e os pacotes do npm
 # e do uv deixam de ser baixados a cada job. Do npm se guarda o diretório de
 # pacotes baixados, não o node_modules: o `npm ci` apaga o node_modules antes
 # de instalar, então guardá-lo não servia de nada.
+
 .cache_go: &cache_go
   variables:
     GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
@@ -94,62 +128,164 @@ validate:ansible:
       prefix: uv
     paths: [.cache/uv]
 
+# --- validate ------------------------------------------------------------------
+
+validate:ci:
+  <<: *local_runner
+  stage: validate
+  image: alpine:3.21
+  script:
+    - echo "Pipeline $CI_PIPELINE_ID — commit $CI_COMMIT_SHA"
+    - test -n "$CI_REGISTRY_IMAGE" || (echo "Registry não configurado" && exit 1)
+
+# Só o syntax-check, e só quando o Ansible ou a esteira mudam: pega erro real de
+# playbook. O inventário real carrega o endereço do servidor e fica fora do Git
+# (repositório público), então a validação usa o .example — para sintaxe, serve
+# igual.
+validate:ansible:
+  <<: *local_runner
+  stage: validate
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet ansible-core
+    # O container começa vazio: sem as coleções, o syntax-check não resolve
+    # community.docker e reprova um playbook que está correto.
+    - ansible-galaxy collection install -r ansible/requirements.yml
+  script:
+    - cd ansible
+    - cp inventory/staging/hosts.ini.example inventory/staging/hosts.ini
+    - ansible-playbook --syntax-check deploy.yml -i inventory/staging/hosts.ini
+  rules:
+    - changes: [ansible/**/*, .gitlab-ci.yml, ci/deploy.Dockerfile]
+
+# --- lint + unit_test ----------------------------------------------------------
+# Os três serviços rodam em paralelo: nenhum depende do outro para validar.
+
 lint:backend:
-  <<: *cache_go
+  <<: [*local_runner, *cache_go]
+  stage: lint
+  image: golang:1.27-alpine
+  script:
+    - cd backend
+    - go build ./...
+    - go vet ./...
+
+lint:frontend:
+  <<: [*local_runner, *cache_npm]
+  stage: lint
+  image: node:24-alpine
+  script:
+    - cd frontend
+    - npm ci --cache ../.cache/npm --prefer-offline --no-audit --no-fund
+    - npm run check
+
+lint:processor:
+  <<: [*local_runner, *cache_uv]
+  stage: lint
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet uv
+  script:
+    - cd edital-processor
+    - uv run ruff check .
+    - uv run mypy --strict app
 
 test:backend:
-  <<: *cache_go
+  <<: [*local_runner, *cache_go]
+  stage: unit_test
+  image: golang:1.27-alpine
+  script:
+    - cd backend
+    - go test ./... -coverprofile=coverage.out
+    - go tool cover -func=coverage.out | tail -1
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    expire_in: 1 week
+    paths: [backend/coverage.out]
 
-# Lê o cache sem regravá-lo: o lint e o test:backend já gravam a mesma chave.
+# Integração com Postgres real: constraint, transação e join só se testam no
+# banco.
 test:backend:integration:
+  <<: *local_runner
+  stage: unit_test
+  image: golang:1.27-alpine
+  services:
+    - docker:27-dind
   variables:
+    # Ryuk (o coletor de containers órfãos do Testcontainers) precisa do socket
+    # montado, que aqui não existe. O dind é descartado junto com o job, então
+    # não há órfão para limpar.
+    TESTCONTAINERS_RYUK_DISABLED: "true"
+    # O Postgres sobe COMO IRMÃO dentro do dind, não dentro deste container.
+    # Sem isto o Testcontainers devolveria "localhost" na string de conexão e o
+    # teste tentaria falar consigo mesmo em vez de com o banco.
+    TESTCONTAINERS_HOST_OVERRIDE: "docker"
     GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
     GOCACHE: "$CI_PROJECT_DIR/.cache/go-build"
+  # Lê o cache sem regravá-lo: o lint e o test:backend já gravam a mesma chave.
   cache:
     key:
       files: [backend/go.sum]
       prefix: go
     paths: [.cache/go-mod, .cache/go-build]
     policy: pull
-
-lint:frontend:
-  <<: *cache_npm
+  before_script:
+    # A imagem do Go não traz cliente docker; sem ele não dá para confirmar que
+    # o daemon subiu antes de os testes tentarem usá-lo.
+    - apk add --no-cache docker-cli
+    - *esperar_docker
   script:
-    - cd frontend
-    - npm ci --cache ../.cache/npm --prefer-offline --no-audit --no-fund
-    - npm run check
+    - cd backend
+    - go test -tags=integration ./...
 
 test:frontend:
-  <<: *cache_npm
+  <<: [*local_runner, *cache_npm]
+  stage: unit_test
+  image: node:24-alpine
   script:
     - cd frontend
     - npm ci --cache ../.cache/npm --prefer-offline --no-audit --no-fund
     - npm test
 
-lint:processor:
-  <<: *cache_uv
-
 test:processor:
-  <<: *cache_uv
+  <<: [*local_runner, *cache_uv]
+  stage: unit_test
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet uv
+  script:
+    - cd edital-processor
+    - uv run pytest --junitxml=report.xml
+  artifacts:
+    expire_in: 1 week
+    when: always
+    reports:
+      junit: edital-processor/report.xml
 
 # --- build ---------------------------------------------------------------------
 # O build não espera os testes: começa junto com eles. A garantia continua — o
-# publish (abaixo) só empurra para o Registry depois de todos os testes, do
+# publish só empurra para o Registry depois de todos os testes, do
 # artifact_test e do e2e passarem.
 #
 # Cache de camadas: o BuildKit guarda as camadas no registry-local
 # (cache/<componente>:buildcache) e as busca de lá no build seguinte. O docker
-# do job nasce vazio, então sem isto toda camada era refeita — a do
-# processador (apt, tesseract, Claude Code) levava 3 min 30 s a cada push.
-# Reaproveitada, a camada sai com o mesmo digest: o publish não a reenvia ao
-# GitLab e o servidor não a baixa de novo. O image-manifest=true grava o cache
-# como uma imagem comum, que o garbage-collect do registry sabe percorrer
-# (make registry-limpar).
-.build_com_cache: &build_com_cache
+# do job nasce vazio, então sem isto toda camada era refeita — a do processador
+# (apt, tesseract, Claude Code) levava 3 min 30 s a cada push. Reaproveitada, a
+# camada sai com o mesmo digest: o publish não a reenvia ao GitLab e o servidor
+# não a baixa de novo. O image-manifest=true grava o cache como uma imagem
+# comum, que o garbage-collect do registry sabe percorrer (make
+# registry-limpar).
+#
+# COMPONENT nomeia a imagem; CONTEXT é o diretório do Dockerfile.
+.build: &build
+  <<: [*local_runner, *dind]
+  stage: build
   needs: []
+  before_script:
+    - *registry_local
   script:
+    - *esperar_docker
     - |
-      for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
       cat > /tmp/buildkitd.toml <<EOF
       [registry."$LOCAL_REGISTRY"]
         http = true
@@ -157,7 +293,7 @@ test:processor:
       EOF
       # O dind fala TLS, e o buildx só aceita os certificados por um contexto.
       # network=host: o BuildKit usa a rede do dind, de onde o registry do host
-      # responde no gateway — o mesmo caminho do docker push do template.
+      # responde no gateway.
       docker context create dind >/dev/null
       docker buildx create --name ci --driver docker-container \
         --driver-opt network=host --driver-opt image=moby/buildkit:v0.22.0 \
@@ -169,29 +305,34 @@ test:processor:
         -t "$LOCAL_REGISTRY/$COMPONENT:$IMAGE_TAG" --push "$CONTEXT"
 
 build:backend:
-  <<: *build_com_cache
+  <<: *build
+  variables:
+    COMPONENT: backend
+    CONTEXT: backend
 
 build:frontend:
-  <<: *build_com_cache
+  <<: *build
+  variables:
+    COMPONENT: frontend
+    CONTEXT: frontend
 
 build:processor:
-  <<: *build_com_cache
+  <<: *build
+  variables:
+    COMPONENT: edital-processor
+    CONTEXT: edital-processor
 
 # A imagem do job de deploy, guardada no registry-local. Só é construída
 # quando a tag DEPLOY_IMAGE_TAG ainda não existe lá.
 imagem:deploy:
-  tags: [local-build]
+  <<: [*local_runner, *dind]
   stage: build
-  image: docker:27-cli
-  services:
-    - name: docker:27-dind
-      command: ["--insecure-registry=172.16.0.0/12"]
   needs: []
   before_script:
     - *registry_local
   script:
+    - *esperar_docker
     - |
-      for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
       alvo="$LOCAL_REGISTRY/ci/deploy-ansible:$DEPLOY_IMAGE_TAG"
       if docker pull -q "$alvo" >/dev/null 2>&1; then
         echo "a imagem de deploy $DEPLOY_IMAGE_TAG já existe; nada a construir"
@@ -200,18 +341,81 @@ imagem:deploy:
       docker build -t "$alvo" -f ci/deploy.Dockerfile ci
       docker push "$alvo"
 
-# --- e2e -----------------------------------------------------------------------
+# --- artifact_test -------------------------------------------------------------
+# Sobe as imagens recém-construídas e exige que respondam. Uma imagem que não
+# passa daqui nunca chega ao Registry — é o que separa "compilou" de "funciona".
+
+artifact_test:
+  <<: [*local_runner, *dind]
+  stage: artifact_test
+  needs: [build:backend, build:frontend, build:processor]
+  before_script:
+    - *registry_local
+  script:
+    - |
+      for c in backend frontend edital-processor; do
+        docker pull "$LOCAL_REGISTRY/$c:$IMAGE_TAG"
+        docker tag "$LOCAL_REGISTRY/$c:$IMAGE_TAG" "$REGISTRY/$c:$IMAGE_TAG"
+      done
+    - docker network create appnet
+
+    - |
+      docker run -d --name pg --network appnet \
+        -e POSTGRES_USER=studygo -e POSTGRES_PASSWORD=studygo -e POSTGRES_DB=studygo \
+        postgres:18-alpine
+    - |
+      for i in $(seq 1 30); do
+        docker exec pg pg_isready -U studygo && break
+        sleep 2
+      done
+
+    - |
+      docker run -d --name backend --network appnet \
+        -e SERVER_ADDR=":8080" \
+        -e DATABASE_URL="postgres://studygo:studygo@pg:5432/studygo?sslmode=disable" \
+        -e JWT_SECRET="troque-por-uma-string-longa-e-aleatoria-de-no-minimo-32-caracteres" \
+        "$REGISTRY/backend:$IMAGE_TAG"
+
+    # O binário precisa responder no /health real, não só iniciar sem crashar.
+    - |
+      ok=0
+      for i in $(seq 1 30); do
+        if docker run --rm --network appnet curlimages/curl:8.11.1 \
+             -fsS http://backend:8080/health >/dev/null 2>&1; then
+          ok=1; break
+        fi
+        sleep 2
+      done
+      if [ "$ok" != "1" ]; then
+        echo "FALHA: a imagem do backend não respondeu em /health"
+        docker logs backend
+        exit 1
+      fi
+      echo "OK: imagem do backend respondeu em /health"
+
+    - |
+      docker run -d --name frontend --network appnet "$REGISTRY/frontend:$IMAGE_TAG"
+      ok=0
+      for i in $(seq 1 20); do
+        if docker run --rm --network appnet curlimages/curl:8.11.1 \
+             -fsS http://frontend:5173/ >/dev/null 2>&1; then
+          ok=1; break
+        fi
+        sleep 2
+      done
+      [ "$ok" = "1" ] || { echo "FALHA: frontend não serviu conteúdo"; docker logs frontend; exit 1; }
+      echo "OK: imagem do frontend serviu conteúdo"
+  after_script:
+    - docker rm -f pg backend frontend 2>/dev/null || true
+    - docker network rm appnet 2>/dev/null || true
+
 # O app inteiro pelo navegador, contra as imagens que o build acabou de fazer:
 # a mesma suíte do `make e2e`, num stack descartável dentro do docker do job
 # (e2e/ci.sh). Roda ao lado do artifact_test, e o relatório — com o print de
 # cada cenário — fica como artefato do job, passe ou falhe.
 e2e:
-  tags: [local-build]
+  <<: [*local_runner, *dind]
   stage: artifact_test
-  image: docker:27-cli
-  services:
-    - name: docker:27-dind
-      command: ["--insecure-registry=172.16.0.0/12"]
   needs: [build:backend, build:frontend]
   before_script:
     - apk add --no-cache bash curl
@@ -225,11 +429,13 @@ e2e:
       - e2e/relatorio/
 
 # --- publish -------------------------------------------------------------------
-# Só entra no Registry o que passou em tudo: os testes (que agora correm ao
-# lado do build), o artifact_test e o e2e. A lista inteira é repetida porque
-# o GitLab substitui arrays em vez de somar — ao subir o ref do template,
-# confira se o needs dele mudou.
+# Só aqui a imagem entra no Registry, e é aqui que o digest — a identidade que
+# o deploy vai consumir — passa a existir. Só entra o que passou em tudo: os
+# testes (que correm ao lado do build), o artifact_test e o e2e.
+
 publish:
+  <<: [*local_runner, *dind]
+  stage: publish
   needs:
     - validate:ci
     - job: validate:ansible
@@ -246,37 +452,226 @@ publish:
     - build:processor
     - artifact_test
     - e2e
-  # A pipeline agendada (segurança, abaixo) testa tudo mas não publica.
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: never
+    - *fora_da_agendada
     - when: on_success
+  before_script:
+    - *registry_local
+    - *docker_login
+  script:
+    # Única travessia da internet na esteira: daqui para o registry do GitLab.
+    - |
+      for c in backend frontend edital-processor; do
+        docker pull "$LOCAL_REGISTRY/$c:$IMAGE_TAG"
+        docker tag "$LOCAL_REGISTRY/$c:$IMAGE_TAG" "$REGISTRY/$c:$IMAGE_TAG"
+      done
+
+    - docker push "$REGISTRY/backend:$IMAGE_TAG"
+    - docker push "$REGISTRY/frontend:$IMAGE_TAG"
+    - docker push "$REGISTRY/edital-processor:$IMAGE_TAG"
+
+    # RepoDigests só existe depois do push: é o registry que atribui o digest.
+    # Ele traz UMA ENTRADA POR REGISTRY onde a imagem foi publicada, e aqui ela
+    # existe nos dois: o registry local (handoff entre jobs) e o do GitLab.
+    # `index 0` pegaria qualquer um dos dois — e um digest do registry local
+    # viaja para o servidor como um endereço que só existe na máquina do
+    # runner. Filtrar por $REGISTRY é o que garante o digest certo.
+    - |
+      digest_de() {
+        docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "$REGISTRY/$1:$IMAGE_TAG" \
+          | grep "^$REGISTRY/$1@" | head -1
+      }
+      BACKEND_DIGEST=$(digest_de backend)
+      FRONTEND_DIGEST=$(digest_de frontend)
+      PROCESSOR_DIGEST=$(digest_de edital-processor)
+
+      for par in "backend:$BACKEND_DIGEST" "frontend:$FRONTEND_DIGEST" "edital-processor:$PROCESSOR_DIGEST"; do
+        nome="${par%%:*}"; valor="${par#*:}"
+        case "$valor" in
+          "$REGISTRY/$nome@sha256:"*) ;;
+          *) echo "FALHA - digest de $nome não aponta para $REGISTRY: '$valor'"
+             exit 1 ;;
+        esac
+      done
+
+      echo "BACKEND_DIGEST=$BACKEND_DIGEST"     >  digests.env
+      echo "FRONTEND_DIGEST=$FRONTEND_DIGEST"   >> digests.env
+      echo "PROCESSOR_DIGEST=$PROCESSOR_DIGEST" >> digests.env
+      echo "PIPELINE_ID=$CI_PIPELINE_ID"        >> digests.env
+
+      echo "--- digests publicados ---"
+      cat digests.env
+  artifacts:
+    expire_in: 90 days
+    reports:
+      dotenv: digests.env
 
 # --- deploy --------------------------------------------------------------------
-# O mesmo before_script do template, numa imagem que já traz o SSH e o Ansible
-# (ci/deploy.Dockerfile): o apt e o pip dele só conferem que está instalado. O
-# runner de deploy puxa a imagem pelo Docker da distro de desenvolvimento, onde
-# o registry-local responde em localhost:5000.
+# O Ansible promove os digests ao servidor. Roda numa imagem com o SSH e o
+# Ansible prontos (ci/deploy.Dockerfile), que o runner de deploy puxa pelo
+# Docker da distro de desenvolvimento, onde o registry-local responde em
+# localhost:5000.
+#
+# É o runner protegido (local-deploy) que tem a chave do servidor: um MR ou um
+# branch comum não alcança o servidor.
+
 deploy_staging:
+  <<: *deploy_runner
+  stage: deploy_staging
   image: "localhost:5000/ci/deploy-ansible:$DEPLOY_IMAGE_TAG"
   needs: [publish, imagem:deploy]
+  variables:
+    TARGET_ENV: staging
   environment:
     name: staging
     url: https://studygo.d4ffy.com
+  resource_group: staging
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: never
+    - *fora_da_agendada
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    # CI_SSH_PRIVATE_KEY é do tipo File: a variável carrega o CAMINHO do arquivo
+    # que o GitLab criou, não a chave. Um `echo` dela gravaria o caminho como se
+    # fosse a chave, e o ssh recusaria com "invalid format".
+    #
+    # O CR do fim das linhas e a ausência de newline final quebram a chave do
+    # mesmo jeito, e o OpenSSH reporta ambos como "error in libcrypto" — sem
+    # dizer que o problema é de formatação. Normalizar aqui é mais barato que
+    # depender de como a variável foi colada na interface do GitLab.
+    - |
+      tr -d '\r' < "$CI_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+      [ -n "$(tail -c1 ~/.ssh/id_ed25519)" ] && echo >> ~/.ssh/id_ed25519
+      chmod 600 ~/.ssh/id_ed25519
+      # Falhar aqui aponta a chave; falhar no playbook parece problema de rede.
+      ssh-keygen -y -f ~/.ssh/id_ed25519 >/dev/null 2>&1 || {
+        echo "FALHA - a chave em CI_SSH_PRIVATE_KEY não é uma chave privada válida."
+        echo ""
+        echo "Diagnóstico (a chave em si nunca é impressa):"
+        echo "  linhas no arquivo: $(wc -l < ~/.ssh/id_ed25519) (uma ed25519 tem ~7)"
+        echo "  primeira linha:    $(head -1 ~/.ssh/id_ed25519 | cut -c1-40)"
+        echo "  última linha:      $(tail -1 ~/.ssh/id_ed25519 | cut -c1-40)"
+        echo "  bytes:             $(wc -c < ~/.ssh/id_ed25519)"
+        echo ""
+        echo "1 linha só = o valor foi achatado ao ser colado; recadastre a"
+        echo "variável (tipo File) colando o arquivo inteiro, com as quebras."
+        exit 1
+      }
+    # known_hosts provisionado a partir de variável — nunca StrictHostKeyChecking=no.
+    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    # As coleções (community.docker) não vêm no container.
+    - ansible-galaxy collection install -r ansible/requirements.yml --force
+    # O Vault guarda os segredos; a senha vem de variável protegida.
+    - echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
+    - chmod 600 ansible/.vault_pass
+    # O secrets.yml não é versionado (o repositório é público), então o
+    # checkout do runner não o traz e o playbook morreria em
+    # 'postgres_password is undefined'. Chega por ANSIBLE_SECRETS, variável de
+    # CI com escopo de ambiente.
+    - |
+      if [ -z "$ANSIBLE_SECRETS" ]; then
+        echo "FALHA - ANSIBLE_SECRETS não chegou neste job."
+        echo "  Confira em Settings > CI/CD > Variables:"
+        echo "  - o nome é exatamente ANSIBLE_SECRETS;"
+        echo "  - o escopo de ambiente é '$TARGET_ENV' ou 'All (default)';"
+        echo "  - se 'Proteger variável' está marcado, o branch precisa ser"
+        echo "    protegido (é o caso de CI_SSH_PRIVATE_KEY, que funciona)."
+        exit 1
+      fi
+      destino="ansible/inventory/$TARGET_ENV/group_vars/app/secrets.yml"
+      mkdir -p "$(dirname "$destino")"
+      # O GitLab tem dois tipos de variável e cada um entrega uma coisa: File
+      # entrega o CAMINHO de um arquivo, Variable entrega o CONTEÚDO. Aceitar
+      # só um deles faria o job falhar por um detalhe de cadastro.
+      if [ -f "$ANSIBLE_SECRETS" ]; then
+        tr -d '\r' < "$ANSIBLE_SECRETS" > "$destino"
+      else
+        printf '%s\n' "$ANSIBLE_SECRETS" | tr -d '\r' > "$destino"
+      fi
+      chmod 600 "$destino"
+      head -1 "$destino" | grep -q '^\$ANSIBLE_VAULT' || {
+        echo "FALHA - o conteúdo de ANSIBLE_SECRETS não está cifrado com Vault."
+        echo "  primeira linha recebida: $(head -c 40 "$destino")"
+        echo "  Deve começar com \$ANSIBLE_VAULT;1.1;AES256. Se a linha veio"
+        echo "  truncada ou vazia, desmarque 'Expand variable reference' —"
+        echo "  o \$ do cabeçalho vira referência a outra variável."
+        exit 1
+      }
+      echo "secrets de $TARGET_ENV instalados ($(wc -l < "$destino") linhas)"
+    # O inventário real não é versionado (carrega o endereço do servidor, e o
+    # repositório é público). O job o monta a partir do .example, com o host de
+    # DEPLOY_HOST ou, na falta dele, o do known_hosts, que já precisa existir
+    # para o SSH funcionar.
+    #
+    # O IP sai da PRIMEIRA COLUNA do known_hosts, não de `ssh-keygen -l`: aquele
+    # comando imprime o fingerprint e o comentário da chave, onde o host não
+    # aparece. O `|| true` é obrigatório — sob `set -e`, um grep sem match
+    # retorna 1 e derruba o job na atribuição, antes do if abaixo poder
+    # explicar o que faltou.
+    - |
+      HOST="${DEPLOY_HOST:-$(awk '{print $1}' ~/.ssh/known_hosts 2>/dev/null | tr ',' '\n' | tr -d '[]' | sed 's/:[0-9]*$//' | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)}"
+      if [ -z "$HOST" ]; then
+        echo "FALHA - não consegui determinar o servidor de destino."
+        echo "O known_hosts não traz um IP em claro (pode estar hasheado)."
+        echo "Defina a variável de CI DEPLOY_HOST com o IP do servidor."
+        exit 1
+      fi
+      echo "Destino: $HOST"
+      sed -e "s/SEU_IP_AQUI/$HOST/" \
+          -e "s#ansible_ssh_private_key_file=.*#ansible_ssh_private_key_file=~/.ssh/id_ed25519#" \
+          "ansible/inventory/$TARGET_ENV/hosts.ini.example" \
+          > "ansible/inventory/$TARGET_ENV/hosts.ini"
+  script:
+    # Sem digest não há o que promover — o publish não rodou ou não propagou o
+    # dotenv. Falhar aqui é melhor que implantar uma versão indefinida.
+    - |
+      if [ -z "$BACKEND_DIGEST" ]; then
+        echo "FALHA - digest ausente. O job publish não rodou nesta pipeline."
+        exit 1
+      fi
+      # CI_DEPLOY_USER/PASSWORD só existem se houver um Deploy Token no projeto.
+      # Sem eles o playbook faz `docker login -u ''` e falha atrás de um
+      # `no_log: true`, que esconde justamente a causa.
+      if [ -z "$CI_DEPLOY_USER" ] || [ -z "$CI_DEPLOY_PASSWORD" ]; then
+        echo "FALHA - credencial do Registry ausente."
+        echo "  CI_DEPLOY_USER definido:     $([ -n "$CI_DEPLOY_USER" ] && echo sim || echo NÃO)"
+        echo "  CI_DEPLOY_PASSWORD definido: $([ -n "$CI_DEPLOY_PASSWORD" ] && echo sim || echo NÃO)"
+        echo ""
+        echo "As duas vêm de um Deploy Token chamado exatamente"
+        echo "'gitlab-deploy-token' (Settings > Repository > Deploy tokens),"
+        echo "com os escopos read_registry e write_registry."
+        exit 1
+      fi
+    - cd ansible
+    - |
+      # --vault-password-file explícito: o runner deixa o diretório
+      # world-writable, e nesse caso o Ansible IGNORA o ansible.cfg — onde
+      # vault_password_file está declarado. Sem isto o secrets.yml não é
+      # decifrado e o playbook morre com 'postgres_password is undefined'.
+      ansible-playbook deploy.yml \
+        -i "inventory/$TARGET_ENV/hosts.ini" \
+        --vault-password-file .vault_pass \
+        -e "backend_image=$BACKEND_DIGEST" \
+        -e "frontend_image=$FRONTEND_DIGEST" \
+        -e "edital_processor_image=$PROCESSOR_DIGEST" \
+        -e "deploy_pipeline_id=$CI_PIPELINE_ID" \
+        -e "registry_user=$CI_DEPLOY_USER" \
+        -e "registry_password=$CI_DEPLOY_PASSWORD" \
+        -e "registry_host=$CI_REGISTRY"
 
-# O smoke_test do template chama um domínio que não existe mais. Este confere
-# duas coisas que o /health sozinho não garantia: que a versão no ar é a deste
-# commit (um deploy que deixasse o container antigo de pé passava) e que o
-# app responde também pelo endereço público, pelo túnel. O endereço interno é
-# o nginx do servidor pela bridge do Docker, o mesmo caminho do SSH do deploy.
+# Confere duas coisas que o /health sozinho não garantia: que a versão no ar é
+# a deste commit (um deploy que deixasse o container antigo de pé passava) e
+# que o app responde também pelo endereço público, pelo túnel. O endereço
+# interno é o nginx do servidor pela bridge do Docker, o mesmo caminho do SSH
+# do deploy.
 smoke_test:
+  <<: *deploy_runner
+  stage: smoke_test
+  image: curlimages/curl:8.11.1
+  needs: [deploy_staging]
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-      when: never
+    - *fora_da_agendada
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - |
@@ -302,7 +697,7 @@ smoke_test:
 # vulnerabilidades muda sozinho, e um push não pode ficar vermelho por isso.
 # Avisam sem bloquear.
 .seguranca: &seguranca
-  tags: [local-build]
+  <<: *local_runner
   stage: unit_test
   needs: []
   allow_failure: true

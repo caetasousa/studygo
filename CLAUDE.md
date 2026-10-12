@@ -242,9 +242,9 @@ de versão: "mandar para produção" é `make push` na `main`. Não crie tag.
 
 Para voltar atrás sem esperar, use o **Rollback environment** do GitLab
 (Operate → Environments → staging), que reexecuta o `deploy_staging` de uma
-pipeline anterior com os digests dela, sem reconstruir. Os jobs de produção do
-template (`deploy_production`, `verify`, `rollback_production`) ficam
-desligados no `.gitlab-ci.yml` — não os religue.
+pipeline anterior com os digests dela, sem reconstruir. A esteira inteira mora
+no repositório (`.gitlab-ci.yml` e `ci/`); não há job de produção — não crie
+um.
 
 ## 🔐 Segurança e servidor
 

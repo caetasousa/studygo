@@ -4,7 +4,7 @@
 # stack. Se ele pudesse construir, o que roda no servidor deixaria de ser
 # necessariamente o que passou nos testes.
 #
-# Uso (a pipeline preenche isto; veja templates/app-pipeline.yml):
+# Uso (a pipeline preenche isto; veja o deploy_staging do .gitlab-ci.yml):
 #   ansible-playbook deploy.yml -i inventory/staging/hosts.ini \
 #     -e "backend_image=registry.gitlab.com/.../backend@sha256:..." \
 #     -e ...

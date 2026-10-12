@@ -68,51 +68,54 @@ imagens ficam prontas. A garantia está no `publish`, que espera por todos —
 validate, lint, testes, artifact_test e e2e. Um teste vermelho não impede o
 build, mas impede que a imagem chegue ao Registry, e portanto qualquer deploy.
 
-O job `e2e` é do projeto, não do template (`.gitlab-ci.yml`): roda a mesma
-suíte do `make e2e` (`e2e/ci.sh`) com as imagens que o build acabou de fazer, e
-o `publish` espera por ele — uma imagem que quebra um fluxo do usuário não
-chega ao Registry. O relatório (`e2e/relatorio/`, com o print de cada cenário)
-fica como artefato do job por 30 dias, passe ou falhe. A imagem do Playwright
-(3,5 GB) é guardada no registry do runner na primeira pipeline de cada versão;
-as seguintes a puxam de lá.
+O job `e2e` roda a mesma suíte do `make e2e` (`e2e/ci.sh`) com as imagens que
+o build acabou de fazer, e o `publish` espera por ele — uma imagem que quebra um
+fluxo do usuário não chega ao Registry. O relatório (`e2e/relatorio/`, com o
+print de cada cenário) fica como artefato do job por 30 dias, passe ou falhe. A
+imagem do Playwright (3,5 GB) é guardada no registry do runner na primeira
+pipeline de cada versão; as seguintes a puxam de lá.
 
-### O que o projeto muda no template
+### Onde a esteira mora
 
-O template (`gitlab-ci-templates`) foi escrito para dois ambientes numa VPS. O
-`.gitlab-ci.yml` do projeto ajusta:
+Toda no repositório — antes ela vinha de um template externo
+(`caetasousa/ci-templates`), que só o studygo usava e que o projeto
+sobrescrevia pela metade:
 
-- **Um ambiente só.** `deploy_production`, `verify` e `rollback_production`
-  estão desligados (`when: never`): o servidor é um, e o nome dele na esteira é
-  `staging`. Não crie tag de versão — não há para onde ela ir. O `url` do
-  ambiente é `https://studygo.d4ffy.com`.
+| | Arquivo | O que é |
+|---|---|---|
+| 🔁 | `.gitlab-ci.yml` | a pipeline inteira |
+| 🐳 | `ci/deploy.Dockerfile` | a imagem do job de deploy (SSH e Ansible prontos) |
+| 🧹 | `ci/limpar-registry-local.py` | a limpeza do registry-local (`make registry-limpar`) |
+| 🏃 | `ci/runner/` | instalar e registrar os runners nesta máquina |
+
+O que vale saber de cada parte:
+
+- **Um ambiente só.** Não há job de produção: o servidor é um, e o nome dele
+  na esteira é `staging`. Tag não dispara pipeline — não há para onde uma
+  versão ir. O `url` do ambiente é `https://studygo.d4ffy.com`.
 - **Build em paralelo e com cache.** Os builds têm `needs: []` e usam o
   BuildKit com cache de camadas no registry-local
   (`cache/<componente>:buildcache`): uma camada que não mudou — o apt, o
   tesseract e o Claude Code do processador — sai do cache em segundos e com o
   mesmo digest, então o publish não a reenvia nem o servidor a baixa de novo.
   Em compensação, o `needs` do `publish` lista todos os jobs de teste.
-- **`validate:ansible` enxuto.** Só o syntax-check (o `ansible-lint` do template
-  tinha o resultado ignorado) e só quando `ansible/`, a esteira ou a imagem de
-  deploy mudam.
+- **`validate:ansible` enxuto.** Só o syntax-check, e só quando `ansible/`, a
+  esteira ou a imagem de deploy mudam.
 - **Cache dos testes.** Módulos do Go, pacotes do npm e do uv ficam no cache do
   runner, com a chave no lockfile de cada serviço.
 - **Imagem de deploy pronta.** O `deploy_staging` roda em
-  `ci/deploy.Dockerfile` (cliente SSH e Ansible já instalados), guardada no
-  registry-local como `ci/deploy-ansible:<DEPLOY_IMAGE_TAG>`. Mudou o
-  Dockerfile? Suba `DEPLOY_IMAGE_TAG` no `.gitlab-ci.yml`: o job
-  `imagem:deploy` só constrói a tag que ainda não existe.
-- **`smoke_test` de verdade.** Exige que o `/health` responda com a `versao`
+  `ci/deploy.Dockerfile`, guardada no registry-local como
+  `ci/deploy-ansible:<DEPLOY_IMAGE_TAG>`. Mudou o Dockerfile? Suba
+  `DEPLOY_IMAGE_TAG` no `.gitlab-ci.yml`: o job `imagem:deploy` só constrói a
+  tag que ainda não existe.
+- **`smoke_test` pela versão.** Exige que o `/health` responda com a `versao`
   deste commit, pelo nginx do servidor (`172.17.0.1:8480`, o caminho do
   deploy) e pelo endereço público, pelo túnel. Um deploy que deixasse o
-  container antigo de pé passava no do template.
+  container antigo de pé passaria num smoke que só olhasse o status.
 - **Segurança semanal.** Os jobs `seguranca:*` (o mesmo `make seguranca`) só
   rodam na pipeline agendada, que testa tudo mas não publica nem implanta, e
   avisam sem bloquear. O agendamento é feito uma vez no GitLab: **Build →
   Pipeline schedules → New schedule**, branch `main`, toda semana.
-
-Ao subir o `ref` do template, confira se mudaram o `needs` do `publish`, o
-`before_script` do `.deploy_base` ou o script do `.build_template`: o projeto
-os sobrescreve.
 
 ## Qual versão está no ar
 
@@ -247,6 +250,11 @@ GitLab.com como runners de **grupo**, reusáveis pelos próximos projetos.
 |---|---|---|
 | `local-build` | lint, testes, build de imagens | Registry |
 | `local-deploy` | Ansible | SSH ao servidor; **protegido** |
+
+Para (re)instalar numa máquina nova: `sudo ci/runner/instalar-runner.sh` e, para
+cada tag, `sudo ci/runner/registrar-runner.sh <tag> <token>` — o token sai de
+Settings → CI/CD → Runners do grupo e não é gravado em lugar nenhum além do
+`config.toml` do runner.
 
 Separados de propósito: o runner que constrói não tem credencial de servidor, e
 o que implanta não constrói.
