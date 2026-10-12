@@ -155,6 +155,12 @@ func (s *PedidosDeMapaService) Redespachar(ctx context.Context) (int, error) {
 // despachar entrega o pedido ao processador e o deixa "processando"; se o
 // processador não aceita, o pedido fica na fila com o motivo.
 func (s *PedidosDeMapaService) despachar(ctx context.Context, usuarioID uuid.UUID, p mapa.Pedido, pdf []byte) (mapa.Pedido, error) {
+	// O PDF já está gravado: a entrega não depende mais de quem pediu. Com o
+	// contexto da requisição, fechar a aba no meio cancelava a entrega e a
+	// própria anotação do motivo, e o pedido ficava "na fila" para sempre, sem
+	// dizer por quê (M37). O prazo da chamada é o do cliente do processador.
+	ctx = context.WithoutCancel(ctx)
+
 	t := port.TrabalhoDeMapa{Pedido: p.ID, Dono: usuarioID.String(), Arquivo: p.Arquivo, PDF: pdf}
 
 	if p.DisciplinaID.Valid {

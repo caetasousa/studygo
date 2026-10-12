@@ -1354,7 +1354,10 @@ test.describe('mapas a partir do PDF da aula', () => {
 		page.getByRole('region', { name: 'PDFs na fila' }).getByRole('listitem').filter({ hasText: arquivo });
 
 	// O processamento termina em segundo plano: a tela recarregada mostra quando.
+	// Antes de recarregar, o pedido tem de estar na lista: é o sinal de que o
+	// upload terminou. Recarregar com ele no meio aborta o envio (M37).
 	async function esperarSituacao(page: Page, arquivo: string, situacao: string) {
+		await expect(pedido(page, arquivo)).toBeVisible();
 		await expect(async () => {
 			await page.reload();
 			await expect(pedido(page, arquivo)).toContainText(situacao, { timeout: 1_000 });
