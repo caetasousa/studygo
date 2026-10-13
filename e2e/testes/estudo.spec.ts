@@ -498,3 +498,33 @@ test.describe('estudo do dia', () => {
 		await expect(topo.getByText('O plano não cobre todo o conteúdo')).toHaveCount(0);
 	});
 });
+
+// A barra lateral numa janela baixa (C22): a lista de páginas encolhia sem
+// rolagem, e o rodapé se desenhava por cima de "Meus concursos" e
+// "Configurações".
+test.describe('barra lateral numa janela baixa', () => {
+	test.use({ viewport: { width: 1280, height: 560 } });
+
+	test('[C22] o rodapé da barra não cobre nenhum link, e o último se alcança rolando a barra', async ({ page, api }, info) => {
+		await api.concurso('Barra E2E');
+		await page.goto('/cronograma');
+
+		const barra = page.getByRole('complementary', { name: 'Navegação principal' });
+		const ultimo = barra.getByRole('link', { name: 'Configurações' });
+		await ultimo.scrollIntoViewIfNeeded();
+		const links = await barra.getByRole('link').all();
+		const sair = (await barra.getByRole('button', { name: 'Sair' }).boundingBox())!;
+		// Nenhum link divide espaço com o rodapé (que vem depois deles na barra).
+		const progresso = (await barra.getByText(/dias p\/ prova/).boundingBox())!;
+		const topoDoRodape = Math.min(progresso.y, sair.y);
+		for (const link of links) {
+			const caixa = (await link.boundingBox())!;
+			expect(caixa.y + caixa.height, `${await link.textContent()} fica debaixo do rodapé`).toBeLessThanOrEqual(topoDoRodape);
+		}
+
+		// O último link recebe o clique: nada está por cima dele.
+		await ultimo.click();
+		await expect(page).toHaveURL(/\/config$/);
+		await page.screenshot({ path: info.outputPath('barra-janela-baixa.png') });
+	});
+});

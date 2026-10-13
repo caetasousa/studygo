@@ -101,12 +101,14 @@ a {
 	text-overflow: ellipsis;
 }
 
+/* Cresce para empurrar o rodapé ao pé da barra, mas nunca encolhe abaixo dos
+   links: numa janela baixa, encolhida e sem rolagem própria, ela deixava o
+   rodapé se desenhar por cima dos últimos. Quem rola é a barra inteira (C22). */
 .nav-groups {
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
-	flex: 1 1 auto;
-	min-height: 0;
+	flex: 1 0 auto;
 }
 .nav-group ul {
 	list-style: none;
