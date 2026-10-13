@@ -49,11 +49,27 @@ provasGo (ferramenta abaixo) mostram o recorte e a profundidade que caem.
 
 ## Figuras
 
-Desenhe você mesmo, em SVG, o que se aprende pelo desenho — camadas, fluxo,
-ciclo, um quadro comparativo — e converta:
-`{python} -I {ferramentas}/diagrama.py ARQUIVO.svg {saida}/imagens/NOME.png`.
-Abra o PNG (Read) e confira que lê bem. Nunca baixe nem copie imagem da
-internet.
+Sem aula de onde recortar, as figuras didáticas são desenhadas por você, no
+padrão das que os mapas já têm (fundo branco, título em negrito, caixas na
+paleta do app), com `{ferramentas}/desenho.py`. Leia o começo do arquivo: ele
+explica cada modelo.
+
+- **Toda estrutura que a banca cobra pelo desenho vira figura**: um processo
+  ou ciclo (as etapas e a ordem), os níveis ou camadas de um modelo, uma
+  hierarquia (o todo e as partes), grupos e o que cabe em cada um, um quadro
+  2×2, os degraus de maturidade, a lista que se decora ("os 5 princípios").
+  Um mapa sem aula costuma ter de 2 a 6 figuras; nenhuma é decorativa.
+- Escreva a figura num JSON em `{trabalho}` e desenhe:
+  `{python} -I {ferramentas}/desenho.py {trabalho}/NOME.json {saida}/imagens/NOME.png`.
+  Modelos: fluxo, ciclo, camadas, piramide, escada, hierarquia, grupos,
+  quadrantes, cartoes. Para o que nenhum serve, um script seu com a classe
+  `Desenho` do mesmo arquivo (mesmo visual) — nunca SVG à mão.
+- O texto da figura é curto e sai da fonte, como o do mapa; o que ela mostra
+  também está escrito nos itens (o filtro do mapa acha pelo texto, não pela
+  imagem). Cite-a no item em que a teoria a apresenta: `![legenda](NOME.png)`.
+- Abra cada PNG (Read) e confira que lê bem e que nada ficou cortado ou
+  sobreposto; se ficou, encurte o texto ou divida a figura. Nunca baixe nem
+  copie imagem da internet.
 
 ## As questões
 
@@ -83,7 +99,7 @@ Só dentro de `{saida}`. Nada fora dela, e nada no repositório.
 
 ## Ferramentas (Python com PyMuPDF: `{python}`)
 
-- `{python} -I {ferramentas}/diagrama.py ARQUIVO.svg SAIDA.png` — o SVG em PNG.
+- `{python} -I {ferramentas}/desenho.py FIGURA.json SAIDA.png` — a figura didática.
 - `{python} -I {ferramentas}/provas.py {provas} 'REGEX' [--assunto TEXTO]` —
   questões do provasGo sobre o assunto, com o gabarito oficial.
 

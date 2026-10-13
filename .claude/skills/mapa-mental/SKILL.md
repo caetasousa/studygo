@@ -15,7 +15,7 @@ processador de mapas (`processador/app/service/mapas/`), que roda esta skill
 sem ninguém olhando para cada PDF enviado pela tela. Nos dois, use as
 ferramentas de `processador/app/service/mapas/ferramentas/` em vez de reescrever:
 `texto.py` (o texto sem os dados do comprador), `figura.py` (o recorte),
-`diagrama.py` (o SVG desenhado para o mapa sem aula, em PNG) e `provas.py` (as
+`desenho.py` (as figuras do mapa sem aula, no padrão das outras) e `provas.py` (as
 questões do provasGo, com o gabarito oficial).
 
 O formato — título, metadados, itens `- texto` com 2 espaços por nível, marcas e
@@ -76,8 +76,12 @@ o que muda é a fonte:
   de fato cobram.
 - `fonte:` começa por "Sem aula do Estratégia — fontes: " e lista as
   principais (o limite é de 300 caracteres).
-- **Figuras desenhadas, não copiadas**: o que se aprende pelo desenho vira um
-  SVG próprio, convertido com `diagrama.py`. Nunca baixe imagem da internet.
+- **Figuras desenhadas, não copiadas, no padrão das que os mapas já têm**:
+  toda estrutura que a banca cobra pelo desenho (processo, ciclo, níveis,
+  hierarquia, grupos, quadrantes, a lista que se decora) vira figura com
+  `desenho.py` — um JSON por figura, num dos modelos dele, ou a classe
+  `Desenho` para o que nenhum serve. Nunca SVG à mão, que sai com outro
+  visual, nem imagem baixada da internet.
 - **Questões**: primeiro as do provasGo sobre o assunto, com o gabarito
   oficial; depois, para o que elas não cobrem, questões elaboradas no estilo da
   banca do concurso — `origem` "Elaborada · base: <fonte> · estilo <banca>" e o

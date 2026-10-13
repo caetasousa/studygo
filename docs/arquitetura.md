@@ -322,9 +322,11 @@ mapas_pedidos (o PDF ou o assunto na fila, a situação, o mapa que saiu e o rel
   pedido percorre o mesmo caminho, sem a parte `pdf` do multipart; o
   processador usa outro prompt (`prompt_assunto.md`), libera ao Claude só
   nesse caso a busca e a leitura da web — a fonte são as normas e a
-  documentação oficiais, nunca a memória do modelo — e as figuras são SVG
-  desenhados por ele (`ferramentas/diagrama.py`). Sem PDF a perder, o pedido
-  que falhou sempre pode voltar à fila.
+  documentação oficiais, nunca a memória do modelo — e as figuras didáticas
+  são desenhadas por ele no padrão das que os mapas já têm
+  (`ferramentas/desenho.py`: fluxo, ciclo, camadas, pirâmide, escada,
+  hierarquia, grupos, quadrantes, cartões). Sem PDF a perder, o pedido que
+  falhou sempre pode voltar à fila.
 - **O banco é a fonte do mapa; a saída é a exportação.** `mapa.Texto()` escreve
   o mapa de volta no formato do outline (o inverso de `mapa.Ler`, com teste de
   ida e volta), e `GET /api/mapas/{slug}/exportacao` (um) e
