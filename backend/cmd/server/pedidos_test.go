@@ -371,7 +371,7 @@ func TestServidor_PedidoDeMapaVoltaAFilaESaiDela(t *testing.T) {
 	s.mapas.foraDoAr(true)
 
 	p := s.pedirMapa(t, c, "aula.pdf", []byte("%PDF-1.4 x"), nil, http.StatusCreated)
-	if p.Situacao != "na_fila" || !strings.Contains(p.Relatorio, "O processador não recebeu o PDF") || p.Disciplina != "" {
+	if p.Situacao != "na_fila" || !strings.Contains(p.Relatorio, "O processador não recebeu o pedido") || p.Disciplina != "" {
 		t.Fatalf("com o processador fora do ar: %+v", p)
 	}
 

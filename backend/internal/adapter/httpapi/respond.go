@@ -174,6 +174,7 @@ func classificar(err error) (int, string) {
 		errors.Is(err, mapa.ErrRespostaInvalida),
 		errors.Is(err, mapa.ErrTemaForaDaMateria),
 		errors.Is(err, mapa.ErrPDFInvalido),
+		errors.Is(err, mapa.ErrAssuntoInvalido),
 		errors.Is(err, mapa.ErrRelatorioGrandeDemais):
 		return http.StatusUnprocessableEntity, err.Error()
 

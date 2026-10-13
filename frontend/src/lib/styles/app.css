@@ -8,6 +8,12 @@ body {
 	margin: 0;
 	padding: 0;
 }
+/* O Safari do iPhone aumenta sozinho o texto de um bloco quando a página passa
+   da largura da tela: os tamanhos são os que o CSS diz (M39). */
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
 body {
 	background: var(--bg);
 	color: var(--text);

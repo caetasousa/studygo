@@ -81,6 +81,8 @@ type MapaRepository interface {
 	// Os pedidos de mapa: a fila de PDFs da conta. Todo acesso leva o dono, e o
 	// pedido de outra conta responde mapa.ErrPedidoNaoEncontrado.
 	CriarPedido(ctx context.Context, usuarioID uuid.UUID, disciplinaID uuid.NullUUID, arquivo string, pdf []byte) (mapa.Pedido, error)
+	// CriarPedidoDeAssunto grava o pedido sem aula: o assunto, sem PDF.
+	CriarPedidoDeAssunto(ctx context.Context, usuarioID uuid.UUID, disciplinaID uuid.NullUUID, arquivo, assunto string) (mapa.Pedido, error)
 	// Pedidos lista os pedidos da conta, do mais recente ao mais antigo.
 	Pedidos(ctx context.Context, usuarioID uuid.UUID) ([]mapa.Pedido, error)
 	Pedido(ctx context.Context, usuarioID, id uuid.UUID) (mapa.Pedido, error)
@@ -112,17 +114,19 @@ type PedidoDaConta struct {
 // PDF e o contexto que o mapa precisa (a matéria e os tópicos dela, os slugs
 // que a conta já usa) e o token do Claude da conta, se ela guardou um.
 type TrabalhoDeMapa struct {
-	Pedido          uuid.UUID
-	Dono            string
-	Arquivo         string
+	Pedido  uuid.UUID
+	Dono    string
+	Arquivo string
+	// PDF é a aula; nil no pedido sem aula, que leva o Assunto no lugar.
 	PDF             []byte
+	Assunto         string
 	Materia         string
 	Temas           []string
 	SlugsExistentes []string
 	TokenClaude     string
 }
 
-// ProcessadorDeMapas faz o mapa a partir do PDF, em segundo plano: aceita o
+// ProcessadorDeMapas faz o mapa a partir do PDF (ou do assunto, sem aula), em segundo plano: aceita o
 // trabalho e, ao terminar, devolve o resultado pela rota interna do backend.
 // Erro aqui é só "não aceitou" (fora do ar, ocupado).
 type ProcessadorDeMapas interface {

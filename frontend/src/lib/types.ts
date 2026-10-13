@@ -937,6 +937,8 @@ export interface PedidoDeMapa {
 	mapa: string;
 	/** O que o processador achou: avisos, divergências, o motivo da falha. */
 	relatorio: string;
+	/** O pedido sem aula: o assunto escrito na tela; vazio no pedido de PDF. */
+	assunto: string;
 	temPdf: boolean;
 	criadoEm: string;
 	atualizadoEm: string;

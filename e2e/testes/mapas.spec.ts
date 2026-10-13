@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { request as novoRequest, type APIRequestContext, type Page } from '@playwright/test';
+import { request as novoRequest, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { test, expect, Api, cadastrar, emailUnico, type Conta, type Disciplina } from './base';
 
 // Os mapas mentais são da conta que os importou, então cada teste (que tem a
@@ -1351,7 +1351,7 @@ test.describe('mapas a partir do PDF da aula', () => {
 	}
 
 	const pedido = (page: Page, arquivo = 'aula-01.pdf') =>
-		page.getByRole('region', { name: 'PDFs na fila' }).getByRole('listitem').filter({ hasText: arquivo });
+		page.getByRole('region', { name: 'Pedidos na fila' }).getByRole('listitem').filter({ hasText: arquivo });
 
 	// O processamento termina em segundo plano: a tela recarregada mostra quando.
 	// Antes de recarregar, o pedido tem de estar na lista: é o sinal de que o
@@ -1387,7 +1387,7 @@ test.describe('mapas a partir do PDF da aula', () => {
 		// O PDF escolhido no painel de importar o texto aponta o painel certo.
 		await page.getByLabel('Arquivo do mapa (.md)').setInputFiles(PDF);
 		await expect(page.getByRole('alert').filter({ hasText: 'é o PDF da aula' })).toContainText(
-			'envie-o em “Criar mapa a partir do PDF da aula”'
+			'envie-o em “Criar um mapa”'
 		);
 
 		await enviar(page, 'GEO — Geografia Física');
@@ -1445,6 +1445,57 @@ test.describe('mapas a partir do PDF da aula', () => {
 		await page.waitForTimeout(3_000);
 		await page.reload();
 		await expect(pedido(page, 'aula-falha.pdf')).toHaveCount(0);
+	});
+
+	test('[M38] o tópico sem aula vira pedido de mapa por assunto, pronto na matéria, e o que falha volta à fila sem PDF', async ({ page, api, conta, baseURL }) => {
+		await api.concurso('Assunto E2E', MATERIAS);
+		await conectarClaude(page.request, conta.token);
+
+		// Vazio ou enorme é recusado, dizendo o motivo.
+		for (const assunto of ['   ', 'x'.repeat(2001)]) {
+			const r = await page.request.post('/api/pedidos-de-mapa/assunto', { headers: cabecalho(conta.token), data: { assunto } });
+			expect(r.status()).toBe(422);
+			expect((await r.json()).erro).toContain('o assunto precisa ter de 3 a 2.000 caracteres');
+		}
+
+		// Da aba "Sem mapa", o tópico chega escrito, com a matéria dele.
+		await page.goto('/mapas?aba=sem-mapa');
+		const geo = page.getByRole('tabpanel', { name: /Sem mapa/ }).getByRole('region', { name: 'Geografia Física' });
+		await geo.getByRole('link', { name: 'Pedir um mapa de “Ciclo hidrológico”' }).click();
+		await expect(page).toHaveURL(/\/mapas\/importar\?materia=GEO&assunto=Ciclo/);
+		await expect(page.getByLabel('Matéria do mapa').locator('option:checked')).toHaveText('GEO — Geografia Física');
+		await expect(page.getByLabel('Assunto do mapa')).toHaveValue('Ciclo hidrológico');
+		await page.getByRole('button', { name: 'Pedir o mapa' }).click();
+		await expect(pedido(page, 'Ciclo hidrológico')).toContainText('Processando');
+		await expect(pedido(page, 'Ciclo hidrológico')).toContainText('Geografia Física');
+		await expect(page.getByLabel('Assunto do mapa')).toHaveValue('');
+
+		// Outra conta não vê o pedido.
+		const outra = await outraSessao(baseURL!);
+		expect(await pedidos(outra.request, outra.token)).toEqual([]);
+		await outra.request.dispose();
+
+		// O processador recebeu o assunto e a matéria, e nenhum PDF.
+		await esperarSituacao(page, 'Ciclo hidrológico', 'Pronto');
+		await pedido(page, 'Ciclo hidrológico').getByText('Relatório do processador').click();
+		await expect(pedido(page, 'Ciclo hidrológico')).toContainText('Assunto recebido: Ciclo hidrológico (GEO — Geografia Física), sem PDF.');
+
+		await pedido(page, 'Ciclo hidrológico').getByRole('link', { name: 'Abrir o mapa' }).click();
+		await expect(page.getByRole('heading', { name: 'Ciclo hidrológico', level: 1 })).toBeVisible();
+		await page.goto('/mapas');
+		await expect(page.getByRole('region', { name: 'Geografia Física' }).getByRole('link', { name: /Ciclo hidrológico/ })).toBeVisible();
+
+		// O que falha volta para a fila sem pedir PDF, e excluir não fala em PDF.
+		await page.goto('/mapas/importar');
+		await page.getByLabel('Assunto do mapa').fill('Assunto que falha de propósito');
+		await page.getByRole('button', { name: 'Pedir o mapa' }).click();
+		await esperarSituacao(page, 'Assunto que falha', 'Falhou');
+		await expect(pedido(page, 'Assunto que falha')).toContainText('Não achei fonte oficial para este assunto.');
+		await pedido(page, 'Assunto que falha').getByRole('button', { name: 'Pôr na fila de novo' }).click();
+		await expect(pedido(page, 'Assunto que falha')).toContainText('Processando');
+		await pedido(page, 'Assunto que falha').getByRole('button', { name: 'Excluir' }).click();
+		await expect(page.getByRole('alertdialog')).toContainText('O mapa deste assunto não será feito.');
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Cancelar' }).click();
 	});
 
 	test('[M31] o token do Claude entra em Configurações, volta só pelo fim e sai com confirmação', async ({ page, api }) => {
@@ -1755,5 +1806,62 @@ test.describe('o que falta virar mapa', () => {
 		await expect(page.getByText('Nenhum mapa mental ainda.')).toBeVisible();
 		await page.getByRole('link', { name: 'Importar o primeiro mapa' }).click();
 		await expect(page).toHaveURL(/\/mapas\/importar$/);
+	});
+});
+
+// A página de importar no celular (M39): no iPhone, o seletor de matéria crescia
+// até o nome mais longo da ementa, a página ficava mais larga que a tela e o
+// Safari aumentava o texto da ajuda sozinho.
+test.describe('importar e exportar no celular', () => {
+	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+	const LONGA: Disciplina = {
+		nome: 'Engenharia de Software Assistida por Inteligência Artificial e Sistemas Agentivos',
+		codigo: 'ENGIA',
+		bloco: 'esp',
+		questoes: 10,
+		temas: ['Sistemas agentivos e assistentes de codificação: Claude Code e Antigravity CLI']
+	};
+
+	const dentroDaTela = async (page: Page, alvo: Locator, nome: string) => {
+		const caixa = await alvo.boundingBox();
+		expect(caixa, nome).not.toBeNull();
+		expect(caixa!.x, `${nome} começa fora da tela`).toBeGreaterThanOrEqual(0);
+		expect(caixa!.x + caixa!.width, `${nome} sai pela direita`).toBeLessThanOrEqual(page.viewportSize()!.width);
+	};
+
+	test('[M39] a página cabe na largura do celular, com o seletor da matéria longa, a fila e o título à vista', async ({ page, api }, info) => {
+		await api.concurso('Celular E2E', [...MATERIAS, LONGA]);
+
+		await page.goto('/mapas/importar');
+		const pdf = {
+			name: 'curso-000000-aula-08-um-nome-de-arquivo-bem-longo-e-sem-espacos-como-os-dos-cursos-completo.pdf',
+			mimeType: 'application/pdf',
+			buffer: Buffer.from('%PDF-1.4\n% aula sintética do E2E\n')
+		};
+		await page.getByLabel('PDF da aula').setInputFiles(pdf);
+		const fila = page.getByRole('region', { name: 'Pedidos na fila' });
+		await expect(fila.getByRole('listitem')).toHaveCount(1);
+
+		// O nome mais longo da ementa está no seletor, e ele não alarga a página.
+		await expect(page.getByLabel('Matéria do mapa').locator('option', { hasText: 'ENGIA' })).toHaveCount(1);
+		expect(await semRolagemLateral(page)).toBe(true);
+		await dentroDaTela(page, page.getByLabel('Matéria do mapa'), 'o seletor da matéria');
+		await dentroDaTela(page, page.getByLabel('Assunto do mapa'), 'o campo do assunto');
+		await dentroDaTela(page, page.getByRole('button', { name: 'Pedir o mapa' }), 'o botão de pedir');
+		await dentroDaTela(page, fila.getByRole('listitem'), 'o pedido da fila');
+		await dentroDaTela(page, page.getByLabel('Texto do mapa'), 'o texto do mapa');
+
+		// O título não fica debaixo do botão do menu.
+		const titulo = (await page.getByRole('heading', { name: 'Importar e exportar', level: 1 }).boundingBox())!;
+		const menu = (await page.getByRole('button', { name: 'Abrir menu' }).boundingBox())!;
+		const sobrepoe =
+			menu.x < titulo.x + titulo.width &&
+			titulo.x < menu.x + menu.width &&
+			menu.y < titulo.y + titulo.height &&
+			titulo.y < menu.y + menu.height;
+		expect(sobrepoe, 'o botão do menu cobre o título').toBe(false);
+
+		await page.screenshot({ path: info.outputPath('importar-no-celular.png'), fullPage: true });
 	});
 });

@@ -58,15 +58,8 @@ func (s *PedidosDeMapaService) Pedir(
 		return mapa.Pedido{}, err
 	}
 
-	if disciplinaID.Valid {
-		c, err := s.concursoDoDono(ctx, usuarioID, concursoSlug)
-		if err != nil {
-			return mapa.Pedido{}, err
-		}
-
-		if !slices.ContainsFunc(c.Disciplinas, func(d concurso.Disciplina) bool { return d.ID == disciplinaID.UUID }) {
-			return mapa.Pedido{}, concurso.ErrNaoEncontrado
-		}
+	if err := s.conferirMateria(ctx, usuarioID, concursoSlug, disciplinaID); err != nil {
+		return mapa.Pedido{}, err
 	}
 
 	p, err := s.mapas.CriarPedido(ctx, usuarioID, disciplinaID, nome, pdf)
@@ -75,6 +68,49 @@ func (s *PedidosDeMapaService) Pedir(
 	}
 
 	return s.despachar(ctx, usuarioID, p, pdf)
+}
+
+// PedirAssunto põe na fila o pedido sem aula: o assunto (o tópico do edital
+// que nenhuma aula cobre) vai ao processador no lugar do PDF, e ele faz o mapa
+// pelas fontes oficiais. A matéria segue a mesma regra do pedido de PDF.
+func (s *PedidosDeMapaService) PedirAssunto(
+	ctx context.Context, usuarioID uuid.UUID, concursoSlug string, disciplinaID uuid.NullUUID, assunto string,
+) (mapa.Pedido, error) {
+	assunto, err := mapa.ConferirAssunto(assunto)
+	if err != nil {
+		return mapa.Pedido{}, err
+	}
+
+	if err := s.conferirMateria(ctx, usuarioID, concursoSlug, disciplinaID); err != nil {
+		return mapa.Pedido{}, err
+	}
+
+	p, err := s.mapas.CriarPedidoDeAssunto(ctx, usuarioID, disciplinaID, mapa.RotuloDoAssunto(assunto), assunto)
+	if err != nil {
+		return mapa.Pedido{}, err
+	}
+
+	return s.despachar(ctx, usuarioID, p, nil)
+}
+
+// conferirMateria recusa a matéria que não é de um concurso da conta.
+func (s *PedidosDeMapaService) conferirMateria(
+	ctx context.Context, usuarioID uuid.UUID, concursoSlug string, disciplinaID uuid.NullUUID,
+) error {
+	if !disciplinaID.Valid {
+		return nil
+	}
+
+	c, err := s.concursoDoDono(ctx, usuarioID, concursoSlug)
+	if err != nil {
+		return err
+	}
+
+	if !slices.ContainsFunc(c.Disciplinas, func(d concurso.Disciplina) bool { return d.ID == disciplinaID.UUID }) {
+		return concurso.ErrNaoEncontrado
+	}
+
+	return nil
 }
 
 // Pedidos lista a fila da conta.
@@ -95,7 +131,8 @@ func (s *PedidosDeMapaService) Reenfileirar(ctx context.Context, usuarioID, id u
 		return mapa.ErrPedidoForaDeHora
 	}
 
-	if !p.TemPDF {
+	// O pedido sem aula não tem PDF a perder: o assunto basta.
+	if !p.TemPDF && p.Assunto == "" {
 		return mapa.ErrPedidoSemPDF
 	}
 
@@ -104,7 +141,7 @@ func (s *PedidosDeMapaService) Reenfileirar(ctx context.Context, usuarioID, id u
 		return err
 	}
 
-	pdf, err := s.mapas.PDFDoPedido(ctx, usuarioID, id)
+	pdf, err := s.pdfDoPedido(ctx, usuarioID, p)
 	if err != nil {
 		return err
 	}
@@ -133,11 +170,11 @@ func (s *PedidosDeMapaService) Redespachar(ctx context.Context) (int, error) {
 	n := 0
 
 	for _, pc := range pendentes {
-		if !pc.Pedido.TemPDF {
+		if !pc.Pedido.TemPDF && pc.Pedido.Assunto == "" {
 			continue
 		}
 
-		pdf, err := s.mapas.PDFDoPedido(ctx, pc.UsuarioID, pc.Pedido.ID)
+		pdf, err := s.pdfDoPedido(ctx, pc.UsuarioID, pc.Pedido)
 		if err != nil {
 			return n, err
 		}
@@ -152,6 +189,15 @@ func (s *PedidosDeMapaService) Redespachar(ctx context.Context) (int, error) {
 	return n, nil
 }
 
+// pdfDoPedido é o PDF da aula, ou nil no pedido sem aula.
+func (s *PedidosDeMapaService) pdfDoPedido(ctx context.Context, usuarioID uuid.UUID, p mapa.Pedido) ([]byte, error) {
+	if !p.TemPDF {
+		return nil, nil
+	}
+
+	return s.mapas.PDFDoPedido(ctx, usuarioID, p.ID)
+}
+
 // despachar entrega o pedido ao processador e o deixa "processando"; se o
 // processador não aceita, o pedido fica na fila com o motivo.
 func (s *PedidosDeMapaService) despachar(ctx context.Context, usuarioID uuid.UUID, p mapa.Pedido, pdf []byte) (mapa.Pedido, error) {
@@ -161,7 +207,7 @@ func (s *PedidosDeMapaService) despachar(ctx context.Context, usuarioID uuid.UUI
 	// dizer por quê (M37). O prazo da chamada é o do cliente do processador.
 	ctx = context.WithoutCancel(ctx)
 
-	t := port.TrabalhoDeMapa{Pedido: p.ID, Dono: usuarioID.String(), Arquivo: p.Arquivo, PDF: pdf}
+	t := port.TrabalhoDeMapa{Pedido: p.ID, Dono: usuarioID.String(), Arquivo: p.Arquivo, PDF: pdf, Assunto: p.Assunto}
 
 	if p.DisciplinaID.Valid {
 		if c, err := s.concursoDoDono(ctx, usuarioID, p.ConcursoSlug); err == nil {
@@ -192,7 +238,7 @@ func (s *PedidosDeMapaService) despachar(ctx context.Context, usuarioID uuid.UUI
 
 	if err := s.processador.Processar(ctx, t); err != nil {
 		// Fica na fila, com o motivo à vista; a tela oferece tentar de novo.
-		motivo := fmt.Sprintf("O processador não recebeu o PDF (%v). Tente \"Pôr na fila de novo\" daqui a pouco.", err)
+		motivo := fmt.Sprintf("O processador não recebeu o pedido (%v). Tente \"Pôr na fila de novo\" daqui a pouco.", err)
 		if err := s.mapas.MudarPedido(ctx, usuarioID, p.ID, de, mapa.NaFila, "", motivo, false); err != nil {
 			return mapa.Pedido{}, err
 		}

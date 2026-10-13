@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     claude_contas_dir: Path = Path("/var/lib/processador/claude")
     # Quantas vezes o Claude corrige o que a importação recusou antes de desistir.
     mapas_tentativas: int = 3
+    # O login da conta em renovação por outro processo do Claude (ou por um que
+    # morreu no meio) é passageiro: espera isto e tenta de novo.
+    mapas_espera_do_login: float = 60.0
     # Uma aula longa leva dezenas de minutos; isto só corta o que travou.
     mapas_timeout_seconds: float = 3 * 3600
     mapas_max_pdf_bytes: int = 40 * 1024 * 1024

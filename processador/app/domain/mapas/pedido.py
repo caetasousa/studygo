@@ -1,7 +1,8 @@
 """O pedido de mapa e o que volta dele.
 
-O backend entrega o PDF de uma aula (o Trabalho); o Claude escreve o mapa numa
-pasta (a Saida); o backend responde à entrega (a Resposta).
+O backend entrega o PDF de uma aula — ou, sem aula, o assunto (o Trabalho); o
+Claude escreve o mapa numa pasta (a Saida); o backend responde à entrega (a
+Resposta).
 """
 
 from __future__ import annotations
@@ -21,6 +22,13 @@ class Trabalho:
     temas: tuple[str, ...] = ()
     slugs_existentes: tuple[str, ...] = ()
     token_claude: str = ""
+    # O pedido sem aula: o tópico que nenhuma aula cobre. Com ele, `pdf` vem
+    # vazio e o mapa sai das fontes oficiais.
+    assunto: str = ""
+
+    @property
+    def sem_aula(self) -> bool:
+        return bool(self.assunto)
 
 
 @dataclass(frozen=True)
@@ -44,3 +52,8 @@ class Saida:
 
 class ClaudeFalhou(Exception):
     """O Claude terminou com erro: o motivo vai para o pedido."""
+
+
+class LoginOcupado(ClaudeFalhou):
+    """O login da conta estava em renovação por outro processo do Claude, ou
+    por um que morreu no meio. Passa sozinho: vale esperar e tentar de novo."""

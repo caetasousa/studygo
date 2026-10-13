@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api } from '$lib/api';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { confirmar } from '$lib/stores/confirmacao.svelte';
@@ -7,13 +9,17 @@
 	import type { PedidoDeMapa, SituacaoDoPedido } from '$lib/types';
 
 	/**
-	 * O PDF da aula que vira mapa. A tela envia o PDF; o backend o entrega ao
-	 * processador, que escreve o mapa com o Claude Code e a skill
-	 * mapa-mental, e o mapa volta importado na conta. Aqui se acompanha a fila: o
-	 * que está sendo feito, o que ficou pronto, o relatório do processador e o que
-	 * falhou.
+	 * O PDF da aula que vira mapa — ou, para o tópico que nenhuma aula cobre, o
+	 * assunto escrito aqui. A tela envia um ou outro; o backend o entrega ao
+	 * processador, que escreve o mapa com o Claude Code e a skill mapa-mental, e
+	 * o mapa volta importado na conta. Aqui se acompanha a fila: o que está sendo
+	 * feito, o que ficou pronto, o relatório do processador e o que falhou.
 	 */
-	let { aoFicarPronto, materia = '' }: { aoFicarPronto: () => void; materia?: string } = $props();
+	let {
+		aoFicarPronto,
+		materia = '',
+		assunto: assuntoDeFora = ''
+	}: { aoFicarPronto: () => void; materia?: string; assunto?: string } = $props();
 
 	let pedidos = $state<PedidoDeMapa[]>([]);
 	/** O que falhou no envio, ao pôr de volta na fila ou ao excluir: fica até a próxima ação. */
@@ -22,6 +28,9 @@
 	let erroDaFila = $state<string | null>(null);
 	let enviando = $state<string | null>(null);
 	let disciplina = $state('');
+	// O tópico da lista "Sem mapa" chega escrito; quem estuda ainda pode mexer.
+	// svelte-ignore state_referenced_locally
+	let assunto = $state(assuntoDeFora);
 
 	// `materia` (o código) vem de quem mandou enviar a aula de uma matéria: a
 	// lista do que falta virar mapa. As matérias chegam depois da tela.
@@ -54,7 +63,7 @@
 			pedidos = (await api.pedidosDeMapa()).pedidos;
 			erroDaFila = null;
 		} catch (e) {
-			erroDaFila = e instanceof Error ? e.message : 'Não foi possível carregar a fila de PDFs';
+			erroDaFila = e instanceof Error ? e.message : 'Não foi possível carregar a fila de pedidos';
 		}
 
 		// Um pedido que ficou pronto trouxe um mapa novo para a lista da página.
@@ -99,6 +108,30 @@
 		await carregar();
 	}
 
+	async function pedirAssunto(e: SubmitEvent) {
+		e.preventDefault();
+		const texto = assunto.trim();
+		if (texto === '') return;
+		erro = null;
+
+		enviando = texto;
+		try {
+			await api.pedirMapaDoAssunto(texto, concursoStore.ativoSlug, disciplina || null);
+			assunto = '';
+			// Recarregar a página não pode trazer o assunto de volta e pedi-lo duas vezes.
+			if (page.url.searchParams.has('assunto')) {
+				const url = new URL(page.url);
+				url.searchParams.delete('assunto');
+				void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+			}
+		} catch (err) {
+			erro = err instanceof Error ? err.message : 'O pedido falhou';
+		}
+
+		enviando = null;
+		await carregar();
+	}
+
 	async function reenfileirar(p: PedidoDeMapa) {
 		erro = null;
 		try {
@@ -115,7 +148,9 @@
 			texto:
 				p.situacao === 'pronto'
 					? 'Sai só o pedido da lista; o mapa que ele gerou continua.'
-					: 'O PDF sai do servidor e o mapa não será feito.',
+					: p.assunto
+						? 'O mapa deste assunto não será feito.'
+						: 'O PDF sai do servidor e o mapa não será feito.',
 			rotulo: 'Excluir',
 			tom: 'perigo'
 		});
@@ -134,12 +169,12 @@
 </script>
 
 <details class="pedir" open>
-	<summary>Criar mapa a partir do PDF da aula</summary>
+	<summary>Criar um mapa</summary>
 	<div class="painel">
 		<p class="ajuda">
-			Assim que o PDF chega, o processador do servidor escreve o mapa e as questões com o Claude e os importa
-			sozinho — uma aula leva de dez minutos a meia hora. Ele usa a sua assinatura do Claude, conectada em
-			<a href="/config">Configurações</a>.
+			Pelo PDF da aula ou, se nenhuma aula cobre o tópico, pelo assunto: o processador do servidor escreve o mapa e
+			as questões com o Claude e os importa sozinho — leva de dez minutos a meia hora. Ele usa a sua assinatura do
+			Claude, conectada em <a href="/config">Configurações</a>.
 		</p>
 		<label class="campo">
 			<span>Matéria do mapa</span>
@@ -161,8 +196,23 @@
 				onchange={aoEscolher}
 			/>
 		</label>
+		<form class="campo assunto" onsubmit={pedirAssunto}>
+			<label for="assunto-do-mapa">Ou, sem aula, o assunto (o tópico como o edital o escreve)</label>
+			<textarea
+				id="assunto-do-mapa"
+				rows="2"
+				maxlength="2000"
+				aria-label="Assunto do mapa"
+				placeholder="Transações: propriedades ACID e níveis de isolamento"
+				disabled={enviando !== null}
+				bind:value={assunto}
+			></textarea>
+			<p class="ajuda">Sem aula, o mapa sai das fontes oficiais — a lei, a norma, a documentação — e as questões, do banco de provas e elaboradas no estilo da banca.</p>
+			<button type="submit" class="btn primary" disabled={enviando !== null || assunto.trim().length < 3}>
+				Pedir o mapa
+			</button>
+		</form>
 		{#if enviando}<p class="ajuda" role="status">Enviando {enviando}…</p>{/if}
-
 	</div>
 </details>
 
@@ -170,7 +220,7 @@
 
 {#if pedidos.length > 0}
 	<section class="fila" aria-labelledby="fila-titulo">
-		<h2 id="fila-titulo">PDFs na fila</h2>
+		<h2 id="fila-titulo">Pedidos na fila</h2>
 		<ul>
 			{#each pedidos as p (p.id)}
 				<li class="pedido" data-situacao={p.situacao}>
@@ -190,7 +240,8 @@
 						{#if p.situacao === 'pronto' && p.mapa}
 							<a class="btn" href="/mapas/{p.mapa}">Abrir o mapa</a>
 						{/if}
-						{#if (p.situacao === 'falhou' || p.situacao === 'processando') && p.temPdf}
+						<!-- O pedido sem aula não tem PDF a perder: o assunto basta para tentar de novo. -->
+						{#if (p.situacao === 'falhou' || p.situacao === 'processando') && (p.temPdf || p.assunto)}
 							<button type="button" class="btn" onclick={() => reenfileirar(p)}>Pôr na fila de novo</button>
 						{:else if p.situacao === 'falhou'}
 							<span class="sem-pdf">O PDF foi apagado depois de uma semana: para tentar de novo, envie-o outra vez.</span>
@@ -221,8 +272,11 @@
 		outline-offset: -2px;
 		border-radius: 10px;
 	}
+	/* A coluna não passa da largura do painel: sem isto, ela crescia até o nome
+	   mais longo do seletor de matéria e empurrava tudo para fora da tela (M39). */
 	.painel {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 12px;
 		padding: 0 14px 14px;
 	}
@@ -235,12 +289,34 @@
 	}
 	.campo {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 5px;
 		font-size: 12.5px;
 		color: var(--text-muted);
 	}
+	.assunto .btn {
+		justify-self: start;
+	}
+	textarea {
+		box-sizing: border-box;
+		width: 100%;
+		padding: 8px 10px;
+		border: 1px solid var(--border-strong);
+		border-radius: 7px;
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+		font-size: 13.5px;
+		line-height: 1.5;
+		resize: vertical;
+	}
+	textarea:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
 	select {
 		box-sizing: border-box;
+		width: 100%;
 		max-width: 100%;
 		min-height: 36px;
 		padding: 6px 9px;
@@ -251,7 +327,8 @@
 		font-size: 13.5px;
 	}
 	@media (pointer: coarse) {
-		select {
+		select,
+		textarea {
 			font-size: 16px;
 			min-height: 44px;
 		}

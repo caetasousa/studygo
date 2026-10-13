@@ -145,7 +145,9 @@ entrega ao `processador` (o Claude Code, com a skill `mapa-mental`), e o
 mapa volta pela porta interna do backend, que o importa como a tela
 importaria. No E2E o processador é o dublê (`e2e/duble-processador`), que
 devolve um mapa sintético — ou a falha, se o nome do PDF pedir — e diz no
-relatório de onde veio o token do Claude.
+relatório de onde veio o token do Claude. Para o tópico que nenhuma aula cobre, o
+mapa nasce de um assunto escrito na tela, sem PDF: o processador o faz pelas
+fontes oficiais, no mesmo padrão (M38).
 
 As questões das aulas não ficam no mapa: vêm num arquivo à parte
 (`<slug>.questoes.json`, fora do git como o mapa), importado na página do mapa,
@@ -191,6 +193,8 @@ escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
 | M35 | a lista "Sem mapa" deixa de fora um tópico da ementa que nenhum mapa cobre, mostra como faltando um tópico que um mapa já cobre (escolhido na página do mapa), a conta "X de Y tópicos com mapa" não bate com a ementa, a matéria toda coberta continua aparecendo como pendente, o mapa que vale para a matéria inteira (sem tópicos escolhidos) dá a matéria por coberta sem dizer que os tópicos dele não foram escolhidos, ou "Enviar o PDF" não leva ao envio já com a matéria do tópico | não sei qual aula ainda falta virar mapa; acho que a matéria está coberta e não está |
 | M36 | a página de ler os mapas volta a misturar os painéis de importar o texto, enviar o PDF e exportar com as estantes (no celular, telas de formulário antes do primeiro mapa), a página de importar e exportar não é alcançável pela lista (nem pela lista vazia), ou lá falta um dos caminhos de entrada e saída (texto, PDF, .zip, exportar todos) | rolo por formulários para chegar ao que quero ler; ou não acho onde importar |
 | M37 | quem envia o PDF e sai da página (fecha a aba, recarrega) logo depois deixa o pedido "na fila" para sempre, sem motivo: a entrega ao processador e a anotação do motivo morrem junto com a requisição (coberto em `backend/internal/service/mapa_pedidos_test.go`) | o PDF foi enviado, mas o mapa nunca sai e a tela não diz por quê |
+| M38 | pedir um mapa sobre um assunto que nenhuma aula cobre aceita o assunto vazio ou enorme; o pedido não entra na fila, vai ao processador sem o assunto ou sem a matéria (ou como se fosse um PDF vazio); o que falhou não volta para a fila porque "falta o PDF", ou o excluído fala em PDF; o tópico da aba "Sem mapa" não chega preenchido no pedido; o mapa pronto não abre nem fica na matéria pedida; ou o pedido aparece para outra conta | o tópico sem aula fica sem mapa; tenho de redigitar o tópico; peço o mapa e ele some ou cai na matéria errada |
+| M39 | no celular, a página de importar e exportar passa da largura da tela: o seletor de matéria cresce até o nome mais longo da ementa e empurra o painel de criar mapa (e o Safari, com a página mais larga que a tela, aumenta o texto da ajuda sozinho); o título fica debaixo do botão do menu; ou um campo, botão ou pedido da fila sai pela direita | a página fica minúscula e torta no celular, com texto gigante num canto e o seletor cortado |
 
 ## Fora da suíte, de propósito
 

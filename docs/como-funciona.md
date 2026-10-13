@@ -55,7 +55,9 @@ O especialista também faz **mapas mentais**: você envia o PDF de uma aula pela
 tela, a cozinha o repassa a ele na hora, e ele — com o Claude, sem ninguém
 olhando — escreve o mapa e o devolve à cozinha por uma porta dos fundos que só
 os funcionários usam. A cozinha confere o mapa como conferiria o que você
-importa pela tela e o guarda na sua conta.
+importa pela tela e o guarda na sua conta. Para o tópico do edital que
+nenhuma aula cobre, basta escrever o assunto: o especialista faz o mapa
+consultando as leis e a documentação oficiais.
 
 ```
 Você → tela (frontend) → cozinha (backend) → despensa (PostgreSQL)

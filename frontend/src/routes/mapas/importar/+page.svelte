@@ -10,8 +10,8 @@
 	import type { MapaImportado } from '$lib/types';
 
 	/**
-	 * Tudo o que entra e sai dos mapas: o PDF da aula, que o processador
-	 * transforma em mapa, o texto de um mapa já pronto, o .zip de uma exportação
+	 * Tudo o que entra e sai dos mapas: o PDF da aula (ou o assunto sem aula),
+	 * que o processador transforma em mapa, o texto de um mapa já pronto, o .zip de uma exportação
 	 * e a exportação de todos. Fica fora da lista, que é para ler: no celular,
 	 * estes formulários vinham telas antes do primeiro mapa.
 	 *
@@ -19,8 +19,9 @@
 	 */
 	let erro = $state<string | null>(null);
 
-	// `?materia=GEO`, que a lista do que falta virar mapa manda.
+	// `?materia=GEO&assunto=…`, que a lista do que falta virar mapa manda.
 	const materia = $derived(page.url.searchParams.get('materia') ?? '');
+	const assunto = $derived(page.url.searchParams.get('assunto') ?? '');
 
 	/** A lista e o cronograma passam a ver o mapa que acabou de entrar. */
 	const recarregar = () => void mapasStore.carregar(true);
@@ -73,7 +74,7 @@
 		// "mapa" ilegível ou um 413 sem explicação.
 		if (arquivo.type === 'application/pdf' || arquivo.name.toLowerCase().endsWith('.pdf')) {
 			resultado = null;
-			erro = `“${arquivo.name}” é o PDF da aula: envie-o em “Criar mapa a partir do PDF da aula”, logo acima, e ele vira mapa sozinho. Aqui entra só o texto de um mapa já pronto (.md).`;
+			erro = `“${arquivo.name}” é o PDF da aula: envie-o em “Criar um mapa”, logo acima, e ele vira mapa sozinho. Aqui entra só o texto de um mapa já pronto (.md).`;
 			return;
 		}
 
@@ -96,7 +97,7 @@
 <PageHead
 	icone="mapa"
 	titulo="Importar e exportar"
-	sub="Os mapas mentais entram por aqui — pelo PDF da aula, pelo texto ou pela cópia exportada — e saem num .zip."
+	sub="Os mapas mentais entram por aqui — pelo PDF da aula, pelo assunto, pelo texto ou pela cópia exportada — e saem num .zip."
 	mostrarProps={false}
 />
 
@@ -120,7 +121,7 @@
 		</div>
 	{/if}
 
-	<PedidosDePDF aoFicarPronto={recarregar} {materia} />
+	<PedidosDePDF aoFicarPronto={recarregar} {materia} {assunto} />
 
 	<section class="importar" aria-labelledby="importar-titulo">
 		<h2 id="importar-titulo">Importar mapa</h2>
@@ -181,6 +182,7 @@
 
 	.importar {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 12px;
 		margin-bottom: 8px;
 		padding: 11px 14px 14px;
@@ -210,6 +212,7 @@
 	.arquivo,
 	.colar {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 5px;
 		font-size: 12.5px;
 		color: var(--text-muted);

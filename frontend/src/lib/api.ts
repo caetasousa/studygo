@@ -263,7 +263,7 @@ export const api = {
 			ligar ? { method: 'PUT', body: JSON.stringify({ temas }) } : { method: 'DELETE' }
 		),
 
-	// ---- pedidos de mapa (o PDF da aula que o processador transforma em mapa) ----
+	// ---- pedidos de mapa (o PDF da aula, ou o assunto sem aula, que o processador transforma em mapa) ----
 	pedidosDeMapa: () => request<{ pedidos: PedidoDeMapa[] }>('/api/pedidos-de-mapa'),
 
 	/** Põe o PDF na fila; com a matéria, o mapa nasce vinculado a ela. */
@@ -291,6 +291,13 @@ export const api = {
 		}
 		return request<PedidoDeMapa>('/api/pedidos-de-mapa', { method: 'POST', body: form });
 	},
+
+	/** O pedido sem aula: o processador faz o mapa do assunto pelas fontes oficiais. */
+	pedirMapaDoAssunto: (assunto: string, concurso?: string | null, disciplina?: string | null) =>
+		request<PedidoDeMapa>('/api/pedidos-de-mapa/assunto', {
+			method: 'POST',
+			body: JSON.stringify(concurso && disciplina ? { assunto, concurso, disciplina } : { assunto })
+		}),
 
 	/** Devolve à fila o pedido que falhou ou que travou processando. */
 	reenfileirarPedido: (id: string) =>

@@ -16,7 +16,7 @@ import (
 // colunasDoPedido é o pedido p como a fila o mostra, com a matéria e o concurso
 // dela; nunca os bytes do PDF, que só saem por PDFDoPedido.
 const colunasDoPedido = `p.id, p.arquivo, p.situacao, p.disciplina_id,
-	coalesce(d.nome, ''), coalesce(c.slug, ''), coalesce(p.mapa_slug, ''), p.relatorio,
+	coalesce(d.nome, ''), coalesce(c.slug, ''), coalesce(p.mapa_slug, ''), p.relatorio, p.assunto,
 	p.pdf IS NOT NULL, p.criado_em, p.atualizado_em`
 
 const deOndeVemOPedido = `mapas_pedidos p
@@ -29,7 +29,7 @@ func lerPedido(row pgx.Row) (mapa.Pedido, error) {
 	var situacao string
 
 	err := row.Scan(&p.ID, &p.Arquivo, &situacao, &p.DisciplinaID, &p.DisciplinaNome, &p.ConcursoSlug,
-		&p.Mapa, &p.Relatorio, &p.TemPDF, &p.CriadoEm, &p.AtualizadoEm)
+		&p.Mapa, &p.Relatorio, &p.Assunto, &p.TemPDF, &p.CriadoEm, &p.AtualizadoEm)
 	p.Situacao = mapa.Situacao(situacao)
 
 	return p, err
@@ -43,6 +43,21 @@ func (r *MapaRepo) CriarPedido(
 	if err := r.pool.QueryRow(ctx,
 		`INSERT INTO mapas_pedidos (usuario_id, disciplina_id, arquivo, pdf) VALUES ($1, $2, $3, $4) RETURNING id`,
 		usuarioID, disciplinaID, arquivo, pdf,
+	).Scan(&id); err != nil {
+		return mapa.Pedido{}, fmt.Errorf("gravando o pedido de mapa: %w", err)
+	}
+
+	return r.Pedido(ctx, usuarioID, id)
+}
+
+func (r *MapaRepo) CriarPedidoDeAssunto(
+	ctx context.Context, usuarioID uuid.UUID, disciplinaID uuid.NullUUID, arquivo, assunto string,
+) (mapa.Pedido, error) {
+	var id uuid.UUID
+
+	if err := r.pool.QueryRow(ctx,
+		`INSERT INTO mapas_pedidos (usuario_id, disciplina_id, arquivo, assunto) VALUES ($1, $2, $3, $4) RETURNING id`,
+		usuarioID, disciplinaID, arquivo, assunto,
 	).Scan(&id); err != nil {
 		return mapa.Pedido{}, fmt.Errorf("gravando o pedido de mapa: %w", err)
 	}
@@ -133,7 +148,7 @@ func (r *MapaRepo) PedidosProcessando(ctx context.Context) ([]port.PedidoDaConta
 
 		p := &pc.Pedido
 		if err := rows.Scan(&pc.UsuarioID, &p.ID, &p.Arquivo, &situacao, &p.DisciplinaID, &p.DisciplinaNome,
-			&p.ConcursoSlug, &p.Mapa, &p.Relatorio, &p.TemPDF, &p.CriadoEm, &p.AtualizadoEm); err != nil {
+			&p.ConcursoSlug, &p.Mapa, &p.Relatorio, &p.Assunto, &p.TemPDF, &p.CriadoEm, &p.AtualizadoEm); err != nil {
 			return nil, fmt.Errorf("lendo pedido em processamento: %w", err)
 		}
 

@@ -22,7 +22,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from app.domain.mapas.pedido import ClaudeFalhou, Trabalho
+from app.domain.mapas.pedido import ClaudeFalhou, LoginOcupado, Trabalho
 from app.platform.config import Settings
 from app.platform.logging import get_logger
 from app.port.backend import Avisar, Entregar
@@ -35,6 +35,11 @@ from app.service.mapas.sessao import (
 )
 
 _log = get_logger("mapas")
+
+# O que o Claude Code diz quando a trava da renovação do login está ocupada.
+_LOGIN_OCUPADO = "another Claude Code process is refreshing"
+# Quantas vezes o Claude tenta com o login ocupado antes de o pedido falhar.
+_VEZES_DO_LOGIN = 3
 
 
 class Mapas:
@@ -114,7 +119,8 @@ class Mapas:
         saida = trabalho / "saida"
         (saida / "imagens").mkdir(parents=True)
         pdf = trabalho / "aula.pdf"
-        pdf.write_bytes(t.pdf)
+        if not t.sem_aula:
+            pdf.write_bytes(t.pdf)
         sistema = trabalho / "instrucoes.md"
         sistema.write_text(instrucoes_do_sistema(), encoding="utf-8")
 
@@ -124,7 +130,9 @@ class Mapas:
 
         for tentativa in range(1, self._settings.mapas_tentativas + 1):
             try:
-                await self._claude(sessao, mensagem, tentativa == 1, trabalho, sistema, ambiente)
+                sessao = await self._claude_paciente(
+                    sessao, mensagem, tentativa == 1, trabalho, sistema, ambiente, t.sem_aula
+                )
                 resultado = ler_saida(saida)
             except ClaudeFalhou as exc:
                 await self._avisar_falha(t.pedido, str(exc))
@@ -166,6 +174,33 @@ class Mapas:
             ambiente["MAPA_COMPRADOR"] = self._settings.mapa_comprador
         return ambiente
 
+    async def _claude_paciente(
+        self,
+        sessao: str,
+        mensagem: str,
+        primeira: bool,
+        trabalho: Path,
+        sistema: Path,
+        ambiente: dict[str, str],
+        web: bool,
+    ) -> str:
+        """Roda o Claude e devolve a sessão em que ele trabalhou. O login ocupado
+        não derruba o pedido: o próprio Claude diz que passa em um minuto."""
+        for _ in range(_VEZES_DO_LOGIN - 1):
+            try:
+                await self._claude(sessao, mensagem, primeira, trabalho, sistema, ambiente, web)
+                return sessao
+            except LoginOcupado:
+                _log.warning("login do Claude ocupado; tentando de novo", extra={"stage": "mapas"})
+                await asyncio.sleep(self._settings.mapas_espera_do_login)
+                # A sessão que não começou pode ter ficado registrada, e
+                # `--session-id` não aceita a mesma duas vezes.
+                if primeira:
+                    sessao = str(uuid.uuid4())
+        # A última vez: se o login ainda estiver ocupado, o pedido falha com o motivo.
+        await self._claude(sessao, mensagem, primeira, trabalho, sistema, ambiente, web)
+        return sessao
+
     async def _claude(
         self,
         sessao: str,
@@ -174,8 +209,9 @@ class Mapas:
         trabalho: Path,
         sistema: Path,
         ambiente: dict[str, str],
+        web: bool,
     ) -> None:
-        args = argumentos_do_claude(self._settings, sessao, primeira, trabalho, sistema)
+        args = argumentos_do_claude(self._settings, sessao, primeira, trabalho, sistema, web)
         codigo, saida = await self._rodar_claude(args, mensagem, trabalho, ambiente)
         if codigo == 0:
             return
@@ -188,5 +224,13 @@ class Mapas:
             raise ClaudeFalhou(
                 "o Claude recusou a conexão desta conta (401). Desconecte e conecte de novo em "
                 "Configurações → Processador de mapas."
+            )
+        if _LOGIN_OCUPADO in saida:
+            raise LoginOcupado(
+                "o login do Claude desta conta ficou preso numa renovação (outro processo do "
+                "Claude a fazia, ou um morreu no meio dela) e não liberou em "
+                f"{_VEZES_DO_LOGIN} tentativas. Use \"Pôr na fila de novo\" daqui a alguns "
+                "minutos; se continuar, desconecte e conecte o Claude em Configurações → "
+                "Processador de mapas."
             )
         raise ClaudeFalhou(f"o Claude terminou com erro {codigo}: {saida[-1500:]}")

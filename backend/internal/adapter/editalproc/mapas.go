@@ -26,18 +26,20 @@ type wireTrabalhoDeMapa struct {
 	Temas           []string `json:"temas"`
 	SlugsExistentes []string `json:"slugsExistentes"`
 	TokenClaude     string   `json:"tokenClaude,omitempty"`
+	// Assunto é o pedido sem aula: vai sem a parte "pdf" no multipart.
+	Assunto string `json:"assunto,omitempty"`
 }
 
 type wireTrabalhoAceito struct {
 	Pedido string `json:"pedido"`
 }
 
-// Processar entrega o PDF e o contexto do mapa; o processador responde 202 e
-// trabalha em segundo plano.
+// Processar entrega o PDF (ou o assunto, no pedido sem aula) e o contexto do
+// mapa; o processador responde 202 e trabalha em segundo plano.
 func (c *Client) Processar(ctx context.Context, t port.TrabalhoDeMapa) error {
 	dados, err := json.Marshal(wireTrabalhoDeMapa{
 		Pedido: t.Pedido.String(), Arquivo: t.Arquivo, Materia: t.Materia, Temas: t.Temas,
-		SlugsExistentes: t.SlugsExistentes, TokenClaude: t.TokenClaude,
+		SlugsExistentes: t.SlugsExistentes, TokenClaude: t.TokenClaude, Assunto: t.Assunto,
 	})
 	if err != nil {
 		return fmt.Errorf("montando o trabalho: %w", err)
@@ -50,13 +52,15 @@ func (c *Client) Processar(ctx context.Context, t port.TrabalhoDeMapa) error {
 		return fmt.Errorf("montando o trabalho: %w", err)
 	}
 
-	fw, err := mw.CreateFormFile("pdf", "aula.pdf")
-	if err != nil {
-		return fmt.Errorf("montando o trabalho: %w", err)
-	}
+	if len(t.PDF) > 0 {
+		fw, err := mw.CreateFormFile("pdf", "aula.pdf")
+		if err != nil {
+			return fmt.Errorf("montando o trabalho: %w", err)
+		}
 
-	if _, err := fw.Write(t.PDF); err != nil {
-		return fmt.Errorf("montando o trabalho: %w", err)
+		if _, err := fw.Write(t.PDF); err != nil {
+			return fmt.Errorf("montando o trabalho: %w", err)
+		}
 	}
 
 	if err := mw.Close(); err != nil {

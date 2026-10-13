@@ -181,8 +181,9 @@ function responder(res, status, corpo) {
 // --- mapas mentais ------------------------------------------------------------
 // O processador real roda o Claude por dezenas de minutos; o dublê responde o
 // mesmo 202 e, um instante depois, devolve ao backend pela porta interna dele
-// um mapa sintético — ou a falha, se o nome do PDF pedir. O relatório diz de
-// onde veio o token do Claude, que é o que a tela não teria como mostrar.
+// um mapa sintético — ou a falha, se o nome do PDF (ou o assunto) pedir. O
+// relatório diz de onde veio o token do Claude e, no pedido por assunto, o
+// que chegou: é o que a tela não teria como mostrar.
 const BACKEND = (process.env.PROCESSADOR_BACKEND_INTERNAL_URL ?? '').replace(/\/$/, '');
 
 // A conexão do Claude de cada conta, como o processador real a faz pela tela:
@@ -196,6 +197,13 @@ const conexao = (dono) =>
 const ESPERA_DO_MAPA = 2000;
 
 function mapaDoPedido(d) {
+	if (d.assunto) {
+		const slug = `assunto-${d.pedido.slice(0, 8)}`;
+		return {
+			slug,
+			texto: `# ${d.assunto}\nslug: ${slug}\nfonte: Sem aula do Estratégia — fontes oficiais (E2E)\n\n- Conceitos\n  - [def] O **assunto** de teste\n`
+		};
+	}
 	const slug = `aula-${d.pedido.slice(0, 8)}`;
 	return {
 		slug,
@@ -218,7 +226,15 @@ async function devolver(d) {
 			});
 			return;
 		}
-		if (/falha/i.test(d.arquivo)) {
+		if (d.assunto && /falha/i.test(d.assunto)) {
+			await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/falha`, {
+				method: 'POST',
+				headers: { ...auth, 'content-type': 'application/json' },
+				body: JSON.stringify({ relatorio: 'Não achei fonte oficial para este assunto.' })
+			});
+			return;
+		}
+		if (!d.assunto && /falha/i.test(d.arquivo)) {
 			await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/falha`, {
 				method: 'POST',
 				headers: { ...auth, 'content-type': 'application/json' },
@@ -234,7 +250,9 @@ async function devolver(d) {
 				mapa: texto,
 				questoes: null,
 				temas: d.temas.slice(0, 1),
-				relatorio: `A questão 3 traz um gabarito que diverge da tabela da aula. Token do Claude: ${token}.`
+				relatorio: d.assunto
+					? `Assunto recebido: ${d.assunto} (${d.materia || 'sem matéria'}), ${d.temPdf ? 'com PDF' : 'sem PDF'}. Token do Claude: ${token}.`
+					: `A questão 3 traz um gabarito que diverge da tabela da aula. Token do Claude: ${token}.`
 			})
 		);
 		await fetch(`${BACKEND}/internal/pedidos-de-mapa/${d.pedido}/resultado`, { method: 'POST', headers: auth, body: form });
@@ -315,7 +333,10 @@ createServer((req, res) => {
 			const dados = corpo.match(/name="dados"\r\n\r\n([\s\S]*?)\r\n--/);
 			if (!dados) return recusar(res, 400, 'invalid_pdf', 'dados do pedido inválidos');
 			const d = JSON.parse(dados[1]);
-			devolver({ ...d, dono: req.headers['x-owner-ref'], temas: d.temas ?? [], tokenClaude: d.tokenClaude ?? '' });
+			const temPdf = /name="pdf"/.test(corpo);
+			// O processador real recusa o pedido sem PDF e sem assunto: o dublê também.
+			if (!temPdf && !d.assunto) return recusar(res, 400, 'invalid_pdf', 'faltou o PDF da aula');
+			devolver({ ...d, temPdf, dono: req.headers['x-owner-ref'], temas: d.temas ?? [], tokenClaude: d.tokenClaude ?? '' });
 			return responder(res, 202, { pedido: d.pedido });
 		}
 

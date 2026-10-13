@@ -193,6 +193,7 @@ func NewRouter(
 	// A fila de PDFs que viram mapa: a tela envia e acompanha; o processador
 	// (interno) devolve o resultado pela porta interna (NewRouterInterno).
 	protegida("POST /api/pedidos-de-mapa", h.Pedidos.Pedir)
+	protegida("POST /api/pedidos-de-mapa/assunto", h.Pedidos.PedirAssunto)
 	protegida("GET /api/pedidos-de-mapa", h.Pedidos.Pedidos)
 	protegida("POST /api/pedidos-de-mapa/{id}/fila", h.Pedidos.Reenfileirar)
 	protegida("DELETE /api/pedidos-de-mapa/{id}", h.Pedidos.Excluir)

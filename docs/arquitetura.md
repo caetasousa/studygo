@@ -252,7 +252,7 @@ mapas ──┬── mapas_itens        (ordem, pai, texto, marca — a árvore
         ├── mapas_imagens      (nome, tipo, bytes — as figuras que o texto cita)
         └── disciplinas_mapas ──► disciplinas
 
-mapas_pedidos (o PDF na fila, a situação, o mapa que saiu e o relatório) ──► disciplinas
+mapas_pedidos (o PDF ou o assunto na fila, a situação, o mapa que saiu e o relatório) ──► disciplinas
 ```
 
 - **O mapa é da conta que o importou.** Deriva de material de estudo pessoal (uma
@@ -316,6 +316,15 @@ mapas_pedidos (o PDF na fila, a situação, o mapa que saiu e o relatório) ─�
   material pago e só vive enquanto serve — o pedido pronto o descarta (`pdf
   NULL`), e o processador apaga a pasta do pedido ao terminar. Teto de 40 MB,
   que os dois nginx do caminho acompanham.
+- **Ou de um assunto, sem aula** (`mapas_pedidos.assunto`, 000020): para o
+  tópico que nenhuma aula cobre, a tela pede o mapa pelo assunto (`POST
+  /api/pedidos-de-mapa/assunto`; a aba "Sem mapa" o manda já escrito). O
+  pedido percorre o mesmo caminho, sem a parte `pdf` do multipart; o
+  processador usa outro prompt (`prompt_assunto.md`), libera ao Claude só
+  nesse caso a busca e a leitura da web — a fonte são as normas e a
+  documentação oficiais, nunca a memória do modelo — e as figuras são SVG
+  desenhados por ele (`ferramentas/diagrama.py`). Sem PDF a perder, o pedido
+  que falhou sempre pode voltar à fila.
 - **O banco é a fonte do mapa; a saída é a exportação.** `mapa.Texto()` escreve
   o mapa de volta no formato do outline (o inverso de `mapa.Ler`, com teste de
   ida e volta), e `GET /api/mapas/{slug}/exportacao` (um) e

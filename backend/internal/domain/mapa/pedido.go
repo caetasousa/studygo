@@ -11,7 +11,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Pedido de mapa: o PDF da aula na fila da conta. Quem o atende é o
+// Pedido de mapa: o PDF da aula na fila da conta — ou, para o tópico que
+// nenhuma aula cobre, o assunto escrito na tela. Quem o atende é o
 // processador, com o Claude Code; o resultado volta ao backend, que o
 // importa como a tela importaria.
 
@@ -34,6 +35,10 @@ const (
 	MaxNomePDF = 200
 	// MaxRelatorio é o tamanho do relatório do processador.
 	MaxRelatorio = 20000
+	// MinAssunto e MaxAssunto limitam o assunto de um pedido sem aula: um
+	// tópico do edital cabe com folga; um texto maior já é material, não pedido.
+	MinAssunto = 3
+	MaxAssunto = 2000
 	// GuardaDoPDFQueFalhou é quanto o PDF de um pedido que falhou fica no
 	// servidor para voltar à fila sem reenviar; depois, a faxina o apaga.
 	GuardaDoPDFQueFalhou = 7 * 24 * time.Hour
@@ -48,6 +53,8 @@ var (
 	ErrPedidoForaDeHora = errors.New("o pedido mudou de situação — recarregue a página")
 	// ErrPDFInvalido: o arquivo não é um PDF, está vazio ou é grande demais.
 	ErrPDFInvalido = errors.New("o arquivo precisa ser um PDF de até 40 MB")
+	// ErrAssuntoInvalido: o assunto do pedido sem aula está vazio ou é longo demais.
+	ErrAssuntoInvalido = errors.New("o assunto precisa ter de 3 a 2.000 caracteres")
 	// ErrPedidoSemPDF: o PDF do pedido que falhou já foi apagado pela faxina.
 	ErrPedidoSemPDF = errors.New("o PDF deste pedido já foi apagado: envie-o de novo")
 	// ErrRelatorioGrandeDemais: o relatório passa do teto.
@@ -65,8 +72,10 @@ type Pedido struct {
 	DisciplinaNome string
 	ConcursoSlug   string
 	// Mapa é o slug do mapa que o pedido gerou, quando pronto.
-	Mapa         string
-	Relatorio    string
+	Mapa      string
+	Relatorio string
+	// Assunto é o que o pedido sem aula pede; vazio no pedido de PDF.
+	Assunto      string
 	TemPDF       bool
 	CriadoEm     time.Time
 	AtualizadoEm time.Time
@@ -90,6 +99,27 @@ func ConferirPDF(nome string, dados []byte) (string, error) {
 	}
 
 	return nome, nil
+}
+
+// ConferirAssunto devolve o assunto como o pedido o guarda — numa linha, sem
+// espaço sobrando —, ou ErrAssuntoInvalido.
+func ConferirAssunto(assunto string) (string, error) {
+	assunto = strings.Join(strings.Fields(assunto), " ")
+	if n := utf8.RuneCountInString(assunto); n < MinAssunto || n > MaxAssunto {
+		return "", ErrAssuntoInvalido
+	}
+
+	return assunto, nil
+}
+
+// RotuloDoAssunto é o nome com que o pedido sem aula aparece na fila, no lugar
+// do nome do arquivo.
+func RotuloDoAssunto(assunto string) string {
+	if r := []rune(assunto); len(r) > MaxNomePDF {
+		return string(r[:MaxNomePDF-1]) + "…"
+	}
+
+	return assunto
 }
 
 // ConferirRelatorio recusa o relatório que não cabe.

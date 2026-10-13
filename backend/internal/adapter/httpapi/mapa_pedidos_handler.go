@@ -15,8 +15,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// PedidosDeMapaHandler serve a fila de PDFs que viram mapa: as rotas da tela
-// (enviar, listar, pôr de novo na fila, excluir) e as internas, por onde o
+// PedidosDeMapaHandler serve a fila de pedidos de mapa — o PDF da aula, ou o
+// assunto sem aula: as rotas da tela (enviar, pedir pelo assunto, listar, pôr
+// de novo na fila, excluir) e as internas, por onde o
 // processador devolve o resultado — estas numa porta que só a rede dos
 // containers alcança, e com o token de serviço.
 type PedidosDeMapaHandler struct {
@@ -79,6 +80,41 @@ func (h *PedidosDeMapaHandler) Pedir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p, err := h.pedidos.Pedir(r.Context(), id, r.FormValue("concurso"), disciplina, cab.Filename, dados)
+	if err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	writeJSON(w, h.logger, http.StatusCreated, pedidoDeMapaParaDTO(p))
+}
+
+// PedirAssunto recebe o pedido sem aula: o assunto e, opcionais, o concurso e
+// a matéria em que o mapa vai morar.
+func (h *PedidosDeMapaHandler) PedirAssunto(w http.ResponseWriter, r *http.Request) {
+	id, ok := usuarioID(r.Context())
+	if !ok {
+		writeError(w, r, h.logger, errNaoAutenticado)
+		return
+	}
+
+	var req pedidoDeAssuntoRequest
+	if err := decode(w, r, &req); err != nil {
+		writeError(w, r, h.logger, err)
+		return
+	}
+
+	var disciplina uuid.NullUUID
+	if req.Disciplina != "" {
+		d, err := uuid.Parse(req.Disciplina)
+		if err != nil {
+			writeError(w, r, h.logger, errRequisicaoInvalida)
+			return
+		}
+
+		disciplina = uuid.NullUUID{UUID: d, Valid: true}
+	}
+
+	p, err := h.pedidos.PedirAssunto(r.Context(), id, req.Concurso, disciplina, req.Assunto)
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return

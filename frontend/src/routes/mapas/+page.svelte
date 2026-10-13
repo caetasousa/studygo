@@ -203,7 +203,9 @@
 			{:else}
 				<p class="resumo">
 					<b>{cob.cobertos} de {cob.topicos} tópicos com mapa mental</b>
-					<span>— coberto é o tópico escolhido na página de algum mapa, como a ementa marca.</span>
+					<span>— coberto é o tópico escolhido na página de algum mapa, como a ementa marca. Toque num tópico para pedir o mapa dele, mesmo sem
+							aula.</span
+						>
 				</p>
 
 				{#each pendentes as m (m.disciplinaId)}
@@ -224,7 +226,12 @@
 						{/if}
 						<ul class="faltam" aria-label="Tópicos sem mapa">
 							{#each m.faltam as t (t)}
-								<li>{t}</li>
+								<li>
+									<a
+										href="/mapas/importar?materia={encodeURIComponent(m.codigo)}&assunto={encodeURIComponent(t)}"
+										aria-label="Pedir um mapa de “{t}”">{t}</a
+									>
+								</li>
 							{/each}
 						</ul>
 					</section>
@@ -410,6 +417,21 @@
 		gap: 4px;
 		font-size: 14px;
 		line-height: 1.45;
+	}
+	.faltam a {
+		color: var(--text);
+		text-decoration: underline dotted var(--text-faint);
+		text-underline-offset: 3px;
+	}
+	.faltam a:hover {
+		color: var(--accent);
+		text-decoration-color: currentColor;
+	}
+	@media (pointer: coarse) {
+		.faltam a {
+			display: inline-block;
+			padding: 6px 0;
+		}
 	}
 	.cobertas {
 		margin: 26px 0 0;

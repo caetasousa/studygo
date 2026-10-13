@@ -32,6 +32,7 @@ class DadosDoTrabalho(BaseModel):
         default_factory=list, alias="slugsExistentes", max_length=5000
     )
     token_claude: str = Field(default="", alias="tokenClaude", max_length=2000)
+    assunto: str = Field(default="", max_length=2000)
 
     @field_validator("temas", "slugs_existentes", mode="before")
     @classmethod
@@ -53,13 +54,16 @@ async def processar(
         d = DadosDoTrabalho.model_validate(json.loads(dados))
     except (ValueError, ValidationError) as exc:
         raise InvalidPDF(f"dados do pedido inválidos: {exc}") from exc
-    if pdf is None:
-        raise InvalidPDF("faltou o PDF da aula")
-    conteudo = await pdf.read(settings.mapas_max_pdf_bytes + 1)
-    if len(conteudo) > settings.mapas_max_pdf_bytes:
-        raise UploadTooLarge("o PDF passa do limite dos mapas")
-    if not conteudo.startswith(b"%PDF-"):
-        raise InvalidPDF("o arquivo não é um PDF")
+    # Sem aula, o assunto vem no lugar do PDF.
+    conteudo = b""
+    if pdf is not None:
+        conteudo = await pdf.read(settings.mapas_max_pdf_bytes + 1)
+        if len(conteudo) > settings.mapas_max_pdf_bytes:
+            raise UploadTooLarge("o PDF passa do limite dos mapas")
+        if not conteudo.startswith(b"%PDF-"):
+            raise InvalidPDF("o arquivo não é um PDF")
+    elif not d.assunto.strip():
+        raise InvalidPDF("faltou o PDF da aula (ou o assunto, no pedido sem aula)")
 
     mapas.iniciar(
         Trabalho(
@@ -71,6 +75,7 @@ async def processar(
             temas=tuple(d.temas),
             slugs_existentes=tuple(d.slugs_existentes),
             token_claude=d.token_claude,
+            assunto=d.assunto.strip(),
         )
     )
     return {"pedido": d.pedido}

@@ -33,13 +33,17 @@ def instrucoes_do_sistema() -> str:
 
 
 def montar_prompt(t: Trabalho, settings: Settings, pdf: Path, trabalho: Path, saida: Path) -> str:
+    """O pedido ao Claude: o da aula (prompt.md) ou, sem aula, o do assunto
+    (prompt_assunto.md), que manda fazer o mapa pelas fontes oficiais."""
     provas = str(settings.provasgo_dir) if settings.provasgo_dir else ""
+    modelo = "prompt_assunto.md" if t.sem_aula else "prompt.md"
     return (
-        (INSTRUCOES / "prompt.md")
+        (INSTRUCOES / modelo)
         .read_text(encoding="utf-8")
         .format(
             pdf=pdf,
             arquivo=t.arquivo,
+            assunto=t.assunto,
             materia=t.materia or "nenhuma (o mapa entra sem vínculo)",
             temas=json.dumps(list(t.temas), ensure_ascii=False) if t.temas else "nenhum",
             slugs=", ".join(sorted(t.slugs_existentes)) or "nenhum",
@@ -53,9 +57,13 @@ def montar_prompt(t: Trabalho, settings: Settings, pdf: Path, trabalho: Path, sa
 
 
 def argumentos_do_claude(
-    settings: Settings, sessao: str, primeira: bool, trabalho: Path, sistema: Path
+    settings: Settings, sessao: str, primeira: bool, trabalho: Path, sistema: Path, web: bool
 ) -> list[str]:
-    """`claude -p` sem perguntas: só arquivos e o Python das ferramentas, na pasta do pedido."""
+    """`claude -p` sem perguntas: só arquivos e o Python das ferramentas, na pasta do pedido.
+
+    Com `web` (o pedido sem aula), também a busca e a leitura de páginas: sem
+    aula, a fonte são as normas e a documentação oficial, não a memória do
+    modelo. O pedido de PDF não precisa da web, e não a ganha."""
     args = [
         settings.claude_bin,
         "-p",
@@ -84,6 +92,8 @@ def argumentos_do_claude(
         "Bash(ls:*)",
         "Bash(mkdir:*)",
     ]
+    if web:
+        args += ["WebSearch", "WebFetch"]
     return args
 
 
