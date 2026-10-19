@@ -176,6 +176,9 @@ func NewRouter(
 	protegida("GET /api/mapas/{slug}/exportacao", h.Mapa.ExportarMapa)
 	protegida("GET /api/exportacao-de-mapas", h.Mapa.ExportarTodos)
 	protegida("POST /api/mapas/questoes/{id}/respostas", h.Mapa.Responder)
+	// Os mapas que vêm com o app: adicionar põe o mapa e as questões na conta.
+	protegida("GET /api/mapas-prontos", h.Mapa.Prontos)
+	protegida("POST /api/mapas-prontos/{slug}", h.Mapa.AdicionarPronto)
 	protegida("GET /api/concursos/{slug}/mapas", h.Mapa.DoConcurso)
 	protegida("PUT /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Vincular)
 	protegida("DELETE /api/concursos/{slug}/disciplinas/{id}/mapas/{mapa}", h.Mapa.Desvincular)

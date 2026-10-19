@@ -1248,3 +1248,48 @@ func TestServidor_PacoteDoMapaVoltaInteiro(t *testing.T) {
 		t.Fatalf("na própria conta o vínculo voltou %+v", deA.Disciplinas[0].Mapas)
 	}
 }
+
+// Os mapas prontos pela montagem de produção: a lista sai do conteúdo
+// embutido, adicionar cria (201) e adicionar de novo atualiza (200), e o
+// slug que não é de pronto nenhum é 404.
+func TestServidor_MapaProntoEntraNaConta(t *testing.T) {
+	t.Parallel()
+
+	s := subir(t, nil, nil)
+	c := s.cadastrar(t)
+
+	type pronto struct {
+		Slug     string `json:"slug"`
+		Ramos    int    `json:"ramos"`
+		Questoes int    `json:"questoes"`
+		NaConta  bool   `json:"naConta"`
+	}
+
+	listar := func() []pronto {
+		t.Helper()
+
+		var lista struct{ Mapas []pronto }
+		lerJSON(t, s.json(t, http.MethodGet, "/api/mapas-prontos", c.token, ""), &lista)
+
+		return lista.Mapas
+	}
+
+	if l := listar(); len(l) != 1 || l[0].Slug != "lingua-portuguesa-fcc" || l[0].NaConta || l[0].Questoes != 282 {
+		t.Fatalf("lista numa conta nova: %+v", l)
+	}
+
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas-prontos/lingua-portuguesa-fcc", c.token, `{}`), http.StatusCreated)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas-prontos/lingua-portuguesa-fcc", c.token, `{}`), http.StatusOK)
+	esperarStatus(t, s.json(t, http.MethodPost, "/api/mapas-prontos/nao-existe", c.token, `{}`), http.StatusNotFound)
+
+	if l := listar(); !l[0].NaConta {
+		t.Fatalf("depois de adicionar: %+v", l)
+	}
+
+	var lido struct{ Questoes []struct{ Ramo string } }
+	lerJSON(t, s.json(t, http.MethodGet, "/api/mapas/lingua-portuguesa-fcc", c.token, ""), &lido)
+
+	if len(lido.Questoes) != 282 {
+		t.Fatalf("o mapa adicionado tem %d questões", len(lido.Questoes))
+	}
+}

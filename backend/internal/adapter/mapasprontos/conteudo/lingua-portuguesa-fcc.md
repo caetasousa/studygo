@@ -1,0 +1,72 @@
+# Língua Portuguesa — provas FCC
+slug: lingua-portuguesa-fcc
+fonte: provas da FCC (catálogo do provasGo), uma prova por ramo, com comentário de cada alternativa
+materia: Língua Portuguesa
+reconhecer: Língua Portuguesa, Português, Compreensão e interpretação de textos
+
+- Técnico · TRT 2 · 2025
+  - Técnico Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Técnico · TRT 15 · 2023
+  - Técnico Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Técnico · TRT 15 · 2025
+  - Técnico Judiciário - Área Apoio Especializado - Especialidade Tecnologia da Informação
+  - 12 questões de português, questões 1 a 12 da prova
+- Técnico · TRT 18 · 2023
+  - Técnico Judiciário - Área Apoio Especializado - Especialidade Tecnologia da Informação
+  - 17 questões de português, questões 1 a 17 da prova
+- Técnico · TRT 20 · 2024
+  - Técnico Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 15 questões de português, questões 1 a 15 da prova
+- Técnico · MPEAL · 2024
+  - Técnico do Ministério Público
+  - 20 questões de português, questões 1 a 20 da prova
+- Analista · TRT 1 · 2025
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRT 2 · 2025
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRT 6 · 2025
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRT 12 · 2023
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRT 15 · 2023
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRT 15 · 2025
+  - Analista Judiciário - Área Apoio Especializado - Especialidade Tecnologia da Informação
+  - 8 questões de português, questões 1 a 8 da prova
+- Analista · TRT 18 · 2023
+  - Analista Judiciário - Área Apoio Especializado - Tecnologia da Informação
+  - 17 questões de português, questões 1 a 17 da prova
+- Analista · TRT 20 · 2024
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 15 questões de português, questões 1 a 15 da prova
+- Analista · TRT 21 · 2023
+  - Analista Judiciário - Área Apoio Especializado Especialidade Tecnologia da Informação
+  - 11 questões de português, questões 1 a 11 da prova
+- Analista · ALERR · 2026
+  - Analista Legislativo - Analista de Segurança da Informação
+  - 20 questões de português, questões 1 a 20 da prova
+- Analista · ARTESP · 2026
+  - Especialista em Regulação de Transporte I Tecnologia da Informação
+  - 9 questões de português, questões 1 a 9 da prova
+- Analista · MPSE · 2026 · Banco de Dados
+  - Analista do Ministério Público - Tecnologia da Informação: Banco de Dados
+  - 16 questões de português, questões 1 a 16 da prova
+- Analista · MPSE · 2026 · Desenvolvimento
+  - Analista do Ministério Público - Tecnologia da Informação: Desenvolvimento
+  - 16 questões de português, questões 1 a 16 da prova
+- Analista · MPSE · 2026 · Infraestrutura
+  - Analista do Ministério Público Tecnologia da Informação: Infraestrutura
+  - 16 questões de português, questões 1 a 16 da prova
+- Analista · TJCE · 2026
+  - Analista Judiciário - Área Técnico Administrativa - Especialidade: Infraestrutura de Tecnologia da Informação
+  - 10 questões de português, questões 1 a 10 da prova
+- Analista · TRF4 · 2025
+  - Analista Judiciário - Área Apoio Especializado Especialidade Análise de Sistemas de Informação
+  - 10 questões de português, questões 1 a 10 da prova

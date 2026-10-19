@@ -1865,3 +1865,70 @@ test.describe('importar e exportar no celular', () => {
 		await page.screenshot({ path: info.outputPath('importar-no-celular.png'), fullPage: true });
 	});
 });
+
+// Os mapas que vêm com o app (M40): o de Língua Portuguesa traz as provas de
+// português da FCC, uma por ramo, cada questão com a explicação das
+// alternativas. É o conteúdo de verdade, embutido no backend.
+test.describe('mapas prontos', () => {
+	const SLUG = 'lingua-portuguesa-fcc';
+	const PORTUGUES: Disciplina = { nome: 'Língua Portuguesa', codigo: 'LINPO', bloco: 'ger', questoes: 10, temas: ['Interpretação de textos'] };
+
+	test('[M40] o mapa pronto entra na conta com as provas e as questões comentadas, e adicionar de novo atualiza sem perder resposta nem vínculo', async ({ page, api, conta, baseURL }) => {
+		const concurso = await api.concurso('Prontos E2E', [PORTUGUES, ...MATERIAS]);
+		const request = page.context().request;
+
+		await page.goto('/mapas/importar');
+		const secao = page.getByRole('region', { name: 'Mapas prontos' });
+		const item = secao.getByRole('listitem').filter({ hasText: 'Língua Portuguesa — provas FCC' });
+		await expect(item).toContainText('22 provas · 282 questões comentadas');
+		await expect(item.getByRole('link', { name: 'Abrir' })).toHaveCount(0);
+
+		await item.getByRole('button', { name: 'Adicionar à minha conta' }).click();
+		const feito = secao.getByRole('status');
+		await expect(feito).toContainText('adicionado: 282 questões');
+		await expect(feito).toContainText('LINPO — Língua Portuguesa');
+		await expect(item.getByRole('button', { name: 'Atualizar' })).toBeVisible();
+
+		// Uma prova por ramo, técnico e analista, e a explicação de cada alternativa.
+		const questoes = await questoesDo(request, conta.token, SLUG);
+		expect(questoes).toHaveLength(282);
+		const ramos = new Set(questoes.map((q) => q.ramo));
+		expect(ramos.size).toBe(22);
+		expect([...ramos]).toEqual(expect.arrayContaining(['Técnico · TRT 15 · 2023', 'Analista · TRT 15 · 2023']));
+		expect(questoes.every((q) => q.banca === 'FCC' && q.alternativas.length === 5)).toBe(true);
+
+		const primeira = questoes[0];
+		const r = await responderQuestao(request, conta.token, primeira.id, 'A');
+		expect(r.status).toBe(201);
+		expect(r.corpo.explicacoes).toHaveLength(5);
+		expect(r.corpo.explicacoes.every((e: string) => e.trim() !== '')).toBe(true);
+
+		// O mapa abre pela tela, com as provas como ramos.
+		await item.getByRole('link', { name: 'Abrir' }).click();
+		await expect(page).toHaveURL(new RegExp(`/mapas/${SLUG}$`));
+		await expect(page.getByText('Técnico · TRT 15 · 2023', { exact: true }).first()).toBeVisible();
+
+		// Adicionar de novo atualiza: um mapa só, a resposta e o vínculo continuam.
+		await page.goto('/mapas/importar');
+		await item.getByRole('button', { name: 'Atualizar' }).click();
+		await expect(feito).toContainText('atualizado: 282 questões');
+
+		expect((await catalogo(request, conta.token)).filter((m) => m.slug === SLUG)).toHaveLength(1);
+		const depois = await questoesDo(request, conta.token, SLUG);
+		expect(depois).toHaveLength(282);
+		expect(depois.find((q) => q.id === primeira.id)?.resposta?.escolhida).toBe('A');
+		const linpo = (await materiasDo(request, conta.token, concurso)).find((m) => m.codigo === 'LINPO');
+		expect(linpo?.mapas.map((m) => m.slug)).toContain(SLUG);
+
+		// Outra conta não tem o mapa até adicionar.
+		const outra = await outraSessao(baseURL!);
+		try {
+			expect(await catalogo(outra.request, outra.token)).toHaveLength(0);
+			const prontos = (await (await outra.request.get('/api/mapas-prontos', { headers: cabecalho(outra.token) })).json()).mapas;
+			expect(prontos).toEqual([expect.objectContaining({ slug: SLUG, naConta: false })]);
+			expect((await ler(outra.request, outra.token, SLUG)).status()).toBe(404);
+		} finally {
+			await outra.request.dispose();
+		}
+	});
+});

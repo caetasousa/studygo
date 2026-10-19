@@ -150,6 +150,13 @@ relatório de onde veio o token do Claude. Para o tópico que nenhuma aula cobre
 mapa nasce de um assunto escrito na tela, sem PDF: o processador o faz pelas
 fontes oficiais, no mesmo padrão (M38).
 
+Há também os **mapas prontos**, que vêm com o app (pedido de 19/10/2026): o
+de Língua Portuguesa traz as provas de português da FCC do provasGo, uma prova
+por ramo (técnico e analista), cada questão com o comentário das
+alternativas. Eles não são de ninguém até alguém os adicionar: em
+**Importar e exportar → Mapas prontos**, um clique põe o mapa e as questões na
+conta, e o clique de novo o atualiza, como reimportar.
+
 As questões das aulas não ficam no mapa: vêm num arquivo à parte
 (`<slug>.questoes.json`, fora do git como o mapa), importado na página do mapa,
 e são resolvidas ali, como as da lei — cada uma presa a um ramo, múltipla
@@ -196,6 +203,7 @@ escolha ou Certo/Errado, com o gabarito revelado só depois da resposta.
 | M37 | quem envia o PDF e sai da página (fecha a aba, recarrega) logo depois deixa o pedido "na fila" para sempre, sem motivo: a entrega ao processador e a anotação do motivo morrem junto com a requisição (coberto em `backend/internal/service/mapa_pedidos_test.go`) | o PDF foi enviado, mas o mapa nunca sai e a tela não diz por quê |
 | M38 | pedir um mapa sobre um assunto que nenhuma aula cobre aceita o assunto vazio ou enorme; o pedido não entra na fila, vai ao processador sem o assunto ou sem a matéria (ou como se fosse um PDF vazio); o que falhou não volta para a fila porque "falta o PDF", ou o excluído fala em PDF; o tópico da aba "Sem mapa" não chega preenchido no pedido; o mapa pronto não abre nem fica na matéria pedida; ou o pedido aparece para outra conta | o tópico sem aula fica sem mapa; tenho de redigitar o tópico; peço o mapa e ele some ou cai na matéria errada |
 | M39 | no celular, a página de importar e exportar passa da largura da tela: o seletor de matéria cresce até o nome mais longo da ementa e empurra o painel de criar mapa (e o Safari, com a página mais larga que a tela, aumenta o texto da ajuda sozinho); o título fica debaixo do botão do menu; ou um campo, botão ou pedido da fila sai pela direita | a página fica minúscula e torta no celular, com texto gigante num canto e o seletor cortado |
+| M40 | os mapas prontos não aparecem em Importar e exportar (ou aparecem como já adicionados numa conta nova); adicionar não traz o mapa inteiro com as questões (um ramo, uma prova ou uma questão a menos, sem o comentário de cada alternativa); adicionar de novo duplica o mapa, apaga as respostas ou o vínculo com a matéria; com o concurso aberto, o mapa não vai para a matéria de Língua Portuguesa; ou adicionar numa conta põe o mapa (ou as respostas) em outra | não acho as provas de português para treinar; perco o que já resolvi ao atualizar; o mapa aparece para quem não pediu |
 
 ## Fora da suíte, de propósito
 

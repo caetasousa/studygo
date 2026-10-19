@@ -1,0 +1,9 @@
+[
+  {
+    "naConta": "bool",
+    "questoes": "number",
+    "ramos": "number",
+    "slug": "string",
+    "titulo": "string"
+  }
+]

@@ -327,6 +327,16 @@ mapas_pedidos (o PDF ou o assunto na fila, a situação, o mapa que saiu e o rel
   (`ferramentas/desenho.py`: fluxo, ciclo, camadas, pirâmide, escada,
   hierarquia, grupos, quadrantes, cartões). Sem PDF a perder, o pedido que
   falhou sempre pode voltar à fila.
+- **Ou pronto, do próprio app.** Os mapas prontos vêm embutidos no binário
+  (`adapter/mapasprontos`, `go:embed` do `<slug>.md` e do
+  `<slug>.questoes.json`), iguais para toda conta: hoje, as provas de
+  português da FCC trazidas do provasGo, uma prova por ramo, com o comentário
+  de cada alternativa. Diferente dos mapas das aulas, são públicos e por isso
+  ficam no repositório. `GET /api/mapas-prontos` lista e diz quais a conta já
+  tem; `POST /api/mapas-prontos/{slug}` os põe na conta pelo mesmo caminho do
+  `.zip` sem estudo (`ImportarPacote`): adicionar de novo atualiza e mantém
+  vínculos e respostas. Um teste sem Docker confere o conteúdo embutido contra
+  as regras da importação.
 - **O banco é a fonte do mapa; a saída é a exportação.** `mapa.Texto()` escreve
   o mapa de volta no formato do outline (o inverso de `mapa.Ler`, com teste de
   ida e volta), e `GET /api/mapas/{slug}/exportacao` (um) e

@@ -12,6 +12,7 @@ import (
 	"studygo/internal/adapter/crypto"
 	"studygo/internal/adapter/editalproc"
 	"studygo/internal/adapter/httpapi"
+	"studygo/internal/adapter/mapasprontos"
 	"studygo/internal/adapter/postgres"
 	"studygo/internal/platform/config"
 	"studygo/internal/platform/db"
@@ -130,7 +131,13 @@ func montarHandler(
 
 	authService := service.NewAuthService(usuarioRepo, hasher, tokens, clock, cfg.RefreshTTL)
 	leiService := service.NewLeiService(postgres.NewLeiRepo(pool), concursoRepo, capturador)
-	mapaService := service.NewMapaService(postgres.NewMapaRepo(pool), concursoRepo)
+
+	prontos, err := mapasprontos.Todos()
+	if err != nil {
+		panic(err) // o conteúdo vem embutido no binário: ilegível, é build quebrado
+	}
+
+	mapaService := service.NewMapaService(postgres.NewMapaRepo(pool), concursoRepo, prontos...)
 
 	cifra, err := crypto.NewCifra(cfg.JWTSecret)
 	if err != nil {

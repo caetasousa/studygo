@@ -5,14 +5,16 @@
 	import PageHead from '$lib/components/PageHead.svelte';
 	import PedidosDePDF from '$lib/mapas/PedidosDePDF.svelte';
 	import ImportarExportacao from '$lib/mapas/ImportarExportacao.svelte';
+	import MapasProntos from '$lib/mapas/MapasProntos.svelte';
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import type { MapaImportado } from '$lib/types';
 
 	/**
-	 * Tudo o que entra e sai dos mapas: o PDF da aula (ou o assunto sem aula),
-	 * que o processador transforma em mapa, o texto de um mapa já pronto, o .zip de uma exportação
-	 * e a exportação de todos. Fica fora da lista, que é para ler: no celular,
+	 * Tudo o que entra e sai dos mapas: os mapas que vêm com o app, o PDF da
+	 * aula (ou o assunto sem aula), que o processador transforma em mapa, o
+	 * texto de um mapa já pronto, o .zip de uma exportação e a exportação de
+	 * todos. Fica fora da lista, que é para ler: no celular,
 	 * estes formulários vinham telas antes do primeiro mapa.
 	 *
 	 * Importar de novo o mesmo mapa troca o conteúdo e mantém os vínculos.
@@ -120,6 +122,8 @@
 			</div>
 		</div>
 	{/if}
+
+	<MapasProntos aoAdicionar={recarregar} />
 
 	<PedidosDePDF aoFicarPronto={recarregar} {materia} {assunto} />
 

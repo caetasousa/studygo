@@ -970,6 +970,16 @@ export interface ConexaoDoClaude {
 }
 
 /** Um mapa que voltou de uma exportação, e o que dele não achou lugar (avisos). */
+/** Um mapa que vem com o app: adicionar põe o mapa e as questões na conta. */
+export interface MapaPronto {
+	slug: string;
+	titulo: string;
+	ramos: number;
+	questoes: number;
+	/** A conta já tem o mapa: adicionar de novo atualiza. */
+	naConta: boolean;
+}
+
 export interface PacoteImportado {
 	mapa: MapaResumo;
 	novo: boolean;

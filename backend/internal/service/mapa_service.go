@@ -19,10 +19,12 @@ import (
 type MapaService struct {
 	mapas     port.MapaRepository
 	concursos port.ConcursoRepository
+	// prontos são os mapas que vêm com o app (mapa_prontos.go).
+	prontos []mapa.MapaPronto
 }
 
-func NewMapaService(mapas port.MapaRepository, concursos port.ConcursoRepository) *MapaService {
-	return &MapaService{mapas: mapas, concursos: concursos}
+func NewMapaService(mapas port.MapaRepository, concursos port.ConcursoRepository, prontos ...mapa.MapaPronto) *MapaService {
+	return &MapaService{mapas: mapas, concursos: concursos, prontos: prontos}
 }
 
 // MateriaDoMapa é a matéria a que um mapa foi vinculado.

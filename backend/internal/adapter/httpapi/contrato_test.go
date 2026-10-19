@@ -377,3 +377,13 @@ func TestContratoHTTP_PacoteDoMapa(t *testing.T) {
 		Respostas: []mapa.RespostaExportada{{Chave: "q1", Resposta: "A", Acertou: true, Em: time.Now()}},
 	})))
 }
+
+// A lista dos mapas prontos é lida pela tela de importar e exportar; o
+// adicionar devolve o mesmo resultado do pacote (pacote_importado.json).
+func TestContratoHTTP_MapasProntos(t *testing.T) {
+	t.Parallel()
+
+	compararComGolden(t, "mapas_prontos.json", forma(t, []mapaProntoDTO{mapaProntoParaDTO(service.MapaProntoResumo{
+		Slug: "lingua-portuguesa-fcc", Titulo: "Língua Portuguesa", Ramos: 22, Questoes: 282, NaConta: true,
+	})}))
+}

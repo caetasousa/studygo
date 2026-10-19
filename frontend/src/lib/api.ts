@@ -28,6 +28,7 @@ import type {
 	LeituraDeLei,
 	CorrecaoDoMapa,
 	MapaImportado,
+	MapaPronto,
 	MapaLido,
 	MapaResumo,
 	MapasDaMateria,
@@ -281,6 +282,15 @@ export const api = {
 		for (const img of p.imagens) form.append('imagens', new Blob([img.dados as BlobPart]), img.nome);
 		return request<PacoteImportado>('/api/mapas/pacote', { method: 'POST', body: form });
 	},
+
+	mapasProntos: async () => (await request<{ mapas: MapaPronto[] }>('/api/mapas-prontos')).mapas,
+
+	/** Põe na conta o mapa pronto e as questões dele; com o concurso aberto, vincula à matéria. */
+	adicionarMapaPronto: (slug: string, concurso?: string | null) =>
+		request<PacoteImportado>(`/api/mapas-prontos/${encodeURIComponent(slug)}`, {
+			method: 'POST',
+			body: JSON.stringify({ concurso: concurso ?? '' })
+		}),
 
 	pedirMapa: (pdf: File, concurso?: string | null, disciplina?: string | null) => {
 		const form = new FormData();
