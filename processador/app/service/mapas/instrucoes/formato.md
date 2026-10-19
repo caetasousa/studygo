@@ -20,6 +20,10 @@ pasta `<slug>/`.
   para o concurso aberto, na matéria de mesmo código ou nome; o que não acha
   lugar vira aviso. Importar o mesmo `.zip` de novo não repete as respostas.
 
+Os **mapas prontos**, que vêm com o app e são públicos (as provas de português
+da FCC), ficam em `backend/internal/adapter/mapasprontos/conteudo/`, no mesmo
+formato, e entram na conta por **Importar e exportar → Mapas prontos**.
+
 Esta pasta não guarda mais os mapas: é só a referência do formato. Os mapas
 derivam de aulas pagas, de uso pessoal, e o repositório é público; por isso o
 `.gitignore` deixa `conteudo/mapas/*` de fora, caso um rascunho pare aqui. Os
