@@ -13,10 +13,19 @@ type mapaProntoDTO struct {
 	Ramos    int    `json:"ramos"`
 	Questoes int    `json:"questoes"`
 	NaConta  bool   `json:"naConta"`
+	// Materias: os códigos das matérias do concurso pedido em que o mapa entra.
+	Materias []string `json:"materias"`
 }
 
 func mapaProntoParaDTO(p service.MapaProntoResumo) mapaProntoDTO {
-	return mapaProntoDTO{Slug: p.Slug, Titulo: p.Titulo, Ramos: p.Ramos, Questoes: p.Questoes, NaConta: p.NaConta}
+	materias := p.Materias
+	if materias == nil {
+		materias = []string{}
+	}
+
+	return mapaProntoDTO{
+		Slug: p.Slug, Titulo: p.Titulo, Ramos: p.Ramos, Questoes: p.Questoes, NaConta: p.NaConta, Materias: materias,
+	}
 }
 
 // adicionarMapaProntoRequest leva só o concurso aberto na tela: é nele que o
@@ -32,7 +41,8 @@ func (h *MapaHandler) Prontos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ps, err := h.mapas.Prontos(r.Context(), id)
+	// ?concurso= é o concurso aberto na tela: diz em que matéria cada pronto entra.
+	ps, err := h.mapas.Prontos(r.Context(), id, r.URL.Query().Get("concurso"))
 	if err != nil {
 		writeError(w, r, h.logger, err)
 		return

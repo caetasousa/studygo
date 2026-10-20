@@ -20,7 +20,7 @@
 
 	async function carregar() {
 		try {
-			prontos = await api.mapasProntos();
+			prontos = await api.mapasProntos(concursoStore.ativoSlug);
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível listar os mapas prontos';
 		}

@@ -1,5 +1,8 @@
 [
   {
+    "materias": [
+      "string"
+    ],
     "naConta": "bool",
     "questoes": "number",
     "ramos": "number",

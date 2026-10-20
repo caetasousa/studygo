@@ -385,5 +385,6 @@ func TestContratoHTTP_MapasProntos(t *testing.T) {
 
 	compararComGolden(t, "mapas_prontos.json", forma(t, []mapaProntoDTO{mapaProntoParaDTO(service.MapaProntoResumo{
 		Slug: "lingua-portuguesa-fcc", Titulo: "Língua Portuguesa", Ramos: 22, Questoes: 282, NaConta: true,
+		Materias: []string{"LINPO"},
 	})}))
 }

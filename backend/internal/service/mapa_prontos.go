@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"studygo/internal/domain/concurso"
 	"studygo/internal/domain/mapa"
 
 	"github.com/google/uuid"
@@ -17,13 +18,27 @@ type MapaProntoResumo struct {
 	// NaConta diz se a conta já tem um mapa com esse slug: adicionar de novo
 	// atualiza o que ela tem.
 	NaConta bool
+	// Materias são os códigos das matérias do concurso aberto em que o mapa
+	// entra ao ser adicionado — a mesma sugestão pelo texto que a importação
+	// usa. É onde a tela de Mapas mentais o mostra antes de estar na conta.
+	Materias []string
 }
 
-// Prontos lista os mapas que vêm com o app e diz quais a conta já tem.
-func (s *MapaService) Prontos(ctx context.Context, usuarioID uuid.UUID) ([]MapaProntoResumo, error) {
+// Prontos lista os mapas que vêm com o app, diz quais a conta já tem e, com o
+// concurso aberto, em que matérias dele cada um entraria.
+func (s *MapaService) Prontos(ctx context.Context, usuarioID uuid.UUID, concursoAberto string) ([]MapaProntoResumo, error) {
 	daConta, err := s.mapas.Catalogo(ctx, usuarioID)
 	if err != nil {
 		return nil, err
+	}
+
+	var c concurso.Concurso
+
+	if concursoAberto != "" {
+		c, err = s.concursoDoDono(ctx, usuarioID, concursoAberto)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tem := make(map[string]bool, len(daConta))
@@ -39,10 +54,18 @@ func (s *MapaService) Prontos(ctx context.Context, usuarioID uuid.UUID) ([]MapaP
 			return nil, err
 		}
 
+		materias := []string{}
+
+		for _, d := range c.Disciplinas {
+			if m.SugereMateria(d.Nome, d.Temas) {
+				materias = append(materias, d.Codigo)
+			}
+		}
+
 		ramos, _ := m.Contar()
 		out = append(out, MapaProntoResumo{
 			Slug: m.Slug, Titulo: m.Titulo, Ramos: ramos,
-			Questoes: len(p.Questoes.Questoes), NaConta: tem[m.Slug],
+			Questoes: len(p.Questoes.Questoes), NaConta: tem[m.Slug], Materias: materias,
 		})
 	}
 

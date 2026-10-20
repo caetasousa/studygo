@@ -4,6 +4,7 @@ package service
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"studygo/internal/adapter/mapasprontos"
@@ -20,6 +21,10 @@ import (
 //	R4  com o concurso aberto, o mapa não vai para a matéria que o texto indica
 //	R5  adicionar numa conta põe o mapa em outra
 //	R6  um slug que não é de pronto nenhum grava alguma coisa
+//	R7  com o concurso aberto, o pronto não diz em que matéria entra — e a tela
+//	    de Mapas mentais não tem onde mostrá-lo (M41)
+//	R8  o pronto aponta para uma matéria que não é a dele, ou para alguma sem
+//	    concurso aberto
 
 const slugDoPronto = "lingua-portuguesa-fcc"
 
@@ -36,13 +41,28 @@ func TestMapasProntos_AdicionarDeNovoAtualizaSemPerderRespostaNemVinculo(t *test
 	svc := NewMapaService(postgres.NewMapaRepo(ce.pool), ce.deps.Concursos, prontos...)
 
 	// R1: antes de adicionar, a conta não tem o pronto.
-	lista, err := svc.Prontos(t.Context(), ce.usuario)
+	lista, err := svc.Prontos(t.Context(), ce.usuario, ce.slug)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if len(lista) != 1 || lista[0].Slug != slugDoPronto || lista[0].NaConta {
 		t.Fatalf("lista dos prontos numa conta nova: %+v", lista)
+	}
+
+	// R7, R8: com o concurso aberto, o pronto diz que entra em Língua
+	// Portuguesa, e só nela; sem concurso, em matéria nenhuma.
+	if !slices.Equal(lista[0].Materias, []string{"LINPO"}) {
+		t.Fatalf("o pronto entra em %v, esperado só LINPO", lista[0].Materias)
+	}
+
+	semConcurso, err := svc.Prontos(t.Context(), ce.usuario, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(semConcurso[0].Materias) != 0 {
+		t.Fatalf("sem concurso aberto, o pronto aponta para %v", semConcurso[0].Materias)
 	}
 
 	if lista[0].Ramos != 22 || lista[0].Questoes != 282 {
@@ -134,7 +154,7 @@ func TestMapasProntos_AdicionarDeNovoAtualizaSemPerderRespostaNemVinculo(t *test
 		t.Fatal("o vínculo com Língua Portuguesa sumiu ao adicionar de novo")
 	}
 
-	lista, err = svc.Prontos(t.Context(), ce.usuario)
+	lista, err = svc.Prontos(t.Context(), ce.usuario, ce.slug)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +166,7 @@ func TestMapasProntos_AdicionarDeNovoAtualizaSemPerderRespostaNemVinculo(t *test
 	// R5: outra conta continua sem ele.
 	outra := novoDono(t, ce.pool)
 
-	lista, err = svc.Prontos(t.Context(), outra)
+	lista, err = svc.Prontos(t.Context(), outra, "")
 	if err != nil {
 		t.Fatal(err)
 	}

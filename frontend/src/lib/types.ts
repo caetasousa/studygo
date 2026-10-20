@@ -978,6 +978,8 @@ export interface MapaPronto {
 	questoes: number;
 	/** A conta já tem o mapa: adicionar de novo atualiza. */
 	naConta: boolean;
+	/** Códigos das matérias do concurso pedido em que o mapa entra ao ser adicionado. */
+	materias: string[];
 }
 
 export interface PacoteImportado {

@@ -22,7 +22,8 @@ pasta `<slug>/`.
 
 Os **mapas prontos**, que vêm com o app e são públicos (as provas de português
 da FCC), ficam em `backend/internal/adapter/mapasprontos/conteudo/`, no mesmo
-formato, e entram na conta por **Importar e exportar → Mapas prontos**.
+formato. Aparecem em **Mapas mentais**, na matéria em que entram (tocar no
+cartão adiciona o mapa à conta), e em **Importar e exportar → Mapas prontos**.
 
 Esta pasta não guarda mais os mapas: é só a referência do formato. Os mapas
 derivam de aulas pagas, de uso pessoal, e o repositório é público; por isso o

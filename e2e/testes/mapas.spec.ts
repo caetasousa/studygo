@@ -1931,4 +1931,35 @@ test.describe('mapas prontos', () => {
 			await outra.request.dispose();
 		}
 	});
+
+	test('[M41] o mapa pronto aparece na matéria de Língua Portuguesa antes de adicionado, e tocar no cartão adiciona, vincula e abre', async ({ page, api, conta }) => {
+		const concurso = await api.concurso('Prontos na matéria E2E', [PORTUGUES, ...MATERIAS]);
+		const request = page.context().request;
+
+		// A conta não tem mapa nenhum, e mesmo assim a estante de português aparece.
+		await page.goto('/mapas');
+		const linpo = page.getByRole('region', { name: 'Língua Portuguesa', exact: true });
+		const cartao = linpo.getByRole('button', { name: 'Língua Portuguesa — provas FCC: adicionar à minha conta e abrir' });
+		await expect(cartao).toContainText('22 provas · 282 questões comentadas');
+		await expect(linpo).toContainText('1 mapa');
+
+		// Só na matéria dele.
+		for (const outra of ['Geografia Física', 'Direito Constitucional']) {
+			await expect(page.getByRole('region', { name: outra, exact: true })).toHaveCount(0);
+		}
+
+		await cartao.click();
+		await expect(page).toHaveURL(new RegExp(`/mapas/${SLUG}$`));
+		await expect(page.getByText('Técnico · TRT 15 · 2023', { exact: true }).first()).toBeVisible();
+
+		expect(await questoesDo(request, conta.token, SLUG)).toHaveLength(282);
+		const vinculada = (await materiasDo(request, conta.token, concurso)).find((m) => m.codigo === 'LINPO');
+		expect(vinculada?.mapas.map((m) => m.slug)).toEqual([SLUG]);
+
+		// De volta: o mapa de verdade no lugar do cartão, sem os dois juntos.
+		await page.goto('/mapas');
+		await expect(linpo.getByRole('link', { name: /Língua Portuguesa — provas FCC/ })).toHaveCount(1);
+		await expect(linpo.getByRole('button')).toHaveCount(0);
+		await expect(linpo).toContainText('1 mapa');
+	});
 });

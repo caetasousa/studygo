@@ -9,7 +9,7 @@
 	import { concursoStore } from '$lib/stores/concurso.svelte';
 	import { mapasStore } from '$lib/stores/mapas.svelte';
 	import { planoStore } from '$lib/stores/plano.svelte';
-	import type { MapaResumo } from '$lib/types';
+	import type { MapaPronto, MapaResumo } from '$lib/types';
 
 	/**
 	 * Os mapas mentais da conta, para ler: por matéria — os vinculados às
@@ -18,16 +18,27 @@
 	 *
 	 * Importar e exportar ficam em /mapas/importar: aqui eles vinham antes das
 	 * estantes, e no celular o primeiro mapa ficava telas abaixo.
+	 *
+	 * Os mapas prontos que vêm com o app aparecem na matéria em que entram,
+	 * antes de estarem na conta: tocar no cartão os adiciona e abre.
 	 */
 	let catalogo = $state<MapaResumo[]>([]);
+	let prontos = $state<MapaPronto[]>([]);
+	let adicionando = $state<string | null>(null);
 	let erro = $state<string | null>(null);
 	let carregado = $state(false);
 
 	async function carregar() {
 		erro = null;
 		try {
-			const [lista] = await Promise.all([api.listarMapas(), mapasStore.carregar(true)]);
+			// O pronto é um extra: sem a lista dele, a página continua com os mapas da conta.
+			const [lista, ps] = await Promise.all([
+				api.listarMapas(),
+				api.mapasProntos(concursoStore.ativoSlug).catch(() => [] as MapaPronto[]),
+				mapasStore.carregar(true)
+			]);
 			catalogo = lista.mapas;
+			prontos = ps;
 			carregado = true;
 		} catch (e) {
 			erro = e instanceof Error ? e.message : 'Não foi possível carregar os mapas mentais';
@@ -46,14 +57,33 @@
 	const materias = $derived(mapasStore.disciplinas);
 	const cor = (codigo: string) => planoStore.discIndex[codigo]?.cor ?? 0;
 
-	/** As estantes: uma por matéria que tem mapa (ou só a do filtro). */
+	/** Os prontos que a conta ainda não tem e que entram nesta matéria. */
+	const prontosDe = (codigo: string) => prontos.filter((p) => !p.naConta && p.materias.includes(codigo));
+
+	/** As estantes: uma por matéria que tem mapa ou um pronto para ela (ou só a do filtro). */
 	const estantes = $derived(
-		materias.filter((d) => d.mapas.length > 0 && (filtro === '' || d.codigo === filtro))
+		materias.filter(
+			(d) => (d.mapas.length > 0 || prontosDe(d.codigo).length > 0) && (filtro === '' || d.codigo === filtro)
+		)
 	);
 	const vinculados = $derived(new Set(materias.flatMap((d) => d.mapas.map((m) => m.slug))));
 	const semMateria = $derived(filtro === '' ? catalogo.filter((m) => !vinculados.has(m.slug)) : []);
 
 	const nf = new Intl.NumberFormat('pt-BR');
+
+	async function adicionar(p: MapaPronto) {
+		erro = null;
+		adicionando = p.slug;
+		try {
+			await api.adicionarMapaPronto(p.slug, concursoStore.ativoSlug);
+			await mapasStore.carregar(true);
+			await goto(`/mapas/${p.slug}`);
+		} catch (e) {
+			erro = e instanceof Error ? e.message : 'Não foi possível adicionar o mapa';
+		} finally {
+			adicionando = null;
+		}
+	}
 
 	// --- o que falta ---------------------------------------------------------
 	const cob = $derived(cobertura(materias.filter((d) => filtro === '' || d.codigo === filtro)));
@@ -136,11 +166,12 @@
 	<div id="painel-materias" role="tabpanel" aria-labelledby="aba-materias" hidden={aba !== 'materias'}>
 		{#if carregado}
 			{#each estantes as m (m.disciplinaId)}
+				{@const total = m.mapas.length + prontosDe(m.codigo).length}
 				<section class="estante" aria-labelledby="est-{m.disciplinaId}">
 					<div class="estante-cabeca">
 						<span class="chip" style={tagStyle(cor(m.codigo))}>{m.codigo}</span>
 						<h2 id="est-{m.disciplinaId}">{m.nome}</h2>
-						<span class="meta">{m.mapas.length} {m.mapas.length === 1 ? 'mapa' : 'mapas'}</span>
+						<span class="meta">{total} {total === 1 ? 'mapa' : 'mapas'}</span>
 					</div>
 					<ul class="cartoes">
 						{#each m.mapas as mapa (mapa.slug)}
@@ -150,6 +181,23 @@
 									<span class="conta">{mapa.ramos} ramos · {nf.format(mapa.itens)} itens</span>
 									{#if mapa.fonte}<span class="fonte">{mapa.fonte}</span>{/if}
 								</a>
+							</li>
+						{/each}
+						{#each prontosDe(m.codigo) as p (p.slug)}
+							<li>
+								<button
+									type="button"
+									class="cartao pronto"
+									disabled={adicionando !== null}
+									aria-label="{p.titulo}: adicionar à minha conta e abrir"
+									onclick={() => adicionar(p)}
+								>
+									<span class="titulo">{p.titulo}</span>
+									<span class="conta">{nf.format(p.ramos)} provas · {nf.format(p.questoes)} questões comentadas</span>
+									<span class="fonte">
+										{adicionando === p.slug ? 'Adicionando…' : 'Mapa pronto do app — toque para adicionar à sua conta'}
+									</span>
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -369,6 +417,17 @@
 	.cartao:hover {
 		background: var(--bg-hover);
 		border-color: var(--border-strong);
+	}
+	/* O pronto é um botão com cara de cartão: o tracejado diz que ainda não é da conta. */
+	.pronto {
+		width: 100%;
+		border-style: dashed;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.pronto:disabled {
+		cursor: progress;
 	}
 	.titulo {
 		font-size: 16px;

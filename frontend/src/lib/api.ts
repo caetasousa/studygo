@@ -283,7 +283,13 @@ export const api = {
 		return request<PacoteImportado>('/api/mapas/pacote', { method: 'POST', body: form });
 	},
 
-	mapasProntos: async () => (await request<{ mapas: MapaPronto[] }>('/api/mapas-prontos')).mapas,
+	/** Com o concurso, cada pronto diz em que matérias dele entra. */
+	mapasProntos: async (concurso?: string | null) =>
+		(
+			await request<{ mapas: MapaPronto[] }>(
+				concurso ? `/api/mapas-prontos?concurso=${encodeURIComponent(concurso)}` : '/api/mapas-prontos'
+			)
+		).mapas,
 
 	/** Põe na conta o mapa pronto e as questões dele; com o concurso aberto, vincula à matéria. */
 	adicionarMapaPronto: (slug: string, concurso?: string | null) =>

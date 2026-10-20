@@ -333,7 +333,10 @@ mapas_pedidos (o PDF ou o assunto na fila, a situação, o mapa que saiu e o rel
   português da FCC trazidas do provasGo, uma prova por ramo, com o comentário
   de cada alternativa. Diferente dos mapas das aulas, são públicos e por isso
   ficam no repositório. `GET /api/mapas-prontos` lista e diz quais a conta já
-  tem; `POST /api/mapas-prontos/{slug}` os põe na conta pelo mesmo caminho do
+  tem e, com `?concurso=`, em que matérias dele cada um entra (a mesma
+  sugestão pelo texto da importação): é onde Mapas mentais mostra o cartão do
+  pronto antes de ele estar na conta, e tocar no cartão o adiciona e abre;
+  `POST /api/mapas-prontos/{slug}` os põe na conta pelo mesmo caminho do
   `.zip` sem estudo (`ImportarPacote`): adicionar de novo atualiza e mantém
   vínculos e respostas. Um teste sem Docker confere o conteúdo embutido contra
   as regras da importação.
