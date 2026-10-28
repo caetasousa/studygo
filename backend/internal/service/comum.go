@@ -261,7 +261,26 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 		return nil, 0
 	}
 
-	atuais := plano.SemAtrasadas(c.Atividades, hoje, c.Registros.Lancada)
+	return redistribuirDesde(c, time.Time{}, hoje), len(atrasados)
+}
+
+// redistribuirDesde esvazia os dias vencidos sem registro a partir de `desde` e
+// redistribui o currículo de hoje em diante. Com `desde` zero são todos os dias
+// vencidos — o atraso que a varredura absorve; com uma data, só os da janela que
+// o estudante escolheu, e o que vem antes dela fica como está.
+func redistribuirDesde(c contexto, desde, hoje time.Time) []plano.Atividade {
+	atuais := make([]plano.Atividade, 0, len(c.Atividades))
+	janela := make([]plano.Atividade, 0, len(c.Atividades))
+
+	for _, a := range c.Atividades {
+		if plano.DayOf(a.Data).Before(desde) {
+			atuais = append(atuais, a)
+		} else {
+			janela = append(janela, a)
+		}
+	}
+
+	atuais = append(atuais, plano.SemAtrasadas(janela, hoje, c.Registros.Lancada)...)
 
 	// A marca de "movida" vale contra o motor, não contra o calendário: quando o
 	// plano encolhe, manter posições escolhidas à mão travaria justamente as
@@ -297,7 +316,7 @@ func absorverAtraso(c contexto, hoje time.Time) ([]plano.Atividade, int) {
 		res.Dias,
 		hoje,
 		plano.DiaConcluidoFunc(replanejadas, c.Registros),
-	), len(atrasados)
+	)
 }
 
 // emDiaComOEstudado aplica plano.ArrumarEstudado a um cronograma e encosta o

@@ -593,8 +593,9 @@
 
 				<p class="page-sub" style="margin:14px 0 8px">
 					Registrou dias que já passaram e quer o cronograma <b>refeito</b> dali para
-					a frente? Escolha a data: o que tem registro fica onde está, e o resto é
-					redistribuído pelos dias que sobram até a prova. Aqui quem decide a
+					a frente? Escolha a data: o que tem registro fica onde está, os dias que já
+					passaram sem estudo ficam vazios, e o resto é redistribuído de hoje até a
+					prova. Aqui quem decide a
 					sequência é o motor — se você arrumou a ordem à mão, ela é refeita.
 					Para só fechar vãos sem perder a sua ordem, use Compactar.
 				</p>

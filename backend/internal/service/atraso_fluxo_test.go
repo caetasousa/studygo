@@ -158,3 +158,68 @@ func TestReorganizarDesde_RecusaDepoisDaProva(t *testing.T) {
 		t.Error("reorganizou a partir de uma data depois da prova, quer recusa")
 	}
 }
+
+// Reorganizar a partir de uma data que já passou é o atraso com a data na mão
+// do estudante (D13). Como pode falhar, escrito antes do código:
+//
+//	R1  os dias vividos sem registro voltam a receber matéria, em vez de ficar vazios
+//	R2  o que foi estudado na janela sai do lugar
+//	R3  nada é redistribuído de hoje em diante
+//	R4  a 1ª passada do tópico estudado na janela volta a ser agendada adiante
+func TestReorganizarDesde_DataPassadaEsvaziaOsDiasSemEstudo(t *testing.T) {
+	ce := novoCenario(t)
+	ce.obter(t)
+
+	desde := ce.hoje
+	estudado := plano.AtividadesDoDia(ce.atividades(t), desde)
+
+	if len(estudado) == 0 || estudado[0].Passada != 1 {
+		t.Fatal("cenário inválido: o primeiro dia precisa começar por uma 1ª passada")
+	}
+
+	alvo := estudado[0]
+	if err := ce.deps.Cronograma.SalvarRegistro(t.Context(), ce.plano(t).ID,
+		plano.RegistroAtividade{AtividadeID: alvo.ID, Concluido: true}); err != nil {
+		t.Fatalf("registrando o estudo: %v", err)
+	}
+
+	// Uma semana depois, sem mais nada registrado — e sem a varredura diária
+	// ter passado, que é o estado de quem recadastra dias já vividos.
+	hoje := desde.AddDate(0, 0, 7)
+	ce.avancarPara(hoje)
+
+	if _, err := NewCronogramaService(ce.deps).ReorganizarDesde(
+		context.Background(), ce.usuario, ce.slug, desde.Format(formatoISO),
+	); err != nil {
+		t.Fatalf("ReorganizarDesde: %v", err)
+	}
+
+	rs := ce.registros(t)
+	adiante := 0
+	ficou := false
+
+	for _, a := range ce.atividades(t) {
+		dt := plano.DayOf(a.Data)
+
+		switch {
+		case a.ID == alvo.ID:
+			ficou = dt.Equal(plano.DayOf(alvo.Data))
+		case dt.Before(hoje) && !rs.Lancada(a.ID):
+			t.Errorf("R1: %s ficou com %q sem registro, quer o dia vazio", dt.Format(formatoISO), a.Tema)
+		case !dt.Before(hoje):
+			adiante++
+
+			if a.Passada == 1 && a.Disciplina == alvo.Disciplina && a.Tema == alvo.Tema {
+				t.Errorf("R4: a 1ª passada de %q voltou em %s", a.Tema, dt.Format(formatoISO))
+			}
+		}
+	}
+
+	if !ficou {
+		t.Error("R2: a atividade estudada saiu do dia em que foi estudada")
+	}
+
+	if adiante == 0 {
+		t.Error("R3: nada agendado de hoje em diante")
+	}
+}

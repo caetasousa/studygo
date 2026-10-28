@@ -289,6 +289,10 @@ func (s *CronogramaService) AbsorverAtraso(
 // reorganizada. Reorganizar é sobre o que ainda vai acontecer naquele trecho,
 // não sobre reescrever o que aconteceu.
 //
+// Uma data que já passou não recebe matéria de volta: os dias vividos sem
+// registro ficam vazios, como o atraso os deixa, e o conteúdo vai de hoje em
+// diante.
+//
 // A data é normalizada para o dia e recusada fora do plano: antes do início não
 // há cronograma para mexer, e a partir da prova não há para onde distribuir.
 func (s *CronogramaService) ReorganizarDesde(
@@ -315,6 +319,17 @@ func (s *CronogramaService) ReorganizarDesde(
 
 	if !desde.Before(plano.DayOf(cfg.Prova)) {
 		return PlanoMontado{}, plano.ErrDestinoInvalido
+	}
+
+	// Data que já passou: os dias vividos dali até ontem são história, não
+	// cronograma. O que não tem registro some deles e volta de hoje em diante —
+	// gerar a partir da data devolveria a matéria a dias que não voltam mais.
+	if hoje := plano.DayOf(s.relogio.Now()); desde.Before(hoje) {
+		if !hoje.Before(plano.DayOf(cfg.Prova)) {
+			return PlanoMontado{}, plano.ErrDestinoInvalido
+		}
+
+		return s.gravarEMontar(ctx, c, redistribuirDesde(c, desde, hoje))
 	}
 
 	atuais := make([]plano.Atividade, len(c.Atividades))
